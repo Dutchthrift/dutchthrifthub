@@ -229,12 +229,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTodo(todo: InsertTodo): Promise<Todo> {
-    const result = await db.insert(todos).values(todo).returning();
+    // Handle dueDate conversion for create
+    const createData = { ...todo };
+    if (createData.dueDate !== undefined && typeof createData.dueDate === 'string') {
+      createData.dueDate = new Date(createData.dueDate);
+    }
+    const result = await db.insert(todos).values(createData as any).returning();
     return result[0];
   }
 
   async updateTodo(id: string, todo: Partial<InsertTodo>): Promise<Todo> {
-    const result = await db.update(todos).set(todo).where(eq(todos.id, id)).returning();
+    // Handle dueDate conversion
+    const updateData = { ...todo };
+    if (updateData.dueDate !== undefined) {
+      if (typeof updateData.dueDate === 'string') {
+        updateData.dueDate = new Date(updateData.dueDate);
+      }
+      // null and Date values can pass through as-is
+    }
+    const result = await db.update(todos).set(updateData as any).where(eq(todos.id, id)).returning();
     return result[0];
   }
 
@@ -290,6 +303,7 @@ export class DatabaseStorage implements IStorage {
 
     // Filter orders created today and calculate totals
     const todaysOrders = allOrders.filter(order => {
+      if (!order.createdAt) return false;
       const orderDate = new Date(order.createdAt);
       return orderDate >= today && orderDate < tomorrow;
     });

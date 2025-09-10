@@ -1,15 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import type { SearchResults } from "@/lib/types";
 
 export function GlobalSearch() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
+  const [, setLocation] = useLocation();
+  const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: searchResults, isLoading } = useQuery<SearchResults>({
-    queryKey: ["/api/search", searchQuery],
+    queryKey: [`/api/search?q=${searchQuery}`],
     enabled: searchQuery.length > 2,
   });
 
@@ -17,27 +21,60 @@ export function GlobalSearch() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        document.getElementById("global-search")?.focus();
+        inputRef.current?.focus();
+      }
+      if (e.key === "Escape") {
+        setShowResults(false);
+        inputRef.current?.blur();
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowResults(false);
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
+  const handleNavigate = (type: string, id: string, orderNumber?: string) => {
+    switch (type) {
+      case 'customer':
+        // Navigate to orders page to show customer-related orders
+        setLocation('/orders');
+        break;
+      case 'order':
+        setLocation('/orders');
+        break;
+      case 'thread':
+        setLocation('/inbox');
+        break;
+      case 'repair':
+        setLocation('/repairs');
+        break;
+    }
+    setShowResults(false);
+    setSearchQuery("");
+  };
+
   return (
-    <div className="relative">
+    <div className="relative" ref={searchRef}>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          id="global-search"
+          ref={inputRef}
           type="text"
           placeholder="Search customers, orders, threads..."
           className="h-9 w-64 pl-10 pr-12"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onFocus={() => setShowResults(true)}
-          onBlur={() => setTimeout(() => setShowResults(false), 200)}
           data-testid="global-search-input"
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -58,6 +95,7 @@ export function GlobalSearch() {
                     <div
                       key={customer.id}
                       className="p-2 hover:bg-accent rounded cursor-pointer"
+                      onClick={() => handleNavigate('customer', customer.id)}
                       data-testid={`search-result-customer-${customer.id}`}
                     >
                       <div className="font-medium">{customer.firstName} {customer.lastName}</div>
@@ -74,6 +112,7 @@ export function GlobalSearch() {
                     <div
                       key={order.id}
                       className="p-2 hover:bg-accent rounded cursor-pointer"
+                      onClick={() => handleNavigate('order', order.id, order.orderNumber)}
                       data-testid={`search-result-order-${order.id}`}
                     >
                       <div className="font-medium">Order #{order.orderNumber}</div>
@@ -90,6 +129,7 @@ export function GlobalSearch() {
                     <div
                       key={thread.id}
                       className="p-2 hover:bg-accent rounded cursor-pointer"
+                      onClick={() => handleNavigate('thread', thread.id)}
                       data-testid={`search-result-thread-${thread.id}`}
                     >
                       <div className="font-medium">{thread.subject}</div>
@@ -106,6 +146,7 @@ export function GlobalSearch() {
                     <div
                       key={repair.id}
                       className="p-2 hover:bg-accent rounded cursor-pointer"
+                      onClick={() => handleNavigate('repair', repair.id)}
                       data-testid={`search-result-repair-${repair.id}`}
                     >
                       <div className="flex items-center justify-between">
