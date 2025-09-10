@@ -13,18 +13,22 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle,
-  Archive
+  Archive,
+  ChevronDown,
+  MessageSquare
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Repair } from "@/lib/types";
 import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { RepairForm } from "@/components/forms/repair-form";
+import { InternalNotes } from "@/components/notes/internal-notes";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function Repairs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [showNewRepair, setShowNewRepair] = useState(false);
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("list");
 
   const { data: repairs, isLoading } = useQuery<Repair[]>({
     queryKey: ["/api/repairs"],
@@ -216,6 +220,24 @@ export default function Repairs() {
                             )}
                           </div>
                         </div>
+                        
+                        {/* Team Notes Section */}
+                        <Collapsible className="mt-4">
+                          <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="sm" className="w-full justify-start" data-testid={`repair-notes-toggle-${repair.id}`}>
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Team Notes
+                              <ChevronDown className="h-4 w-4 ml-auto" />
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="pt-4">
+                            <InternalNotes 
+                              entityType="repair"
+                              entityId={repair.id}
+                              entityTitle={repair.title}
+                            />
+                          </CollapsibleContent>
+                        </Collapsible>
                       </CardContent>
                     </Card>
                   ))}

@@ -14,7 +14,9 @@ import {
   CreditCard,
   Truck,
   Eye,
-  MoreHorizontal
+  MoreHorizontal,
+  MessageSquare,
+  ChevronDown
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Order } from "@/lib/types";
@@ -34,6 +36,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { InternalNotes } from "@/components/notes/internal-notes";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function Orders() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -324,6 +328,10 @@ export default function Orders() {
                             <DropdownMenuItem>
                               <Download className="mr-2 h-4 w-4" />
                               Download Invoice
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <MessageSquare className="mr-2 h-4 w-4" />
+                              Team Notes
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

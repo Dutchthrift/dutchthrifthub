@@ -1,11 +1,15 @@
 import type {
   User, Customer, Order, EmailThread, EmailMessage, 
-  Repair, Todo, InternalNote, Activity
+  Repair, Todo, InternalNote, Activity,
+  InsertUser, InsertCustomer, InsertOrder, InsertEmailThread, InsertEmailMessage,
+  InsertRepair, InsertTodo, InsertInternalNote, InsertActivity
 } from "@shared/schema";
 
 export type {
   User, Customer, Order, EmailThread, EmailMessage, 
-  Repair, Todo, InternalNote, Activity
+  Repair, Todo, InternalNote, Activity,
+  InsertUser, InsertCustomer, InsertOrder, InsertEmailThread, InsertEmailMessage,
+  InsertRepair, InsertTodo, InsertInternalNote, InsertActivity
 };
 
 export interface DashboardStats {

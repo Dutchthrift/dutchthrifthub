@@ -155,7 +155,7 @@ export function BusinessMetricsWidget() {
   const satisfactionChange = oldSatisfactionRate > 0 ? satisfactionRate - oldSatisfactionRate : 0;
 
   const metrics: BusinessMetrics = {
-    weeklyRevenue: thisWeekRevenue,
+    weeklyRevenue: thisWeekRevenue / 100, // Convert from cents to euros
     weeklyRevenueChange: revenueChange,
     monthlyCustomers: newCustomersThisMonth,
     monthlyCustomersChange: customersChange,

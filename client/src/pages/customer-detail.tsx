@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { InternalNotes } from "@/components/notes/internal-notes";
 import type { Customer, Order, EmailThread, Repair } from "@/lib/types";
 
 interface CustomerWithDetails extends Customer {
@@ -150,6 +151,9 @@ export default function CustomerDetail() {
             <TabsTrigger value="repairs" data-testid="tab-repairs">
               Repairs ({repairs.length})
             </TabsTrigger>
+            <TabsTrigger value="notes" data-testid="tab-notes">
+              Team Notes
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="orders" className="space-y-4">
@@ -290,6 +294,14 @@ export default function CustomerDetail() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="notes" className="space-y-4">
+            <InternalNotes 
+              entityType="customer"
+              entityId={customerId!}
+              entityTitle={customer ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email : undefined}
+            />
           </TabsContent>
         </Tabs>
       </div>
