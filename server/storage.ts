@@ -80,7 +80,14 @@ export interface IStorage {
     customers: Customer[];
     orders: Order[];
     emailThreads: EmailThread[];
+    repairs: Repair[];
   }>;
+  
+  // Customer relations
+  getCustomers(): Promise<Customer[]>;
+  getCustomerOrders(customerId: string): Promise<Order[]>;
+  getCustomerEmailThreads(customerId: string): Promise<EmailThread[]>;
+  getCustomerRepairs(customerId: string): Promise<Repair[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -124,6 +131,22 @@ export class DatabaseStorage implements IStorage {
   async updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer> {
     const result = await db.update(customers).set(customer).where(eq(customers.id, id)).returning();
     return result[0];
+  }
+
+  async getCustomers(): Promise<Customer[]> {
+    return await db.select().from(customers).orderBy(desc(customers.createdAt));
+  }
+
+  async getCustomerOrders(customerId: string): Promise<Order[]> {
+    return await db.select().from(orders).where(eq(orders.customerId, customerId)).orderBy(desc(orders.createdAt));
+  }
+
+  async getCustomerEmailThreads(customerId: string): Promise<EmailThread[]> {
+    return await db.select().from(emailThreads).where(eq(emailThreads.customerId, customerId)).orderBy(desc(emailThreads.createdAt));
+  }
+
+  async getCustomerRepairs(customerId: string): Promise<Repair[]> {
+    return await db.select().from(repairs).where(eq(repairs.customerId, customerId)).orderBy(desc(repairs.createdAt));
   }
 
   // Orders

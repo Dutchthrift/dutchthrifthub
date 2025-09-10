@@ -604,8 +604,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customers
   app.get("/api/customers", async (req, res) => {
     try {
-      // Implementation would depend on how you want to list customers
-      res.json([]);
+      const customers = await storage.getCustomers();
+      res.json(customers);
     } catch (error) {
       console.error("Error fetching customers:", error);
       res.status(500).json({ message: "Failed to fetch customers" });
@@ -623,6 +623,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching customer:", error);
       res.status(500).json({ message: "Failed to fetch customer" });
+    }
+  });
+
+  app.get("/api/customers/:id/orders", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const orders = await storage.getCustomerOrders(id);
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching customer orders:", error);
+      res.status(500).json({ message: "Failed to fetch customer orders" });
+    }
+  });
+
+  app.get("/api/customers/:id/email-threads", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const threads = await storage.getCustomerEmailThreads(id);
+      res.json(threads);
+    } catch (error) {
+      console.error("Error fetching customer email threads:", error);
+      res.status(500).json({ message: "Failed to fetch customer email threads" });
+    }
+  });
+
+  app.get("/api/customers/:id/repairs", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const repairs = await storage.getCustomerRepairs(id);
+      res.json(repairs);
+    } catch (error) {
+      console.error("Error fetching customer repairs:", error);
+      res.status(500).json({ message: "Failed to fetch customer repairs" });
     }
   });
 

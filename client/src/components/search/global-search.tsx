@@ -46,8 +46,7 @@ export function GlobalSearch() {
   const handleNavigate = (type: string, id: string, orderNumber?: string) => {
     switch (type) {
       case 'customer':
-        // Navigate to orders page to show customer-related orders
-        setLocation('/orders');
+        setLocation(`/customers/${id}`);
         break;
       case 'order':
         setLocation('/orders');
