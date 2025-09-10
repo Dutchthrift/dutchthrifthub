@@ -99,9 +99,37 @@ export function GlobalSearch() {
                 </div>
               )}
 
+              {searchResults.repairs.length > 0 && (
+                <div className="p-2">
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Repairs</h4>
+                  {searchResults.repairs.map((repair) => (
+                    <div
+                      key={repair.id}
+                      className="p-2 hover:bg-accent rounded cursor-pointer"
+                      data-testid={`search-result-repair-${repair.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">{repair.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Status: {repair.status} • Priority: {repair.priority}
+                          </div>
+                        </div>
+                        {repair.estimatedCost && (
+                          <div className="text-xs font-medium">
+                            €{((repair.estimatedCost || 0) / 100).toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {searchResults.customers.length === 0 && 
                searchResults.orders.length === 0 && 
-               searchResults.emailThreads.length === 0 && (
+               searchResults.emailThreads.length === 0 && 
+               searchResults.repairs.length === 0 && (
                 <div className="p-4 text-sm text-muted-foreground">No results found</div>
               )}
             </div>

@@ -22,6 +22,7 @@ export interface SearchResults {
   customers: Customer[];
   orders: Order[];
   emailThreads: EmailThread[];
+  repairs: Repair[];
 }
 
 export interface RepairWithDetails extends Repair {

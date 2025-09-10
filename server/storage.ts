@@ -315,7 +315,7 @@ export class DatabaseStorage implements IStorage {
   async globalSearch(query: string) {
     const searchTerm = `%${query}%`;
 
-    const [foundCustomers, foundOrders, foundEmailThreads] = await Promise.all([
+    const [foundCustomers, foundOrders, foundEmailThreads, foundRepairs] = await Promise.all([
       db.select().from(customers).where(or(
         ilike(customers.email, searchTerm),
         ilike(customers.firstName, searchTerm),
@@ -330,13 +330,19 @@ export class DatabaseStorage implements IStorage {
       db.select().from(emailThreads).where(or(
         ilike(emailThreads.subject, searchTerm),
         ilike(emailThreads.customerEmail, searchTerm)
+      )).limit(10),
+
+      db.select().from(repairs).where(or(
+        ilike(repairs.title, searchTerm),
+        ilike(repairs.description, searchTerm)
       )).limit(10)
     ]);
 
     return {
       customers: foundCustomers,
       orders: foundOrders,
-      emailThreads: foundEmailThreads
+      emailThreads: foundEmailThreads,
+      repairs: foundRepairs
     };
   }
 }
