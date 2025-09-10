@@ -1,0 +1,317 @@
+import {
+  type User, type InsertUser,
+  type Customer, type InsertCustomer,
+  type Order, type InsertOrder,
+  type EmailThread, type InsertEmailThread,
+  type EmailMessage, type InsertEmailMessage,
+  type Repair, type InsertRepair,
+  type Todo, type InsertTodo,
+  type InternalNote, type InsertInternalNote,
+  type Activity, type InsertActivity,
+  users, customers, orders, emailThreads, emailMessages, repairs, todos, internalNotes, activities
+} from "@shared/schema";
+import { db } from "./services/supabaseClient";
+import { eq, desc, and, or, ilike, count } from "drizzle-orm";
+
+export interface IStorage {
+  // Users
+  getUser(id: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+
+  // Customers
+  getCustomer(id: string): Promise<Customer | undefined>;
+  getCustomerByEmail(email: string): Promise<Customer | undefined>;
+  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer>;
+
+  // Orders
+  getOrders(limit?: number): Promise<Order[]>;
+  getOrder(id: string): Promise<Order | undefined>;
+  getOrderByShopifyId(shopifyId: string): Promise<Order | undefined>;
+  createOrder(order: InsertOrder): Promise<Order>;
+  updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order>;
+
+  // Email Threads
+  getEmailThreads(limit?: number): Promise<EmailThread[]>;
+  getEmailThread(id: string): Promise<EmailThread | undefined>;
+  createEmailThread(thread: InsertEmailThread): Promise<EmailThread>;
+  updateEmailThread(id: string, thread: Partial<InsertEmailThread>): Promise<EmailThread>;
+
+  // Email Messages
+  getEmailMessages(threadId: string): Promise<EmailMessage[]>;
+  createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage>;
+
+  // Repairs
+  getRepairs(): Promise<Repair[]>;
+  getRepair(id: string): Promise<Repair | undefined>;
+  createRepair(repair: InsertRepair): Promise<Repair>;
+  updateRepair(id: string, repair: Partial<InsertRepair>): Promise<Repair>;
+  getRepairsByStatus(status: string): Promise<Repair[]>;
+
+  // Todos
+  getTodos(userId?: string): Promise<Todo[]>;
+  getTodo(id: string): Promise<Todo | undefined>;
+  createTodo(todo: InsertTodo): Promise<Todo>;
+  updateTodo(id: string, todo: Partial<InsertTodo>): Promise<Todo>;
+  deleteTodo(id: string): Promise<void>;
+
+  // Internal Notes
+  getInternalNotes(entityId: string, entityType: string): Promise<InternalNote[]>;
+  createInternalNote(note: InsertInternalNote): Promise<InternalNote>;
+
+  // Activities
+  getActivities(limit?: number): Promise<Activity[]>;
+  createActivity(activity: InsertActivity): Promise<Activity>;
+
+  // Dashboard stats
+  getDashboardStats(): Promise<{
+    unreadEmails: number;
+    newRepairs: number;
+    slaAlerts: number;
+    todaysOrders: { count: number; total: number };
+  }>;
+
+  // Search
+  globalSearch(query: string): Promise<{
+    customers: Customer[];
+    orders: Order[];
+    emailThreads: EmailThread[];
+  }>;
+}
+
+export class DatabaseStorage implements IStorage {
+  // Users
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0];
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(user).returning();
+    return result[0];
+  }
+
+  // Customers
+  async getCustomer(id: string): Promise<Customer | undefined> {
+    const result = await db.select().from(customers).where(eq(customers.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getCustomerByEmail(email: string): Promise<Customer | undefined> {
+    const result = await db.select().from(customers).where(eq(customers.email, email)).limit(1);
+    return result[0];
+  }
+
+  async createCustomer(customer: InsertCustomer): Promise<Customer> {
+    const result = await db.insert(customers).values(customer).returning();
+    return result[0];
+  }
+
+  async updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer> {
+    const result = await db.update(customers).set(customer).where(eq(customers.id, id)).returning();
+    return result[0];
+  }
+
+  // Orders
+  async getOrders(limit: number = 50): Promise<Order[]> {
+    return await db.select().from(orders).orderBy(desc(orders.createdAt)).limit(limit);
+  }
+
+  async getOrder(id: string): Promise<Order | undefined> {
+    const result = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getOrderByShopifyId(shopifyId: string): Promise<Order | undefined> {
+    const result = await db.select().from(orders).where(eq(orders.shopifyOrderId, shopifyId)).limit(1);
+    return result[0];
+  }
+
+  async createOrder(order: InsertOrder): Promise<Order> {
+    const result = await db.insert(orders).values(order).returning();
+    return result[0];
+  }
+
+  async updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order> {
+    const result = await db.update(orders).set(order).where(eq(orders.id, id)).returning();
+    return result[0];
+  }
+
+  // Email Threads
+  async getEmailThreads(limit: number = 50): Promise<EmailThread[]> {
+    return await db.select().from(emailThreads).orderBy(desc(emailThreads.lastActivity)).limit(limit);
+  }
+
+  async getEmailThread(id: string): Promise<EmailThread | undefined> {
+    const result = await db.select().from(emailThreads).where(eq(emailThreads.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createEmailThread(thread: InsertEmailThread): Promise<EmailThread> {
+    const result = await db.insert(emailThreads).values(thread).returning();
+    return result[0];
+  }
+
+  async updateEmailThread(id: string, thread: Partial<InsertEmailThread>): Promise<EmailThread> {
+    const result = await db.update(emailThreads).set(thread).where(eq(emailThreads.id, id)).returning();
+    return result[0];
+  }
+
+  // Email Messages
+  async getEmailMessages(threadId: string): Promise<EmailMessage[]> {
+    return await db.select().from(emailMessages).where(eq(emailMessages.threadId, threadId)).orderBy(desc(emailMessages.sentAt));
+  }
+
+  async createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage> {
+    const result = await db.insert(emailMessages).values(message).returning();
+    return result[0];
+  }
+
+  // Repairs
+  async getRepairs(): Promise<Repair[]> {
+    return await db.select().from(repairs).orderBy(desc(repairs.createdAt));
+  }
+
+  async getRepair(id: string): Promise<Repair | undefined> {
+    const result = await db.select().from(repairs).where(eq(repairs.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createRepair(repair: InsertRepair): Promise<Repair> {
+    const result = await db.insert(repairs).values(repair).returning();
+    return result[0];
+  }
+
+  async updateRepair(id: string, repair: Partial<InsertRepair>): Promise<Repair> {
+    const result = await db.update(repairs).set(repair).where(eq(repairs.id, id)).returning();
+    return result[0];
+  }
+
+  async getRepairsByStatus(status: string): Promise<Repair[]> {
+    return await db.select().from(repairs).where(eq(repairs.status, status as any));
+  }
+
+  // Todos
+  async getTodos(userId?: string): Promise<Todo[]> {
+    if (userId) {
+      return await db.select().from(todos).where(eq(todos.assignedUserId, userId)).orderBy(desc(todos.createdAt));
+    }
+    return await db.select().from(todos).orderBy(desc(todos.createdAt));
+  }
+
+  async getTodo(id: string): Promise<Todo | undefined> {
+    const result = await db.select().from(todos).where(eq(todos.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createTodo(todo: InsertTodo): Promise<Todo> {
+    const result = await db.insert(todos).values(todo).returning();
+    return result[0];
+  }
+
+  async updateTodo(id: string, todo: Partial<InsertTodo>): Promise<Todo> {
+    const result = await db.update(todos).set(todo).where(eq(todos.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteTodo(id: string): Promise<void> {
+    await db.delete(todos).where(eq(todos.id, id));
+  }
+
+  // Internal Notes
+  async getInternalNotes(entityId: string, entityType: string): Promise<InternalNote[]> {
+    const column = entityType === 'customer' ? internalNotes.customerId :
+                  entityType === 'order' ? internalNotes.orderId :
+                  entityType === 'repair' ? internalNotes.repairId :
+                  internalNotes.emailThreadId;
+    
+    return await db.select().from(internalNotes).where(eq(column, entityId)).orderBy(desc(internalNotes.createdAt));
+  }
+
+  async createInternalNote(note: InsertInternalNote): Promise<InternalNote> {
+    const result = await db.insert(internalNotes).values(note).returning();
+    return result[0];
+  }
+
+  // Activities
+  async getActivities(limit: number = 20): Promise<Activity[]> {
+    return await db.select().from(activities).orderBy(desc(activities.createdAt)).limit(limit);
+  }
+
+  async createActivity(activity: InsertActivity): Promise<Activity> {
+    const result = await db.insert(activities).values(activity).returning();
+    return result[0];
+  }
+
+  // Dashboard stats
+  async getDashboardStats() {
+    const [unreadEmailsResult] = await db.select({ count: count() }).from(emailThreads).where(eq(emailThreads.isUnread, true));
+    const [newRepairsResult] = await db.select({ count: count() }).from(repairs).where(eq(repairs.status, 'new'));
+    const [slaAlertsResult] = await db.select({ count: count() }).from(emailThreads).where(and(
+      eq(emailThreads.status, 'open'),
+      // Add SLA deadline check here
+    ));
+
+    // Get today's orders
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const todaysOrdersResult = await db.select({
+      count: count(),
+    }).from(orders).where(and(
+      // Add date filter for today
+    ));
+
+    return {
+      unreadEmails: unreadEmailsResult.count,
+      newRepairs: newRepairsResult.count,
+      slaAlerts: slaAlertsResult.count,
+      todaysOrders: { count: todaysOrdersResult[0]?.count || 0, total: 0 }
+    };
+  }
+
+  // Search
+  async globalSearch(query: string) {
+    const searchTerm = `%${query}%`;
+
+    const [foundCustomers, foundOrders, foundEmailThreads] = await Promise.all([
+      db.select().from(customers).where(or(
+        ilike(customers.email, searchTerm),
+        ilike(customers.firstName, searchTerm),
+        ilike(customers.lastName, searchTerm)
+      )).limit(10),
+
+      db.select().from(orders).where(or(
+        ilike(orders.orderNumber, searchTerm),
+        ilike(orders.customerEmail, searchTerm)
+      )).limit(10),
+
+      db.select().from(emailThreads).where(or(
+        ilike(emailThreads.subject, searchTerm),
+        ilike(emailThreads.customerEmail, searchTerm)
+      )).limit(10)
+    ]);
+
+    return {
+      customers: foundCustomers,
+      orders: foundOrders,
+      emailThreads: foundEmailThreads
+    };
+  }
+}
+
+export const storage = new DatabaseStorage();

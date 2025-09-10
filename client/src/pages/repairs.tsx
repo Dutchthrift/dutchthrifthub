@@ -1,0 +1,235 @@
+import { useState } from "react";
+import { Navigation } from "@/components/layout/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Search, 
+  Filter, 
+  Plus,
+  Wrench,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  Archive
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import type { Repair } from "@/lib/types";
+import { KanbanBoard } from "@/components/kanban/kanban-board";
+import { RepairForm } from "@/components/forms/repair-form";
+
+export default function Repairs() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [showNewRepair, setShowNewRepair] = useState(false);
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+
+  const { data: repairs, isLoading } = useQuery<Repair[]>({
+    queryKey: ["/api/repairs"],
+  });
+
+  const filteredRepairs = repairs?.filter(repair => {
+    if (priorityFilter !== "all" && repair.priority !== priorityFilter) return false;
+    if (searchQuery && 
+        !repair.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !repair.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  }) || [];
+
+  const repairStatusCount = {
+    new: filteredRepairs?.filter(r => r.status === 'new').length || 0,
+    in_progress: filteredRepairs?.filter(r => r.status === 'in_progress').length || 0,
+    waiting_customer: filteredRepairs?.filter(r => r.status === 'waiting_customer').length || 0,
+    waiting_part: filteredRepairs?.filter(r => r.status === 'waiting_part').length || 0,
+    ready: filteredRepairs?.filter(r => r.status === 'ready').length || 0,
+    closed: filteredRepairs?.filter(r => r.status === 'closed').length || 0,
+  };
+
+  const totalWaiting = repairStatusCount.waiting_customer + repairStatusCount.waiting_part;
+  const totalActive = repairStatusCount.new + repairStatusCount.in_progress + totalWaiting + repairStatusCount.ready;
+
+  return (
+    <div className="min-h-screen bg-background" data-testid="repairs-page">
+      <Navigation />
+      
+      <main className="flex-1 p-6">
+        <div className="flex items-center justify-between mb-6" data-testid="repairs-header">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Repairs</h1>
+            <p className="text-muted-foreground">Manage repair requests and track progress</p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button 
+              variant="outline"
+              onClick={() => setViewMode(viewMode === "kanban" ? "list" : "kanban")}
+              data-testid="toggle-view-mode"
+            >
+              {viewMode === "kanban" ? "List View" : "Kanban View"}
+            </Button>
+            <Button onClick={() => setShowNewRepair(true)} data-testid="new-repair-button">
+              <Plus className="mr-2 h-4 w-4" />
+              New Repair
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6 mb-6">
+          <Card data-testid="repairs-stats-total">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Active</CardTitle>
+              <Wrench className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalActive}</div>
+            </CardContent>
+          </Card>
+          
+          <Card data-testid="repairs-stats-new">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">New</CardTitle>
+              <div className="h-3 w-3 rounded-full bg-chart-4"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{repairStatusCount.new}</div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="repairs-stats-progress">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+              <div className="h-3 w-3 rounded-full bg-primary"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{repairStatusCount.in_progress}</div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="repairs-stats-waiting">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Waiting</CardTitle>
+              <div className="h-3 w-3 rounded-full bg-chart-1"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalWaiting}</div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="repairs-stats-ready">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Ready</CardTitle>
+              <div className="h-3 w-3 rounded-full bg-chart-2"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{repairStatusCount.ready}</div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="repairs-stats-closed">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Closed</CardTitle>
+              <div className="h-3 w-3 rounded-full bg-muted-foreground"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{repairStatusCount.closed}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between space-x-4">
+              <div className="flex items-center space-x-4 flex-1">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search repairs..."
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    data-testid="repairs-search-input"
+                  />
+                </div>
+                
+                <Tabs value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <TabsList>
+                    <TabsTrigger value="all" data-testid="filter-all-priority">All</TabsTrigger>
+                    <TabsTrigger value="urgent" data-testid="filter-urgent-priority">Urgent</TabsTrigger>
+                    <TabsTrigger value="high" data-testid="filter-high-priority">High</TabsTrigger>
+                    <TabsTrigger value="medium" data-testid="filter-medium-priority">Medium</TabsTrigger>
+                    <TabsTrigger value="low" data-testid="filter-low-priority">Low</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+              
+              <Button variant="outline" size="icon" data-testid="advanced-filters-button">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Repair Board/List */}
+        {viewMode === "kanban" ? (
+          <KanbanBoard repairs={filteredRepairs} isLoading={isLoading} />
+        ) : (
+          <Card data-testid="repairs-list-view">
+            <CardContent className="p-6">
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="p-4 border rounded-lg animate-pulse">
+                      <div className="h-4 bg-muted rounded mb-2"></div>
+                      <div className="h-3 bg-muted rounded w-3/4 mb-1"></div>
+                      <div className="h-3 bg-muted rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : filteredRepairs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No repairs found
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredRepairs.map((repair) => (
+                    <Card key={repair.id} data-testid={`repair-item-${repair.id}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-medium">{repair.title}</h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {repair.description}
+                            </p>
+                            <div className="flex items-center space-x-2 mt-2">
+                              <Badge variant="outline">{repair.status}</Badge>
+                              <Badge variant={repair.priority === 'urgent' ? 'destructive' : 'secondary'}>
+                                {repair.priority}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="text-right text-sm text-muted-foreground">
+                            {repair.slaDeadline && (
+                              <div>Due: {new Date(repair.slaDeadline).toLocaleDateString()}</div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </main>
+
+      <RepairForm 
+        open={showNewRepair} 
+        onOpenChange={setShowNewRepair}
+      />
+    </div>
+  );
+}
