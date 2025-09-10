@@ -32,6 +32,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/todos", async (req, res) => {
     try {
       const validatedData = insertTodoSchema.parse(req.body);
+      
+      // Convert dueDate string to Date object if provided
+      if (validatedData.dueDate && typeof validatedData.dueDate === 'string') {
+        validatedData.dueDate = new Date(validatedData.dueDate);
+      }
+      
       const todo = await storage.createTodo(validatedData);
       
       // Create activity
@@ -52,7 +58,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/todos/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const todo = await storage.updateTodo(id, req.body);
+      
+      // Convert dueDate string to Date object if provided in update
+      const updateData = { ...req.body };
+      if (updateData.dueDate && typeof updateData.dueDate === 'string') {
+        updateData.dueDate = new Date(updateData.dueDate);
+      }
+      if (updateData.completedAt && typeof updateData.completedAt === 'string') {
+        updateData.completedAt = new Date(updateData.completedAt);
+      }
+      
+      const todo = await storage.updateTodo(id, updateData);
       
       if (req.body.status === 'done') {
         await storage.createActivity({

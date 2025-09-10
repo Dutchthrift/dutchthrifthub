@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +63,28 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
     },
   });
 
+  // Pre-populate form when editing
+  useEffect(() => {
+    if (todo) {
+      setValue("title", todo.title || "");
+      setValue("description", todo.description || "");
+      setValue("priority", todo.priority || "medium");
+      setValue("assignedUserId", todo.assignedUserId || "current-user");
+      
+      // Set due date
+      if (todo.dueDate) {
+        const date = typeof todo.dueDate === 'string' ? new Date(todo.dueDate) : todo.dueDate;
+        setDueDate(date);
+      } else {
+        setDueDate(null);
+      }
+    } else {
+      // Reset form for new todo
+      reset();
+      setDueDate(null);
+    }
+  }, [todo, setValue, reset]);
+
   const createTodoMutation = useMutation({
     mutationFn: async (data: InsertTodo) => {
       const response = await fetch("/api/todos", {
@@ -91,6 +113,34 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
     }
   });
 
+  const updateTodoMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertTodo> }) => {
+      const response = await fetch(`/api/todos/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update todo");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      toast({
+        title: "Todo updated",
+        description: "Your todo has been updated successfully",
+      });
+      handleClose();
+    },
+    onError: () => {
+      toast({
+        title: "Failed to update todo",
+        description: "There was an error updating your todo",
+        variant: "destructive",
+      });
+    }
+  });
+
   const onSubmit = (data: TodoFormData) => {
     const todoData: InsertTodo = {
       title: data.title,
@@ -100,7 +150,13 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
       dueDate: dueDate?.toISOString(),
     };
 
-    createTodoMutation.mutate(todoData);
+    if (todo) {
+      // Update existing todo
+      updateTodoMutation.mutate({ id: todo.id, data: todoData });
+    } else {
+      // Create new todo
+      createTodoMutation.mutate(todoData);
+    }
   };
 
   const handleClose = () => {
@@ -148,7 +204,7 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
               <Label>Priority</Label>
               <Select 
                 onValueChange={(value) => setValue("priority", value as any)}
-                defaultValue="medium"
+                value={watch("priority")}
               >
                 <SelectTrigger data-testid="todo-priority-select">
                   <SelectValue placeholder="Select priority" />
@@ -199,10 +255,12 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
             </Button>
             <Button
               type="submit"
-              disabled={createTodoMutation.isPending}
+              disabled={createTodoMutation.isPending || updateTodoMutation.isPending}
               data-testid="todo-submit-button"
             >
-              {createTodoMutation.isPending ? "Creating..." : "Create Todo"}
+              {(createTodoMutation.isPending || updateTodoMutation.isPending) 
+                ? (todo ? "Updating..." : "Creating...") 
+                : (todo ? "Save Changes" : "Create Todo")}
             </Button>
           </DialogFooter>
         </form>

@@ -34,6 +34,7 @@ export default function Todos() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [showNewTodo, setShowNewTodo] = useState(false);
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "kanban" | "calendar">("list");
   const { toast } = useToast();
 
@@ -325,7 +326,7 @@ export default function Todos() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setEditingTodo(todo)}>
                                   Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>
@@ -387,6 +388,12 @@ export default function Todos() {
       <TodoForm 
         open={showNewTodo} 
         onOpenChange={setShowNewTodo}
+      />
+      
+      <TodoForm 
+        open={!!editingTodo} 
+        onOpenChange={(open) => !open && setEditingTodo(null)}
+        todo={editingTodo}
       />
     </div>
   );

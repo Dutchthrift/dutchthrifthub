@@ -195,6 +195,8 @@ export const insertTodoSchema = createInsertSchema(todos).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  dueDate: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
 });
 
 export const insertInternalNoteSchema = createInsertSchema(internalNotes).omit({
