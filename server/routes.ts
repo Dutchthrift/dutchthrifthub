@@ -162,6 +162,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create sample repairs for testing
+  app.post("/api/repairs/create-samples", async (req, res) => {
+    try {
+      const sampleRepairs = [
+        {
+          title: "iPhone 12 Screen Replacement",
+          description: "Customer dropped device, screen completely shattered. Screen replacement needed.",
+          status: "new" as const,
+          priority: "high" as const,
+          estimatedCost: 15000, // €150.00
+          partsNeeded: ["iPhone 12 Screen", "Screen Adhesive"],
+          slaDeadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) // 2 days from now
+        },
+        {
+          title: "MacBook Air M1 Battery Issue",
+          description: "Battery not holding charge. Diagnostic required to determine replacement necessity.",
+          status: "in_progress" as const,
+          priority: "medium" as const,
+          estimatedCost: 18000, // €180.00
+          partsNeeded: ["MacBook Air M1 Battery"],
+          slaDeadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000) // 5 days from now
+        },
+        {
+          title: "Samsung Galaxy S21 Water Damage",
+          description: "Device exposed to water, not powering on. Full diagnostic and cleaning required.",
+          status: "waiting_customer" as const,
+          priority: "urgent" as const,
+          estimatedCost: 25000, // €250.00
+          partsNeeded: ["Cleaning Kit", "Possibly Motherboard"],
+          slaDeadline: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000) // 1 day from now
+        },
+        {
+          title: "iPad Pro Charging Port Repair",
+          description: "Charging port loose, device charges intermittently. Port replacement needed.",
+          status: "ready" as const,
+          priority: "medium" as const,
+          estimatedCost: 8000, // €80.00
+          partsNeeded: ["iPad Pro Charging Port"],
+          slaDeadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days from now
+        },
+        {
+          title: "PS5 Controller Stick Drift",
+          description: "Left analog stick drifting, affecting gaming experience. Stick module replacement.",
+          status: "closed" as const,
+          priority: "low" as const,
+          estimatedCost: 3500, // €35.00
+          actualCost: 3500,
+          partsNeeded: ["PS5 Analog Stick Module"],
+          completedAt: new Date()
+        }
+      ];
+
+      let created = 0;
+      const results = [];
+      
+      for (const repairData of sampleRepairs) {
+        try {
+          // Validate the data with the schema
+          const validatedData = insertRepairSchema.parse(repairData);
+          await storage.createRepair(validatedData);
+          created++;
+          results.push({ title: repairData.title, ok: true });
+        } catch (error) {
+          console.error(`Error creating repair "${repairData.title}":`, error);
+          results.push({ 
+            title: repairData.title, 
+            ok: false, 
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+
+      res.json({ created, results, message: `Created ${created} sample repairs` });
+    } catch (error) {
+      console.error("Error creating sample repairs:", error);
+      res.status(500).json({ message: "Failed to create sample repairs" });
+    }
+  });
+
   // Orders
   app.get("/api/orders", async (req, res) => {
     try {

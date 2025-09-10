@@ -226,7 +226,7 @@ export function KanbanBoard({ repairs, isLoading }: KanbanBoardProps) {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Badge variant={getPriorityVariant(repair.priority || 'medium')} className="text-xs">
-                          {repair.priority?.charAt(0).toUpperCase() + repair.priority?.slice(1) || 'Medium'}
+                          {(repair.priority || 'medium').charAt(0).toUpperCase() + (repair.priority || 'medium').slice(1)}
                         </Badge>
                         
                         {repair.estimatedCost && (
