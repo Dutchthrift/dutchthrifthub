@@ -126,14 +126,16 @@ export function KanbanBoard({ repairs, isLoading }: KanbanBoardProps) {
     });
   };
 
-  const formatDate = (date: string | null) => {
+  const formatDate = (date: string | Date | null) => {
     if (!date) return null;
-    return new Date(date).toLocaleDateString();
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString();
   };
 
-  const isOverdue = (deadline: string | null) => {
+  const isOverdue = (deadline: string | Date | null) => {
     if (!deadline) return false;
-    return new Date(deadline) < new Date();
+    const deadlineDate = typeof deadline === 'string' ? new Date(deadline) : deadline;
+    return deadlineDate < new Date();
   };
 
   if (isLoading) {
