@@ -9,6 +9,7 @@ import { TeamActivityWidget } from "@/components/widgets/team-activity-widget";
 import { QuickActionsWidget } from "@/components/widgets/quick-actions-widget";
 import { RecentOrdersWidget } from "@/components/widgets/recent-orders-widget";
 import { RepairStatusWidget } from "@/components/widgets/repair-status-widget";
+import { BusinessMetricsWidget } from "@/components/widgets/business-metrics-widget";
 import { TodoForm } from "@/components/forms/todo-form";
 import { RepairForm } from "@/components/forms/repair-form";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,9 @@ export default function Home() {
           onOpenTodo={() => setOpenTodoDialog(true)}
           onOpenRepair={() => setOpenRepairDialog(true)}
         />
+
+        {/* Business Performance Metrics */}
+        <BusinessMetricsWidget />
 
         {/* Recent Orders and Repairs */}
         <div className="grid gap-4 lg:grid-cols-2" data-testid="recent-content-grid">

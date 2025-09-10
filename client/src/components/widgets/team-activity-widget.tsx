@@ -114,7 +114,7 @@ export function TeamActivityWidget() {
                     {activity.description}
                   </p>
                   <p className="text-xs text-muted-foreground" data-testid={`activity-timestamp-${activity.id}`}>
-                    {formatTimeAgo(activity.createdAt || new Date().toISOString())}
+                    {formatTimeAgo(typeof activity.createdAt === 'string' ? activity.createdAt : new Date().toISOString())}
                   </p>
                 </div>
               </div>
