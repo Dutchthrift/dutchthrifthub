@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema } from "@shared/schema";
-import { syncEmails, sendEmail } from "./outlookClient";
+import { syncEmails, sendEmail } from "./services/emailService";
 import { shopifyClient } from "./services/shopifyClient";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -265,34 +265,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const emails = await syncEmails();
       
-      // Process and store emails (simplified)
+      // Process and store emails
       for (const email of emails) {
-        // Check if thread exists
-        let thread = await storage.getEmailThread(email.conversationId);
+        // Check if message already exists (deduplication)
+        const existingMessage = await storage.getEmailMessage(email.messageId);
+        if (existingMessage) {
+          continue; // Skip if already processed
+        }
+
+        // Check if thread exists by threadId
+        const threadId = email.conversationId || email.messageId;
+        let thread = await storage.getEmailThreadByThreadId(threadId);
         
         if (!thread) {
           // Create new thread
-          thread = await storage.createEmailThread({
-            threadId: email.conversationId,
-            subject: email.subject,
-            customerEmail: email.sender?.emailAddress?.address,
-            status: 'open',
-            isUnread: !email.isRead,
-            lastActivity: new Date(email.receivedDateTime)
-          });
+          try {
+            thread = await storage.createEmailThread({
+              threadId: threadId,
+              subject: email.subject,
+              customerEmail: email.from,
+              status: 'open',
+              isUnread: !email.isRead,
+              lastActivity: new Date(email.receivedDateTime),
+              hasAttachment: email.hasAttachment
+            });
+          } catch (error: any) {
+            // If duplicate thread ID, fetch the existing one
+            if (error.code === '23505') {
+              thread = await storage.getEmailThreadByThreadId(threadId);
+              if (!thread) {
+                throw error; // Re-throw if still can't find it
+              }
+            } else {
+              throw error;
+            }
+          }
         }
 
-        // Create message
-        await storage.createEmailMessage({
-          messageId: email.id,
-          threadId: thread.id,
-          fromEmail: email.sender?.emailAddress?.address || '',
-          toEmail: email.toRecipients?.[0]?.emailAddress?.address || '',
-          subject: email.subject,
-          body: email.body?.content,
-          isHtml: email.body?.contentType === 'HTML',
-          sentAt: new Date(email.receivedDateTime)
-        });
+        // Create message (only if not duplicate)
+        try {
+          await storage.createEmailMessage({
+            messageId: email.messageId,
+            threadId: thread.id,
+            fromEmail: email.from,
+            toEmail: email.to,
+            subject: email.subject,
+            body: email.body,
+            isHtml: email.isHtml,
+            sentAt: new Date(email.receivedDateTime)
+          });
+        } catch (error: any) {
+          // Skip duplicates, log others
+          if (error.code !== '23505') {
+            console.error('Error creating email message:', error);
+          }
+        }
       }
       
       res.json({ synced: emails.length });
@@ -302,12 +329,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update email thread
+  app.patch("/api/email-threads/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      
+      const thread = await storage.updateEmailThread(id, updateData);
+      
+      // Create activity for status changes
+      if (updateData.status) {
+        await storage.createActivity({
+          type: "email_status_updated",
+          description: `Email thread status changed to: ${updateData.status}`,
+          userId: "default-user", // TODO: Use actual user from session
+          metadata: { threadId: id, newStatus: updateData.status }
+        });
+      }
+      
+      res.json(thread);
+    } catch (error) {
+      console.error("Error updating email thread:", error);
+      res.status(500).json({ message: "Failed to update email thread" });
+    }
+  });
+
   // Send email
   app.post("/api/emails/send", async (req, res) => {
     try {
       const { to, subject, body } = req.body;
-      await sendEmail(to, subject, body);
-      res.json({ success: true });
+      
+      if (!to || !subject || !body) {
+        return res.status(400).json({ message: "Missing required fields: to, subject, body" });
+      }
+
+      const result = await sendEmail(to, subject, body);
+      res.json(result);
     } catch (error) {
       console.error("Error sending email:", error);
       res.status(500).json({ message: "Failed to send email" });

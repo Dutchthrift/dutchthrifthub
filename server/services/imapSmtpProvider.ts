@@ -1,0 +1,145 @@
+import { ImapFlow } from 'imapflow';
+import nodemailer from 'nodemailer';
+import type { EmailProvider, RawEmail } from './emailProvider';
+
+export class ImapSmtpProvider implements EmailProvider {
+  private imapConfig = {
+    host: (process.env.IMAP_HOST || '').trim(),
+    port: parseInt(process.env.IMAP_PORT || '993'),
+    secure: true,
+    auth: {
+      user: (process.env.IMAP_USER || '').trim(),
+      pass: (process.env.IMAP_PASS || '').trim()
+    }
+  };
+
+  private smtpTransporter = nodemailer.createTransport({
+    host: (process.env.SMTP_HOST || '').trim(),
+    port: parseInt(process.env.SMTP_PORT || '465'),
+    secure: true,
+    auth: {
+      user: (process.env.SMTP_USER || '').trim(),
+      pass: (process.env.SMTP_PASS || '').trim()
+    }
+  });
+
+  async syncEmails(): Promise<RawEmail[]> {
+    console.log('IMAP Config:', {
+      host: this.imapConfig.host,
+      port: this.imapConfig.port,
+      user: this.imapConfig.auth.user
+    });
+    
+    const client = new ImapFlow(this.imapConfig);
+    
+    try {
+      console.log('Attempting IMAP connection...');
+      await client.connect();
+      
+      // Select INBOX
+      let lock = await client.getMailboxLock('INBOX');
+      
+      try {
+        // Get recent emails (last 50)
+        const messages = [];
+        for await (let message of client.fetch('1:50', {
+          envelope: true,
+          flags: true,
+          bodyStructure: true,
+          internalDate: true,
+          uid: true
+        }, { uid: true })) {
+          
+          // Check if message has attachments
+          const hasAttachment = this.checkForAttachments(message.bodyStructure);
+          
+          // Build conversation ID from subject and participants
+          const envelope = message.envelope;
+          const conversationId = envelope ? this.buildConversationId(
+            envelope.subject || '',
+            envelope.from?.[0]?.address || '',
+            envelope.to?.[0]?.address || ''
+          ) : `${message.uid}@${this.imapConfig.host}`;
+
+          // For now, use a placeholder for body text - we'll fetch it separately if needed
+          const bodyText = `Email from ${envelope?.from?.[0]?.address || 'unknown'} - ${envelope?.subject || 'No subject'}`;
+          
+          const rawEmail: RawEmail = {
+            messageId: envelope?.messageId || `${message.uid}@${this.imapConfig.host}`,
+            conversationId,
+            subject: envelope?.subject || '',
+            from: envelope?.from?.[0]?.address || '',
+            to: envelope?.to?.[0]?.address || '',
+            body: bodyText,
+            isHtml: false, // Plain text from IMAP
+            receivedDateTime: message.internalDate instanceof Date ? message.internalDate.toISOString() : new Date().toISOString(),
+            isRead: message.flags?.has('\\Seen') || false,
+            hasAttachment,
+            inReplyTo: envelope?.inReplyTo,
+            references: ''
+          };
+
+          messages.push(rawEmail);
+        }
+        
+        return messages.reverse(); // Return oldest first
+        
+      } finally {
+        lock.release();
+      }
+      
+    } finally {
+      await client.logout();
+    }
+  }
+
+  async sendEmail(to: string, subject: string, body: string, replyToMessageId?: string): Promise<{ success: boolean }> {
+    try {
+      const mailOptions: any = {
+        from: process.env.SMTP_USER,
+        to,
+        subject,
+        html: body,
+        text: body.replace(/<[^>]*>/g, '') // Strip HTML for text version
+      };
+
+      // Add reply headers if this is a reply
+      if (replyToMessageId) {
+        mailOptions.inReplyTo = replyToMessageId;
+        mailOptions.references = replyToMessageId;
+      }
+
+      await this.smtpTransporter.sendMail(mailOptions);
+      return { success: true };
+      
+    } catch (error) {
+      console.error('SMTP send error:', error);
+      throw error;
+    }
+  }
+
+  private checkForAttachments(bodyStructure: any): boolean {
+    if (!bodyStructure) return false;
+    
+    // Check if multipart and has non-text parts
+    if (bodyStructure.type === 'multipart') {
+      return bodyStructure.childNodes?.some((node: any) => 
+        node.type !== 'text' || node.disposition === 'attachment'
+      ) || false;
+    }
+    
+    return bodyStructure.disposition === 'attachment';
+  }
+
+  private buildConversationId(subject: string, from: string, to: string): string {
+    // Remove common reply prefixes and normalize
+    const cleanSubject = subject
+      .replace(/^(re:|fwd?:|fw:)\s*/i, '')
+      .trim()
+      .toLowerCase();
+    
+    // Create consistent conversation ID
+    const participants = [from, to].sort().join('|');
+    return `${cleanSubject}|${participants}`.replace(/\s+/g, '_');
+  }
+}

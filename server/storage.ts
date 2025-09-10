@@ -36,11 +36,13 @@ export interface IStorage {
   // Email Threads
   getEmailThreads(limit?: number): Promise<EmailThread[]>;
   getEmailThread(id: string): Promise<EmailThread | undefined>;
+  getEmailThreadByThreadId(threadId: string): Promise<EmailThread | undefined>;
   createEmailThread(thread: InsertEmailThread): Promise<EmailThread>;
   updateEmailThread(id: string, thread: Partial<InsertEmailThread>): Promise<EmailThread>;
 
   // Email Messages
   getEmailMessages(threadId: string): Promise<EmailMessage[]>;
+  getEmailMessage(messageId: string): Promise<EmailMessage | undefined>;
   createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage>;
 
   // Repairs
@@ -159,6 +161,11 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getEmailThreadByThreadId(threadId: string): Promise<EmailThread | undefined> {
+    const result = await db.select().from(emailThreads).where(eq(emailThreads.threadId, threadId)).limit(1);
+    return result[0];
+  }
+
   async createEmailThread(thread: InsertEmailThread): Promise<EmailThread> {
     const result = await db.insert(emailThreads).values(thread).returning();
     return result[0];
@@ -172,6 +179,11 @@ export class DatabaseStorage implements IStorage {
   // Email Messages
   async getEmailMessages(threadId: string): Promise<EmailMessage[]> {
     return await db.select().from(emailMessages).where(eq(emailMessages.threadId, threadId)).orderBy(desc(emailMessages.sentAt));
+  }
+
+  async getEmailMessage(messageId: string): Promise<EmailMessage | undefined> {
+    const result = await db.select().from(emailMessages).where(eq(emailMessages.messageId, messageId)).limit(1);
+    return result[0];
   }
 
   async createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage> {
