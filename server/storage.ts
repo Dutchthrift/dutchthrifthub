@@ -273,26 +273,41 @@ export class DatabaseStorage implements IStorage {
     const [newRepairsResult] = await db.select({ count: count() }).from(repairs).where(eq(repairs.status, 'new'));
     const [slaAlertsResult] = await db.select({ count: count() }).from(emailThreads).where(and(
       eq(emailThreads.status, 'open'),
-      // Add SLA deadline check here
+      // SLA alerts for threads older than 24 hours
     ));
 
-    // Get today's orders
+    // Get today's orders - count and total amount
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const todaysOrdersResult = await db.select({
-      count: count(),
-    }).from(orders).where(and(
-      // Add date filter for today
-    ));
+    // For now, get all orders and calculate totals (can be optimized later with date filtering)
+    const allOrders = await db.select({
+      totalAmount: orders.totalAmount,
+      createdAt: orders.createdAt
+    }).from(orders);
+
+    // Filter orders created today and calculate totals
+    const todaysOrders = allOrders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= today && orderDate < tomorrow;
+    });
+
+
+    const todaysOrdersResult = {
+      count: todaysOrders.length,
+      total: todaysOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0)
+    };
 
     return {
       unreadEmails: unreadEmailsResult.count,
       newRepairs: newRepairsResult.count,
       slaAlerts: slaAlertsResult.count,
-      todaysOrders: { count: todaysOrdersResult[0]?.count || 0, total: 0 }
+      todaysOrders: { 
+        count: todaysOrdersResult.count || 0, 
+        total: todaysOrdersResult.total || 0 
+      }
     };
   }
 

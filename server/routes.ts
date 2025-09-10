@@ -210,6 +210,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
+          // Map Shopify financial status to our enum values
+          const mapShopifyStatus = (financialStatus: string, fulfillmentStatus: string | null) => {
+            if (fulfillmentStatus === 'fulfilled') return 'delivered';
+            if (fulfillmentStatus === 'partial') return 'shipped';
+            if (financialStatus === 'paid' || financialStatus === 'authorized') {
+              return fulfillmentStatus === null ? 'processing' : 'shipped';
+            }
+            if (financialStatus === 'pending') return 'pending';
+            if (financialStatus === 'refunded') return 'refunded';
+            if (financialStatus === 'voided') return 'cancelled';
+            return 'pending'; // default fallback
+          };
+
           // Create order
           await storage.createOrder({
             shopifyOrderId: shopifyOrder.id.toString(),
@@ -218,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerEmail: shopifyOrder.email,
             totalAmount: Math.round(parseFloat(shopifyOrder.total_price) * 100),
             currency: shopifyOrder.currency,
-            status: shopifyOrder.financial_status as any,
+            status: mapShopifyStatus(shopifyOrder.financial_status, shopifyOrder.fulfillment_status),
             fulfillmentStatus: shopifyOrder.fulfillment_status,
             paymentStatus: shopifyOrder.financial_status,
             orderData: shopifyOrder
@@ -230,6 +243,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error syncing orders:", error);
       res.status(500).json({ message: "Failed to sync orders" });
+    }
+  });
+
+  // Create sample orders for testing (temporary until Shopify sync works)
+  app.post("/api/orders/create-samples", async (req, res) => {
+    try {
+      const sampleOrders = [
+        {
+          shopifyOrderId: "5506048598246",
+          orderNumber: "1001",
+          customerEmail: "john.doe@example.com",
+          totalAmount: 15999, // €159.99 
+          currency: "EUR",
+          status: "delivered" as const,
+          fulfillmentStatus: "shipped",
+          paymentStatus: "paid",
+          orderData: {
+            id: 5506048598246,
+            created_at: "2024-09-10T10:30:00Z",
+            line_items: [
+              { title: "iPhone 12 Pro - 128GB", quantity: 1, price: "159.99" }
+            ]
+          }
+        },
+        {
+          shopifyOrderId: "5506048598247",
+          orderNumber: "1002", 
+          customerEmail: "marie.smith@example.com",
+          totalAmount: 8999, // €89.99
+          currency: "EUR",
+          status: "pending" as const,
+          fulfillmentStatus: "pending",
+          paymentStatus: "pending",
+          orderData: {
+            id: 5506048598247,
+            created_at: "2024-09-10T14:15:00Z",
+            line_items: [
+              { title: "Samsung Galaxy S21 - 64GB", quantity: 1, price: "89.99" }
+            ]
+          }
+        },
+        {
+          shopifyOrderId: "5506048598248", 
+          orderNumber: "1003",
+          customerEmail: "david.wilson@example.com",
+          totalAmount: 25000, // €250.00
+          currency: "EUR",
+          status: "shipped" as const,
+          fulfillmentStatus: "delivered",
+          paymentStatus: "paid",
+          orderData: {
+            id: 5506048598248,
+            created_at: "2024-09-09T09:00:00Z",
+            line_items: [
+              { title: "MacBook Air M1 - 256GB", quantity: 1, price: "250.00" }
+            ]
+          }
+        }
+      ];
+
+      let created = 0;
+      for (const orderData of sampleOrders) {
+        const existingOrder = await storage.getOrderByShopifyId(orderData.shopifyOrderId);
+        if (!existingOrder) {
+          // Create customer if doesn't exist
+          let customer = await storage.getCustomerByEmail(orderData.customerEmail);
+          if (!customer) {
+            const [firstName, lastName] = orderData.customerEmail.split('@')[0].split('.');
+            customer = await storage.createCustomer({
+              email: orderData.customerEmail,
+              firstName: firstName?.charAt(0).toUpperCase() + firstName?.slice(1),
+              lastName: lastName?.charAt(0).toUpperCase() + lastName?.slice(1),
+              shopifyCustomerId: `customer_${orderData.shopifyOrderId}`
+            });
+          }
+
+          await storage.createOrder({
+            ...orderData,
+            customerId: customer.id
+          });
+          created++;
+        }
+      }
+
+      res.json({ created, message: `Created ${created} sample orders` });
+    } catch (error) {
+      console.error("Error creating sample orders:", error);
+      res.status(500).json({ message: "Failed to create sample orders" });
     }
   });
 
