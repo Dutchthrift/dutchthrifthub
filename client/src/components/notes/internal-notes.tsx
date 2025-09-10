@@ -103,11 +103,14 @@ export function InternalNotes({ entityType, entityId, entityTitle }: InternalNot
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            data-testid="toggle-notes-button"
+            onClick={() => {
+              console.log('Add Note clicked, isExpanded:', isExpanded);
+              setIsExpanded(!isExpanded);
+            }}
+            data-testid="add-note-button"
           >
             <MessageSquarePlus className="h-4 w-4 mr-2" />
-            Add Note
+            {isExpanded ? 'Cancel' : 'Add Note'}
           </Button>
         </div>
         {entityTitle && (
