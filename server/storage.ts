@@ -138,7 +138,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCustomerOrders(customerId: string): Promise<Order[]> {
-    return await db.select().from(orders).where(eq(orders.customerId, customerId)).orderBy(desc(orders.createdAt));
+    return await db.select().from(orders).where(eq(orders.customerId, customerId)).orderBy(orders.orderNumber);
   }
 
   async getCustomerEmailThreads(customerId: string): Promise<EmailThread[]> {
@@ -151,7 +151,7 @@ export class DatabaseStorage implements IStorage {
 
   // Orders
   async getOrders(limit: number = 50): Promise<Order[]> {
-    return await db.select().from(orders).orderBy(desc(orders.createdAt)).limit(limit);
+    return await db.select().from(orders).orderBy(orders.orderNumber).limit(limit);
   }
 
   async getOrder(id: string): Promise<Order | undefined> {
