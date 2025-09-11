@@ -194,7 +194,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
     if (!thread || !replyText.trim()) return;
     
     sendReplyMutation.mutate({
-      to: thread.customerEmail,
+      to: thread.customerEmail || '',
       subject: `Re: ${thread.subject}`,
       body: replyText,
     });

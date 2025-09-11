@@ -263,10 +263,12 @@ export class ImapSmtpProvider implements EmailProvider {
           const { ObjectStorageService } = await import('../objectStorage.js');
           const objectStorageService = new ObjectStorageService();
           
+          let processedCount = 0;
           for (const descriptor of attachmentQueue) {
+            processedCount++;
+            console.log(`📎 Processing attachment ${processedCount}/${attachmentQueue.length}: ${descriptor.filename}`);
+            
             try {
-              console.log(`📎 Downloading attachment: ${descriptor.filename} (Seq ${descriptor.seq}, UID ${descriptor.uid}, part ${descriptor.partId})`);
-              
               // Skip attachments over 10MB to prevent memory issues
               if (descriptor.size > 10 * 1024 * 1024) {
                 console.log(`⚠️ Skipping large attachment ${descriptor.filename} (${descriptor.size} bytes)`);
@@ -275,12 +277,23 @@ export class ImapSmtpProvider implements EmailProvider {
               
               let attachmentBuffer: Buffer | undefined;
               
+              // Helper function to add timeout to fetchOne operations
+              const fetchWithTimeout = async (fetchPromise: Promise<any>, timeoutMs: number = 15000) => {
+                const timeoutPromise = new Promise((_, reject) => {
+                  setTimeout(() => reject(new Error(`Fetch timeout after ${timeoutMs}ms`)), timeoutMs);
+                });
+                return Promise.race([fetchPromise, timeoutPromise]);
+              };
+              
               // Try sequence number first (more reliable within same session)
               try {
-                const result = await client.fetchOne(descriptor.seq, {
-                  uid: false, // Use sequence number
-                  bodyParts: [descriptor.partId]
-                });
+                console.log(`📥 Attempting sequence fetch: ${descriptor.filename} (Seq ${descriptor.seq}, part ${descriptor.partId})`);
+                const result = await fetchWithTimeout(
+                  client.fetchOne(descriptor.seq, {
+                    uid: false, // Use sequence number
+                    bodyParts: [descriptor.partId]
+                  })
+                );
                 
                 if (result && result.bodyParts) {
                   attachmentBuffer = result.bodyParts.get(descriptor.partId) as Buffer;
@@ -289,17 +302,19 @@ export class ImapSmtpProvider implements EmailProvider {
                   }
                 }
               } catch (seqError: any) {
-                console.log(`⚠️ Sequence fetch failed for ${descriptor.filename}, trying UID fallback: ${seqError.message || seqError}`);
+                console.log(`⚠️ Sequence fetch failed for ${descriptor.filename}: ${seqError.message || seqError}`);
               }
               
               // Fallback to UID if sequence fetch failed or returned no data
               if (!attachmentBuffer || attachmentBuffer.length === 0) {
                 try {
-                  console.log(`🔄 Fallback: Using UID ${descriptor.uid} for ${descriptor.filename}`);
-                  const result = await client.fetchOne(descriptor.uid, {
-                    uid: true, // Use UID
-                    bodyParts: [descriptor.partId]
-                  });
+                  console.log(`🔄 Attempting UID fetch: ${descriptor.filename} (UID ${descriptor.uid}, part ${descriptor.partId})`);
+                  const result = await fetchWithTimeout(
+                    client.fetchOne(descriptor.uid, {
+                      uid: true, // Use UID
+                      bodyParts: [descriptor.partId]
+                    })
+                  );
                   
                   if (result && result.bodyParts) {
                     attachmentBuffer = result.bodyParts.get(descriptor.partId) as Buffer;
@@ -313,29 +328,44 @@ export class ImapSmtpProvider implements EmailProvider {
               }
               
               if (attachmentBuffer && attachmentBuffer.length > 0) {
-                // Save to object storage
-                const storageUrl = await objectStorageService.saveAttachment(
-                  descriptor.filename,
-                  attachmentBuffer,
-                  descriptor.contentType
-                );
-                
-                // Add to the corresponding message's extractedAttachments
-                if (messages[descriptor.messageIndex]) {
-                  const extractedAttachments = (messages[descriptor.messageIndex] as any).extractedAttachments || [];
-                  extractedAttachments.push(storageUrl);
-                  (messages[descriptor.messageIndex] as any).extractedAttachments = extractedAttachments;
+                try {
+                  console.log(`💾 Saving attachment to object storage: ${descriptor.filename}`);
+                  // Save to object storage with timeout
+                  const storagePromise = objectStorageService.saveAttachment(
+                    descriptor.filename,
+                    attachmentBuffer,
+                    descriptor.contentType
+                  );
+                  const storageUrl = await fetchWithTimeout(storagePromise, 20000); // 20 second timeout for storage
+                  
+                  // Add to the corresponding message's extractedAttachments
+                  if (messages[descriptor.messageIndex]) {
+                    const extractedAttachments = (messages[descriptor.messageIndex] as any).extractedAttachments || [];
+                    extractedAttachments.push(storageUrl);
+                    (messages[descriptor.messageIndex] as any).extractedAttachments = extractedAttachments;
+                  }
+                  
+                  console.log(`✅ Saved attachment: ${descriptor.filename} to ${storageUrl}`);
+                } catch (storageError: any) {
+                  console.error(`❌ Failed to save attachment ${descriptor.filename} to storage: ${storageError.message || storageError}`);
                 }
-                
-                console.log(`✅ Saved attachment: ${descriptor.filename} to ${storageUrl}`);
               } else {
                 console.log(`⚠️ No attachment data could be downloaded for ${descriptor.filename}`);
               }
               
             } catch (attachmentError: any) {
               console.error(`❌ Error processing attachment ${descriptor.filename}:`, attachmentError.message || attachmentError);
+              // Continue to next attachment even if this one fails
+            }
+            
+            // Add a small delay to prevent overwhelming the IMAP server
+            if (processedCount % 5 === 0) {
+              console.log(`📊 Progress: ${processedCount}/${attachmentQueue.length} attachments processed`);
+              await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay every 5 attachments
             }
           }
+          
+          console.log(`✅ Attachment processing completed: ${processedCount}/${attachmentQueue.length} attachments processed`);
         }
         
         return messages; // Already in chronological order (oldest to newest)
