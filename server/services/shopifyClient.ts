@@ -105,6 +105,109 @@ class ShopifyClient {
     return response.orders as ShopifyOrder[];
   }
 
+  async getAllOrders(onProgress?: (processed: number, total?: number) => void) {
+    const allOrders: ShopifyOrder[] = [];
+    let sinceId: string | undefined = undefined;
+    const batchSize = 250; // Shopify's max limit per request
+    let hasMore = true;
+    let batchCount = 0;
+
+    console.log('Starting to fetch all orders from Shopify...');
+
+    while (hasMore) {
+      batchCount++;
+      console.log(`Fetching batch ${batchCount} (limit: ${batchSize}${sinceId ? `, since_id: ${sinceId}` : ''})`);
+
+      const params: any = {
+        limit: batchSize,
+        status: 'any' // Include all order statuses
+      };
+
+      if (sinceId) {
+        params.since_id = sinceId;
+      }
+
+      const batchOrders = await this.getOrders(params);
+      
+      if (batchOrders.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allOrders.push(...batchOrders);
+      
+      // Update progress callback
+      if (onProgress) {
+        onProgress(allOrders.length);
+      }
+
+      console.log(`Batch ${batchCount}: Retrieved ${batchOrders.length} orders (total: ${allOrders.length})`);
+
+      // If we got fewer orders than the limit, we've reached the end
+      if (batchOrders.length < batchSize) {
+        hasMore = false;
+      } else {
+        // Set since_id to the last order's ID for pagination
+        sinceId = batchOrders[batchOrders.length - 1].id.toString();
+      }
+
+      // Add a small delay to be respectful to Shopify's API
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+
+    console.log(`✅ Completed fetching all orders: ${allOrders.length} total orders retrieved`);
+    return allOrders;
+  }
+
+  async getAllCustomers(onProgress?: (processed: number, total?: number) => void) {
+    const allCustomers: any[] = [];
+    let sinceId: string | undefined = undefined;
+    const batchSize = 250;
+    let hasMore = true;
+    let batchCount = 0;
+
+    console.log('Starting to fetch all customers from Shopify...');
+
+    while (hasMore) {
+      batchCount++;
+      console.log(`Fetching customer batch ${batchCount} (limit: ${batchSize}${sinceId ? `, since_id: ${sinceId}` : ''})`);
+
+      const params: any = {
+        limit: batchSize
+      };
+
+      if (sinceId) {
+        params.since_id = sinceId;
+      }
+
+      const batchCustomers = await this.getCustomers(params);
+      
+      if (batchCustomers.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allCustomers.push(...batchCustomers);
+      
+      if (onProgress) {
+        onProgress(allCustomers.length);
+      }
+
+      console.log(`Customer batch ${batchCount}: Retrieved ${batchCustomers.length} customers (total: ${allCustomers.length})`);
+
+      if (batchCustomers.length < batchSize) {
+        hasMore = false;
+      } else {
+        sinceId = batchCustomers[batchCustomers.length - 1].id.toString();
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+
+    console.log(`✅ Completed fetching all customers: ${allCustomers.length} total customers retrieved`);
+    return allCustomers;
+  }
+
   async getOrder(orderId: string) {
     const response = await this.makeRequest(`/orders/${orderId}.json`);
     return response.order as ShopifyOrder;
