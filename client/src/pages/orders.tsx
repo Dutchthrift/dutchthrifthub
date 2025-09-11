@@ -18,7 +18,9 @@ import {
   MessageSquare,
   ChevronDown,
   ChevronUp,
-  ChevronsUpDown
+  ChevronsUpDown,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Order } from "@/lib/types";
@@ -38,6 +40,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { InternalNotes } from "@/components/notes/internal-notes";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -49,11 +66,37 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortField, setSortField] = useState<SortField>('orderNumber');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
   const { toast } = useToast();
 
-  const { data: orders, isLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
+  const { data: ordersData, isLoading } = useQuery<{ orders: Order[], total: number } | Order[]>({
+    queryKey: ["/api/orders", currentPage, pageSize],
+    queryFn: async () => {
+      const response = await fetch(`/api/orders?page=${currentPage}&limit=${pageSize}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch orders');
+      }
+      return response.json();
+    },
   });
+
+  const { data: orderStats } = useQuery<{
+    total: number;
+    pending: number;
+    processing: number;
+    shipped: number;
+    delivered: number;
+  }>({
+    queryKey: ["/api/orders/stats"],
+  });
+
+  // Handle both paginated and non-paginated data structures
+  const orders = Array.isArray(ordersData) ? ordersData : ordersData?.orders || [];
+  const totalOrders = Array.isArray(ordersData) ? ordersData.length : ordersData?.total || 0;
+  const totalPages = Math.ceil(totalOrders / pageSize);
 
   const syncAllMutation = useMutation({
     mutationFn: async () => {
@@ -102,6 +145,65 @@ export default function Orders() {
       setSortField(field);
       setSortDirection('asc');
     }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: string) => {
+    setPageSize(parseInt(size));
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  const handleViewDetails = (order: Order) => {
+    setSelectedOrder(order);
+    setShowOrderDetails(true);
+  };
+
+  const handleTrackShipment = (order: Order) => {
+    // Check if there's tracking information in the order data
+    const trackingNumber = (order.orderData as any)?.fulfillments?.[0]?.tracking_number;
+    const trackingUrl = (order.orderData as any)?.fulfillments?.[0]?.tracking_url;
+    
+    if (trackingUrl) {
+      window.open(trackingUrl, '_blank', 'noopener,noreferrer');
+    } else if (trackingNumber) {
+      toast({
+        title: "Tracking Number",
+        description: `Tracking number: ${trackingNumber}`,
+      });
+    } else {
+      toast({
+        title: "No tracking information",
+        description: "This order doesn't have tracking information yet.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadInvoice = (order: Order) => {
+    // For now, open the Shopify order page or show a message
+    const shopifyOrderId = order.shopifyOrderId;
+    if (shopifyOrderId) {
+      toast({
+        title: "Invoice Download",
+        description: "Invoice download functionality will be implemented soon.",
+      });
+    } else {
+      toast({
+        title: "No invoice available",
+        description: "This order doesn't have an associated invoice.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleTeamNotes = (order: Order) => {
+    // Set the order for notes display
+    setSelectedOrder(order);
+    setShowOrderDetails(true);
+    // Future: Could scroll to notes section or open a separate dialog
   };
 
   const getSortIcon = (field: SortField) => {
@@ -194,11 +296,11 @@ export default function Orders() {
   };
 
   const statusCounts = {
-    all: orders?.length || 0,
-    pending: orders?.filter(o => o.status === 'pending').length || 0,
-    processing: orders?.filter(o => o.status === 'processing').length || 0,
-    shipped: orders?.filter(o => o.status === 'shipped').length || 0,
-    delivered: orders?.filter(o => o.status === 'delivered').length || 0,
+    all: orderStats?.total || 0,
+    pending: orderStats?.pending || 0,
+    processing: orderStats?.processing || 0,
+    shipped: orderStats?.shipped || 0,
+    delivered: orderStats?.delivered || 0,
   };
 
   return (
@@ -307,9 +409,22 @@ export default function Orders() {
                 </Tabs>
               </div>
               
-              <Button variant="outline" size="icon" data-testid="advanced-filters-button">
-                <Filter className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center space-x-2">
+                <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                  <SelectTrigger className="w-32" data-testid="page-size-selector">
+                    <SelectValue placeholder="Page size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="20">20 per page</SelectItem>
+                    <SelectItem value="50">50 per page</SelectItem>
+                    <SelectItem value="100">100 per page</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                <Button variant="outline" size="icon" data-testid="advanced-filters-button">
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -455,19 +570,19 @@ export default function Orders() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewDetails(order)} data-testid={`view-details-${order.id}`}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleTrackShipment(order)} data-testid={`track-shipment-${order.id}`}>
                               <Truck className="mr-2 h-4 w-4" />
                               Track Shipment
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadInvoice(order)} data-testid={`download-invoice-${order.id}`}>
                               <Download className="mr-2 h-4 w-4" />
                               Download Invoice
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleTeamNotes(order)} data-testid={`team-notes-${order.id}`}>
                               <MessageSquare className="mr-2 h-4 w-4" />
                               Team Notes
                             </DropdownMenuItem>
@@ -481,6 +596,213 @@ export default function Orders() {
             )}
           </CardContent>
         </Card>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm text-muted-foreground">
+              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalOrders)} of {totalOrders} orders
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                data-testid="prev-page-button"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const page = i + 1;
+                  return (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageChange(page)}
+                      data-testid={`page-${page}-button`}
+                    >
+                      {page}
+                    </Button>
+                  );
+                })}
+                {totalPages > 5 && (
+                  <>
+                    {currentPage < totalPages - 2 && <span className="px-2">...</span>}
+                    <Button
+                      variant={currentPage === totalPages ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageChange(totalPages)}
+                      data-testid={`page-${totalPages}-button`}
+                    >
+                      {totalPages}
+                    </Button>
+                  </>
+                )}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                data-testid="next-page-button"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Order Details Dialog */}
+        <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Order Details #{selectedOrder?.orderNumber}</DialogTitle>
+              <DialogDescription>
+                Complete order information and history
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedOrder && (
+              <div className="space-y-6">
+                {/* Order Summary */}
+                <div className="grid grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Order Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Order Number:</span>
+                        <span className="font-medium">#{selectedOrder.orderNumber}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Amount:</span>
+                        <span className="font-medium">€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Status:</span>
+                        <Badge variant={getStatusVariant(selectedOrder.status)}>
+                          {selectedOrder.status?.charAt(0).toUpperCase() + selectedOrder.status?.slice(1)}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Payment Status:</span>
+                        <span className="font-medium">
+                          {selectedOrder.paymentStatus ? selectedOrder.paymentStatus.charAt(0).toUpperCase() + selectedOrder.paymentStatus.slice(1) : 'Pending'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Order Date:</span>
+                        <span className="font-medium">
+                          {new Date(selectedOrder.createdAt || '').toLocaleDateString()}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Customer Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Name:</span>
+                        <span className="font-medium">
+                          {(selectedOrder.orderData as any)?.customer ? 
+                            `${(selectedOrder.orderData as any).customer.first_name} ${(selectedOrder.orderData as any).customer.last_name}` :
+                            'Guest'
+                          }
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Email:</span>
+                        <span className="font-medium">{selectedOrder.customerEmail}</span>
+                      </div>
+                      {(selectedOrder.orderData as any)?.customer?.phone && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Phone:</span>
+                          <span className="font-medium">{(selectedOrder.orderData as any).customer.phone}</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Line Items */}
+                {(selectedOrder.orderData as any)?.line_items && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Order Items</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {(selectedOrder.orderData as any).line_items.map((item: any, index: number) => (
+                          <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
+                            <div className="flex-1">
+                              <div className="font-medium">{item.title}</div>
+                              {item.variant_title && (
+                                <div className="text-sm text-muted-foreground">{item.variant_title}</div>
+                              )}
+                              <div className="text-sm text-muted-foreground">Quantity: {item.quantity}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-medium">€{parseFloat(item.price).toFixed(2)}</div>
+                              <div className="text-sm text-muted-foreground">
+                                Total: €{(parseFloat(item.price) * item.quantity).toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Shipping Address */}
+                {(selectedOrder.orderData as any)?.shipping_address && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Shipping Address</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1">
+                        <div>{(selectedOrder.orderData as any).shipping_address.name}</div>
+                        <div>{(selectedOrder.orderData as any).shipping_address.address1}</div>
+                        {(selectedOrder.orderData as any).shipping_address.address2 && (
+                          <div>{(selectedOrder.orderData as any).shipping_address.address2}</div>
+                        )}
+                        <div>
+                          {(selectedOrder.orderData as any).shipping_address.city}, {(selectedOrder.orderData as any).shipping_address.zip}
+                        </div>
+                        <div>{(selectedOrder.orderData as any).shipping_address.country}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Team Notes */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Team Notes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <InternalNotes 
+                      entityType="order" 
+                      entityId={selectedOrder.id}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

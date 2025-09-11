@@ -261,21 +261,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Orders
   app.get("/api/orders", async (req, res) => {
     try {
-      const { caseId } = req.query;
+      const { caseId, page, limit } = req.query;
       
       if (caseId) {
         // Get orders linked to a specific case
         const relatedItems = await storage.getCaseRelatedItems(caseId as string);
         res.json(relatedItems.orders);
+      } else if (page) {
+        // Get paginated orders with total count
+        const pageNum = parseInt(page as string) || 1;
+        const limitNum = parseInt(limit as string) || 20;
+        const result = await storage.getOrdersPaginated(pageNum, limitNum);
+        res.json(result);
       } else {
         // Get all orders with optional limit for dropdowns (default 20 for UI performance)
-        const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
-        const orders = await storage.getOrders(limit);
+        const limitNum = req.query.limit ? parseInt(req.query.limit as string) : 20;
+        const orders = await storage.getOrders(limitNum);
         res.json(orders);
       }
     } catch (error) {
       console.error("Error fetching orders:", error);
       res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
+  // Get order statistics (must come before :id route)
+  app.get("/api/orders/stats", async (req, res) => {
+    try {
+      const allOrders = await storage.getOrders(1000); // Get more orders for accurate stats
+      const stats = {
+        total: allOrders.length,
+        pending: allOrders.filter(o => o.status === 'pending').length,
+        processing: allOrders.filter(o => o.status === 'processing').length,
+        shipped: allOrders.filter(o => o.status === 'shipped').length,
+        delivered: allOrders.filter(o => o.status === 'delivered').length,
+      };
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching order stats:", error);
+      res.status(500).json({ message: "Failed to fetch order stats" });
     }
   });
 

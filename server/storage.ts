@@ -14,7 +14,7 @@ import {
   users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, cases, activities
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
-import { eq, desc, and, or, ilike, count, inArray, isNotNull } from "drizzle-orm";
+import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql } from "drizzle-orm";
 import { ObjectStorageService } from "./objectStorage";
 import type { Response } from "express";
 
@@ -33,6 +33,7 @@ export interface IStorage {
 
   // Orders
   getOrders(limit?: number): Promise<Order[]>;
+  getOrdersPaginated(page?: number, limit?: number): Promise<{ orders: Order[], total: number }>;
   getOrder(id: string): Promise<Order | undefined>;
   getOrderByShopifyId(shopifyId: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
@@ -187,6 +188,27 @@ export class DatabaseStorage implements IStorage {
   async getOrders(limit: number = 50): Promise<Order[]> {
     // Sort by creation date descending (newest first) for better dropdown UX
     return await db.select().from(orders).orderBy(desc(orders.createdAt)).limit(limit);
+  }
+
+  async getOrdersPaginated(page: number = 1, limit: number = 20): Promise<{ orders: Order[], total: number }> {
+    const offset = (page - 1) * limit;
+    
+    // Get total count
+    const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(orders);
+    const total = Number(countResult.count);
+    
+    // Get paginated orders
+    const ordersResult = await db
+      .select()
+      .from(orders)
+      .orderBy(desc(orders.createdAt))
+      .limit(limit)
+      .offset(offset);
+    
+    return {
+      orders: ordersResult,
+      total
+    };
   }
 
   async getOrder(id: string): Promise<Order | undefined> {
