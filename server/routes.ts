@@ -261,17 +261,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Orders
   app.get("/api/orders", async (req, res) => {
     try {
-      const { caseId, page, limit } = req.query;
+      const { caseId, page, limit, search } = req.query;
       
       if (caseId) {
         // Get orders linked to a specific case
         const relatedItems = await storage.getCaseRelatedItems(caseId as string);
         res.json(relatedItems.orders);
       } else if (page) {
-        // Get paginated orders with total count
+        // Get paginated orders with total count and optional search
         const pageNum = parseInt(page as string) || 1;
         const limitNum = parseInt(limit as string) || 20;
-        const result = await storage.getOrdersPaginated(pageNum, limitNum);
+        const searchQuery = search as string;
+        const result = await storage.getOrdersPaginated(pageNum, limitNum, searchQuery);
         res.json(result);
       } else {
         // Get all orders with optional limit for dropdowns (default 20 for UI performance)

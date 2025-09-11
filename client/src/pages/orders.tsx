@@ -65,7 +65,7 @@ export default function Orders() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortField, setSortField] = useState<SortField>('orderNumber');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -73,9 +73,16 @@ export default function Orders() {
   const { toast } = useToast();
 
   const { data: ordersData, isLoading } = useQuery<{ orders: Order[], total: number } | Order[]>({
-    queryKey: ["/api/orders", currentPage, pageSize],
+    queryKey: ["/api/orders", currentPage, pageSize, searchQuery],
     queryFn: async () => {
-      const response = await fetch(`/api/orders?page=${currentPage}&limit=${pageSize}`);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: pageSize.toString(),
+      });
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+      const response = await fetch(`/api/orders?${params}`);
       if (!response.ok) {
         throw new Error('Failed to fetch orders');
       }
@@ -393,7 +400,10 @@ export default function Orders() {
                     placeholder="Search orders, customers..."
                     className="pl-10"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1); // Reset to first page when searching
+                    }}
                     data-testid="orders-search-input"
                   />
                 </div>

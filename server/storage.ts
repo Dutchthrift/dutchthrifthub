@@ -186,24 +186,44 @@ export class DatabaseStorage implements IStorage {
 
   // Orders
   async getOrders(limit: number = 50): Promise<Order[]> {
-    // Sort by creation date descending (newest first) for better dropdown UX
-    return await db.select().from(orders).orderBy(desc(orders.createdAt)).limit(limit);
+    // Sort by order number descending (newest order number first)
+    return await db.select().from(orders).orderBy(desc(orders.orderNumber)).limit(limit);
   }
 
-  async getOrdersPaginated(page: number = 1, limit: number = 20): Promise<{ orders: Order[], total: number }> {
+  async getOrdersPaginated(page: number = 1, limit: number = 20, searchQuery?: string): Promise<{ orders: Order[], total: number }> {
     const offset = (page - 1) * limit;
     
-    // Get total count
-    const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(orders);
+    // Build search conditions
+    let whereCondition;
+    if (searchQuery) {
+      const query = `%${searchQuery}%`;
+      whereCondition = or(
+        ilike(orders.orderNumber, query),
+        ilike(orders.customerEmail, query)
+      );
+    }
+    
+    // Get total count with search filter
+    const countQuery = db.select({ count: sql<number>`count(*)` }).from(orders);
+    if (whereCondition) {
+      countQuery.where(whereCondition);
+    }
+    const [countResult] = await countQuery;
     const total = Number(countResult.count);
     
-    // Get paginated orders
-    const ordersResult = await db
+    // Get paginated orders with search filter
+    const ordersQuery = db
       .select()
       .from(orders)
-      .orderBy(desc(orders.createdAt))
+      .orderBy(desc(orders.orderNumber))
       .limit(limit)
       .offset(offset);
+    
+    if (whereCondition) {
+      ordersQuery.where(whereCondition);
+    }
+    
+    const ordersResult = await ordersQuery;
     
     return {
       orders: ordersResult,
