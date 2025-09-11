@@ -16,7 +16,9 @@ import {
   Eye,
   MoreHorizontal,
   MessageSquare,
-  ChevronDown
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Order } from "@/lib/types";
@@ -39,9 +41,14 @@ import {
 import { InternalNotes } from "@/components/notes/internal-notes";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
+type SortField = 'orderNumber' | 'customer' | 'totalAmount' | 'status' | 'paymentStatus' | 'createdAt';
+type SortDirection = 'asc' | 'desc';
+
 export default function Orders() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortField, setSortField] = useState<SortField>('orderNumber');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const { toast } = useToast();
 
   const { data: orders, isLoading } = useQuery<Order[]>({
@@ -88,12 +95,71 @@ export default function Orders() {
     }
   });
 
-  const filteredOrders = orders?.filter(order => {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ChevronsUpDown className="ml-2 h-4 w-4" />;
+    }
+    return sortDirection === 'asc' ? 
+      <ChevronUp className="ml-2 h-4 w-4" /> : 
+      <ChevronDown className="ml-2 h-4 w-4" />;
+  };
+
+  const filteredAndSortedOrders = orders?.filter(order => {
     if (statusFilter !== "all" && order.status !== statusFilter) return false;
     if (searchQuery && 
         !order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) &&
         !order.customerEmail?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
+  }).sort((a, b) => {
+    let aVal: any, bVal: any;
+    
+    switch (sortField) {
+      case 'orderNumber':
+        aVal = parseInt(a.orderNumber.replace(/[^0-9]/g, '')) || 0;
+        bVal = parseInt(b.orderNumber.replace(/[^0-9]/g, '')) || 0;
+        break;
+      case 'customer':
+        const aCustomer = (a.orderData as any)?.customer ? 
+          `${(a.orderData as any).customer.first_name} ${(a.orderData as any).customer.last_name}` : 
+          'Guest';
+        const bCustomer = (b.orderData as any)?.customer ? 
+          `${(b.orderData as any).customer.first_name} ${(b.orderData as any).customer.last_name}` : 
+          'Guest';
+        aVal = aCustomer.toLowerCase();
+        bVal = bCustomer.toLowerCase();
+        break;
+      case 'totalAmount':
+        aVal = a.totalAmount || 0;
+        bVal = b.totalAmount || 0;
+        break;
+      case 'status':
+        aVal = a.status?.toLowerCase() || '';
+        bVal = b.status?.toLowerCase() || '';
+        break;
+      case 'paymentStatus':
+        aVal = a.paymentStatus?.toLowerCase() || '';
+        bVal = b.paymentStatus?.toLowerCase() || '';
+        break;
+      case 'createdAt':
+        aVal = new Date(a.createdAt || '').getTime();
+        bVal = new Date(b.createdAt || '').getTime();
+        break;
+      default:
+        return 0;
+    }
+    
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
   }) || [];
 
   const getStatusVariant = (status: string) => {
@@ -263,7 +329,7 @@ export default function Orders() {
                   </div>
                 ))}
               </div>
-            ) : filteredOrders.length === 0 ? (
+            ) : filteredAndSortedOrders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No orders found
               </div>
@@ -271,17 +337,71 @@ export default function Orders() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('orderNumber')}
+                      data-testid="sort-order-header"
+                    >
+                      <div className="flex items-center">
+                        Order
+                        {getSortIcon('orderNumber')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('customer')}
+                      data-testid="sort-customer-header"
+                    >
+                      <div className="flex items-center">
+                        Customer
+                        {getSortIcon('customer')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('totalAmount')}
+                      data-testid="sort-total-header"
+                    >
+                      <div className="flex items-center">
+                        Total
+                        {getSortIcon('totalAmount')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('status')}
+                      data-testid="sort-status-header"
+                    >
+                      <div className="flex items-center">
+                        Status
+                        {getSortIcon('status')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('paymentStatus')}
+                      data-testid="sort-payment-header"
+                    >
+                      <div className="flex items-center">
+                        Payment
+                        {getSortIcon('paymentStatus')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('createdAt')}
+                      data-testid="sort-date-header"
+                    >
+                      <div className="flex items-center">
+                        Date
+                        {getSortIcon('createdAt')}
+                      </div>
+                    </TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOrders.map((order) => (
+                  {filteredAndSortedOrders.map((order) => (
                     <TableRow key={order.id} data-testid={`order-row-${order.id}`}>
                       <TableCell className="font-medium">
                         <div className="flex items-center space-x-2">
