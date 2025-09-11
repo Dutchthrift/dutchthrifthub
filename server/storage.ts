@@ -367,12 +367,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPurchaseOrder(purchaseOrder: InsertPurchaseOrder): Promise<PurchaseOrder> {
-    const result = await db.insert(purchaseOrders).values(purchaseOrder).returning();
+    const result = await db.insert(purchaseOrders).values(purchaseOrder as any).returning();
     return result[0];
   }
 
   async updatePurchaseOrder(id: string, purchaseOrder: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder> {
-    const result = await db.update(purchaseOrders).set(purchaseOrder).where(eq(purchaseOrders.id, id)).returning();
+    const result = await db.update(purchaseOrders).set(purchaseOrder as any).where(eq(purchaseOrders.id, id)).returning();
     return result[0];
   }
 

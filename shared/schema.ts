@@ -226,9 +226,6 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   id: true,
   createdAt: true,
   updatedAt: true,
-}).extend({
-  purchaseDate: z.string().datetime().or(z.date()),
-  amount: z.number().int().positive(),
 });
 
 export const insertActivitySchema = createInsertSchema(activities).omit({

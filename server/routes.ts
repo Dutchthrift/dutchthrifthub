@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema } from "@shared/schema";
+import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertPurchaseOrderSchema } from "@shared/schema";
 import { syncEmails, sendEmail } from "./services/emailService";
 import { shopifyClient } from "./services/shopifyClient";
 
@@ -677,6 +677,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating note:", error);
       res.status(400).json({ message: "Failed to create note" });
+    }
+  });
+
+  // Purchase Orders
+  app.get("/api/purchase-orders", async (req, res) => {
+    try {
+      const purchaseOrders = await storage.getPurchaseOrders();
+      res.json(purchaseOrders);
+    } catch (error) {
+      console.error("Error fetching purchase orders:", error);
+      res.status(500).json({ message: "Failed to fetch purchase orders" });
+    }
+  });
+
+  app.get("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const purchaseOrder = await storage.getPurchaseOrder(id);
+      if (!purchaseOrder) {
+        return res.status(404).json({ message: "Purchase order not found" });
+      }
+      res.json(purchaseOrder);
+    } catch (error) {
+      console.error("Error fetching purchase order:", error);
+      res.status(500).json({ message: "Failed to fetch purchase order" });
+    }
+  });
+
+  app.post("/api/purchase-orders", async (req, res) => {
+    try {
+      const validatedData = insertPurchaseOrderSchema.parse(req.body);
+      
+      // Convert purchaseDate string to Date object if provided
+      if (validatedData.purchaseDate && typeof validatedData.purchaseDate === 'string') {
+        validatedData.purchaseDate = new Date(validatedData.purchaseDate);
+      }
+      
+      const purchaseOrder = await storage.createPurchaseOrder(validatedData);
+      
+      // Create activity
+      await storage.createActivity({
+        type: "purchase_order_created",
+        description: `Created purchase order: ${purchaseOrder.title}`,
+        userId: null, // TODO: Get from session
+        metadata: { purchaseOrderId: purchaseOrder.id }
+      });
+
+      res.status(201).json(purchaseOrder);
+    } catch (error) {
+      console.error("Error creating purchase order:", error);
+      res.status(400).json({ message: "Failed to create purchase order" });
+    }
+  });
+
+  app.patch("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Convert purchaseDate string to Date object if provided in update
+      const updateData = { ...req.body };
+      if (updateData.purchaseDate && typeof updateData.purchaseDate === 'string') {
+        updateData.purchaseDate = new Date(updateData.purchaseDate);
+      }
+      
+      const purchaseOrder = await storage.updatePurchaseOrder(id, updateData);
+      
+      if (req.body.status) {
+        await storage.createActivity({
+          type: "purchase_order_status_updated",
+          description: `Updated purchase order status to ${req.body.status}: ${purchaseOrder.title}`,
+          userId: null, // TODO: Get from session
+          metadata: { purchaseOrderId: purchaseOrder.id, status: req.body.status }
+        });
+      }
+
+      res.json(purchaseOrder);
+    } catch (error) {
+      console.error("Error updating purchase order:", error);
+      res.status(400).json({ message: "Failed to update purchase order" });
+    }
+  });
+
+  app.delete("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePurchaseOrder(id);
+      
+      await storage.createActivity({
+        type: "purchase_order_deleted",
+        description: `Deleted purchase order`,
+        userId: null, // TODO: Get from session
+        metadata: { purchaseOrderId: id }
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting purchase order:", error);
+      res.status(400).json({ message: "Failed to delete purchase order" });
     }
   });
 
