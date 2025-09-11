@@ -20,9 +20,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Todos
   app.get("/api/todos", async (req, res) => {
     try {
-      const { userId } = req.query;
-      const todos = await storage.getTodos(userId as string);
-      res.json(todos);
+      const { userId, caseId } = req.query;
+      
+      if (caseId) {
+        // Get todos linked to a specific case
+        const relatedItems = await storage.getCaseRelatedItems(caseId as string);
+        res.json(relatedItems.todos);
+      } else {
+        // Get todos for a user or all todos
+        const todos = await storage.getTodos(userId as string);
+        res.json(todos);
+      }
     } catch (error) {
       console.error("Error fetching todos:", error);
       res.status(500).json({ message: "Failed to fetch todos" });
@@ -100,8 +108,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Repairs
   app.get("/api/repairs", async (req, res) => {
     try {
-      const repairs = await storage.getRepairs();
-      res.json(repairs);
+      const { caseId } = req.query;
+      
+      if (caseId) {
+        // Get repairs linked to a specific case
+        const relatedItems = await storage.getCaseRelatedItems(caseId as string);
+        res.json(relatedItems.repairs);
+      } else {
+        // Get all repairs
+        const repairs = await storage.getRepairs();
+        res.json(repairs);
+      }
     } catch (error) {
       console.error("Error fetching repairs:", error);
       res.status(500).json({ message: "Failed to fetch repairs" });
@@ -244,8 +261,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Orders
   app.get("/api/orders", async (req, res) => {
     try {
-      const orders = await storage.getOrders();
-      res.json(orders);
+      const { caseId } = req.query;
+      
+      if (caseId) {
+        // Get orders linked to a specific case
+        const relatedItems = await storage.getCaseRelatedItems(caseId as string);
+        res.json(relatedItems.orders);
+      } else {
+        // Get all orders
+        const orders = await storage.getOrders();
+        res.json(orders);
+      }
     } catch (error) {
       console.error("Error fetching orders:", error);
       res.status(500).json({ message: "Failed to fetch orders" });
@@ -511,8 +537,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Email threads
   app.get("/api/email-threads", async (req, res) => {
     try {
-      const threads = await storage.getEmailThreads();
-      res.json(threads);
+      const { caseId } = req.query;
+      
+      if (caseId) {
+        // Get email threads linked to a specific case
+        const relatedItems = await storage.getCaseRelatedItems(caseId as string);
+        res.json(relatedItems.emails);
+      } else {
+        // Get all email threads
+        const threads = await storage.getEmailThreads();
+        res.json(threads);
+      }
     } catch (error) {
       console.error("Error fetching email threads:", error);
       res.status(500).json({ message: "Failed to fetch email threads" });
@@ -677,6 +712,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating note:", error);
       res.status(400).json({ message: "Failed to create note" });
+    }
+  });
+
+  // Internal notes endpoint (alternate naming for frontend compatibility)
+  app.get("/api/internal-notes", async (req, res) => {
+    try {
+      const { entityType, entityId, caseId } = req.query;
+      
+      if (caseId) {
+        // Get notes linked to a specific case
+        const relatedItems = await storage.getCaseRelatedItems(caseId as string);
+        res.json(relatedItems.notes);
+      } else if (entityType && entityId) {
+        // Get notes for a specific entity  
+        const notes = await storage.getInternalNotes(entityId as string, entityType as any);
+        res.json(notes);
+      } else {
+        res.status(400).json({ message: "Either caseId or entityType+entityId required" });
+      }
+    } catch (error) {
+      console.error("Error fetching internal notes:", error);
+      res.status(500).json({ message: "Failed to fetch internal notes" });
     }
   });
 

@@ -87,27 +87,52 @@ export default function CaseDetail() {
   });
 
   const { data: relatedEmails } = useQuery<EmailThread[]>({
-    queryKey: ["/api/email-threads", { caseId }],
+    queryKey: ["/api/email-threads", "caseId", caseId],
+    queryFn: async () => {
+      const response = await fetch(`/api/email-threads?caseId=${caseId}`);
+      if (!response.ok) throw new Error('Failed to fetch related emails');
+      return response.json();
+    },
     enabled: !!caseId,
   });
 
   const { data: relatedOrders } = useQuery<Order[]>({
-    queryKey: ["/api/orders", { caseId }],
+    queryKey: ["/api/orders", "caseId", caseId],
+    queryFn: async () => {
+      const response = await fetch(`/api/orders?caseId=${caseId}`);
+      if (!response.ok) throw new Error('Failed to fetch related orders');
+      return response.json();
+    },
     enabled: !!caseId,
   });
 
   const { data: relatedRepairs } = useQuery<Repair[]>({
-    queryKey: ["/api/repairs", { caseId }],
+    queryKey: ["/api/repairs", "caseId", caseId],
+    queryFn: async () => {
+      const response = await fetch(`/api/repairs?caseId=${caseId}`);
+      if (!response.ok) throw new Error('Failed to fetch related repairs');
+      return response.json();
+    },
     enabled: !!caseId,
   });
 
   const { data: relatedTodos } = useQuery<Todo[]>({
-    queryKey: ["/api/todos", { caseId }],
+    queryKey: ["/api/todos", "caseId", caseId],
+    queryFn: async () => {
+      const response = await fetch(`/api/todos?caseId=${caseId}`);
+      if (!response.ok) throw new Error('Failed to fetch related todos');
+      return response.json();
+    },
     enabled: !!caseId,
   });
 
   const { data: internalNotes } = useQuery<InternalNote[]>({
-    queryKey: ["/api/internal-notes", { caseId }],
+    queryKey: ["/api/internal-notes", "caseId", caseId],
+    queryFn: async () => {
+      const response = await fetch(`/api/internal-notes?caseId=${caseId}`);
+      if (!response.ok) throw new Error('Failed to fetch internal notes');
+      return response.json();
+    },
     enabled: !!caseId,
   });
 
