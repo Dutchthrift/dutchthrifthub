@@ -726,7 +726,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validatedData = insertPurchaseOrderSchema.parse(req.body);
       
-      const purchaseOrder = await storage.createPurchaseOrder(validatedData);
+      // Convert purchaseDate string to Date object for database
+      const purchaseOrderData = {
+        ...validatedData,
+        purchaseDate: typeof validatedData.purchaseDate === 'string' 
+          ? new Date(validatedData.purchaseDate) 
+          : validatedData.purchaseDate
+      };
+      
+      const purchaseOrder = await storage.createPurchaseOrder(purchaseOrderData);
       
       // Create activity
       await storage.createActivity({
@@ -750,7 +758,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Always validate with partial schema for data integrity
       const updateData = insertPurchaseOrderSchema.partial().parse(req.body);
       
-      const purchaseOrder = await storage.updatePurchaseOrder(id, updateData);
+      // Convert purchaseDate string to Date object for database if present
+      const purchaseOrderUpdateData = updateData.purchaseDate 
+        ? {
+            ...updateData,
+            purchaseDate: typeof updateData.purchaseDate === 'string' 
+              ? new Date(updateData.purchaseDate) 
+              : updateData.purchaseDate
+          }
+        : updateData;
+      
+      const purchaseOrder = await storage.updatePurchaseOrder(id, purchaseOrderUpdateData);
       
       if (req.body.status) {
         await storage.createActivity({
