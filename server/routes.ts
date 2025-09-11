@@ -574,10 +574,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sync emails
   app.post("/api/emails/sync", async (req, res) => {
     try {
+      console.log(`🚀 Starting email sync...`);
       const emails = await syncEmails();
+      console.log(`📬 Received ${emails.length} emails from IMAP provider`);
       
       // Process and store emails
+      let processedCount = 0;
       for (const email of emails) {
+        processedCount++;
+        console.log(`📧 Processing email ${processedCount}/${emails.length}: ${email.messageId} (hasAttachment: ${email.hasAttachment})`);
+        
+        // Check if extractedAttachments exists and log details
+        const extractedAttachments = (email as any).extractedAttachments;
+        console.log(`🔍 Attachments check - Email ${email.messageId}: extractedAttachments type=${typeof extractedAttachments}, isArray=${Array.isArray(extractedAttachments)}, length=${extractedAttachments?.length || 'undefined'}`);
+        if (extractedAttachments && Array.isArray(extractedAttachments) && extractedAttachments.length > 0) {
+          console.log(`📎 Found ${extractedAttachments.length} attachments:`, extractedAttachments);
+        }
         // Check if message already exists (deduplication)
         const existingMessage = await storage.getEmailMessage(email.messageId);
         if (existingMessage) {
@@ -628,12 +640,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Create attachment records if attachments were extracted
           const extractedAttachments = (email as any).extractedAttachments;
-          if (extractedAttachments && Array.isArray(extractedAttachments)) {
-            for (const attachmentUrl of extractedAttachments) {
+          console.log(`🔍 DEBUG: Email ${email.messageId} (hasAttachment: ${email.hasAttachment}) extractedAttachments:`, extractedAttachments);
+          console.log(`🔍 DEBUG: Type check - extractedAttachments isArray: ${Array.isArray(extractedAttachments)}, length: ${extractedAttachments?.length || 'undefined'}`);
+          
+          if (extractedAttachments && Array.isArray(extractedAttachments) && extractedAttachments.length > 0) {
+            console.log(`📎 Processing ${extractedAttachments.length} attachments for email ${email.messageId}`);
+            for (let i = 0; i < extractedAttachments.length; i++) {
+              const attachmentUrl = extractedAttachments[i];
               try {
                 // Extract filename from storage URL
                 const urlParts = attachmentUrl.split('/');
                 const filename = urlParts[urlParts.length - 1];
+                
+                console.log(`📎 Creating attachment record ${i + 1}/${extractedAttachments.length}: ${filename} -> ${attachmentUrl}`);
                 
                 await storage.createEmailAttachment({
                   messageId: createdMessage.id,
@@ -644,11 +663,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   isInline: false
                 });
                 
-                console.log(`Created attachment record: ${filename}`);
+                console.log(`✅ Created attachment record: ${filename}`);
               } catch (attachmentError) {
-                console.error('Error creating attachment record:', attachmentError);
+                console.error(`❌ Error creating attachment record for ${attachmentUrl}:`, attachmentError);
               }
             }
+          } else if (email.hasAttachment) {
+            console.log(`⚠️ WARNING: Email ${email.messageId} has hasAttachment=true but extractedAttachments is empty or invalid`);
           }
         } catch (error: any) {
           // Skip duplicates, log others

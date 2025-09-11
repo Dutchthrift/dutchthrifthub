@@ -343,6 +343,11 @@ export class ImapSmtpProvider implements EmailProvider {
                     const extractedAttachments = (messages[descriptor.messageIndex] as any).extractedAttachments || [];
                     extractedAttachments.push(storageUrl);
                     (messages[descriptor.messageIndex] as any).extractedAttachments = extractedAttachments;
+                    
+                    console.log(`📎 Added attachment to message[${descriptor.messageIndex}]: ${storageUrl}`);
+                    console.log(`📎 Message[${descriptor.messageIndex}] now has ${extractedAttachments.length} attachments total`);
+                  } else {
+                    console.error(`❌ Could not find message at index ${descriptor.messageIndex} (total messages: ${messages.length})`);
                   }
                   
                   console.log(`✅ Saved attachment: ${descriptor.filename} to ${storageUrl}`);
