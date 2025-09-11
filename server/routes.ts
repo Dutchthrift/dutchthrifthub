@@ -362,17 +362,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Sync customers from Shopify
+  // Sync customers from Shopify - Enhanced with bulk import
   app.post("/api/customers/sync", async (req, res) => {
     try {
-      const shopifyCustomers = await shopifyClient.getCustomers({ limit: 100 });
+      const { fullSync } = req.query;
+      let shopifyCustomers;
+
+      if (fullSync === 'true') {
+        console.log('🔄 Starting full customer sync from Shopify...');
+        shopifyCustomers = await shopifyClient.getAllCustomers((processed) => {
+          console.log(`📊 Customer sync progress: ${processed} customers processed`);
+        });
+      } else {
+        console.log('🔄 Starting incremental customer sync from Shopify...');
+        shopifyCustomers = await shopifyClient.getCustomers({ limit: 250 });
+      }
       
       let synced = 0;
       let created = 0;
       let updated = 0;
+      let skipped = 0;
+      
+      console.log(`Processing ${shopifyCustomers.length} customers...`);
       
       for (const shopifyCustomer of shopifyCustomers) {
-        if (!shopifyCustomer.email) continue; // Skip customers without email
+        if (!shopifyCustomer.email) {
+          skipped++;
+          continue; // Skip customers without email
+        }
         
         const existingCustomer = await storage.getCustomerByEmail(shopifyCustomer.email);
         
@@ -390,18 +407,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Update existing customer with Shopify ID if missing
           await storage.updateCustomer(existingCustomer.id, {
             shopifyCustomerId: shopifyCustomer.id.toString(),
-            phone: shopifyCustomer.phone || existingCustomer.phone
+            phone: shopifyCustomer.phone || existingCustomer.phone,
+            firstName: shopifyCustomer.first_name || existingCustomer.firstName,
+            lastName: shopifyCustomer.last_name || existingCustomer.lastName
           });
           updated++;
         }
         synced++;
       }
       
+      console.log(`✅ Customer sync completed: ${created} created, ${updated} updated, ${skipped} skipped from ${shopifyCustomers.length} Shopify customers`);
+      
       res.json({ 
         synced, 
         created, 
         updated,
-        message: `Customer sync completed: ${created} created, ${updated} updated from ${synced} Shopify customers` 
+        skipped,
+        total: shopifyCustomers.length,
+        message: `Customer sync completed: ${created} created, ${updated} updated, ${skipped} skipped from ${shopifyCustomers.length} Shopify customers` 
       });
     } catch (error) {
       console.error("Error syncing customers from Shopify:", error);
@@ -409,66 +432,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Sync orders from Shopify
+  // Sync orders from Shopify - Enhanced with bulk import
   app.post("/api/orders/sync", async (req, res) => {
     try {
-      const shopifyOrders = await shopifyClient.getOrders({ limit: 50 });
+      const { fullSync } = req.query;
+      let shopifyOrders;
+
+      if (fullSync === 'true') {
+        console.log('🔄 Starting full order sync from Shopify...');
+        shopifyOrders = await shopifyClient.getAllOrders((processed) => {
+          console.log(`📊 Order sync progress: ${processed} orders processed`);
+        });
+      } else {
+        console.log('🔄 Starting incremental order sync from Shopify...');
+        shopifyOrders = await shopifyClient.getOrders({ limit: 250 });
+      }
+      
+      let synced = 0;
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      
+      console.log(`Processing ${shopifyOrders.length} orders...`);
+      
+      // Map Shopify financial status to our enum values
+      const mapShopifyStatus = (financialStatus: string, fulfillmentStatus: string | null) => {
+        if (fulfillmentStatus === 'fulfilled') return 'delivered';
+        if (fulfillmentStatus === 'partial') return 'shipped';
+        if (financialStatus === 'paid' || financialStatus === 'authorized') {
+          return fulfillmentStatus === null ? 'processing' : 'shipped';
+        }
+        if (financialStatus === 'pending') return 'pending';
+        if (financialStatus === 'refunded') return 'refunded';
+        if (financialStatus === 'voided') return 'cancelled';
+        return 'pending'; // default fallback
+      };
       
       for (const shopifyOrder of shopifyOrders) {
-        const existingOrder = await storage.getOrderByShopifyId(shopifyOrder.id.toString());
-        
-        if (!existingOrder) {
-          // Create customer if doesn't exist
-          let customer = null;
-          if (shopifyOrder.customer && shopifyOrder.customer.email) {
-            customer = await storage.getCustomerByEmail(shopifyOrder.customer.email);
-            if (!customer) {
-              customer = await storage.createCustomer({
-                email: shopifyOrder.customer.email,
-                firstName: shopifyOrder.customer.first_name,
-                lastName: shopifyOrder.customer.last_name,
-                shopifyCustomerId: shopifyOrder.customer.id.toString()
-              });
+        try {
+          const existingOrder = await storage.getOrderByShopifyId(shopifyOrder.id.toString());
+          
+          if (!existingOrder) {
+            // Create customer if doesn't exist
+            let customer = null;
+            if (shopifyOrder.customer && shopifyOrder.customer.email) {
+              customer = await storage.getCustomerByEmail(shopifyOrder.customer.email);
+              if (!customer) {
+                customer = await storage.createCustomer({
+                  email: shopifyOrder.customer.email,
+                  firstName: shopifyOrder.customer.first_name,
+                  lastName: shopifyOrder.customer.last_name,
+                  shopifyCustomerId: shopifyOrder.customer.id.toString()
+                });
+              }
             }
+
+            // Create order
+            await storage.createOrder({
+              shopifyOrderId: shopifyOrder.id.toString(),
+              orderNumber: shopifyOrder.order_number,
+              customerId: customer?.id,
+              customerEmail: shopifyOrder.email,
+              totalAmount: Math.round(parseFloat(shopifyOrder.total_price) * 100),
+              currency: shopifyOrder.currency,
+              status: mapShopifyStatus(shopifyOrder.financial_status, shopifyOrder.fulfillment_status),
+              fulfillmentStatus: shopifyOrder.fulfillment_status,
+              paymentStatus: shopifyOrder.financial_status,
+              orderData: shopifyOrder
+            });
+            created++;
+          } else {
+            // Update existing order with latest data from Shopify
+            await storage.updateOrder(existingOrder.id, {
+              status: mapShopifyStatus(shopifyOrder.financial_status, shopifyOrder.fulfillment_status),
+              fulfillmentStatus: shopifyOrder.fulfillment_status,
+              paymentStatus: shopifyOrder.financial_status,
+              orderData: shopifyOrder,
+              totalAmount: Math.round(parseFloat(shopifyOrder.total_price) * 100)
+            });
+            updated++;
           }
-
-          // Map Shopify financial status to our enum values
-          const mapShopifyStatus = (financialStatus: string, fulfillmentStatus: string | null) => {
-            if (fulfillmentStatus === 'fulfilled') return 'delivered';
-            if (fulfillmentStatus === 'partial') return 'shipped';
-            if (financialStatus === 'paid' || financialStatus === 'authorized') {
-              return fulfillmentStatus === null ? 'processing' : 'shipped';
-            }
-            if (financialStatus === 'pending') return 'pending';
-            if (financialStatus === 'refunded') return 'refunded';
-            if (financialStatus === 'voided') return 'cancelled';
-            return 'pending'; // default fallback
-          };
-
-          // Create order
-          await storage.createOrder({
-            shopifyOrderId: shopifyOrder.id.toString(),
-            orderNumber: shopifyOrder.order_number,
-            customerId: customer?.id,
-            customerEmail: shopifyOrder.email,
-            totalAmount: Math.round(parseFloat(shopifyOrder.total_price) * 100),
-            currency: shopifyOrder.currency,
-            status: mapShopifyStatus(shopifyOrder.financial_status, shopifyOrder.fulfillment_status),
-            fulfillmentStatus: shopifyOrder.fulfillment_status,
-            paymentStatus: shopifyOrder.financial_status,
-            orderData: shopifyOrder
-          });
+          synced++;
+        } catch (orderError) {
+          console.error(`Error processing order ${shopifyOrder.id}:`, orderError);
+          skipped++;
         }
       }
       
+      console.log(`✅ Order sync completed: ${created} created, ${updated} updated, ${skipped} skipped from ${shopifyOrders.length} Shopify orders`);
+      
       res.json({ 
-        synced: shopifyOrders.length, 
-        created: shopifyOrders.length, // All synced orders are new in this implementation
-        message: `Order sync completed: ${shopifyOrders.length} orders synced from Shopify` 
+        synced, 
+        created, 
+        updated,
+        skipped,
+        total: shopifyOrders.length,
+        message: `Order sync completed: ${created} created, ${updated} updated, ${skipped} skipped from ${shopifyOrders.length} Shopify orders` 
       });
     } catch (error) {
       console.error("Error syncing orders:", error);
-      res.status(500).json({ message: "Failed to sync orders" });
+      res.status(500).json({ message: "Failed to sync orders", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
