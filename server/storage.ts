@@ -4,16 +4,19 @@ import {
   type Order, type InsertOrder,
   type EmailThread, type InsertEmailThread,
   type EmailMessage, type InsertEmailMessage,
+  type EmailAttachment, type InsertEmailAttachment,
   type Repair, type InsertRepair,
   type Todo, type InsertTodo,
   type InternalNote, type InsertInternalNote,
   type PurchaseOrder, type InsertPurchaseOrder,
   type Case, type InsertCase,
   type Activity, type InsertActivity,
-  users, customers, orders, emailThreads, emailMessages, repairs, todos, internalNotes, purchaseOrders, cases, activities
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, cases, activities
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count, inArray, isNotNull } from "drizzle-orm";
+import { ObjectStorageService } from "./objectStorage";
+import type { Response } from "express";
 
 export interface IStorage {
   // Users
@@ -46,6 +49,12 @@ export interface IStorage {
   getEmailMessages(threadId: string): Promise<EmailMessage[]>;
   getEmailMessage(messageId: string): Promise<EmailMessage | undefined>;
   createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage>;
+
+  // Email Attachments
+  getEmailAttachment(attachmentPath: string): Promise<EmailAttachment | undefined>;
+  getEmailMessageAttachments(messageId: string): Promise<EmailAttachment[]>;
+  createEmailAttachment(attachment: InsertEmailAttachment): Promise<EmailAttachment>;
+  downloadAttachment(attachmentPath: string, res: any): Promise<void>;
 
   // Repairs
   getRepairs(): Promise<Repair[]>;
@@ -643,6 +652,27 @@ export class DatabaseStorage implements IStorage {
       repairs: foundRepairs,
       purchaseOrders: foundPurchaseOrders
     };
+  }
+
+  // Email Attachments
+  async getEmailAttachment(attachmentPath: string): Promise<EmailAttachment | undefined> {
+    const result = await db.select().from(emailAttachments).where(eq(emailAttachments.storageUrl, attachmentPath)).limit(1);
+    return result[0];
+  }
+
+  async getEmailMessageAttachments(messageId: string): Promise<EmailAttachment[]> {
+    return await db.select().from(emailAttachments).where(eq(emailAttachments.messageId, messageId));
+  }
+
+  async createEmailAttachment(attachment: InsertEmailAttachment): Promise<EmailAttachment> {
+    const result = await db.insert(emailAttachments).values(attachment).returning();
+    return result[0];
+  }
+
+  async downloadAttachment(attachmentPath: string, res: Response): Promise<void> {
+    const objectStorageService = new ObjectStorageService();
+    const file = await objectStorageService.getAttachmentFile(attachmentPath);
+    await objectStorageService.downloadObject(file, res);
   }
 }
 

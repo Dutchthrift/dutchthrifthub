@@ -1,6 +1,8 @@
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
 import type { EmailProvider, RawEmail } from './emailProvider';
+import { ObjectStorageService } from '../objectStorage';
+import { storage } from '../storage';
 
 export class ImapSmtpProvider implements EmailProvider {
   private imapConfig = {
@@ -51,6 +53,16 @@ export class ImapSmtpProvider implements EmailProvider {
         
         // Get recent emails (last 50)
         const messages = [];
+        let attachmentQueue: Array<{
+          messageIndex: number;
+          uid: number;
+          partId: string;
+          filename: string;
+          contentType: string;
+          contentId?: string;
+          isInline: boolean;
+          size: number;
+        }> = [];
         for await (let message of client.fetch(`${startSeq}:${endSeq}`, {
           envelope: true,
           flags: true,
@@ -61,7 +73,10 @@ export class ImapSmtpProvider implements EmailProvider {
         })) {
           
           // Check if message has attachments
+          console.log(`=== DEBUG: Checking message UID ${message.uid} for attachments ===`);
+          console.log('bodyStructure:', JSON.stringify(message.bodyStructure, null, 2));
           const hasAttachment = this.checkForAttachments(message.bodyStructure);
+          console.log(`=== DEBUG: hasAttachment result for UID ${message.uid}: ${hasAttachment} ===`);
           
           // Build conversation ID from subject and participants
           const envelope = message.envelope;
@@ -209,7 +224,92 @@ export class ImapSmtpProvider implements EmailProvider {
             references: ''
           };
 
+          // Collect attachment descriptors if email has them (don't download yet to avoid IMAP deadlock)
+          const attachmentDescriptors: Array<{
+            messageIndex: number;
+            uid: number;
+            partId: string;
+            filename: string;
+            contentType: string;
+            contentId?: string;
+            isInline: boolean;
+            size: number;
+          }> = [];
+
+          if (hasAttachment) {
+            console.log(`📎 Collecting attachment descriptors for Message UID ${message.uid}, Subject: ${envelope?.subject || 'No subject'}`);
+            const descriptors = this.collectAttachmentDescriptors(message, messages.length);
+            attachmentDescriptors.push(...descriptors);
+            console.log(`📎 Found ${descriptors.length} attachment descriptors`);
+          }
+
+          // Store descriptors for later processing (after fetch loop completes)
+          if (!attachmentQueue) {
+            attachmentQueue = [];
+          }
+          attachmentQueue.push(...attachmentDescriptors);
+
+          // Initialize extractedAttachments as empty for now
+          (rawEmail as any).extractedAttachments = [];
+
           messages.push(rawEmail);
+        }
+        
+        // Phase 2: Download attachments after fetch loop completes (avoids IMAP deadlock)
+        console.log(`📎 Processing ${attachmentQueue.length} attachments in phase 2`);
+        if (attachmentQueue.length > 0) {
+          const { ObjectStorageService } = await import('../objectStorage.js');
+          const objectStorageService = new ObjectStorageService();
+          
+          for (const descriptor of attachmentQueue) {
+            try {
+              console.log(`📎 Downloading attachment: ${descriptor.filename} (UID ${descriptor.uid}, part ${descriptor.partId})`);
+              
+              // Skip attachments over 10MB to prevent memory issues
+              if (descriptor.size > 10 * 1024 * 1024) {
+                console.log(`⚠️ Skipping large attachment ${descriptor.filename} (${descriptor.size} bytes)`);
+                continue;
+              }
+              
+              // Use fetchOne with bodyParts to get Buffer directly
+              const result = await client.fetchOne(descriptor.uid, {
+                uid: true,
+                bodyParts: [descriptor.partId]
+              });
+              
+              if (!result || !result.bodyParts) {
+                console.log(`⚠️ No result or bodyParts for attachment ${descriptor.filename}`);
+                continue;
+              }
+              
+              const attachmentBuffer = result.bodyParts.get(descriptor.partId) as Buffer;
+              
+              if (attachmentBuffer && attachmentBuffer.length > 0) {
+                console.log(`✅ Downloaded attachment: ${descriptor.filename} (${attachmentBuffer.length} bytes)`);
+                
+                // Save to object storage
+                const storageUrl = await objectStorageService.saveAttachment(
+                  descriptor.filename,
+                  attachmentBuffer,
+                  descriptor.contentType
+                );
+                
+                // Add to the corresponding message's extractedAttachments
+                if (messages[descriptor.messageIndex]) {
+                  const extractedAttachments = (messages[descriptor.messageIndex] as any).extractedAttachments || [];
+                  extractedAttachments.push(storageUrl);
+                  (messages[descriptor.messageIndex] as any).extractedAttachments = extractedAttachments;
+                }
+                
+                console.log(`✅ Saved attachment: ${descriptor.filename} to ${storageUrl}`);
+              } else {
+                console.log(`⚠️ No data received for attachment ${descriptor.filename}`);
+              }
+              
+            } catch (attachmentError) {
+              console.error(`❌ Error processing attachment ${descriptor.filename}:`, attachmentError.message || attachmentError);
+            }
+          }
         }
         
         return messages; // Already in chronological order (oldest to newest)
@@ -251,14 +351,214 @@ export class ImapSmtpProvider implements EmailProvider {
   private checkForAttachments(bodyStructure: any): boolean {
     if (!bodyStructure) return false;
     
-    // Check if multipart and has non-text parts
-    if (bodyStructure.type === 'multipart') {
-      return bodyStructure.childNodes?.some((node: any) => 
-        node.type !== 'text' || node.disposition === 'attachment'
-      ) || false;
+    // Function to recursively check for attachments
+    const hasAttachmentRecursive = (structure: any): boolean => {
+      if (!structure) return false;
+      
+      // Check if this part itself is an attachment
+      if (structure.disposition === 'attachment') {
+        return true;
+      }
+      
+      // Check for images or files with names (inline attachments)
+      if (structure.type && structure.type !== 'text' && structure.parameters?.name) {
+        return true;
+      }
+      
+      // Check if this is an image type (common inline attachments)
+      if (structure.type === 'image') {
+        return true;
+      }
+      
+      // Recursively check child nodes for multipart messages
+      if (structure.childNodes && Array.isArray(structure.childNodes)) {
+        return structure.childNodes.some((child: any) => hasAttachmentRecursive(child));
+      }
+      
+      return false;
+    };
+    
+    return hasAttachmentRecursive(bodyStructure);
+  }
+
+  // Collect attachment descriptors without downloading (avoids IMAP deadlock)
+  private collectAttachmentDescriptors(message: any, messageIndex: number): Array<{
+    messageIndex: number;
+    uid: number;
+    partId: string;
+    filename: string;
+    contentType: string;
+    contentId?: string;
+    isInline: boolean;
+    size: number;
+  }> {
+    const descriptors: Array<{
+      messageIndex: number;
+      uid: number;
+      partId: string;
+      filename: string;
+      contentType: string;
+      contentId?: string;
+      isInline: boolean;
+      size: number;
+    }> = [];
+    
+    if (!message.bodyStructure) {
+      return descriptors;
     }
     
-    return bodyStructure.disposition === 'attachment';
+    const collectFromPart = (part: any) => {
+      if (!part) return;
+      
+      // Check if this part is an attachment - use broader criteria
+      const isAttachment = part.disposition === 'attachment' || 
+                          part.disposition === 'inline' ||
+                          (part.type && part.type.startsWith('image/')) ||
+                          (part.type && !part.type.startsWith('text/'));
+      
+      // Use broader filename detection
+      const hasFilename = part.parameters?.name || part.dispositionParameters?.filename;
+      
+      if (isAttachment && hasFilename) {
+        const partId = part.part || '1';
+        const filename = part.parameters?.name || part.dispositionParameters?.filename || `part-${partId}`;
+        const contentType = part.type || 'application/octet-stream';
+        const contentId = part.id;
+        const isInline = part.disposition === 'inline';
+        const size = part.size || 0;
+        
+        console.log(`📎 Found attachment descriptor: ${filename} (part ${partId}, ${contentType}, ${size} bytes)`);
+        
+        descriptors.push({
+          messageIndex,
+          uid: message.uid,
+          partId,
+          filename,
+          contentType,
+          contentId,
+          isInline,
+          size
+        });
+      }
+      
+      // Recursively process child nodes
+      if (part.childNodes && Array.isArray(part.childNodes)) {
+        for (const childPart of part.childNodes) {
+          collectFromPart(childPart);
+        }
+      }
+    };
+    
+    // Start processing from the root
+    const bodyStructure = message.bodyStructure;
+    if (bodyStructure.childNodes) {
+      for (const childPart of bodyStructure.childNodes) {
+        collectFromPart(childPart);
+      }
+    } else {
+      // Single part message
+      collectFromPart(bodyStructure);
+    }
+    
+    return descriptors;
+  }
+
+  // Extract attachments from email message
+  private async extractAttachments(client: any, message: any): Promise<Array<{ filename: string; data: Buffer; contentType?: string; contentId?: string; isInline: boolean }>> {
+    console.log(`🔍 Starting attachment extraction for UID ${message.uid}`);
+    const attachments: Array<{ filename: string; data: Buffer; contentType?: string; contentId?: string; isInline: boolean }> = [];
+    
+    if (!message.bodyStructure) {
+      console.log(`❌ No bodyStructure found for UID ${message.uid}`);
+      return attachments;
+    }
+    
+    console.log(`🔍 bodyStructure found, processing...`);
+    console.log(`🔍 bodyStructure has ${message.bodyStructure.childNodes?.length || 0} child nodes`);
+    
+    try {
+      // Get the body structure to find attachments
+      const bodyStructure = message.bodyStructure;
+      
+      // Recursive function to find all attachments in nested structures
+      const processBodyPart = async (part: any) => {
+        if (!part) return;
+        
+        const partId = part.part || '1';
+        console.log(`Processing part ${partId}: type=${part.type}, disposition=${part.disposition}, name=${part.parameters?.name}, dispFilename=${part.dispositionParameters?.filename}`);
+        
+        // Check if this part is an attachment - use broader criteria
+        const isAttachment = part.disposition === 'attachment' || 
+                            part.disposition === 'inline' ||
+                            (part.type && part.type.startsWith('image/')) ||
+                            (part.type && !part.type.startsWith('text/'));
+        
+        // Use broader filename detection
+        const hasFilename = part.parameters?.name || part.dispositionParameters?.filename;
+        
+        if (isAttachment && hasFilename) {
+          try {
+            console.log(`Downloading attachment part ${partId}...`);
+            
+            // Add timeout protection for IMAP downloads
+            const downloadPromise = client.download(`${message.uid}`, partId, {
+              uid: true
+            });
+            
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error(`Download timeout for part ${partId}`)), 30000); // 30 second timeout
+            });
+            
+            // Race between download and timeout
+            const attachmentData = await Promise.race([downloadPromise, timeoutPromise]);
+            
+            if (attachmentData && attachmentData.length > 0) {
+              const filename = part.parameters?.name || part.dispositionParameters?.filename || `part-${partId}`;
+              const contentType = part.type || 'application/octet-stream';
+              const contentId = part.id;
+              const isInline = part.disposition === 'inline';
+              
+              attachments.push({
+                filename,
+                data: attachmentData,
+                contentType,
+                contentId,
+                isInline
+              });
+              
+              console.log(`✅ Extracted attachment: ${filename} (${contentType}, ${attachmentData.length} bytes)`);
+            } else {
+              console.log(`⚠️ No data received for attachment part ${partId}`);
+            }
+          } catch (downloadError) {
+            console.error(`❌ Error downloading attachment part ${partId}:`, downloadError.message || downloadError);
+            // Continue processing other parts even if one fails
+          }
+        }
+        
+        // Recursively process child nodes
+        if (part.childNodes && Array.isArray(part.childNodes)) {
+          for (const childPart of part.childNodes) {
+            await processBodyPart(childPart);
+          }
+        }
+      };
+      
+      // Start processing from the root
+      if (bodyStructure.childNodes) {
+        for (const childPart of bodyStructure.childNodes) {
+          await processBodyPart(childPart);
+        }
+      } else {
+        // Single part message
+        await processBodyPart(bodyStructure);
+      }
+      
+    } catch (error) {
+      console.error('Error extracting attachments:', error);
+    }
+    
+    return attachments;
   }
 
   private buildConversationId(subject: string, from: string, to: string): string {

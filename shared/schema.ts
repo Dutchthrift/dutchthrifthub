@@ -151,6 +151,19 @@ export const internalNotes = pgTable("internal_notes", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Email attachments table
+export const emailAttachments = pgTable("email_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").references(() => emailMessages.id).notNull(),
+  filename: text("filename").notNull(),
+  contentType: text("content_type"),
+  size: integer("size"), // in bytes
+  storageUrl: text("storage_url").notNull(), // path in object storage
+  contentId: text("content_id"), // for inline attachments
+  isInline: boolean("is_inline").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Cases table - Central overarching object for customer requests
 export const cases = pgTable("cases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -274,6 +287,11 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
   createdAt: true,
 });
 
+export const insertEmailAttachmentSchema = createInsertSchema(emailAttachments).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -307,3 +325,6 @@ export type InsertCase = z.infer<typeof insertCaseSchema>;
 
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
+
+export type EmailAttachment = typeof emailAttachments.$inferSelect;
+export type InsertEmailAttachment = z.infer<typeof insertEmailAttachmentSchema>;

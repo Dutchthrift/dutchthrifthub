@@ -34,6 +34,7 @@ import type { EmailThread, EmailMessage, Case, Order } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { CreateCaseModal } from "@/components/forms/create-case-modal";
+import { EmailAttachments } from "./email-attachments";
 
 interface EmailThreadViewProps {
   threadId: string;
@@ -374,14 +375,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                     )}
                   </div>
                   
-                  {message.attachments && (message.attachments as any[]).length > 0 && (
-                    <div className="mt-3 pt-3 border-t">
-                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                        <Paperclip className="h-4 w-4" />
-                        <span>{(message.attachments as any[]).length} attachment(s)</span>
-                      </div>
-                    </div>
-                  )}
+                  <EmailAttachments messageId={message.id} />
                 </CardContent>
               </Card>
             ))

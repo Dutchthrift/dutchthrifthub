@@ -615,7 +615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Create message (only if not duplicate)
         try {
-          await storage.createEmailMessage({
+          const createdMessage = await storage.createEmailMessage({
             messageId: email.messageId,
             threadId: thread.id,
             fromEmail: email.from,
@@ -625,6 +625,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isHtml: email.isHtml,
             sentAt: new Date(email.receivedDateTime)
           });
+
+          // Create attachment records if attachments were extracted
+          const extractedAttachments = (email as any).extractedAttachments;
+          if (extractedAttachments && Array.isArray(extractedAttachments)) {
+            for (const attachmentUrl of extractedAttachments) {
+              try {
+                // Extract filename from storage URL
+                const urlParts = attachmentUrl.split('/');
+                const filename = urlParts[urlParts.length - 1];
+                
+                await storage.createEmailAttachment({
+                  messageId: createdMessage.id,
+                  filename: filename,
+                  storageUrl: attachmentUrl,
+                  contentType: 'application/octet-stream', // Default, could be improved
+                  size: 0, // Could be improved to track actual size
+                  isInline: false
+                });
+                
+                console.log(`Created attachment record: ${filename}`);
+              } catch (attachmentError) {
+                console.error('Error creating attachment record:', attachmentError);
+              }
+            }
+          }
         } catch (error: any) {
           // Skip duplicates, log others
           if (error.code !== '23505') {
@@ -679,6 +704,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error sending email:", error);
       res.status(500).json({ message: "Failed to send email" });
+    }
+  });
+
+  // Attachment endpoints
+  app.get("/api/attachments/:attachmentPath(*)", async (req, res) => {
+    try {
+      const attachmentPath = '/' + req.params.attachmentPath;
+      const attachment = await storage.getEmailAttachment(attachmentPath);
+      if (!attachment) {
+        return res.status(404).json({ error: 'Attachment not found' });
+      }
+      
+      await storage.downloadAttachment(attachmentPath, res);
+    } catch (error) {
+      console.error('Error downloading attachment:', error);
+      res.status(500).json({ error: 'Failed to download attachment' });
+    }
+  });
+
+  // Get attachments for an email message
+  app.get("/api/emails/:messageId/attachments", async (req, res) => {
+    try {
+      const { messageId } = req.params;
+      const attachments = await storage.getEmailMessageAttachments(messageId);
+      res.json(attachments);
+    } catch (error) {
+      console.error('Error fetching attachments:', error);
+      res.status(500).json({ error: 'Failed to fetch attachments' });
     }
   });
 
