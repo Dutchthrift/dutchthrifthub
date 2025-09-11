@@ -7,8 +7,9 @@ import {
   type Repair, type InsertRepair,
   type Todo, type InsertTodo,
   type InternalNote, type InsertInternalNote,
+  type PurchaseOrder, type InsertPurchaseOrder,
   type Activity, type InsertActivity,
-  users, customers, orders, emailThreads, emailMessages, repairs, todos, internalNotes, activities
+  users, customers, orders, emailThreads, emailMessages, repairs, todos, internalNotes, purchaseOrders, activities
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count } from "drizzle-orm";
@@ -51,6 +52,13 @@ export interface IStorage {
   createRepair(repair: InsertRepair): Promise<Repair>;
   updateRepair(id: string, repair: Partial<InsertRepair>): Promise<Repair>;
   getRepairsByStatus(status: string): Promise<Repair[]>;
+
+  // Purchase Orders
+  getPurchaseOrders(): Promise<PurchaseOrder[]>;
+  getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined>;
+  createPurchaseOrder(purchaseOrder: InsertPurchaseOrder): Promise<PurchaseOrder>;
+  updatePurchaseOrder(id: string, purchaseOrder: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder>;
+  deletePurchaseOrder(id: string): Promise<void>;
 
   // Todos
   getTodos(userId?: string): Promise<Todo[]>;
@@ -348,11 +356,35 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Purchase Orders
+  async getPurchaseOrders(): Promise<PurchaseOrder[]> {
+    return await db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
+  }
+
+  async getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined> {
+    const result = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createPurchaseOrder(purchaseOrder: InsertPurchaseOrder): Promise<PurchaseOrder> {
+    const result = await db.insert(purchaseOrders).values(purchaseOrder).returning();
+    return result[0];
+  }
+
+  async updatePurchaseOrder(id: string, purchaseOrder: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder> {
+    const result = await db.update(purchaseOrders).set(purchaseOrder).where(eq(purchaseOrders.id, id)).returning();
+    return result[0];
+  }
+
+  async deletePurchaseOrder(id: string): Promise<void> {
+    await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
+  }
+
   // Search
   async globalSearch(query: string) {
     const searchTerm = `%${query}%`;
 
-    const [foundCustomers, foundOrders, foundEmailThreads, foundRepairs] = await Promise.all([
+    const [foundCustomers, foundOrders, foundEmailThreads, foundRepairs, foundPurchaseOrders] = await Promise.all([
       db.select().from(customers).where(or(
         ilike(customers.email, searchTerm),
         ilike(customers.firstName, searchTerm),
@@ -372,6 +404,12 @@ export class DatabaseStorage implements IStorage {
       db.select().from(repairs).where(or(
         ilike(repairs.title, searchTerm),
         ilike(repairs.description, searchTerm)
+      )).limit(10),
+
+      db.select().from(purchaseOrders).where(or(
+        ilike(purchaseOrders.title, searchTerm),
+        ilike(purchaseOrders.supplierName, searchTerm),
+        ilike(purchaseOrders.supplierNumber, searchTerm)
       )).limit(10)
     ]);
 
@@ -379,7 +417,8 @@ export class DatabaseStorage implements IStorage {
       customers: foundCustomers,
       orders: foundOrders,
       emailThreads: foundEmailThreads,
-      repairs: foundRepairs
+      repairs: foundRepairs,
+      purchaseOrders: foundPurchaseOrders
     };
   }
 }
