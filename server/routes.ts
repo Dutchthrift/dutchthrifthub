@@ -707,6 +707,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/purchase-orders", async (req, res) => {
     try {
+      // Additional validation for photos array size
+      if (req.body.photos && Array.isArray(req.body.photos)) {
+        if (req.body.photos.length > 5) {
+          return res.status(400).json({ message: "Maximum 5 images allowed" });
+        }
+        // Basic validation for base64 image format
+        for (const photo of req.body.photos) {
+          if (typeof photo !== 'string' || !photo.startsWith('data:image/')) {
+            return res.status(400).json({ message: "Invalid image format" });
+          }
+          // Check approximate size (base64 is ~33% larger than original)
+          if (photo.length > 7000000) { // ~5MB encoded size
+            return res.status(400).json({ message: "Image too large, maximum 5MB per image" });
+          }
+        }
+      }
+
       const validatedData = insertPurchaseOrderSchema.parse(req.body);
       
       const purchaseOrder = await storage.createPurchaseOrder(validatedData);

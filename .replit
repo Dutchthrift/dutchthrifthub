@@ -14,7 +14,7 @@ run = ["npm", "run", "start"]
 PORT = "5000"
 
 [agent]
-integrations = ["outlook:1.0.0", "javascript_supabase:1.0.0"]
+integrations = ["outlook:1.0.0", "javascript_supabase:1.0.0", "javascript_object_storage:1.0.0"]
 
 [workflows]
 runButton = "Project"

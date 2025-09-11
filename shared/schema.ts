@@ -227,8 +227,11 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   createdAt: true,
   updatedAt: true,
 }).extend({
-  purchaseDate: z.coerce.date(),
+  purchaseDate: z.union([z.string(), z.date()]).transform(val => 
+    typeof val === 'string' ? val : val
+  ),
   amount: z.number().int().positive(),
+  photos: z.array(z.string()).max(5).optional(),
 });
 
 export const insertActivitySchema = createInsertSchema(activities).omit({

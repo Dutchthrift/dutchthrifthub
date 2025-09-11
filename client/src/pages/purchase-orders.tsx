@@ -70,6 +70,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertPurchaseOrderSchema } from "@shared/schema";
 import type { z } from "zod";
 import { InternalNotes } from "@/components/notes/internal-notes";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 type PurchaseOrderFormData = z.infer<typeof insertPurchaseOrderSchema>;
 
@@ -96,7 +97,7 @@ export default function PurchaseOrders() {
       title: "",
       supplierNumber: "",
       supplierName: "",
-      purchaseDate: new Date(),
+      purchaseDate: new Date().toISOString().split('T')[0],
       amount: 0,
       currency: "EUR",
       status: "pending",
@@ -176,7 +177,9 @@ export default function PurchaseOrders() {
       title: purchaseOrder.title,
       supplierNumber: purchaseOrder.supplierNumber,
       supplierName: purchaseOrder.supplierName,
-      purchaseDate: new Date(purchaseOrder.purchaseDate),
+      purchaseDate: typeof purchaseOrder.purchaseDate === 'string' 
+        ? purchaseOrder.purchaseDate 
+        : new Date(purchaseOrder.purchaseDate).toISOString().split('T')[0],
       amount: purchaseOrder.amount,
       currency: purchaseOrder.currency || "EUR",
       status: purchaseOrder.status || "pending",
@@ -372,8 +375,9 @@ export default function PurchaseOrders() {
                               <Input 
                                 data-testid="input-purchase-date"
                                 type="date" 
-                                value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : field.value}
-                                onChange={(e) => field.onChange(new Date(e.target.value))}
+                                value={typeof field.value === 'string' ? field.value : 
+                                       field.value instanceof Date ? field.value.toISOString().split('T')[0] : ''}
+                                onChange={(e) => field.onChange(e.target.value)}
                               />
                             </FormControl>
                             <FormMessage />
@@ -427,6 +431,25 @@ export default function PurchaseOrders() {
                       )}
                     />
                     
+                    <FormField
+                      control={form.control}
+                      name="photos"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Afbeeldingen</FormLabel>
+                          <FormControl>
+                            <ImageUpload
+                              images={field.value || []}
+                              onChange={field.onChange}
+                              maxImages={5}
+                              maxSizeMB={5}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <FormField
                       control={form.control}
                       name="notes"
@@ -596,12 +619,31 @@ export default function PurchaseOrders() {
                         {sortedPurchaseOrders.map((purchaseOrder) => (
                           <TableRow key={purchaseOrder.id} data-testid={`row-purchase-order-${purchaseOrder.id}`}>
                             <TableCell className="font-medium">
-                              <div className="space-y-1">
-                                <div className="font-medium" data-testid={`text-title-${purchaseOrder.id}`}>
-                                  {purchaseOrder.title}
-                                </div>
-                                <div className="text-sm text-gray-500" data-testid={`text-supplier-number-${purchaseOrder.id}`}>
-                                  #{purchaseOrder.supplierNumber}
+                              <div className="flex items-center gap-3">
+                                {purchaseOrder.photos && purchaseOrder.photos.length > 0 && (
+                                  <div className="flex-shrink-0">
+                                    <img
+                                      src={purchaseOrder.photos[0]}
+                                      alt="Inkoop order"
+                                      className="h-12 w-12 object-cover rounded border"
+                                      data-testid={`image-preview-${purchaseOrder.id}`}
+                                    />
+                                  </div>
+                                )}
+                                <div className="space-y-1">
+                                  <div className="font-medium" data-testid={`text-title-${purchaseOrder.id}`}>
+                                    {purchaseOrder.title}
+                                  </div>
+                                  <div className="text-sm text-gray-500 flex items-center gap-2">
+                                    <span data-testid={`text-supplier-number-${purchaseOrder.id}`}>
+                                      #{purchaseOrder.supplierNumber}
+                                    </span>
+                                    {purchaseOrder.photos && purchaseOrder.photos.length > 1 && (
+                                      <span className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                                        +{purchaseOrder.photos.length - 1} foto's
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </TableCell>
@@ -743,8 +785,9 @@ export default function PurchaseOrders() {
                         <FormControl>
                           <Input 
                             type="date" 
-                            value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : field.value}
-                            onChange={(e) => field.onChange(new Date(e.target.value))}
+                            value={typeof field.value === 'string' ? field.value : 
+                                   field.value instanceof Date ? field.value.toISOString().split('T')[0] : ''}
+                            onChange={(e) => field.onChange(e.target.value)}
                           />
                         </FormControl>
                         <FormMessage />
@@ -797,6 +840,25 @@ export default function PurchaseOrders() {
                   )}
                 />
                 
+                <FormField
+                  control={form.control}
+                  name="photos"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Afbeeldingen</FormLabel>
+                      <FormControl>
+                        <ImageUpload
+                          images={field.value || []}
+                          onChange={field.onChange}
+                          maxImages={5}
+                          maxSizeMB={5}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="notes"
