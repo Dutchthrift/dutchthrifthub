@@ -10,6 +10,7 @@ export const repairStatusEnum = pgEnum("repair_status", ["new", "in_progress", "
 export const todoStatusEnum = pgEnum("todo_status", ["todo", "in_progress", "done"]);
 export const emailStatusEnum = pgEnum("email_status", ["open", "closed", "archived"]);
 export const orderStatusEnum = pgEnum("order_status", ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]);
+export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["pending", "ordered", "received", "cancelled"]);
 
 // Users table
 export const users = pgTable("users", {
@@ -145,10 +146,26 @@ export const internalNotes = pgTable("internal_notes", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Purchase Orders table
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  supplierNumber: text("supplier_number").notNull(),
+  supplierName: text("supplier_name").notNull(),
+  purchaseDate: timestamp("purchase_date").notNull(),
+  amount: integer("amount").notNull(), // in cents
+  currency: text("currency").default("EUR"),
+  notes: text("notes"),
+  photos: text("photos").array(), // URLs to stored images
+  status: purchaseOrderStatusEnum("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Activity feed table
 export const activities = pgTable("activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  type: text("type").notNull(), // e.g., 'order_created', 'repair_completed', 'email_replied'
+  type: text("type").notNull(), // e.g., 'order_created', 'repair_completed', 'email_replied', 'purchase_order_created'
   description: text("description").notNull(),
   userId: varchar("user_id").references(() => users.id),
   metadata: jsonb("metadata"), // additional data about the activity
@@ -205,6 +222,15 @@ export const insertInternalNoteSchema = createInsertSchema(internalNotes).omit({
   updatedAt: true,
 });
 
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  purchaseDate: z.string().datetime().or(z.date()),
+  amount: z.number().int().positive(),
+});
+
 export const insertActivitySchema = createInsertSchema(activities).omit({
   id: true,
   createdAt: true,
@@ -234,6 +260,9 @@ export type InsertTodo = z.infer<typeof insertTodoSchema>;
 
 export type InternalNote = typeof internalNotes.$inferSelect;
 export type InsertInternalNote = z.infer<typeof insertInternalNoteSchema>;
+
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
 
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
