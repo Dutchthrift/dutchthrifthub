@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Camera, Home, Inbox, ShoppingCart, Wrench, CheckSquare, BarChart3, Search, Bell, ChevronDown } from "lucide-react";
+import { Camera, Home, Inbox, ShoppingCart, Package2, Wrench, CheckSquare, BarChart3, Search, Bell, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ const navigationItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/inbox", label: "Inbox", icon: Inbox, badge: 3 },
   { href: "/orders", label: "Orders", icon: ShoppingCart },
+  { href: "/purchase-orders", label: "Inkoop Orders", icon: Package2 },
   { href: "/repairs", label: "Repairs", icon: Wrench },
   { href: "/todos", label: "To-do's", icon: CheckSquare },
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },

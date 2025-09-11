@@ -709,11 +709,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertPurchaseOrderSchema.parse(req.body);
       
-      // Convert purchaseDate string to Date object if provided
-      if (validatedData.purchaseDate && typeof validatedData.purchaseDate === 'string') {
-        validatedData.purchaseDate = new Date(validatedData.purchaseDate);
-      }
-      
       const purchaseOrder = await storage.createPurchaseOrder(validatedData);
       
       // Create activity
@@ -735,11 +730,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       
-      // Convert purchaseDate string to Date object if provided in update
-      const updateData = { ...req.body };
-      if (updateData.purchaseDate && typeof updateData.purchaseDate === 'string') {
-        updateData.purchaseDate = new Date(updateData.purchaseDate);
-      }
+      // Always validate with partial schema for data integrity
+      const updateData = insertPurchaseOrderSchema.partial().parse(req.body);
       
       const purchaseOrder = await storage.updatePurchaseOrder(id, updateData);
       

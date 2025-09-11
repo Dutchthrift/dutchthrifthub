@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Inbox from "@/pages/inbox";
 import Orders from "@/pages/orders";
+import PurchaseOrders from "@/pages/purchase-orders";
 import Repairs from "@/pages/repairs";
 import Todos from "@/pages/todos";
 import Dashboard from "@/pages/dashboard";
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/inbox" component={Inbox} />
       <Route path="/orders" component={Orders} />
+      <Route path="/purchase-orders" component={PurchaseOrders} />
       <Route path="/repairs" component={Repairs} />
       <Route path="/todos" component={Todos} />
       <Route path="/dashboard" component={Dashboard} />
