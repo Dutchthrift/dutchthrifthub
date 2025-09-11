@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertPurchaseOrderSchema } from "@shared/schema";
+import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertPurchaseOrderSchema, insertCaseSchema } from "@shared/schema";
 import { syncEmails, sendEmail } from "./services/emailService";
 import { shopifyClient } from "./services/shopifyClient";
 
@@ -876,6 +876,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching customer repairs:", error);
       res.status(500).json({ message: "Failed to fetch customer repairs" });
+    }
+  });
+
+  // Cases
+  app.get("/api/cases", async (req, res) => {
+    try {
+      const { status, q } = req.query;
+      const cases = await storage.getCases(status as string, q as string);
+      res.json(cases);
+    } catch (error) {
+      console.error("Error fetching cases:", error);
+      res.status(500).json({ message: "Failed to fetch cases" });
+    }
+  });
+
+  app.post("/api/cases", async (req, res) => {
+    try {
+      const validatedData = insertCaseSchema.parse(req.body);
+      
+      // Handle date conversions
+      if (validatedData.slaDeadline && typeof validatedData.slaDeadline === 'string') {
+        validatedData.slaDeadline = new Date(validatedData.slaDeadline);
+      }
+      if (validatedData.resolvedAt && typeof validatedData.resolvedAt === 'string') {
+        validatedData.resolvedAt = new Date(validatedData.resolvedAt);
+      }
+      if (validatedData.closedAt && typeof validatedData.closedAt === 'string') {
+        validatedData.closedAt = new Date(validatedData.closedAt);
+      }
+      
+      const newCase = await storage.createCase(validatedData);
+      
+      // Create activity
+      await storage.createActivity({
+        type: "case_created",
+        description: `Created case: ${newCase.title}`,
+        userId: newCase.assignedUserId,
+        metadata: { caseId: newCase.id, caseNumber: newCase.caseNumber }
+      });
+
+      res.status(201).json(newCase);
+    } catch (error) {
+      console.error("Error creating case:", error);
+      res.status(400).json({ message: "Failed to create case" });
+    }
+  });
+
+  app.get("/api/cases/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const caseItem = await storage.getCase(id);
+      if (!caseItem) {
+        return res.status(404).json({ message: "Case not found" });
+      }
+      
+      // Get related items
+      const relatedItems = await storage.getCaseRelatedItems(id);
+      
+      res.json({
+        case: caseItem,
+        ...relatedItems
+      });
+    } catch (error) {
+      console.error("Error fetching case:", error);
+      res.status(500).json({ message: "Failed to fetch case" });
+    }
+  });
+
+  app.patch("/api/cases/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Handle date conversions
+      const updateData = { ...req.body };
+      if (updateData.slaDeadline && typeof updateData.slaDeadline === 'string') {
+        updateData.slaDeadline = new Date(updateData.slaDeadline);
+      }
+      if (updateData.resolvedAt && typeof updateData.resolvedAt === 'string') {
+        updateData.resolvedAt = new Date(updateData.resolvedAt);
+      }
+      if (updateData.closedAt && typeof updateData.closedAt === 'string') {
+        updateData.closedAt = new Date(updateData.closedAt);
+      }
+      
+      const updatedCase = await storage.updateCase(id, updateData);
+      
+      // Create activity for status change
+      if (req.body.status) {
+        await storage.createActivity({
+          type: "case_status_updated",
+          description: `Updated case status to ${req.body.status}: ${updatedCase.title}`,
+          userId: updatedCase.assignedUserId,
+          metadata: { caseId: updatedCase.id, status: req.body.status }
+        });
+      }
+      
+      res.json(updatedCase);
+    } catch (error) {
+      console.error("Error updating case:", error);
+      res.status(400).json({ message: "Failed to update case" });
+    }
+  });
+
+  app.post("/api/cases/:id/link", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { entityType, entityId } = req.body;
+      
+      if (!entityType || !entityId) {
+        return res.status(400).json({ message: "entityType and entityId are required" });
+      }
+      
+      if (!['email', 'repair', 'todo', 'order', 'note'].includes(entityType)) {
+        return res.status(400).json({ message: "Invalid entityType" });
+      }
+      
+      await storage.linkEntityToCase(id, entityType, entityId);
+      
+      const caseItem = await storage.getCase(id);
+      await storage.createActivity({
+        type: "case_entity_linked",
+        description: `Linked ${entityType} to case: ${caseItem?.title}`,
+        userId: caseItem?.assignedUserId,
+        metadata: { caseId: id, entityType, entityId }
+      });
+      
+      res.json({ message: "Entity linked to case successfully" });
+    } catch (error) {
+      console.error("Error linking entity to case:", error);
+      res.status(400).json({ message: "Failed to link entity to case" });
+    }
+  });
+
+  app.post("/api/cases/:id/unlink", async (req, res) => {
+    try {
+      const { entityType, entityId } = req.body;
+      
+      if (!entityType || !entityId) {
+        return res.status(400).json({ message: "entityType and entityId are required" });
+      }
+      
+      if (!['email', 'repair', 'todo', 'order', 'note'].includes(entityType)) {
+        return res.status(400).json({ message: "Invalid entityType" });
+      }
+      
+      await storage.unlinkEntityFromCase(entityType, entityId);
+      
+      const { id } = req.params;
+      const caseItem = await storage.getCase(id);
+      await storage.createActivity({
+        type: "case_entity_unlinked",
+        description: `Unlinked ${entityType} from case: ${caseItem?.title}`,
+        userId: caseItem?.assignedUserId,
+        metadata: { caseId: id, entityType, entityId }
+      });
+      
+      res.json({ message: "Entity unlinked from case successfully" });
+    } catch (error) {
+      console.error("Error unlinking entity from case:", error);
+      res.status(400).json({ message: "Failed to unlink entity from case" });
+    }
+  });
+
+  app.post("/api/cases/from-email/:threadId", async (req, res) => {
+    try {
+      const { threadId } = req.params;
+      
+      const newCase = await storage.createCaseFromEmailThread(threadId);
+      
+      await storage.createActivity({
+        type: "case_created_from_email",
+        description: `Created case from email thread: ${newCase.title}`,
+        userId: newCase.assignedUserId,
+        metadata: { caseId: newCase.id, threadId }
+      });
+      
+      res.status(201).json(newCase);
+    } catch (error) {
+      console.error("Error creating case from email thread:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to create case from email thread" });
     }
   });
 

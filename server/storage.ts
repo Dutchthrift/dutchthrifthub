@@ -8,8 +8,9 @@ import {
   type Todo, type InsertTodo,
   type InternalNote, type InsertInternalNote,
   type PurchaseOrder, type InsertPurchaseOrder,
+  type Case, type InsertCase,
   type Activity, type InsertActivity,
-  users, customers, orders, emailThreads, emailMessages, repairs, todos, internalNotes, purchaseOrders, activities
+  users, customers, orders, emailThreads, emailMessages, repairs, todos, internalNotes, purchaseOrders, cases, activities
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count } from "drizzle-orm";
@@ -70,6 +71,22 @@ export interface IStorage {
   // Internal Notes
   getInternalNotes(entityId: string, entityType: string): Promise<InternalNote[]>;
   createInternalNote(note: InsertInternalNote): Promise<InternalNote>;
+
+  // Cases
+  getCases(status?: string, search?: string): Promise<Case[]>;
+  getCase(id: string): Promise<Case | undefined>;
+  createCase(caseData: InsertCase): Promise<Case>;
+  updateCase(id: string, caseData: Partial<InsertCase>): Promise<Case>;
+  linkEntityToCase(caseId: string, entityType: 'email' | 'repair' | 'todo' | 'order' | 'note', entityId: string): Promise<void>;
+  unlinkEntityFromCase(entityType: 'email' | 'repair' | 'todo' | 'order' | 'note', entityId: string): Promise<void>;
+  createCaseFromEmailThread(threadId: string): Promise<Case>;
+  getCaseRelatedItems(caseId: string): Promise<{
+    emails: EmailThread[];
+    orders: Order[];
+    repairs: Repair[];
+    todos: Todo[];
+    notes: InternalNote[];
+  }>;
 
   // Activities
   getActivities(limit?: number): Promise<Activity[]>;
@@ -299,6 +316,181 @@ export class DatabaseStorage implements IStorage {
   async createInternalNote(note: InsertInternalNote): Promise<InternalNote> {
     const result = await db.insert(internalNotes).values(note).returning();
     return result[0];
+  }
+
+  // Cases
+  async getCases(status?: string, search?: string): Promise<Case[]> {
+    const conditions = [];
+    
+    if (status) {
+      conditions.push(eq(cases.status, status as any));
+    }
+    
+    if (search) {
+      const searchTerm = `%${search}%`;
+      conditions.push(or(
+        ilike(cases.title, searchTerm),
+        ilike(cases.description, searchTerm),
+        ilike(cases.caseNumber, searchTerm),
+        ilike(cases.customerEmail, searchTerm)
+      ));
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(cases).where(and(...conditions)).orderBy(desc(cases.createdAt));
+    } else {
+      return await db.select().from(cases).orderBy(desc(cases.createdAt));
+    }
+  }
+
+  async getCase(id: string): Promise<Case | undefined> {
+    const result = await db.select().from(cases).where(eq(cases.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createCase(caseData: InsertCase): Promise<Case> {
+    // Generate a unique case number
+    const existingCases = await db.select({ caseNumber: cases.caseNumber }).from(cases);
+    const maxNumber = existingCases
+      .map(c => parseInt(c.caseNumber.replace('CASE-', ''), 10))
+      .filter(num => !isNaN(num))
+      .reduce((max, num) => Math.max(max, num), 0);
+    
+    const newCaseNumber = `CASE-${String(maxNumber + 1).padStart(3, '0')}`;
+    
+    const createData = {
+      ...caseData,
+      caseNumber: newCaseNumber
+    };
+
+    // Handle date conversions
+    if (createData.slaDeadline && typeof createData.slaDeadline === 'string') {
+      createData.slaDeadline = new Date(createData.slaDeadline);
+    }
+    if (createData.resolvedAt && typeof createData.resolvedAt === 'string') {
+      createData.resolvedAt = new Date(createData.resolvedAt);
+    }
+    if (createData.closedAt && typeof createData.closedAt === 'string') {
+      createData.closedAt = new Date(createData.closedAt);
+    }
+
+    const result = await db.insert(cases).values(createData as any).returning();
+    return result[0];
+  }
+
+  async updateCase(id: string, caseData: Partial<InsertCase>): Promise<Case> {
+    // Handle date conversions
+    const updateData = { ...caseData };
+    if (updateData.slaDeadline && typeof updateData.slaDeadline === 'string') {
+      updateData.slaDeadline = new Date(updateData.slaDeadline);
+    }
+    if (updateData.resolvedAt && typeof updateData.resolvedAt === 'string') {
+      updateData.resolvedAt = new Date(updateData.resolvedAt);
+    }
+    if (updateData.closedAt && typeof updateData.closedAt === 'string') {
+      updateData.closedAt = new Date(updateData.closedAt);
+    }
+
+    const result = await db.update(cases).set(updateData as any).where(eq(cases.id, id)).returning();
+    return result[0];
+  }
+
+  async linkEntityToCase(caseId: string, entityType: 'email' | 'repair' | 'todo' | 'order' | 'note', entityId: string): Promise<void> {
+    switch (entityType) {
+      case 'email':
+        await db.update(emailThreads).set({ caseId }).where(eq(emailThreads.id, entityId));
+        break;
+      case 'repair':
+        await db.update(repairs).set({ caseId }).where(eq(repairs.id, entityId));
+        break;
+      case 'todo':
+        await db.update(todos).set({ caseId }).where(eq(todos.id, entityId));
+        break;
+      case 'order':
+        // For orders, we link via the email thread that might exist
+        const orderEmailThread = await db.select().from(emailThreads).where(eq(emailThreads.orderId, entityId)).limit(1);
+        if (orderEmailThread.length > 0) {
+          await db.update(emailThreads).set({ caseId }).where(eq(emailThreads.orderId, entityId));
+        }
+        break;
+      case 'note':
+        await db.update(internalNotes).set({ caseId }).where(eq(internalNotes.id, entityId));
+        break;
+    }
+  }
+
+  async unlinkEntityFromCase(entityType: 'email' | 'repair' | 'todo' | 'order' | 'note', entityId: string): Promise<void> {
+    switch (entityType) {
+      case 'email':
+        await db.update(emailThreads).set({ caseId: null }).where(eq(emailThreads.id, entityId));
+        break;
+      case 'repair':
+        await db.update(repairs).set({ caseId: null }).where(eq(repairs.id, entityId));
+        break;
+      case 'todo':
+        await db.update(todos).set({ caseId: null }).where(eq(todos.id, entityId));
+        break;
+      case 'order':
+        await db.update(emailThreads).set({ caseId: null }).where(eq(emailThreads.orderId, entityId));
+        break;
+      case 'note':
+        await db.update(internalNotes).set({ caseId: null }).where(eq(internalNotes.id, entityId));
+        break;
+    }
+  }
+
+  async createCaseFromEmailThread(threadId: string): Promise<Case> {
+    const thread = await this.getEmailThread(threadId);
+    if (!thread) {
+      throw new Error('Email thread not found');
+    }
+
+    const caseData: InsertCase = {
+      title: thread.subject || 'Case from email thread',
+      description: `Case created from email thread: ${thread.subject}`,
+      customerId: thread.customerId || undefined,
+      customerEmail: thread.customerEmail || undefined,
+      assignedUserId: thread.assignedUserId || undefined,
+      priority: thread.priority || 'medium',
+      status: 'new'
+    };
+
+    const newCase = await this.createCase(caseData);
+    
+    // Link the email thread to the case
+    await this.linkEntityToCase(newCase.id, 'email', threadId);
+    
+    return newCase;
+  }
+
+  async getCaseRelatedItems(caseId: string): Promise<{
+    emails: EmailThread[];
+    orders: Order[];
+    repairs: Repair[];
+    todos: Todo[];
+    notes: InternalNote[];
+  }> {
+    const [caseEmails, caseRepairs, caseTodos, caseNotes] = await Promise.all([
+      db.select().from(emailThreads).where(eq(emailThreads.caseId, caseId)),
+      db.select().from(repairs).where(eq(repairs.caseId, caseId)),
+      db.select().from(todos).where(eq(todos.caseId, caseId)),
+      db.select().from(internalNotes).where(eq(internalNotes.caseId, caseId))
+    ]);
+
+    // Get orders that are linked via email threads
+    const orderIds = caseEmails.filter(email => email.orderId).map(email => email.orderId!);
+    const caseOrders: Order[] = orderIds.length > 0 ? 
+      await db.select().from(orders).where(or(
+        ...orderIds.map(orderId => eq(orders.id, orderId))
+      )) : [];
+
+    return {
+      emails: caseEmails,
+      orders: caseOrders,
+      repairs: caseRepairs,
+      todos: caseTodos,
+      notes: caseNotes
+    };
   }
 
   // Activities

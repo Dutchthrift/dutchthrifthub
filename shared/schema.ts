@@ -11,6 +11,7 @@ export const todoStatusEnum = pgEnum("todo_status", ["todo", "in_progress", "don
 export const emailStatusEnum = pgEnum("email_status", ["open", "closed", "archived"]);
 export const orderStatusEnum = pgEnum("order_status", ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]);
 export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["pending", "ordered", "received", "cancelled"]);
+export const caseStatusEnum = pgEnum("case_status", ["new", "in_progress", "waiting_customer", "waiting_part", "resolved", "closed"]);
 
 // Users table
 export const users = pgTable("users", {
@@ -69,6 +70,7 @@ export const emailThreads = pgTable("email_threads", {
   lastActivity: timestamp("last_activity").defaultNow(),
   slaDeadline: timestamp("sla_deadline"),
   orderId: varchar("order_id").references(() => orders.id),
+  caseId: varchar("case_id").references(() => cases.id), // Link email threads to cases
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -108,6 +110,7 @@ export const repairs = pgTable("repairs", {
   timeline: jsonb("timeline"), // array of status updates
   slaDeadline: timestamp("sla_deadline"),
   completedAt: timestamp("completed_at"),
+  caseId: varchar("case_id").references(() => cases.id), // Link repairs to cases
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -126,6 +129,7 @@ export const todos = pgTable("todos", {
   orderId: varchar("order_id").references(() => orders.id),
   repairId: varchar("repair_id").references(() => repairs.id),
   emailThreadId: varchar("email_thread_id").references(() => emailThreads.id),
+  caseId: varchar("case_id").references(() => cases.id), // Link todos to cases
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -141,7 +145,27 @@ export const internalNotes = pgTable("internal_notes", {
   orderId: varchar("order_id").references(() => orders.id),
   repairId: varchar("repair_id").references(() => repairs.id),
   emailThreadId: varchar("email_thread_id").references(() => emailThreads.id),
+  caseId: varchar("case_id").references(() => cases.id), // Link notes to cases
   mentions: text("mentions").array(), // user IDs mentioned in the note
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Cases table - Central overarching object for customer requests
+export const cases = pgTable("cases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  customerId: varchar("customer_id").references(() => customers.id),
+  customerEmail: text("customer_email"),
+  assignedUserId: varchar("assigned_user_id").references(() => users.id),
+  status: caseStatusEnum("status").notNull().default("new"),
+  priority: priorityEnum("priority").default("medium"),
+  caseNumber: text("case_number").notNull().unique(), // Auto-generated case number
+  timeline: jsonb("timeline"), // Chronological log of all activities
+  slaDeadline: timestamp("sla_deadline"),
+  resolvedAt: timestamp("resolved_at"),
+  closedAt: timestamp("closed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -234,6 +258,17 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   photos: z.array(z.string()).max(3).optional(),
 });
 
+export const insertCaseSchema = createInsertSchema(cases).omit({
+  id: true,
+  caseNumber: true, // Auto-generated
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  slaDeadline: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
+  resolvedAt: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
+  closedAt: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
+});
+
 export const insertActivitySchema = createInsertSchema(activities).omit({
   id: true,
   createdAt: true,
@@ -266,6 +301,9 @@ export type InsertInternalNote = z.infer<typeof insertInternalNoteSchema>;
 
 export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+
+export type Case = typeof cases.$inferSelect;
+export type InsertCase = z.infer<typeof insertCaseSchema>;
 
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
