@@ -40,15 +40,24 @@ export class ImapSmtpProvider implements EmailProvider {
       let lock = await client.getMailboxLock('INBOX');
       
       try {
+        // Get total message count from selected mailbox
+        const totalMessages = client.mailbox && typeof client.mailbox === 'object' ? client.mailbox.exists : 50;
+        
+        // Calculate range for last 50 messages
+        const startSeq = Math.max(1, totalMessages - 49); // Get last 50 messages
+        const endSeq = totalMessages;
+        
+        console.log(`IMAP total messages: ${totalMessages}, fetching range: ${startSeq}:${endSeq}`);
+        
         // Get recent emails (last 50)
         const messages = [];
-        for await (let message of client.fetch('1:50', {
+        for await (let message of client.fetch(`${startSeq}:${endSeq}`, {
           envelope: true,
           flags: true,
           bodyStructure: true,
           internalDate: true,
           uid: true
-        }, { uid: true })) {
+        })) {
           
           // Check if message has attachments
           const hasAttachment = this.checkForAttachments(message.bodyStructure);
@@ -82,7 +91,7 @@ export class ImapSmtpProvider implements EmailProvider {
           messages.push(rawEmail);
         }
         
-        return messages.reverse(); // Return oldest first
+        return messages; // Already in chronological order (oldest to newest)
         
       } finally {
         lock.release();
