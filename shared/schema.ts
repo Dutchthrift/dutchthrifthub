@@ -228,7 +228,7 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   updatedAt: true,
 }).extend({
   purchaseDate: z.union([z.string(), z.date()]).transform(val => 
-    typeof val === 'string' ? val : val
+    typeof val === 'string' ? new Date(val) : val
   ),
   amount: z.number().int().positive(),
   photos: z.array(z.string()).max(3).optional(),
