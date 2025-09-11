@@ -80,13 +80,72 @@ export class ImapSmtpProvider implements EmailProvider {
             
             // Try to get text/html first, then text/plain
             if (message.bodyParts && message.bodyParts.size > 0) {
-              for (let [partId, bodyPart] of message.bodyParts) {
+              for (let [partId, bodyPart] of Array.from(message.bodyParts.entries())) {
                 console.log('Processing bodyPart:', partId, 'length:', bodyPart ? bodyPart.toString().length : 0);
                 if (bodyPart) {
-                  const content = bodyPart.toString();
+                  let content = bodyPart.toString();
                   if (content && content.trim().length > 0) {
-                    bodyText = content;
-                    isHtml = partId.includes('html') || content.includes('<html>') || content.includes('<div>');
+                    
+                    // Parse multipart MIME content to extract clean text/HTML
+                    if (content.includes('Content-Type:') && content.includes('--')) {
+                      // This is multipart MIME content, extract the actual message
+                      const lines = content.split('\n');
+                      let inTextSection = false;
+                      let inHtmlSection = false;
+                      let cleanContent = '';
+                      let currentSection = '';
+                      
+                      for (const line of lines) {
+                        if (line.startsWith('--') && line.length > 10) {
+                          // MIME boundary - save current section and reset
+                          if (inHtmlSection && currentSection.trim()) {
+                            cleanContent = currentSection.trim();
+                            isHtml = true;
+                            break; // Prefer HTML over plain text
+                          } else if (inTextSection && currentSection.trim() && !cleanContent) {
+                            cleanContent = currentSection.trim();
+                            isHtml = false;
+                          }
+                          inTextSection = false;
+                          inHtmlSection = false;
+                          currentSection = '';
+                        } else if (line.includes('Content-Type: text/plain')) {
+                          inTextSection = true;
+                          inHtmlSection = false;
+                          currentSection = '';
+                        } else if (line.includes('Content-Type: text/html')) {
+                          inHtmlSection = true;
+                          inTextSection = false;
+                          currentSection = '';
+                        } else if ((inTextSection || inHtmlSection) && line.trim() !== '' && !line.includes('Content-Type:') && !line.includes('charset=')) {
+                          // Actual content line
+                          currentSection += line + '\n';
+                        }
+                      }
+                      
+                      // Handle final section
+                      if (inHtmlSection && currentSection.trim()) {
+                        cleanContent = currentSection.trim();
+                        isHtml = true;
+                      } else if (inTextSection && currentSection.trim() && !cleanContent) {
+                        cleanContent = currentSection.trim();
+                        isHtml = false;
+                      }
+                      
+                      if (cleanContent) {
+                        bodyText = cleanContent;
+                        console.log('Extracted clean content, length:', bodyText.length, 'isHtml:', isHtml);
+                      } else {
+                        // Fallback: use raw content
+                        bodyText = content;
+                        isHtml = partId.includes('html') || content.includes('<html>') || content.includes('<div>');
+                      }
+                    } else {
+                      // Simple content, use as-is
+                      bodyText = content;
+                      isHtml = partId.includes('html') || content.includes('<html>') || content.includes('<div>');
+                    }
+                    
                     console.log('Found body content, length:', bodyText.length, 'isHtml:', isHtml);
                     break;
                   }
@@ -110,8 +169,8 @@ export class ImapSmtpProvider implements EmailProvider {
                 });
                 bodyLock.release();
                 
-                if (fullMessage.bodyParts && fullMessage.bodyParts.size > 0) {
-                  for (let [partId, bodyPart] of fullMessage.bodyParts) {
+                if (fullMessage && fullMessage.bodyParts && fullMessage.bodyParts.size > 0) {
+                  for (let [partId, bodyPart] of Array.from(fullMessage.bodyParts.entries())) {
                     if (bodyPart) {
                       bodyText = bodyPart.toString();
                       if (bodyText.trim().length > 0) break;
