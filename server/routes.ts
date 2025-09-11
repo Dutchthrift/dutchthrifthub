@@ -362,6 +362,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Full sync endpoint for importing ALL data from Shopify
+  app.post("/api/shopify/sync-all", async (req, res) => {
+    try {
+      console.log('🚀 Starting full Shopify sync - importing ALL customers and orders...');
+      
+      let customerStats = { synced: 0, created: 0, updated: 0, skipped: 0, total: 0 };
+      let orderStats = { synced: 0, created: 0, updated: 0, skipped: 0, total: 0 };
+      let errors: string[] = [];
+
+      // Step 1: Sync all customers
+      try {
+        console.log('👥 Step 1/2: Syncing all customers from Shopify...');
+        const shopifyCustomers = await shopifyClient.getAllCustomers((processed) => {
+          console.log(`📊 Customer sync progress: ${processed} customers processed`);
+        });
+        
+        console.log(`Processing ${shopifyCustomers.length} customers...`);
+        
+        for (const shopifyCustomer of shopifyCustomers) {
+          try {
+            if (!shopifyCustomer.email) {
+              customerStats.skipped++;
+              continue;
+            }
+            
+            const existingCustomer = await storage.getCustomerByEmail(shopifyCustomer.email);
+            
+            if (!existingCustomer) {
+              await storage.createCustomer({
+                email: shopifyCustomer.email,
+                firstName: shopifyCustomer.first_name || null,
+                lastName: shopifyCustomer.last_name || null,
+                phone: shopifyCustomer.phone || null,
+                shopifyCustomerId: shopifyCustomer.id.toString()
+              });
+              customerStats.created++;
+            } else if (!existingCustomer.shopifyCustomerId || existingCustomer.shopifyCustomerId !== shopifyCustomer.id.toString()) {
+              await storage.updateCustomer(existingCustomer.id, {
+                shopifyCustomerId: shopifyCustomer.id.toString(),
+                phone: shopifyCustomer.phone || existingCustomer.phone,
+                firstName: shopifyCustomer.first_name || existingCustomer.firstName,
+                lastName: shopifyCustomer.last_name || existingCustomer.lastName
+              });
+              customerStats.updated++;
+            }
+            customerStats.synced++;
+          } catch (customerError) {
+            console.error(`Error processing customer ${shopifyCustomer.id}:`, customerError);
+            customerStats.skipped++;
+            errors.push(`Customer ${shopifyCustomer.id}: ${customerError instanceof Error ? customerError.message : String(customerError)}`);
+          }
+        }
+        
+        customerStats.total = shopifyCustomers.length;
+        console.log(`✅ Customer sync completed: ${customerStats.created} created, ${customerStats.updated} updated, ${customerStats.skipped} skipped from ${customerStats.total} customers`);
+        
+      } catch (customerSyncError) {
+        console.error('Failed to sync customers:', customerSyncError);
+        errors.push(`Customer sync failed: ${customerSyncError instanceof Error ? customerSyncError.message : String(customerSyncError)}`);
+      }
+
+      // Step 2: Sync all orders
+      try {
+        console.log('🛒 Step 2/2: Syncing all orders from Shopify...');
+        const shopifyOrders = await shopifyClient.getAllOrders((processed) => {
+          console.log(`📊 Order sync progress: ${processed} orders processed`);
+        });
+        
+        console.log(`Processing ${shopifyOrders.length} orders...`);
+        
+        // Map Shopify financial status to our enum values
+        const mapShopifyStatus = (financialStatus: string, fulfillmentStatus: string | null) => {
+          if (fulfillmentStatus === 'fulfilled') return 'delivered';
+          if (fulfillmentStatus === 'partial') return 'shipped';
+          if (financialStatus === 'paid' || financialStatus === 'authorized') {
+            return fulfillmentStatus === null ? 'processing' : 'shipped';
+          }
+          if (financialStatus === 'pending') return 'pending';
+          if (financialStatus === 'refunded') return 'refunded';
+          if (financialStatus === 'voided') return 'cancelled';
+          return 'pending';
+        };
+        
+        for (const shopifyOrder of shopifyOrders) {
+          try {
+            const existingOrder = await storage.getOrderByShopifyId(shopifyOrder.id.toString());
+            
+            if (!existingOrder) {
+              // Create customer if doesn't exist
+              let customer = null;
+              if (shopifyOrder.customer && shopifyOrder.customer.email) {
+                customer = await storage.getCustomerByEmail(shopifyOrder.customer.email);
+                if (!customer) {
+                  customer = await storage.createCustomer({
+                    email: shopifyOrder.customer.email,
+                    firstName: shopifyOrder.customer.first_name,
+                    lastName: shopifyOrder.customer.last_name,
+                    shopifyCustomerId: shopifyOrder.customer.id.toString()
+                  });
+                }
+              }
+
+              await storage.createOrder({
+                shopifyOrderId: shopifyOrder.id.toString(),
+                orderNumber: shopifyOrder.order_number,
+                customerId: customer?.id,
+                customerEmail: shopifyOrder.email,
+                totalAmount: Math.round(parseFloat(shopifyOrder.total_price) * 100),
+                currency: shopifyOrder.currency,
+                status: mapShopifyStatus(shopifyOrder.financial_status, shopifyOrder.fulfillment_status),
+                fulfillmentStatus: shopifyOrder.fulfillment_status,
+                paymentStatus: shopifyOrder.financial_status,
+                orderData: shopifyOrder
+              });
+              orderStats.created++;
+            } else {
+              await storage.updateOrder(existingOrder.id, {
+                status: mapShopifyStatus(shopifyOrder.financial_status, shopifyOrder.fulfillment_status),
+                fulfillmentStatus: shopifyOrder.fulfillment_status,
+                paymentStatus: shopifyOrder.financial_status,
+                orderData: shopifyOrder,
+                totalAmount: Math.round(parseFloat(shopifyOrder.total_price) * 100)
+              });
+              orderStats.updated++;
+            }
+            orderStats.synced++;
+          } catch (orderError) {
+            console.error(`Error processing order ${shopifyOrder.id}:`, orderError);
+            orderStats.skipped++;
+            errors.push(`Order ${shopifyOrder.id}: ${orderError instanceof Error ? orderError.message : String(orderError)}`);
+          }
+        }
+        
+        orderStats.total = shopifyOrders.length;
+        console.log(`✅ Order sync completed: ${orderStats.created} created, ${orderStats.updated} updated, ${orderStats.skipped} skipped from ${orderStats.total} orders`);
+        
+      } catch (orderSyncError) {
+        console.error('Failed to sync orders:', orderSyncError);
+        errors.push(`Order sync failed: ${orderSyncError instanceof Error ? orderSyncError.message : String(orderSyncError)}`);
+      }
+
+      const totalTime = Date.now();
+      console.log(`🎉 Full Shopify sync completed! Customer: ${customerStats.created + customerStats.updated} processed, Orders: ${orderStats.created + orderStats.updated} processed`);
+      
+      res.json({
+        success: true,
+        customers: customerStats,
+        orders: orderStats,
+        errors: errors.length > 0 ? errors.slice(0, 10) : [], // Limit error messages
+        totalErrors: errors.length,
+        message: `Full sync completed: ${customerStats.total} customers and ${orderStats.total} orders processed from Shopify`
+      });
+      
+    } catch (error) {
+      console.error('Full Shopify sync failed:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Full sync failed',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // Sync customers from Shopify - Enhanced with bulk import
   app.post("/api/customers/sync", async (req, res) => {
     try {
