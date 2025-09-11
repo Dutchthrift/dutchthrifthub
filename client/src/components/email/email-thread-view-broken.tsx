@@ -55,15 +55,23 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
     queryKey: ["/api/email-threads", threadId],
   });
 
-  // Get all available cases for linking  
-  const { data: allCases } = useQuery<Case[]>({
-    queryKey: ["/api/cases"],
-    enabled: true,
-  });
-
-  // Get linked cases for this thread
+  // Check if this thread is linked to any case
   const { data: linkedCases } = useQuery<Case[]>({
     queryKey: ["/api/cases", "linked", threadId],
+    queryFn: async () => {
+      const response = await fetch(`/api/cases?emailThreadId=${threadId}`);
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        throw new Error('Failed to fetch linked cases');
+      }
+      return response.json();
+    },
+    enabled: !!threadId,
+  });
+
+  // Get all available cases for linking
+  const { data: allCases } = useQuery<Case[]>({
+    queryKey: ["/api/cases"],
     enabled: true,
   });
 
@@ -72,6 +80,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
     queryKey: ["/api/orders"],
     enabled: true,
   });
+
 
   const sendReplyMutation = useMutation({
     mutationFn: async (data: { to: string; subject: string; body: string }) => {
@@ -84,9 +93,10 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-threads", threadId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/email-threads"] });
       setReplyText("");
       setShowReply(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/email-threads", threadId] });
       toast({
         title: "Reply sent",
         description: "Your reply has been sent successfully",
@@ -98,22 +108,6 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
         description: "There was an error sending your reply",
         variant: "destructive",
       });
-    }
-  });
-
-  const markAsReadMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/email-threads/${threadId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isUnread: false }),
-      });
-      if (!response.ok) throw new Error("Failed to mark as read");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/email-threads", threadId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/email-threads"] });
     }
   });
 
@@ -191,16 +185,18 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
 
   const handleSendReply = () => {
     if (!thread || !replyText.trim()) return;
-    
+
     sendReplyMutation.mutate({
-      to: thread.customerEmail,
-      subject: `Re: ${thread.subject}`,
+      to: thread.customerEmail || "",
+      subject: `Re: ${thread.subject || "No Subject"}`,
       body: replyText,
     });
   };
 
   const markAsRead = () => {
-    markAsReadMutation.mutate();
+    if (thread?.isUnread) {
+      updateThreadMutation.mutate({ isUnread: false });
+    }
   };
 
   const closeThread = () => {
@@ -219,7 +215,6 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
     }
   };
 
-  // Fixed timestamp formatting - Dutch format HH:MM DD-MM-YYYY
   const formatMessageTime = (date: string | Date | null) => {
     if (!date) return "Unknown time";
     const messageDate = typeof date === 'string' ? new Date(date) : date;
@@ -243,10 +238,18 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
   if (isLoading) {
     return (
       <Card className="h-full" data-testid="email-thread-loading">
-        <CardContent className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading email thread...</p>
+        <CardContent className="p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-6 bg-muted rounded"></div>
+            <div className="h-4 bg-muted rounded w-3/4"></div>
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="p-4 border rounded">
+                  <div className="h-4 bg-muted rounded mb-2"></div>
+                  <div className="h-16 bg-muted rounded"></div>
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -255,30 +258,28 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
 
   if (!thread) {
     return (
-      <Card className="h-full" data-testid="email-thread-not-found">
-        <CardContent className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <Mail className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">Thread not found</h3>
-            <p className="text-muted-foreground">The requested email thread could not be found.</p>
-          </div>
+      <Card className="h-full flex items-center justify-center">
+        <CardContent className="text-center">
+          <p className="text-muted-foreground">Thread not found</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="h-full flex gap-6" data-testid="email-thread-view">
+    <div className="flex h-full gap-6" data-testid="email-thread-detail">
+      {/* Main Email Thread View */}
       <div className="flex-1 flex flex-col">
         {/* Thread Header */}
-        <Card className="mb-4" data-testid="email-thread-header">
+        <Card className="mb-4">
           <CardHeader>
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <CardTitle className="flex items-center space-x-2">
-                  <span>{thread.subject || "No Subject"}</span>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {thread.subject || "No Subject"}
                   {linkedCases && linkedCases.length > 0 && (
-                    <Badge variant="outline" className="ml-2">
+                    <Badge variant="secondary" className="text-xs">
+                      <Briefcase className="h-3 w-3 mr-1" />
                       Gekoppeld aan Case #{linkedCases[0].caseNumber}
                     </Badge>
                   )}
@@ -433,7 +434,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                     data-testid="send-reply-button"
                   >
                     <Send className="h-4 w-4 mr-1" />
-                    Send
+                    {sendReplyMutation.isPending ? "Sending..." : "Send Reply"}
                   </Button>
                 </div>
               </div>
@@ -444,14 +445,44 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
 
       {/* Customer Context Sidebar */}
       <div className="w-80 space-y-4" data-testid="customer-context-sidebar">
+        {/* Customer Information */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center">
-              <UserCircle className="h-5 w-5 mr-2" />
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserCircle className="h-5 w-5" />
               Klantcontext
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Email</div>
+              <div className="text-sm">{thread.customerEmail}</div>
+            </div>
+            
+            {thread.orderId && (
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Gekoppelde Order</div>
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{thread.orderId}</span>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Thread Status</div>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant={thread.status === 'open' ? 'default' : 'secondary'}>
+                  {thread.status}
+                </Badge>
+                <Badge variant={thread.priority === 'high' ? 'destructive' : 'outline'}>
+                  {thread.priority}
+                </Badge>
+              </div>
+            </div>
+
+            <Separator />
+
             {/* Case Actions */}
             <div className="space-y-3">
               {linkedCases && linkedCases.length > 0 ? (
@@ -534,7 +565,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
 
             <Separator />
 
-            {/* Order Linking - Simplified working version */}
+            {/* Order Linking */}
             <div className="space-y-3">
               <div className="text-sm font-medium text-muted-foreground mb-2">Order Koppeling</div>
               
@@ -562,32 +593,57 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
               ) : (
                 allOrders && allOrders.length > 0 && (
                   <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
-                        <SelectTrigger className="flex-1" data-testid="order-select-trigger">
-                          <SelectValue placeholder="Selecteer order..." />
-                        </SelectTrigger>
-                        <SelectContent data-testid="order-select-content" className="max-h-60 overflow-y-auto">
-                          {(allOrders || [])
-                            .slice()
-                            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-                            .slice(0, 20)
-                            .map((order) => (
-                              <SelectItem key={order.id} value={order.id} data-testid={`order-option-${order.id}`}>
-                                #{order.orderNumber} - €{((order.totalAmount || 0) / 100).toFixed(2)}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                      <Button 
-                        size="sm" 
-                        onClick={handleLinkToOrder}
-                        disabled={!selectedOrderId || linkToOrderMutation.isPending}
-                        data-testid="link-order-button"
-                      >
-                        <Package className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Zoek op ordernummer..."
+                        value={orderSearchQuery}
+                        onChange={(e) => setOrderSearchQuery(e.target.value)}
+                        className="text-sm"
+                        data-testid="order-search-input"
+                      />
+                      <div className="flex gap-2">
+                        <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
+                          <SelectTrigger className="flex-1" data-testid="order-select-trigger">
+                            <SelectValue placeholder="Selecteer order..." />
+                          </SelectTrigger>
+                          <SelectContent data-testid="order-select-content" className="max-h-60 overflow-y-auto">
+                            {filteredOrders.length > 0 ? (
+                              <>
+                                {filteredOrders.map((order) => (
+                                  <SelectItem key={order.id} value={order.id} data-testid={`order-option-${order.id}`}>
+                                    #{order.orderNumber} - €{((order.totalAmount || 0) / 100).toFixed(2)}
+                                  </SelectItem>
+                                ))}
+                                {!showAllOrders && allOrders && allOrders.length > 20 && filteredOrders.length >= 20 && (
+                                  <div className="px-2 py-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setShowAllOrders(true)}
+                                      className="w-full text-xs"
+                                      data-testid="show-more-orders"
+                                    >
+                                      Toon meer orders... ({allOrders.length - 20} meer)
+                                    </Button>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="px-2 py-1 text-sm text-muted-foreground">
+                                Geen orders gevonden
+                              </div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          size="sm" 
+                          onClick={handleLinkToOrder}
+                          disabled={!selectedOrderId || linkToOrderMutation.isPending}
+                          data-testid="link-order-button"
+                        >
+                          <Package className="h-4 w-4" />
+                        </Button>
+                      </div>
                     <p className="text-xs text-muted-foreground">
                       Koppel een order aan deze email thread voor betere organisatie.
                     </p>

@@ -56,7 +56,8 @@ export class ImapSmtpProvider implements EmailProvider {
           flags: true,
           bodyStructure: true,
           internalDate: true,
-          uid: true
+          uid: true,
+          bodyParts: ['TEXT']
         })) {
           
           // Check if message has attachments
@@ -70,8 +71,69 @@ export class ImapSmtpProvider implements EmailProvider {
             envelope.to?.[0]?.address || ''
           ) : `${message.uid}@${this.imapConfig.host}`;
 
-          // For now, use a placeholder for body text - we'll fetch it separately if needed
-          const bodyText = `Email from ${envelope?.from?.[0]?.address || 'unknown'} - ${envelope?.subject || 'No subject'}`;
+          // Extract actual email body content
+          let bodyText = '';
+          let isHtml = false;
+          
+          try {
+            console.log('Message bodyParts available:', message.bodyParts ? message.bodyParts.size : 0);
+            
+            // Try to get text/html first, then text/plain
+            if (message.bodyParts && message.bodyParts.size > 0) {
+              for (let [partId, bodyPart] of message.bodyParts) {
+                console.log('Processing bodyPart:', partId, 'length:', bodyPart ? bodyPart.toString().length : 0);
+                if (bodyPart) {
+                  const content = bodyPart.toString();
+                  if (content && content.trim().length > 0) {
+                    bodyText = content;
+                    isHtml = partId.includes('html') || content.includes('<html>') || content.includes('<div>');
+                    console.log('Found body content, length:', bodyText.length, 'isHtml:', isHtml);
+                    break;
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error extracting body from message:', error);
+          }
+          
+          // Improved content - try multiple sources and provide better fallbacks
+          if (!bodyText || bodyText.trim().length === 0) {
+            // Try bodyStructure for simple messages
+            if (message.bodyStructure) {
+              console.log('Trying bodyStructure as fallback');
+              try {
+                const bodyLock = await client.getMailboxLock('INBOX');
+                const fullMessage = await client.fetchOne(message.uid, {
+                  source: true,
+                  bodyParts: ['1']
+                });
+                bodyLock.release();
+                
+                if (fullMessage.bodyParts && fullMessage.bodyParts.size > 0) {
+                  for (let [partId, bodyPart] of fullMessage.bodyParts) {
+                    if (bodyPart) {
+                      bodyText = bodyPart.toString();
+                      if (bodyText.trim().length > 0) break;
+                    }
+                  }
+                }
+              } catch (fetchError) {
+                console.error('Error fetching full message:', fetchError);
+              }
+            }
+          }
+          
+          // Final fallback - better than completely generic placeholder
+          if (!bodyText || bodyText.trim().length === 0) {
+            // At least provide some meaningful content
+            const subject = envelope?.subject || 'No subject';
+            const fromAddr = envelope?.from?.[0]?.address || 'unknown';
+            bodyText = `[Content not available] Message from ${fromAddr} with subject: "${subject}"`;
+            console.log('Using enhanced fallback for message:', message.uid);
+          } else {
+            console.log('Successfully extracted email body, length:', bodyText.length);
+          }
           
           const rawEmail: RawEmail = {
             messageId: envelope?.messageId || `${message.uid}@${this.imapConfig.host}`,
@@ -80,7 +142,7 @@ export class ImapSmtpProvider implements EmailProvider {
             from: envelope?.from?.[0]?.address || '',
             to: envelope?.to?.[0]?.address || '',
             body: bodyText,
-            isHtml: false, // Plain text from IMAP
+            isHtml: isHtml,
             receivedDateTime: message.internalDate instanceof Date ? message.internalDate.toISOString() : new Date().toISOString(),
             isRead: message.flags?.has('\\Seen') || false,
             hasAttachment,

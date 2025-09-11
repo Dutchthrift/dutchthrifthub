@@ -176,7 +176,8 @@ export class DatabaseStorage implements IStorage {
 
   // Orders
   async getOrders(limit: number = 50): Promise<Order[]> {
-    return await db.select().from(orders).orderBy(orders.orderNumber).limit(limit);
+    // Sort by creation date descending (newest first) for better dropdown UX
+    return await db.select().from(orders).orderBy(desc(orders.createdAt)).limit(limit);
   }
 
   async getOrder(id: string): Promise<Order | undefined> {
@@ -220,7 +221,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateEmailThread(id: string, thread: Partial<InsertEmailThread>): Promise<EmailThread> {
-    const result = await db.update(emailThreads).set(thread).where(eq(emailThreads.id, id)).returning();
+    // Convert empty strings to null for foreign key fields to avoid constraint violations
+    const updateData = { ...thread };
+    if (updateData.orderId === '') {
+      updateData.orderId = null;
+    }
+    if (updateData.caseId === '') {
+      updateData.caseId = null;
+    }
+    
+    const result = await db.update(emailThreads).set(updateData).where(eq(emailThreads.id, id)).returning();
     return result[0];
   }
 

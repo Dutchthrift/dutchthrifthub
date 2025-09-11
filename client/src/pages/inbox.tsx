@@ -78,13 +78,22 @@ export default function Inbox() {
   };
 
   const formatLastActivity = (date: string) => {
-    const now = new Date();
     const activityDate = new Date(date);
-    const diffInHours = Math.floor((now.getTime() - activityDate.getTime()) / (1000 * 60 * 60));
     
-    if (diffInHours < 1) return "Just now";
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    return activityDate.toLocaleDateString();
+    // Format as "HH:MM DD-MM-YYYY"
+    const time = activityDate.toLocaleTimeString('nl-NL', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    
+    const dateStr = activityDate.toLocaleDateString('nl-NL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    
+    return `${time}\n${dateStr}`;
   };
 
   return (

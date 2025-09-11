@@ -268,8 +268,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const relatedItems = await storage.getCaseRelatedItems(caseId as string);
         res.json(relatedItems.orders);
       } else {
-        // Get all orders
-        const orders = await storage.getOrders();
+        // Get all orders with optional limit for dropdowns (default 20 for UI performance)
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+        const orders = await storage.getOrders(limit);
         res.json(orders);
       }
     } catch (error) {
