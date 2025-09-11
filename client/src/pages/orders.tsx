@@ -58,13 +58,35 @@ export default function Orders() {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       toast({
         title: "Orders synced",
-        description: `Synced ${data.synced} orders from Shopify`,
+        description: data.message || `Synced ${data.synced} orders from Shopify`,
       });
     },
     onError: () => {
       toast({
         title: "Sync failed",
         description: "Failed to sync orders from Shopify",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const syncCustomersMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/customers/sync", { method: "POST" });
+      if (!response.ok) throw new Error("Failed to sync customers");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      toast({
+        title: "Customers synced",
+        description: data.message || `Synced ${data.synced} customers from Shopify`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Sync failed",
+        description: "Failed to sync customers from Shopify",
         variant: "destructive",
       });
     }
@@ -138,7 +160,36 @@ export default function Orders() {
               data-testid="sync-orders-button"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${syncOrdersMutation.isPending ? 'animate-spin' : ''}`} />
-              Sync from Shopify
+              {syncOrdersMutation.isPending ? "Syncing..." : "Sync Orders"}
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const testResponse = await fetch('/api/shopify/test');
+                  const testResult = await testResponse.json();
+                  if (testResult.success) {
+                    syncCustomersMutation.mutate();
+                  } else {
+                    toast({
+                      title: "Shopify Connection Issue",
+                      description: `${testResult.message || 'Check API credentials'}`,
+                      variant: "destructive",
+                    });
+                  }
+                } catch (error) {
+                  toast({
+                    title: "Connection Test Failed",
+                    description: "Unable to test Shopify connection",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              disabled={syncCustomersMutation.isPending}
+              data-testid="sync-customers-button"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${syncCustomersMutation.isPending ? 'animate-spin' : ''}`} />
+              {syncCustomersMutation.isPending ? "Syncing..." : "Sync Customers"}
             </Button>
           </div>
         </div>

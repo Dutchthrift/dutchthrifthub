@@ -23,15 +23,20 @@ export interface ShopifyOrder {
 }
 
 class ShopifyClient {
-  private apiKey: string;
-  private password: string;
+  private accessToken: string;
   private shopDomain: string;
   private baseUrl: string;
 
   constructor() {
-    this.apiKey = process.env.SHOPIFY_API_KEY || '';
-    this.password = process.env.SHOPIFY_PASSWORD || '';
+    // Support both old and new credential formats
+    this.accessToken = process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_PASSWORD || '';
     this.shopDomain = process.env.SHOPIFY_SHOP_DOMAIN || '';
+    
+    console.log('Shopify Client initialized with:', {
+      hasAccessToken: !!this.accessToken,
+      shopDomain: this.shopDomain,
+      tokenLength: this.accessToken.length
+    });
     
     // Ensure proper domain format
     let domain = this.shopDomain;
@@ -45,24 +50,39 @@ class ShopifyClient {
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseUrl}${endpoint}`;
     
-    // Create auth header instead of embedding in URL
-    const auth = Buffer.from(`${this.apiKey}:${this.password}`).toString('base64');
+    if (!this.accessToken || !this.shopDomain) {
+      throw new Error('Shopify credentials not configured. Please set SHOPIFY_ACCESS_TOKEN and SHOPIFY_SHOP_DOMAIN environment variables.');
+    }
+    
+    console.log('Making Shopify API request:', {
+      url,
+      hasToken: !!this.accessToken,
+      tokenPrefix: this.accessToken.substring(0, 8) + '...',
+    });
     
     const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${auth}`,
+        'X-Shopify-Access-Token': this.accessToken,
         ...options.headers,
       },
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Shopify API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        url,
+        errorText
+      });
       throw new Error(`Shopify API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log('Shopify API response received for:', endpoint);
+    return result;
   }
 
   async getOrders(params: {

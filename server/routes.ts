@@ -266,6 +266,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test Shopify connection
+  app.get("/api/shopify/test", async (req, res) => {
+    try {
+      // Try to get shop info first (lighter request)
+      const response = await fetch(`${process.env.SHOPIFY_SHOP_DOMAIN ? 
+        `https://${process.env.SHOPIFY_SHOP_DOMAIN.replace('.myshopify.com', '')}.myshopify.com` : 
+        'https://shambu-nl.myshopify.com'
+      }/admin/api/2024-01/shop.json`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_PASSWORD || ''
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(response.status).json({
+          error: 'Shopify connection failed',
+          status: response.status,
+          message: errorText,
+          credentials: {
+            hasToken: !!(process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_PASSWORD),
+            tokenLength: (process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_PASSWORD || '').length,
+            shopDomain: process.env.SHOPIFY_SHOP_DOMAIN || 'shambu-nl.myshopify.com'
+          }
+        });
+      }
+      
+      const shopInfo = await response.json();
+      res.json({
+        success: true,
+        shop: shopInfo.shop?.name || 'Connected',
+        domain: shopInfo.shop?.myshopify_domain,
+        message: 'Shopify connection successful'
+      });
+    } catch (error) {
+      console.error('Shopify test error:', error);
+      res.status(500).json({
+        error: 'Shopify test failed',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Sync customers from Shopify
+  app.post("/api/customers/sync", async (req, res) => {
+    try {
+      const shopifyCustomers = await shopifyClient.getCustomers({ limit: 100 });
+      
+      let synced = 0;
+      let created = 0;
+      let updated = 0;
+      
+      for (const shopifyCustomer of shopifyCustomers) {
+        if (!shopifyCustomer.email) continue; // Skip customers without email
+        
+        const existingCustomer = await storage.getCustomerByEmail(shopifyCustomer.email);
+        
+        if (!existingCustomer) {
+          // Create new customer
+          await storage.createCustomer({
+            email: shopifyCustomer.email,
+            firstName: shopifyCustomer.first_name || null,
+            lastName: shopifyCustomer.last_name || null,
+            phone: shopifyCustomer.phone || null,
+            shopifyCustomerId: shopifyCustomer.id.toString()
+          });
+          created++;
+        } else if (!existingCustomer.shopifyCustomerId || existingCustomer.shopifyCustomerId !== shopifyCustomer.id.toString()) {
+          // Update existing customer with Shopify ID if missing
+          await storage.updateCustomer(existingCustomer.id, {
+            shopifyCustomerId: shopifyCustomer.id.toString(),
+            phone: shopifyCustomer.phone || existingCustomer.phone
+          });
+          updated++;
+        }
+        synced++;
+      }
+      
+      res.json({ 
+        synced, 
+        created, 
+        updated,
+        message: `Customer sync completed: ${created} created, ${updated} updated from ${synced} Shopify customers` 
+      });
+    } catch (error) {
+      console.error("Error syncing customers from Shopify:", error);
+      res.status(500).json({ message: "Failed to sync customers from Shopify", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // Sync orders from Shopify
   app.post("/api/orders/sync", async (req, res) => {
     try {
@@ -318,7 +409,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      res.json({ synced: shopifyOrders.length });
+      res.json({ 
+        synced: shopifyOrders.length, 
+        created: shopifyOrders.length, // All synced orders are new in this implementation
+        message: `Order sync completed: ${shopifyOrders.length} orders synced from Shopify` 
+      });
     } catch (error) {
       console.error("Error syncing orders:", error);
       res.status(500).json({ message: "Failed to sync orders" });
