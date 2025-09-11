@@ -512,12 +512,12 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                       <div className="text-xs font-medium text-muted-foreground">Of koppel aan bestaande case:</div>
                       <div className="flex gap-2">
                         <Select value={selectedCaseId} onValueChange={setSelectedCaseId}>
-                          <SelectTrigger className="flex-1">
+                          <SelectTrigger className="flex-1" data-testid="case-select-trigger">
                             <SelectValue placeholder="Selecteer case..." />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent data-testid="case-select-content">
                             {allCases.map((caseItem) => (
-                              <SelectItem key={caseItem.id} value={caseItem.id}>
+                              <SelectItem key={caseItem.id} value={caseItem.id} data-testid={`case-option-${caseItem.id}`}>
                                 Case #{caseItem.caseNumber} - {caseItem.title}
                               </SelectItem>
                             ))}
@@ -561,12 +561,12 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                   <div className="space-y-2">
                     <div className="flex gap-2">
                       <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
-                        <SelectTrigger className="flex-1">
+                        <SelectTrigger className="flex-1" data-testid="order-select-trigger">
                           <SelectValue placeholder="Selecteer order..." />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent data-testid="order-select-content">
                           {allOrders.map((order) => (
-                            <SelectItem key={order.id} value={order.id}>
+                            <SelectItem key={order.id} value={order.id} data-testid={`order-option-${order.id}`}>
                               #{order.orderNumber} - €{((order.totalAmount || 0) / 100).toFixed(2)}
                             </SelectItem>
                           ))}
