@@ -882,8 +882,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cases
   app.get("/api/cases", async (req, res) => {
     try {
-      const { status, q } = req.query;
-      const cases = await storage.getCases(status as string, q as string);
+      const { status, q, emailThreadId } = req.query;
+      const cases = await storage.getCases(status as string, q as string, emailThreadId as string);
       res.json(cases);
     } catch (error) {
       console.error("Error fetching cases:", error);

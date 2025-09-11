@@ -13,7 +13,7 @@ import {
   users, customers, orders, emailThreads, emailMessages, repairs, todos, internalNotes, purchaseOrders, cases, activities
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
-import { eq, desc, and, or, ilike, count } from "drizzle-orm";
+import { eq, desc, and, or, ilike, count, inArray, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -319,7 +319,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Cases
-  async getCases(status?: string, search?: string): Promise<Case[]> {
+  async getCases(status?: string, search?: string, emailThreadId?: string): Promise<Case[]> {
     const conditions = [];
     
     if (status) {
@@ -334,6 +334,27 @@ export class DatabaseStorage implements IStorage {
         ilike(cases.caseNumber, searchTerm),
         ilike(cases.customerEmail, searchTerm)
       ));
+    }
+    
+    if (emailThreadId) {
+      // Find cases linked to this email thread via the emailThreads.caseId field
+      const linkedThreads = await db.select({ caseId: emailThreads.caseId })
+        .from(emailThreads)
+        .where(and(
+          eq(emailThreads.id, emailThreadId),
+          isNotNull(emailThreads.caseId)
+        ));
+      
+      const linkedCaseIds = linkedThreads
+        .map(thread => thread.caseId)
+        .filter(id => id !== null) as string[];
+        
+      if (linkedCaseIds.length > 0) {
+        conditions.push(inArray(cases.id, linkedCaseIds));
+      } else {
+        // No linked cases found, return empty result
+        return [];
+      }
     }
     
     if (conditions.length > 0) {
