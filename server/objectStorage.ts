@@ -4,7 +4,6 @@ import { randomUUID } from "crypto";
 import {
   ObjectAclPolicy,
   ObjectPermission,
-  canAccessObject,
   getObjectAclPolicy,
   setObjectAclPolicy,
 } from "./objectAcl";
@@ -82,14 +81,36 @@ export class ObjectStorageService {
       // Get the ACL policy for the object.
       const aclPolicy = await getObjectAclPolicy(file);
       const isPublic = aclPolicy?.visibility === "public";
+      
+      const contentType = metadata.contentType || "application/octet-stream";
+      const filename = file.name.split('/').pop() || 'attachment';
+      
+      // Determine if content should be served inline or as attachment
+      const isPreviewable = contentType.startsWith('image/') || contentType.includes('pdf');
+      
       // Set appropriate headers
-      res.set({
-        "Content-Type": metadata.contentType || "application/octet-stream",
-        "Content-Length": metadata.size,
+      const headers: Record<string, string> = {
+        "Content-Type": contentType,
+        "Content-Length": metadata.size?.toString() || "",
         "Cache-Control": `${
           isPublic ? "public" : "private"
         }, max-age=${cacheTtlSec}`,
-      });
+        "X-Content-Type-Options": "nosniff",
+      };
+      
+      // Set Content-Disposition based on file type
+      if (isPreviewable) {
+        headers["Content-Disposition"] = `inline; filename="${filename}"`;
+        // Allow framing for PDFs in preview
+        if (contentType.includes('pdf')) {
+          headers["X-Frame-Options"] = "SAMEORIGIN";
+        }
+      } else {
+        headers["Content-Disposition"] = `attachment; filename="${filename}"`;
+        headers["X-Frame-Options"] = "DENY";
+      }
+      
+      res.set(headers);
 
       // Stream the file to the response
       const stream = file.createReadStream();
