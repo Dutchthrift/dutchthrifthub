@@ -442,6 +442,36 @@ export class ImapSmtpProvider implements EmailProvider {
     return hasAttachmentRecursive(bodyStructure);
   }
 
+  // Helper function to detect content type from filename
+  private detectContentTypeFromFilename(filename: string): string {
+    const ext = filename.toLowerCase().split('.').pop();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'txt':
+        return 'text/plain';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
   // Collect attachment descriptors without downloading (avoids IMAP deadlock)
   private collectAttachmentDescriptors(message: any, messageIndex: number, sequenceNumber: number): Array<{
     messageIndex: number;
@@ -485,7 +515,13 @@ export class ImapSmtpProvider implements EmailProvider {
       if (isAttachment && hasFilename) {
         const partId = part.part || '1';
         const filename = part.parameters?.name || part.dispositionParameters?.filename || `part-${partId}`;
-        const contentType = part.type || 'application/octet-stream';
+        
+        // Use proper content type detection
+        const rawContentType = part.type || 'application/octet-stream';
+        const contentType = rawContentType === 'application/octet-stream' 
+          ? this.detectContentTypeFromFilename(filename) 
+          : rawContentType;
+        
         const contentId = part.id;
         const isInline = part.disposition === 'inline';
         const size = part.size || 0;
@@ -578,7 +614,13 @@ export class ImapSmtpProvider implements EmailProvider {
             
             if (attachmentData && attachmentData.length > 0) {
               const filename = part.parameters?.name || part.dispositionParameters?.filename || `part-${partId}`;
-              const contentType = part.type || 'application/octet-stream';
+              
+              // Use proper content type detection
+              const rawContentType = part.type || 'application/octet-stream';
+              const contentType = rawContentType === 'application/octet-stream' 
+                ? this.detectContentTypeFromFilename(filename) 
+                : rawContentType;
+              
               const contentId = part.id;
               const isInline = part.disposition === 'inline';
               
