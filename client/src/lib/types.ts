@@ -1,15 +1,15 @@
 import type {
   User, Customer, Order, EmailThread, EmailMessage, 
-  Repair, Todo, InternalNote, Activity,
+  Repair, Todo, InternalNote, Activity, Case,
   InsertUser, InsertCustomer, InsertOrder, InsertEmailThread, InsertEmailMessage,
-  InsertRepair, InsertTodo, InsertInternalNote, InsertActivity
+  InsertRepair, InsertTodo, InsertInternalNote, InsertActivity, InsertCase
 } from "@shared/schema";
 
 export type {
   User, Customer, Order, EmailThread, EmailMessage, 
-  Repair, Todo, InternalNote, Activity,
+  Repair, Todo, InternalNote, Activity, Case,
   InsertUser, InsertCustomer, InsertOrder, InsertEmailThread, InsertEmailMessage,
-  InsertRepair, InsertTodo, InsertInternalNote, InsertActivity
+  InsertRepair, InsertTodo, InsertInternalNote, InsertActivity, InsertCase
 };
 
 export interface DashboardStats {
@@ -44,4 +44,9 @@ export interface TodoWithDetails extends Todo {
 
 export interface ActivityWithUser extends Activity {
   user?: User;
+}
+
+export interface CaseWithDetails extends Case {
+  customer?: Customer;
+  assignedUser?: User;
 }

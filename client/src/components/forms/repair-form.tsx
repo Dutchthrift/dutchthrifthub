@@ -103,7 +103,7 @@ export function RepairForm({ open, onOpenChange, repair }: RepairFormProps) {
       estimatedCost: Math.round(data.estimatedCost * 100), // Convert to cents
       partsNeeded: data.partsNeeded ? [data.partsNeeded] : undefined,
       assignedUserId: data.assignedUserId,
-      slaDeadline: slaDeadline?.toISOString(),
+      slaDeadline: slaDeadline,
     };
 
     createRepairMutation.mutate(repairData);
