@@ -56,6 +56,7 @@ export class ImapSmtpProvider implements EmailProvider {
         let attachmentQueue: Array<{
           messageIndex: number;
           uid: number;
+          seq: number;
           partId: string;
           filename: string;
           contentType: string;
@@ -228,6 +229,7 @@ export class ImapSmtpProvider implements EmailProvider {
           const attachmentDescriptors: Array<{
             messageIndex: number;
             uid: number;
+            seq: number;
             partId: string;
             filename: string;
             contentType: string;
@@ -237,8 +239,8 @@ export class ImapSmtpProvider implements EmailProvider {
           }> = [];
 
           if (hasAttachment) {
-            console.log(`📎 Collecting attachment descriptors for Message UID ${message.uid}, Subject: ${envelope?.subject || 'No subject'}`);
-            const descriptors = this.collectAttachmentDescriptors(message, messages.length);
+            console.log(`📎 Collecting attachment descriptors for Message UID ${message.uid}, Seq ${message.seq}, Subject: ${envelope?.subject || 'No subject'}`);
+            const descriptors = this.collectAttachmentDescriptors(message, messages.length, message.seq);
             attachmentDescriptors.push(...descriptors);
             console.log(`📎 Found ${descriptors.length} attachment descriptors`);
           }
@@ -263,7 +265,7 @@ export class ImapSmtpProvider implements EmailProvider {
           
           for (const descriptor of attachmentQueue) {
             try {
-              console.log(`📎 Downloading attachment: ${descriptor.filename} (UID ${descriptor.uid}, part ${descriptor.partId})`);
+              console.log(`📎 Downloading attachment: ${descriptor.filename} (Seq ${descriptor.seq}, UID ${descriptor.uid}, part ${descriptor.partId})`);
               
               // Skip attachments over 10MB to prevent memory issues
               if (descriptor.size > 10 * 1024 * 1024) {
@@ -271,22 +273,46 @@ export class ImapSmtpProvider implements EmailProvider {
                 continue;
               }
               
-              // Use fetchOne with bodyParts to get Buffer directly
-              const result = await client.fetchOne(descriptor.uid, {
-                uid: true,
-                bodyParts: [descriptor.partId]
-              });
+              let attachmentBuffer: Buffer | undefined;
               
-              if (!result || !result.bodyParts) {
-                console.log(`⚠️ No result or bodyParts for attachment ${descriptor.filename}`);
-                continue;
+              // Try sequence number first (more reliable within same session)
+              try {
+                const result = await client.fetchOne(descriptor.seq, {
+                  uid: false, // Use sequence number
+                  bodyParts: [descriptor.partId]
+                });
+                
+                if (result && result.bodyParts) {
+                  attachmentBuffer = result.bodyParts.get(descriptor.partId) as Buffer;
+                  if (attachmentBuffer && attachmentBuffer.length > 0) {
+                    console.log(`✅ Downloaded via sequence: ${descriptor.filename} (${attachmentBuffer.length} bytes)`);
+                  }
+                }
+              } catch (seqError: any) {
+                console.log(`⚠️ Sequence fetch failed for ${descriptor.filename}, trying UID fallback: ${seqError.message || seqError}`);
               }
               
-              const attachmentBuffer = result.bodyParts.get(descriptor.partId) as Buffer;
+              // Fallback to UID if sequence fetch failed or returned no data
+              if (!attachmentBuffer || attachmentBuffer.length === 0) {
+                try {
+                  console.log(`🔄 Fallback: Using UID ${descriptor.uid} for ${descriptor.filename}`);
+                  const result = await client.fetchOne(descriptor.uid, {
+                    uid: true, // Use UID
+                    bodyParts: [descriptor.partId]
+                  });
+                  
+                  if (result && result.bodyParts) {
+                    attachmentBuffer = result.bodyParts.get(descriptor.partId) as Buffer;
+                    if (attachmentBuffer && attachmentBuffer.length > 0) {
+                      console.log(`✅ Downloaded via UID: ${descriptor.filename} (${attachmentBuffer.length} bytes)`);
+                    }
+                  }
+                } catch (uidError: any) {
+                  console.log(`❌ UID fetch also failed for ${descriptor.filename}: ${uidError.message || uidError}`);
+                }
+              }
               
               if (attachmentBuffer && attachmentBuffer.length > 0) {
-                console.log(`✅ Downloaded attachment: ${descriptor.filename} (${attachmentBuffer.length} bytes)`);
-                
                 // Save to object storage
                 const storageUrl = await objectStorageService.saveAttachment(
                   descriptor.filename,
@@ -303,10 +329,10 @@ export class ImapSmtpProvider implements EmailProvider {
                 
                 console.log(`✅ Saved attachment: ${descriptor.filename} to ${storageUrl}`);
               } else {
-                console.log(`⚠️ No data received for attachment ${descriptor.filename}`);
+                console.log(`⚠️ No attachment data could be downloaded for ${descriptor.filename}`);
               }
               
-            } catch (attachmentError) {
+            } catch (attachmentError: any) {
               console.error(`❌ Error processing attachment ${descriptor.filename}:`, attachmentError.message || attachmentError);
             }
           }
@@ -382,9 +408,10 @@ export class ImapSmtpProvider implements EmailProvider {
   }
 
   // Collect attachment descriptors without downloading (avoids IMAP deadlock)
-  private collectAttachmentDescriptors(message: any, messageIndex: number): Array<{
+  private collectAttachmentDescriptors(message: any, messageIndex: number, sequenceNumber: number): Array<{
     messageIndex: number;
     uid: number;
+    seq: number;
     partId: string;
     filename: string;
     contentType: string;
@@ -395,6 +422,7 @@ export class ImapSmtpProvider implements EmailProvider {
     const descriptors: Array<{
       messageIndex: number;
       uid: number;
+      seq: number;
       partId: string;
       filename: string;
       contentType: string;
@@ -432,6 +460,7 @@ export class ImapSmtpProvider implements EmailProvider {
         descriptors.push({
           messageIndex,
           uid: message.uid,
+          seq: sequenceNumber,
           partId,
           filename,
           contentType,
@@ -530,7 +559,7 @@ export class ImapSmtpProvider implements EmailProvider {
             } else {
               console.log(`⚠️ No data received for attachment part ${partId}`);
             }
-          } catch (downloadError) {
+          } catch (downloadError: any) {
             console.error(`❌ Error downloading attachment part ${partId}:`, downloadError.message || downloadError);
             // Continue processing other parts even if one fails
           }
