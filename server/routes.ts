@@ -709,8 +709,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Additional validation for photos array size
       if (req.body.photos && Array.isArray(req.body.photos)) {
-        if (req.body.photos.length > 5) {
-          return res.status(400).json({ message: "Maximum 5 images allowed" });
+        if (req.body.photos.length > 3) {
+          return res.status(400).json({ message: "Maximum 3 images allowed" });
         }
         // Basic validation for base64 image format
         for (const photo of req.body.photos) {
@@ -718,8 +718,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(400).json({ message: "Invalid image format" });
           }
           // Check approximate size (base64 is ~33% larger than original)
-          if (photo.length > 7000000) { // ~5MB encoded size
-            return res.status(400).json({ message: "Image too large, maximum 5MB per image" });
+          if (photo.length > 2800000) { // ~2MB encoded size
+            return res.status(400).json({ message: "Image too large, maximum 2MB per image" });
           }
         }
       }

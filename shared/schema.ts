@@ -231,7 +231,7 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
     typeof val === 'string' ? val : val
   ),
   amount: z.number().int().positive(),
-  photos: z.array(z.string()).max(5).optional(),
+  photos: z.array(z.string()).max(3).optional(),
 });
 
 export const insertActivitySchema = createInsertSchema(activities).omit({

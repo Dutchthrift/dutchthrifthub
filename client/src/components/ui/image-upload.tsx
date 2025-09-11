@@ -16,8 +16,8 @@ interface ImageUploadProps {
 export function ImageUpload({ 
   images, 
   onChange, 
-  maxImages = 5, 
-  maxSizeMB = 5,
+  maxImages = 3, 
+  maxSizeMB = 2,
   className 
 }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
