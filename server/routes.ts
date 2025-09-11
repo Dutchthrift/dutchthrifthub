@@ -449,43 +449,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const existingOrder = await storage.getOrderByShopifyId(shopifyOrder.id.toString());
             
-            if (!existingOrder) {
-              // Create customer if doesn't exist
-              let customer = null;
-              if (shopifyOrder.customer && shopifyOrder.customer.email) {
-                customer = await storage.getCustomerByEmail(shopifyOrder.customer.email);
-                if (!customer) {
+            // Handle customer creation/updating first
+            let customer = null;
+            if (shopifyOrder.customer && shopifyOrder.customer.email) {
+              customer = await storage.getCustomerByEmail(shopifyOrder.customer.email);
+              if (!customer) {
+                try {
                   customer = await storage.createCustomer({
                     email: shopifyOrder.customer.email,
                     firstName: shopifyOrder.customer.first_name,
                     lastName: shopifyOrder.customer.last_name,
                     shopifyCustomerId: shopifyOrder.customer.id.toString()
                   });
+                } catch (customerError) {
+                  // If customer creation fails due to duplicate, try to get existing customer
+                  console.log(`Customer creation failed, attempting to get existing customer: ${shopifyOrder.customer.email}`);
+                  customer = await storage.getCustomerByEmail(shopifyOrder.customer.email);
+                }
+              } else if (!customer.shopifyCustomerId || customer.shopifyCustomerId !== shopifyOrder.customer.id.toString()) {
+                // Update existing customer with Shopify ID and any missing data
+                try {
+                  await storage.updateCustomer(customer.id, {
+                    shopifyCustomerId: shopifyOrder.customer.id.toString(),
+                    firstName: shopifyOrder.customer.first_name || customer.firstName,
+                    lastName: shopifyOrder.customer.last_name || customer.lastName
+                  });
+                } catch (updateError) {
+                  console.log(`Customer update failed: ${updateError instanceof Error ? updateError.message : updateError}`);
                 }
               }
+            }
 
-              await storage.createOrder({
-                shopifyOrderId: shopifyOrder.id.toString(),
-                orderNumber: shopifyOrder.order_number,
-                customerId: customer?.id,
-                customerEmail: shopifyOrder.email,
-                totalAmount: Math.round(parseFloat(shopifyOrder.total_price) * 100),
-                currency: shopifyOrder.currency,
-                status: mapShopifyStatus(shopifyOrder.financial_status, shopifyOrder.fulfillment_status),
-                fulfillmentStatus: shopifyOrder.fulfillment_status,
-                paymentStatus: shopifyOrder.financial_status,
-                orderData: shopifyOrder
-              });
-              orderStats.created++;
+            if (!existingOrder) {
+              try {
+                await storage.createOrder({
+                  shopifyOrderId: shopifyOrder.id.toString(),
+                  orderNumber: shopifyOrder.order_number,
+                  customerId: customer?.id,
+                  customerEmail: shopifyOrder.email,
+                  totalAmount: Math.round(parseFloat(shopifyOrder.total_price) * 100),
+                  currency: shopifyOrder.currency,
+                  status: mapShopifyStatus(shopifyOrder.financial_status, shopifyOrder.fulfillment_status),
+                  fulfillmentStatus: shopifyOrder.fulfillment_status,
+                  paymentStatus: shopifyOrder.financial_status,
+                  orderData: shopifyOrder
+                });
+                orderStats.created++;
+              } catch (createError) {
+                console.error(`Failed to create order ${shopifyOrder.id}: ${createError instanceof Error ? createError.message : createError}`);
+                orderStats.skipped++;
+                errors.push(`Order ${shopifyOrder.id}: Failed to create - ${createError instanceof Error ? createError.message : String(createError)}`);
+                continue;
+              }
             } else {
-              await storage.updateOrder(existingOrder.id, {
-                status: mapShopifyStatus(shopifyOrder.financial_status, shopifyOrder.fulfillment_status),
-                fulfillmentStatus: shopifyOrder.fulfillment_status,
-                paymentStatus: shopifyOrder.financial_status,
-                orderData: shopifyOrder,
-                totalAmount: Math.round(parseFloat(shopifyOrder.total_price) * 100)
-              });
-              orderStats.updated++;
+              try {
+                await storage.updateOrder(existingOrder.id, {
+                  status: mapShopifyStatus(shopifyOrder.financial_status, shopifyOrder.fulfillment_status),
+                  fulfillmentStatus: shopifyOrder.fulfillment_status,
+                  paymentStatus: shopifyOrder.financial_status,
+                  orderData: shopifyOrder,
+                  totalAmount: Math.round(parseFloat(shopifyOrder.total_price) * 100)
+                });
+                orderStats.updated++;
+              } catch (updateError) {
+                console.error(`Failed to update order ${shopifyOrder.id}: ${updateError instanceof Error ? updateError.message : updateError}`);
+                orderStats.skipped++;
+                errors.push(`Order ${shopifyOrder.id}: Failed to update - ${updateError instanceof Error ? updateError.message : String(updateError)}`);
+                continue;
+              }
             }
             orderStats.synced++;
           } catch (orderError) {
