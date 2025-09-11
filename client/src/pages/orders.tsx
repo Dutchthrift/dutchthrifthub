@@ -114,7 +114,7 @@ export default function Orders() {
         throw new Error(testResult.message || 'Shopify connection failed');
       }
 
-      // Sync both customers and orders
+      // Sync both customers and orders (incremental)
       const [customersResponse, ordersResponse] = await Promise.all([
         fetch("/api/customers/sync", { method: "POST" }),
         fetch("/api/orders/sync", { method: "POST" })
@@ -140,6 +140,48 @@ export default function Orders() {
       toast({
         title: "Sync mislukt",
         description: error instanceof Error ? error.message : "Failed to sync from Shopify",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const fullSyncMutation = useMutation({
+    mutationFn: async () => {
+      // Test connection first
+      const testResponse = await fetch('/api/shopify/test');
+      const testResult = await testResponse.json();
+      if (!testResult.success) {
+        throw new Error(testResult.message || 'Shopify connection failed');
+      }
+
+      // Perform full sync of ALL data
+      const response = await fetch("/api/shopify/sync-all", { method: "POST" });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to perform full sync");
+      }
+      
+      const data = await response.json();
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders/stats"] });
+      
+      const customerMsg = `${data.customers.total} klanten (${data.customers.created} nieuw, ${data.customers.updated} bijgewerkt)`;
+      const orderMsg = `${data.orders.total} orders (${data.orders.created} nieuw, ${data.orders.updated} bijgewerkt)`;
+      
+      toast({
+        title: "Volledige Shopify import voltooid",
+        description: `Import voltooid: ${customerMsg}, ${orderMsg}`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Volledige import mislukt",
+        description: error instanceof Error ? error.message : "Failed to import all data from Shopify",
         variant: "destructive",
       });
     }
@@ -325,14 +367,44 @@ export default function Orders() {
               <Download className="mr-2 h-4 w-4" />
               Export CSV
             </Button>
-            <Button 
-              onClick={() => syncAllMutation.mutate()}
-              disabled={syncAllMutation.isPending}
-              data-testid="sync-shopify-button"
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${syncAllMutation.isPending ? 'animate-spin' : ''}`} />
-              {syncAllMutation.isPending ? "Synchroniseren..." : "Sync Shopify"}
-            </Button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  disabled={syncAllMutation.isPending || fullSyncMutation.isPending}
+                  data-testid="sync-shopify-button"
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 ${(syncAllMutation.isPending || fullSyncMutation.isPending) ? 'animate-spin' : ''}`} />
+                  {syncAllMutation.isPending ? "Sync nieuwe..." : 
+                   fullSyncMutation.isPending ? "Importeer alles..." : "Sync Shopify"}
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem 
+                  onClick={() => syncAllMutation.mutate()}
+                  disabled={syncAllMutation.isPending || fullSyncMutation.isPending}
+                  data-testid="sync-new-orders"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sync nieuwe orders
+                  <div className="text-xs text-muted-foreground ml-2">
+                    (Laatste 250 orders)
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => fullSyncMutation.mutate()}
+                  disabled={syncAllMutation.isPending || fullSyncMutation.isPending}
+                  data-testid="import-all-orders"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Importeer alle orders
+                  <div className="text-xs text-muted-foreground ml-2">
+                    (Alle orders uit Shopify)
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
