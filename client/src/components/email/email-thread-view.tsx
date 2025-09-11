@@ -6,6 +6,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Reply,
   Forward,
   Archive,
@@ -18,10 +25,12 @@ import {
   Briefcase,
   ShoppingCart,
   Mail,
-  UserCircle
+  UserCircle,
+  Link as LinkIcon,
+  Package
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { EmailThread, EmailMessage, Case } from "@/lib/types";
+import type { EmailThread, EmailMessage, Case, Order } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { CreateCaseModal } from "@/components/forms/create-case-modal";
@@ -38,6 +47,8 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
   const [replyText, setReplyText] = useState("");
   const [showReply, setShowReply] = useState(false);
   const [showCreateCase, setShowCreateCase] = useState(false);
+  const [selectedCaseId, setSelectedCaseId] = useState<string>("");
+  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
   const { toast } = useToast();
 
   const { data: thread, isLoading } = useQuery<ThreadWithMessages>({
@@ -56,6 +67,18 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
       return response.json();
     },
     enabled: !!threadId,
+  });
+
+  // Get all available cases for linking
+  const { data: allCases } = useQuery<Case[]>({
+    queryKey: ["/api/cases"],
+    enabled: true,
+  });
+
+  // Get all available orders for linking  
+  const { data: allOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders"],
+    enabled: true,
   });
 
   const sendReplyMutation = useMutation({
@@ -100,6 +123,62 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/email-threads", threadId] });
       queryClient.invalidateQueries({ queryKey: ["/api/email-threads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", "linked", threadId] });
+    }
+  });
+
+  const linkToCaseMutation = useMutation({
+    mutationFn: async (caseId: string) => {
+      const response = await fetch(`/api/email-threads/${threadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId }),
+      });
+      if (!response.ok) throw new Error("Failed to link to case");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-threads", threadId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", "linked", threadId] });
+      setSelectedCaseId("");
+      toast({
+        title: "Email gekoppeld",
+        description: "Email thread is succesvol gekoppeld aan de case",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Koppeling mislukt",
+        description: "Er is een fout opgetreden bij het koppelen aan de case",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const linkToOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await fetch(`/api/email-threads/${threadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+      if (!response.ok) throw new Error("Failed to link to order");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-threads", threadId] });
+      setSelectedOrderId("");
+      toast({
+        title: "Order gekoppeld",
+        description: "Email thread is succesvol gekoppeld aan de order",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Koppeling mislukt",
+        description: "Er is een fout opgetreden bij het koppelen aan de order",
+        variant: "destructive",
+      });
     }
   });
 
@@ -121,6 +200,18 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
 
   const closeThread = () => {
     updateThreadMutation.mutate({ status: 'closed' });
+  };
+
+  const handleLinkToCase = () => {
+    if (selectedCaseId) {
+      linkToCaseMutation.mutate(selectedCaseId);
+    }
+  };
+
+  const handleLinkToOrder = () => {
+    if (selectedOrderId) {
+      linkToOrderMutation.mutate(selectedOrderId);
+    }
   };
 
   const formatMessageTime = (date: string | Date | null) => {
@@ -402,8 +493,10 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                   ))}
                 </div>
               ) : (
-                <div>
+                <div className="space-y-3">
                   <div className="text-sm font-medium text-muted-foreground mb-2">Case Beheer</div>
+                  
+                  {/* Create new case */}
                   <Button 
                     className="w-full" 
                     onClick={() => setShowCreateCase(true)}
@@ -412,10 +505,87 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                     <Briefcase className="h-4 w-4 mr-2" />
                     Maak Case
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Maak een case aan om dit klantverzoek gestructureerd te beheren.
+                  
+                  {/* Link to existing case */}
+                  {allCases && allCases.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-muted-foreground">Of koppel aan bestaande case:</div>
+                      <div className="flex gap-2">
+                        <Select value={selectedCaseId} onValueChange={setSelectedCaseId}>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Selecteer case..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allCases.map((caseItem) => (
+                              <SelectItem key={caseItem.id} value={caseItem.id}>
+                                Case #{caseItem.caseNumber} - {caseItem.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          size="sm" 
+                          onClick={handleLinkToCase}
+                          disabled={!selectedCaseId || linkToCaseMutation.isPending}
+                          data-testid="link-case-button"
+                        >
+                          <LinkIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <p className="text-xs text-muted-foreground">
+                    Maak een case aan of koppel aan een bestaande case om dit verzoek te beheren.
                   </p>
                 </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Order Linking */}
+            <div className="space-y-3">
+              <div className="text-sm font-medium text-muted-foreground mb-2">Order Koppeling</div>
+              
+              {thread.orderId ? (
+                <div className="p-2 bg-muted rounded">
+                  <div className="text-sm font-medium">Gekoppelde Order</div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <ShoppingCart className="h-3 w-3" />
+                    Order ID: {thread.orderId}
+                  </div>
+                </div>
+              ) : (
+                allOrders && allOrders.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Selecteer order..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allOrders.map((order) => (
+                            <SelectItem key={order.id} value={order.id}>
+                              #{order.orderNumber} - €{((order.totalAmount || 0) / 100).toFixed(2)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        size="sm" 
+                        onClick={handleLinkToOrder}
+                        disabled={!selectedOrderId || linkToOrderMutation.isPending}
+                        data-testid="link-order-button"
+                      >
+                        <Package className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Koppel een order aan deze email thread voor betere organisatie.
+                    </p>
+                  </div>
+                )
               )}
             </div>
           </CardContent>
