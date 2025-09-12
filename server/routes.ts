@@ -840,6 +840,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Match orders for existing email threads that don't have orders linked
+  app.post("/api/email-threads/match-orders", async (req, res) => {
+    try {
+      console.log(`🔄 POST /api/email-threads/match-orders endpoint called`);
+      console.log(`🔄 Starting order matching for existing email threads...`);
+      
+      // Get all threads that don't have orders linked
+      const threads = await storage.getEmailThreads();
+      const threadsWithoutOrders = threads.filter(thread => !thread.orderId);
+      
+      console.log(`📊 Found ${threadsWithoutOrders.length} threads without orders to process`);
+      
+      let matchedCount = 0;
+      let processedCount = 0;
+      
+      for (const thread of threadsWithoutOrders) {
+        processedCount++;
+        console.log(`🔍 Processing thread ${processedCount}/${threadsWithoutOrders.length}: "${thread.subject}" from ${thread.customerEmail}`);
+        
+        try {
+          // Try to match order using thread subject and customer email
+          const matchedOrder = await orderMatchingService.getOrderForAutoLink(
+            '', // no body content for existing threads
+            thread.customerEmail || '', 
+            thread.subject || ''
+          );
+
+          if (matchedOrder) {
+            console.log(`🎯 MATCHED: Order ${matchedOrder.orderNumber} (ID: ${matchedOrder.id}) for thread "${thread.subject}" from ${thread.customerEmail}`);
+            
+            // Update the thread with the matched order
+            await storage.updateEmailThread(thread.id, {
+              orderId: matchedOrder.id
+            });
+            
+            matchedCount++;
+          } else {
+            console.log(`🔍 NO MATCH: No order found for thread "${thread.subject}" from ${thread.customerEmail}`);
+          }
+        } catch (matchingError) {
+          console.error(`❌ Error matching order for thread ${thread.id}:`, matchingError);
+        }
+      }
+      
+      console.log(`✅ Order matching completed: ${matchedCount}/${processedCount} threads matched with orders`);
+      
+      res.json({ 
+        processed: processedCount, 
+        matched: matchedCount, 
+        message: `Successfully processed ${processedCount} threads, matched ${matchedCount} with orders` 
+      });
+    } catch (error) {
+      console.error("❌ Error in match-orders endpoint:", error);
+      res.status(500).json({ message: "Failed to match orders for existing threads" });
+    }
+  });
+
   app.get("/api/email-threads/:id", async (req, res) => {
     try {
       const { id } = req.params;
