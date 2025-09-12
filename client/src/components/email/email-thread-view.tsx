@@ -74,6 +74,12 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
     enabled: true,
   });
 
+  // Get the linked order details when thread has an orderId
+  const { data: linkedOrder } = useQuery<Order>({
+    queryKey: ["/api/orders", thread?.orderId],
+    enabled: !!thread?.orderId,
+  });
+
   const sendReplyMutation = useMutation({
     mutationFn: async (data: { to: string; subject: string; body: string }) => {
       const response = await fetch("/api/emails/send", {
@@ -533,15 +539,9 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
               <div className="text-sm font-medium text-muted-foreground mb-2">Order Koppeling</div>
               
               {thread.orderId ? (
-                <div className="p-2 bg-muted rounded">
+                <div className="p-4 bg-muted rounded-lg space-y-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium">Gekoppelde Order</div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <ShoppingCart className="h-3 w-3" />
-                        Order ID: {thread.orderId}
-                      </div>
-                    </div>
+                    <div className="text-sm font-medium">Gekoppelde Order</div>
                     <Button 
                       size="sm" 
                       variant="destructive"
@@ -552,6 +552,79 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                       Ontkoppel
                     </Button>
                   </div>
+                  
+                  {linkedOrder ? (
+                    <div className="space-y-3">
+                      {/* Order Header */}
+                      <div className="flex items-center gap-2 pb-2 border-b">
+                        <ShoppingCart className="h-4 w-4 text-primary" />
+                        <span className="font-semibold text-sm">Order #{linkedOrder.orderNumber}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {linkedOrder.status}
+                        </Badge>
+                      </div>
+
+                      {/* Customer Info */}
+                      {linkedOrder.orderData?.customer && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-xs font-medium text-muted-foreground mb-1">Klantnaam</div>
+                            <div className="text-sm">
+                              {linkedOrder.orderData.customer.first_name} {linkedOrder.orderData.customer.last_name}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs font-medium text-muted-foreground mb-1">Totaal uitgegeven</div>
+                            <div className="text-sm font-medium">
+                              €{((linkedOrder.totalAmount || 0) / 100).toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Address */}
+                      {linkedOrder.orderData?.customer?.default_address && (
+                        <div>
+                          <div className="text-xs font-medium text-muted-foreground mb-1">Adres</div>
+                          <div className="text-sm">
+                            {linkedOrder.orderData.customer.default_address.address1}
+                            {linkedOrder.orderData.customer.default_address.address2 && 
+                              `, ${linkedOrder.orderData.customer.default_address.address2}`
+                            }<br/>
+                            {linkedOrder.orderData.customer.default_address.zip} {linkedOrder.orderData.customer.default_address.city}<br/>
+                            {linkedOrder.orderData.customer.default_address.country}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Order Items */}
+                      {linkedOrder.orderData?.line_items && linkedOrder.orderData.line_items.length > 0 && (
+                        <div>
+                          <div className="text-xs font-medium text-muted-foreground mb-2">Aangekochte artikelen</div>
+                          <div className="space-y-2">
+                            {linkedOrder.orderData.line_items.map((item: any, index: number) => (
+                              <div key={index} className="flex justify-between items-start p-2 bg-background rounded border">
+                                <div className="flex-1">
+                                  <div className="text-sm font-medium">{item.title}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    SKU: {item.sku} • Qty: {item.quantity}
+                                  </div>
+                                </div>
+                                <div className="text-sm font-medium ml-2">
+                                  €{parseFloat(item.price).toFixed(2)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <ShoppingCart className="h-3 w-3" />
+                      Order ID: {thread.orderId} (laden...)
+                    </div>
+                  )}
                 </div>
               ) : (
                 allOrders && allOrders.length > 0 && (
