@@ -618,6 +618,51 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                           </div>
                         </div>
                       )}
+
+                      {/* Tracking Information */}
+                      <div>
+                        <div className="text-xs font-medium text-muted-foreground mb-2">Tracking gegevens</div>
+                        {linkedOrder.orderData?.fulfillments && linkedOrder.orderData.fulfillments.length > 0 ? (
+                          <div className="space-y-2">
+                            {linkedOrder.orderData.fulfillments.map((fulfillment: any, index: number) => (
+                              <div key={index} className="p-2 bg-background rounded border">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="text-sm font-medium">
+                                      {fulfillment.tracking_company || 'Vervoerder onbekend'}
+                                    </div>
+                                    {fulfillment.tracking_number && (
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        Tracking: {fulfillment.tracking_number}
+                                      </div>
+                                    )}
+                                    <div className="text-xs text-muted-foreground">
+                                      Status: {fulfillment.status || 'Onbekend'}
+                                    </div>
+                                  </div>
+                                  {fulfillment.tracking_url && (
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => window.open(fulfillment.tracking_url, '_blank', 'noopener,noreferrer')}
+                                      data-testid="track-shipment-button"
+                                    >
+                                      <ExternalLink className="h-3 w-3 mr-1" />
+                                      Track
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-2 bg-background rounded border text-center">
+                            <div className="text-sm text-muted-foreground">
+                              Geen tracking informatie beschikbaar
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
