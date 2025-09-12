@@ -36,6 +36,8 @@ export interface IStorage {
   getOrdersPaginated(page?: number, limit?: number): Promise<{ orders: Order[], total: number }>;
   getOrder(id: string): Promise<Order | undefined>;
   getOrderByShopifyId(shopifyId: string): Promise<Order | undefined>;
+  getOrderByOrderNumber(orderNumber: string): Promise<Order | undefined>;
+  getOrdersByCustomerEmail(customerEmail: string): Promise<Order[]>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order>;
 
@@ -239,6 +241,15 @@ export class DatabaseStorage implements IStorage {
   async getOrderByShopifyId(shopifyId: string): Promise<Order | undefined> {
     const result = await db.select().from(orders).where(eq(orders.shopifyOrderId, shopifyId)).limit(1);
     return result[0];
+  }
+
+  async getOrderByOrderNumber(orderNumber: string): Promise<Order | undefined> {
+    const result = await db.select().from(orders).where(eq(orders.orderNumber, orderNumber)).limit(1);
+    return result[0];
+  }
+
+  async getOrdersByCustomerEmail(customerEmail: string): Promise<Order[]> {
+    return await db.select().from(orders).where(eq(orders.customerEmail, customerEmail));
   }
 
   async createOrder(order: InsertOrder): Promise<Order> {

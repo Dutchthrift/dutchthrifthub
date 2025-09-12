@@ -4,8 +4,11 @@ import { storage } from "./storage";
 import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertPurchaseOrderSchema, insertCaseSchema } from "@shared/schema";
 import { syncEmails, sendEmail } from "./services/emailService";
 import { shopifyClient } from "./services/shopifyClient";
+import { OrderMatchingService } from "./services/orderMatchingService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize order matching service
+  const orderMatchingService = new OrderMatchingService(storage);
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
@@ -883,8 +886,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let thread = await storage.getEmailThreadByThreadId(threadId);
         
         if (!thread) {
-          // Create new thread
+          // Create new thread with automatic order matching
           try {
+            // Try to automatically match orders for this email
+            const matchedOrder = await orderMatchingService.getOrderForAutoLink(
+              email.body || '', 
+              email.from || '', 
+              email.subject || ''
+            );
+
+            console.log(matchedOrder ? 
+              `🎯 NEW THREAD: Automatically matched order ${matchedOrder.orderNumber} (ID: ${matchedOrder.id}) for email from ${email.from}` : 
+              `🔍 NEW THREAD: No automatic order match found for email from ${email.from}`
+            );
+
             thread = await storage.createEmailThread({
               threadId: threadId,
               subject: email.subject,
@@ -892,7 +907,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               status: 'open',
               isUnread: !email.isRead,
               lastActivity: new Date(email.receivedDateTime),
-              hasAttachment: email.hasAttachment
+              hasAttachment: email.hasAttachment,
+              orderId: matchedOrder?.id || null // Automatically link order if found
             });
           } catch (error: any) {
             // If duplicate thread ID, fetch the existing one
@@ -905,6 +921,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
               throw error;
             }
           }
+        } else if (!thread.orderId) {
+          // Thread exists but doesn't have an order linked - try to match one
+          try {
+            const matchedOrder = await orderMatchingService.getOrderForAutoLink(
+              email.body || '', 
+              email.from || '', 
+              email.subject || ''
+            );
+
+            if (matchedOrder) {
+              console.log(`🎯 EXISTING THREAD: Matched order ${matchedOrder.orderNumber} (ID: ${matchedOrder.id}) for existing thread from ${email.from}`);
+              
+              // Update the existing thread with the matched order
+              thread = await storage.updateEmailThread(thread.id, {
+                orderId: matchedOrder.id
+              });
+            } else {
+              console.log(`🔍 EXISTING THREAD: No order match found for existing thread from ${email.from}`);
+            }
+          } catch (matchingError) {
+            console.error(`❌ Error matching order for existing thread ${thread.id}:`, matchingError);
+          }
+        } else {
+          console.log(`✅ EXISTING THREAD: Thread from ${email.from} already has order ${thread.orderId} linked`);
         }
 
         // Create message (only if not duplicate)
