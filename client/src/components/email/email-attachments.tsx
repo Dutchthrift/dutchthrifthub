@@ -47,7 +47,11 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
 
   const handleDownload = async (attachment: EmailAttachment) => {
     try {
-      const response = await fetch(`/api/attachments${attachment.storageUrl}`);
+      // Remove the leading /attachments from storageUrl since the API endpoint expects /api/attachments/:path
+      const attachmentPath = attachment.storageUrl.startsWith('/attachments/') 
+        ? attachment.storageUrl.substring('/attachments/'.length)
+        : attachment.storageUrl;
+      const response = await fetch(`/api/attachments/${attachmentPath}`);
       if (!response.ok) {
         throw new Error('Failed to download attachment');
       }
@@ -86,18 +90,28 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
     return FileIcon;
   };
 
-  const canPreview = (contentType: string | null) => {
-    if (!contentType) return false;
-    return contentType.startsWith('image/') || contentType.includes('pdf');
+  const canPreview = (contentType: string | null, filename: string) => {
+    // Check both contentType and filename extension for better file type detection
+    const isImage = contentType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filename);
+    const isPdf = contentType?.includes('pdf') || filename.toLowerCase().endsWith('.pdf');
+    return isImage || isPdf;
   };
 
   const renderPreviewContent = () => {
     if (!selectedAttachment) return null;
 
     const { contentType, storageUrl, filename, id } = selectedAttachment;
-    const attachmentUrl = `/api/attachments${storageUrl}`;
+    // Remove the leading /attachments from storageUrl since the API endpoint expects /api/attachments/:path
+    const attachmentPath = storageUrl.startsWith('/attachments/') 
+      ? storageUrl.substring('/attachments/'.length)
+      : storageUrl;
+    const attachmentUrl = `/api/attachments/${attachmentPath}`;
 
-    if (contentType?.startsWith('image/')) {
+    // Check both contentType and filename extension for better file type detection
+    const isImage = contentType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filename);
+    const isPdf = contentType?.includes('pdf') || filename.toLowerCase().endsWith('.pdf');
+
+    if (isImage) {
       return (
         <div className="flex justify-center">
           <img
@@ -110,7 +124,7 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
       );
     }
 
-    if (contentType?.includes('pdf')) {
+    if (isPdf) {
       return (
         <iframe
           src={attachmentUrl}
@@ -187,6 +201,7 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
                     onClick={() => handlePreview(attachment)}
                     className="flex-shrink-0"
                     data-testid={`button-preview-${attachment.filename}`}
+                    disabled={!canPreview(attachment.contentType, attachment.filename)}
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -234,7 +249,10 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
               data-testid="button-open-new-tab"
             >
               <a
-                href={selectedAttachment ? `/api/attachments${selectedAttachment.storageUrl}` : '#'}
+                href={selectedAttachment ? 
+                  `/api/attachments/${selectedAttachment.storageUrl.startsWith('/attachments/') 
+                    ? selectedAttachment.storageUrl.substring('/attachments/'.length)
+                    : selectedAttachment.storageUrl}` : '#'}
                 target="_blank"
                 rel="noopener noreferrer"
               >
