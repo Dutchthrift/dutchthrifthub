@@ -1108,14 +1108,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Attachment endpoints
-  app.get("/api/attachments/:attachmentPath(*)", async (req, res) => {
+  app.get("/api/attachments/*", async (req, res) => {
     try {
-      const attachmentPath = '/' + req.params.attachmentPath;
+      // Extract the path after /api/attachments/
+      const pathAfterAttachments = req.path.replace('/api/attachments/', '');
+      console.log('Attachment request path:', req.path, 'extracted path:', pathAfterAttachments);
+      
+      // Construct the storage path with /attachments/ prefix
+      const attachmentPath = `/attachments/${pathAfterAttachments}`;
+      console.log('Looking for attachment with storageUrl:', attachmentPath);
+      
       const attachment = await storage.getEmailAttachment(attachmentPath);
       if (!attachment) {
+        console.log('Attachment not found in database with path:', attachmentPath);
         return res.status(404).json({ error: 'Attachment not found' });
       }
       
+      console.log('Found attachment:', attachment.filename, 'contentType:', attachment.contentType);
       await storage.downloadAttachment(attachmentPath, res);
     } catch (error) {
       console.error('Error downloading attachment:', error);

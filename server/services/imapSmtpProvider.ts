@@ -1,5 +1,6 @@
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
+import * as mimeTypes from 'mime-types';
 import type { EmailProvider, RawEmail } from './emailProvider';
 import { ObjectStorageService } from '../objectStorage';
 import { storage } from '../storage';
@@ -442,8 +443,17 @@ export class ImapSmtpProvider implements EmailProvider {
     return hasAttachmentRecursive(bodyStructure);
   }
 
-  // Helper function to detect content type from filename
+  // Helper function to detect content type from filename using mime-types library
   private detectContentTypeFromFilename(filename: string): string {
+    // Use mime-types library for comprehensive MIME type detection
+    const detectedType = mimeTypes.lookup(filename);
+    
+    if (detectedType) {
+      console.log(`🔍 Detected MIME type for ${filename}: ${detectedType}`);
+      return detectedType;
+    }
+    
+    // Fallback to manual detection for any edge cases
     const ext = filename.toLowerCase().split('.').pop();
     switch (ext) {
       case 'jpg':
@@ -468,6 +478,7 @@ export class ImapSmtpProvider implements EmailProvider {
       case 'txt':
         return 'text/plain';
       default:
+        console.log(`⚠️ Could not detect MIME type for ${filename}, using application/octet-stream`);
         return 'application/octet-stream';
     }
   }
