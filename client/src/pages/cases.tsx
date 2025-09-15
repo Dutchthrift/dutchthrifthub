@@ -44,6 +44,7 @@ const CASE_STATUS_CONFIG = {
 export default function Cases() {
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [showNewCase, setShowNewCase] = useState(false);
   const [columns, setColumns] = useState(Object.keys(CASE_STATUS_CONFIG));
   const { toast } = useToast();
@@ -378,7 +379,14 @@ export default function Cases() {
                   />
                 </div>
                 
-                <Tabs value={priorityFilter} onValueChange={setPriorityFilter}>
+                <Tabs value={priorityFilter} onValueChange={(value) => {
+                  setIsTransitioning(true);
+                  // Small delay to allow for smooth transition
+                  setTimeout(() => {
+                    setPriorityFilter(value);
+                    setIsTransitioning(false);
+                  }, 50);
+                }}>
                   <TabsList>
                     <TabsTrigger value="all" data-testid="filter-all-priority">All</TabsTrigger>
                     <TabsTrigger value="urgent" data-testid="filter-urgent-priority">Urgent</TabsTrigger>
@@ -397,8 +405,8 @@ export default function Cases() {
         </Card>
 
         {/* Kanban Board */}
-        <div className="min-h-[600px]" data-testid="cases-kanban-board">
-          {isLoading ? (
+        <div className={`min-h-[600px] transition-opacity duration-150 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`} data-testid="cases-kanban-board">
+          {isLoading || isTransitioning ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Card key={i} className="h-[400px] animate-pulse">
