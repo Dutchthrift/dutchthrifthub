@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum("user_role", ["admin", "agent", "repair_tech", "viewer"]);
+export const userRoleEnum = pgEnum("user_role", ["beheerder", "technicus", "support"]);
 export const priorityEnum = pgEnum("priority", ["low", "medium", "high", "urgent"]);
 export const repairStatusEnum = pgEnum("repair_status", ["new", "in_progress", "waiting_customer", "waiting_part", "ready", "closed"]);
 export const todoStatusEnum = pgEnum("todo_status", ["todo", "in_progress", "done"]);
@@ -19,7 +19,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: userRoleEnum("role").notNull().default("agent"),
+  role: userRoleEnum("role").notNull().default("support"),
   firstName: text("first_name"),
   lastName: text("last_name"),
   createdAt: timestamp("created_at").defaultNow(),
