@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Navigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,41 +78,70 @@ export default function Cases() {
     }
   });
 
-  const filteredCases = cases?.filter(caseItem => {
-    if (priorityFilter !== "all" && caseItem.priority !== priorityFilter) return false;
-    if (searchQuery && 
-        !caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !caseItem.description?.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !caseItem.caseNumber.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  }) || [];
+  const filteredCases = useMemo(() => {
+    if (!cases) return [];
+    
+    return cases.filter(caseItem => {
+      if (priorityFilter !== "all" && caseItem.priority !== priorityFilter) return false;
+      if (searchQuery && 
+          !caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !caseItem.description?.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !caseItem.caseNumber.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      return true;
+    });
+  }, [cases, priorityFilter, searchQuery]);
 
-  const caseStatusCount = {
-    all: filteredCases.length,
-    new: filteredCases.filter(c => c.status === 'new').length,
-    in_progress: filteredCases.filter(c => c.status === 'in_progress').length,
-    waiting_customer: filteredCases.filter(c => c.status === 'waiting_customer').length,
-    waiting_part: filteredCases.filter(c => c.status === 'waiting_part').length,
-    resolved: filteredCases.filter(c => c.status === 'resolved').length,
-    closed: filteredCases.filter(c => c.status === 'closed').length,
-  };
+  const caseStatusCount = useMemo(() => {
+    const counts = {
+      all: filteredCases.length,
+      new: 0,
+      in_progress: 0,
+      waiting_customer: 0,
+      waiting_part: 0,
+      resolved: 0,
+      closed: 0,
+    };
+
+    filteredCases.forEach(c => {
+      if (c.status in counts) {
+        counts[c.status as keyof typeof counts]++;
+      }
+    });
+
+    return counts;
+  }, [filteredCases]);
 
   const totalWaiting = caseStatusCount.waiting_customer + caseStatusCount.waiting_part;
   const totalActive = caseStatusCount.new + caseStatusCount.in_progress + totalWaiting + caseStatusCount.resolved;
 
-  const onDragEnd = (result: any) => {
+  const onDragEnd = useCallback((result: any) => {
     if (!result.destination) return;
 
-    const { draggableId, destination } = result;
+    const { draggableId, destination, source } = result;
     const newStatus = destination.droppableId;
     const caseId = draggableId;
+
+    // Don't update if dropped in the same position
+    if (source.droppableId === destination.droppableId && source.index === destination.index) {
+      return;
+    }
+
+    // Optimistic update
+    queryClient.setQueryData(["/api/cases"], (oldData: CaseWithDetails[] | undefined) => {
+      if (!oldData) return oldData;
+      return oldData.map(caseItem => 
+        caseItem.id === caseId 
+          ? { ...caseItem, status: newStatus as any }
+          : caseItem
+      );
+    });
 
     // Update case status
     updateCaseMutation.mutate({ 
       id: caseId, 
       data: { status: newStatus as any } 
     });
-  };
+  }, [updateCaseMutation, queryClient]);
 
   const getPriorityVariant = (priority: string | null) => {
     switch (priority) {
@@ -136,7 +165,7 @@ export default function Cases() {
     return deadlineDate < new Date();
   };
 
-  const CaseCard = ({ caseItem, index }: { caseItem: CaseWithDetails; index: number }) => (
+  const CaseCard = useCallback(({ caseItem, index }: { caseItem: CaseWithDetails; index: number }) => (
     <Draggable draggableId={caseItem.id} index={index}>
       {(provided, snapshot) => (
         <Card
@@ -199,9 +228,9 @@ export default function Cases() {
         </Card>
       )}
     </Draggable>
-  );
+  ), []);
 
-  const Column = ({ status, cases: columnCases }: { status: string; cases: CaseWithDetails[] }) => {
+  const Column = useCallback(({ status, cases: columnCases }: { status: string; cases: CaseWithDetails[] }) => {
     const config = CASE_STATUS_CONFIG[status as keyof typeof CASE_STATUS_CONFIG];
     const Icon = config.icon;
     
@@ -239,7 +268,7 @@ export default function Cases() {
         </CardContent>
       </Card>
     );
-  };
+  }, [CaseCard]);
 
   return (
     <div className="min-h-screen bg-background" data-testid="cases-page">
@@ -341,7 +370,10 @@ export default function Cases() {
                     placeholder="Search cases..."
                     className="pl-10"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSearchQuery(value);
+                    }}
                     data-testid="cases-search-input"
                   />
                 </div>
@@ -384,12 +416,12 @@ export default function Cases() {
               ))}
             </div>
           ) : (
-            <DragDropContext onDragEnd={onDragEnd}>
+            <DragDropContext key={`${priorityFilter}-${searchQuery}`} onDragEnd={onDragEnd}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                 {columns.map(status => {
                   const columnCases = filteredCases.filter(caseItem => caseItem.status === status);
                   return (
-                    <Column key={status} status={status} cases={columnCases} />
+                    <Column key={`${status}-${priorityFilter}`} status={status} cases={columnCases} />
                   );
                 })}
               </div>
