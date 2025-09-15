@@ -17,6 +17,7 @@ import Repairs from "@/pages/repairs";
 import Todos from "@/pages/todos";
 import CustomerDetail from "@/pages/customer-detail";
 import CaseDetail from "@/pages/case-detail";
+import UserManagement from "@/pages/user-management";
 
 // Higher-order component that wraps pages with admin layout and protection
 function createProtectedPage(PageComponent, allowedRoles) {
@@ -47,7 +48,7 @@ function Router() {
       {/* User Management - ADMIN only */}
       <Route 
         path="/users" 
-        component={createProtectedPage(Orders, ["ADMIN"])} // Placeholder - we'll create UserManagement component later
+        component={createProtectedPage(UserManagement, ["ADMIN"])}
       />
 
       {/* Repairs - ADMIN and TECHNICUS only */}

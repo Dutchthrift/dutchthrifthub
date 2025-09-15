@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
 import { storage } from "./storage";
 import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertPurchaseOrderSchema, insertCaseSchema, insertUserSchema, insertAuditLogSchema } from "@shared/schema";
 import { syncEmails, sendEmail } from "./services/emailService";
@@ -220,14 +221,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/users", requireAuth, requireRole(["ADMIN"]), async (req: any, res: any) => {
     try {
-      const userData = insertUserSchema.parse(req.body);
+      // Create schema for frontend data (without username)
+      const createUserSchema = z.object({
+        email: z.string().email("Please enter a valid email address"),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+        role: z.enum(["ADMIN", "SUPPORT", "TECHNICUS"]),
+      });
+
+      const userData = createUserSchema.parse(req.body);
       
       // Hash password
       const hashedPassword = await bcrypt.hash(userData.password, 10);
       
+      // Generate username from email
+      const username = userData.email.split('@')[0];
+      
       const newUser = await storage.createUser({
         ...userData,
-        password: hashedPassword
+        password: hashedPassword,
+        username
       });
 
       await auditLog(req, "CREATE", "users", newUser.id, { email: newUser.email, role: newUser.role });
@@ -236,7 +250,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(userWithoutPassword);
     } catch (error) {
       console.error("Error creating user:", error);
-      res.status(400).json({ error: "Failed to create user" });
+      if (error.code === '23505') { // Unique constraint violation
+        res.status(409).json({ error: "Email or username already exists" });
+      } else if (error.name === 'ZodError') {
+        res.status(400).json({ error: "Invalid user data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Failed to create user" });
+      }
+    }
+  });
+
+  app.patch("/api/users/:id", requireAuth, requireRole(["ADMIN"]), async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      // Validate that user exists
+      const existingUser = await storage.getUser(id);
+      if (!existingUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Create update schema that excludes password and sensitive fields
+      const updateUserSchema = z.object({
+        email: z.string().email().optional(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        role: z.enum(["ADMIN", "SUPPORT", "TECHNICUS"]).optional(),
+      });
+
+      // Validate update data
+      const validatedUpdateData = updateUserSchema.parse(updateData);
+
+      // Update user
+      const updatedUser = await storage.updateUser(id, validatedUpdateData);
+      await auditLog(req, "UPDATE", "users", id, validatedUpdateData);
+
+      // Return user without password
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Update user error:", error);
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: "Invalid update data", details: error.errors });
+      } else if (error.code === '23505') { // Unique constraint violation
+        res.status(409).json({ error: "Email already exists" });
+      } else {
+        res.status(500).json({ error: "Failed to update user" });
+      }
+    }
+  });
+
+  app.delete("/api/users/:id", requireAuth, requireRole(["ADMIN"]), async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+
+      // Validate that user exists and is not the current user
+      const existingUser = await storage.getUser(id);
+      if (!existingUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (id === req.user.id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      await storage.deleteUser(id);
+      await auditLog(req, "DELETE", "users", id, { email: existingUser.email });
+
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Delete user error:", error);
+      res.status(500).json({ error: "Failed to delete user" });
     }
   });
 
