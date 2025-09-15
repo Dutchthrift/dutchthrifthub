@@ -44,6 +44,7 @@ const CASE_STATUS_CONFIG = {
 export default function Cases() {
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [pendingFilter, setPendingFilter] = useState("all");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showNewCase, setShowNewCase] = useState(false);
   const [columns, setColumns] = useState(Object.keys(CASE_STATUS_CONFIG));
@@ -82,15 +83,18 @@ export default function Cases() {
   const filteredCases = useMemo(() => {
     if (!cases) return [];
     
+    // Use the current filter during transition, pending filter when not transitioning
+    const activeFilter = isTransitioning ? priorityFilter : pendingFilter;
+    
     return cases.filter(caseItem => {
-      if (priorityFilter !== "all" && caseItem.priority !== priorityFilter) return false;
+      if (activeFilter !== "all" && caseItem.priority !== activeFilter) return false;
       if (searchQuery && 
           !caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
           !caseItem.description?.toLowerCase().includes(searchQuery.toLowerCase()) &&
           !caseItem.caseNumber.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
-  }, [cases, priorityFilter, searchQuery]);
+  }, [cases, priorityFilter, pendingFilter, searchQuery, isTransitioning]);
 
   const caseStatusCount = useMemo(() => {
     const counts = {
@@ -379,13 +383,19 @@ export default function Cases() {
                   />
                 </div>
                 
-                <Tabs value={priorityFilter} onValueChange={(value) => {
+                <Tabs value={pendingFilter} onValueChange={(value) => {
+                  if (value === pendingFilter) return;
+                  
+                  setPendingFilter(value);
                   setIsTransitioning(true);
-                  // Small delay to allow for smooth transition
-                  setTimeout(() => {
-                    setPriorityFilter(value);
-                    setIsTransitioning(false);
-                  }, 50);
+                  
+                  // Use requestAnimationFrame for smoother transitions
+                  requestAnimationFrame(() => {
+                    setTimeout(() => {
+                      setPriorityFilter(value);
+                      setIsTransitioning(false);
+                    }, 100);
+                  });
                 }}>
                   <TabsList>
                     <TabsTrigger value="all" data-testid="filter-all-priority">All</TabsTrigger>
@@ -405,8 +415,8 @@ export default function Cases() {
         </Card>
 
         {/* Kanban Board */}
-        <div className={`min-h-[600px] transition-opacity duration-150 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`} data-testid="cases-kanban-board">
-          {isLoading || isTransitioning ? (
+        <div className={`min-h-[600px] transition-all duration-300 ease-in-out ${isTransitioning ? 'opacity-60 scale-[0.98]' : 'opacity-100 scale-100'}`} data-testid="cases-kanban-board">
+          {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Card key={i} className="h-[400px] animate-pulse">
@@ -424,7 +434,7 @@ export default function Cases() {
               ))}
             </div>
           ) : (
-            <DragDropContext key={`${priorityFilter}-${searchQuery}`} onDragEnd={onDragEnd}>
+            <DragDropContext key={`dnd-${priorityFilter}`} onDragEnd={onDragEnd}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                 {columns.map(status => {
                   const columnCases = filteredCases.filter(caseItem => caseItem.status === status);
