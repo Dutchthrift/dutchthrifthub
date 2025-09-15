@@ -15,7 +15,6 @@ import {
 import { useTheme } from "@/hooks/use-theme";
 import { GlobalSearch } from "@/components/search/global-search";
 import { CommandPalette } from "@/components/search/command-palette";
-import { AdminDialog } from "@/components/admin/admin-dialog";
 import { useState } from "react";
 
 const navigationItems = [
@@ -33,7 +32,6 @@ export function Navigation() {
   const [location] = useLocation();
   const { setTheme } = useTheme();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [showAdminDialog, setShowAdminDialog] = useState(false);
 
   return (
     <>
@@ -107,10 +105,6 @@ export function Navigation() {
                   Profile Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setShowAdminDialog(true)} data-testid="user-menu-admin">
-                  Admin Beheer
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setTheme("light")} data-testid="user-menu-light-theme">
                   Light Theme
                 </DropdownMenuItem>
@@ -133,10 +127,6 @@ export function Navigation() {
       <CommandPalette 
         open={showCommandPalette} 
         onOpenChange={setShowCommandPalette}
-      />
-      <AdminDialog 
-        open={showAdminDialog} 
-        onOpenChange={setShowAdminDialog}
       />
     </>
   );
