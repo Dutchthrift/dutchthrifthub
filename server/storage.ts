@@ -11,7 +11,8 @@ import {
   type PurchaseOrder, type InsertPurchaseOrder,
   type Case, type InsertCase,
   type Activity, type InsertActivity,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, cases, activities
+  type AuditLog, type InsertAuditLog,
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, cases, activities, auditLogs
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql } from "drizzle-orm";
@@ -20,6 +21,7 @@ import type { Response } from "express";
 
 export interface IStorage {
   // Users
+  getUsers(): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -105,6 +107,10 @@ export interface IStorage {
   getActivities(limit?: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
 
+  // Audit Logs
+  createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(limit?: number): Promise<AuditLog[]>;
+
   // Dashboard stats
   getDashboardStats(): Promise<{
     unreadEmails: number;
@@ -130,6 +136,10 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // Users
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return result[0];
@@ -614,6 +624,16 @@ export class DatabaseStorage implements IStorage {
   async createActivity(activity: InsertActivity): Promise<Activity> {
     const result = await db.insert(activities).values(activity).returning();
     return result[0];
+  }
+
+  // Audit Logs
+  async createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog> {
+    const result = await db.insert(auditLogs).values(auditLog).returning();
+    return result[0];
+  }
+
+  async getAuditLogs(limit: number = 50): Promise<AuditLog[]> {
+    return await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(limit);
   }
 
   // Dashboard stats

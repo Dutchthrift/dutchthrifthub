@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum("user_role", ["admin", "agent", "repair_tech", "viewer"]);
+export const userRoleEnum = pgEnum("user_role", ["ADMIN", "SUPPORT", "TECHNICUS"]);
 export const priorityEnum = pgEnum("priority", ["low", "medium", "high", "urgent"]);
 export const repairStatusEnum = pgEnum("repair_status", ["new", "in_progress", "waiting_customer", "waiting_part", "ready", "closed"]);
 export const todoStatusEnum = pgEnum("todo_status", ["todo", "in_progress", "done"]);
@@ -19,7 +19,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: userRoleEnum("role").notNull().default("agent"),
+  role: userRoleEnum("role").notNull().default("SUPPORT"),
   firstName: text("first_name"),
   lastName: text("last_name"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -211,6 +211,21 @@ export const activities = pgTable("activities", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Audit logs table - for RBAC audit trail
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  action: text("action").notNull(), // e.g., 'CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT'
+  resource: text("resource").notNull(), // e.g., 'user', 'case', 'repair', 'email'
+  resourceId: text("resource_id"), // ID of the affected resource
+  details: jsonb("details"), // Additional context about the action
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  success: boolean("success").notNull().default(true),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -289,6 +304,11 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
   createdAt: true,
 });
 
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertEmailAttachmentSchema = createInsertSchema(emailAttachments).omit({
   id: true,
   createdAt: true,
@@ -327,6 +347,9 @@ export type InsertCase = z.infer<typeof insertCaseSchema>;
 
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 export type EmailAttachment = typeof emailAttachments.$inferSelect;
 export type InsertEmailAttachment = z.infer<typeof insertEmailAttachmentSchema>;

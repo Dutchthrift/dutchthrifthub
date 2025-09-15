@@ -1,14 +1,245 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import bcrypt from "bcryptjs";
 import { storage } from "./storage";
-import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertPurchaseOrderSchema, insertCaseSchema } from "@shared/schema";
+import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertPurchaseOrderSchema, insertCaseSchema, insertUserSchema, insertAuditLogSchema } from "@shared/schema";
 import { syncEmails, sendEmail } from "./services/emailService";
 import { shopifyClient } from "./services/shopifyClient";
 import { OrderMatchingService } from "./services/orderMatchingService";
 
+// Extend Request type to include session
+interface AuthenticatedRequest extends Request {
+  session: any;
+  user?: any;
+}
+
+// Authentication middleware
+const requireAuth = async (req: any, res: any, next: any) => {
+  const userId = req.session?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  const user = await storage.getUser(userId);
+  if (!user) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ error: "User not found" });
+  }
+
+  req.user = user;
+  next();
+};
+
+// Role-based authorization middleware
+const requireRole = (roles: string[]) => {
+  return async (req: any, res: any, next: any) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    if (!roles.includes(req.user.role)) {
+      // Log unauthorized access attempt
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: "UNAUTHORIZED_ACCESS",
+        resource: "endpoint",
+        resourceId: req.path,
+        details: { 
+          requiredRoles: roles, 
+          userRole: req.user.role,
+          method: req.method,
+          endpoint: req.path
+        },
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+        success: false,
+        errorMessage: "Insufficient permissions"
+      });
+
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
+    next();
+  };
+};
+
+// Audit logging helper
+const auditLog = async (req: any, action: string, resource: string, resourceId?: string, details?: any) => {
+  if (req.user) {
+    await storage.createAuditLog({
+      userId: req.user.id,
+      action,
+      resource,
+      resourceId,
+      details,
+      ipAddress: req.ip,
+      userAgent: req.get("User-Agent"),
+      success: true
+    });
+  }
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize order matching service
   const orderMatchingService = new OrderMatchingService(storage);
+
+  // Authentication routes
+  app.post("/api/auth/signin", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Log failed login attempt
+        await storage.createAuditLog({
+          action: "LOGIN_FAILED",
+          resource: "auth",
+          details: { email, reason: "User not found" },
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
+          success: false,
+          errorMessage: "Invalid credentials"
+        });
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        // Log failed login attempt
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "LOGIN_FAILED",
+          resource: "auth",
+          details: { email, reason: "Invalid password" },
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
+          success: false,
+          errorMessage: "Invalid credentials"
+        });
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Create session
+      (req as any).session.userId = user.id;
+
+      // Log successful login
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "LOGIN_SUCCESS",
+        resource: "auth",
+        details: { email },
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+        success: true
+      });
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.json({ 
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName
+        }
+      });
+    } catch (error) {
+      console.error("Sign in error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/signout", requireAuth, async (req: any, res: any) => {
+    try {
+      // Log logout
+      await auditLog(req, "LOGOUT", "auth");
+
+      req.session.destroy((err: any) => {
+        if (err) {
+          console.error("Session destroy error:", err);
+          return res.status(500).json({ error: "Failed to sign out" });
+        }
+        res.json({ message: "Signed out successfully" });
+      });
+    } catch (error) {
+      console.error("Sign out error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/auth/session", async (req: any, res: any) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "No active session" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName
+        }
+      });
+    } catch (error) {
+      console.error("Session check error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // User Management routes (ADMIN only)
+  app.get("/api/users", requireAuth, requireRole(["ADMIN"]), async (req: any, res: any) => {
+    try {
+      const users = await storage.getUsers();
+      await auditLog(req, "LIST", "users");
+      
+      // Remove passwords from response
+      const safeUsers = users.map(user => {
+        const { password, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      });
+      
+      res.json(safeUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/users", requireAuth, requireRole(["ADMIN"]), async (req: any, res: any) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+      
+      const newUser = await storage.createUser({
+        ...userData,
+        password: hashedPassword
+      });
+
+      await auditLog(req, "CREATE", "users", newUser.id, { email: newUser.email, role: newUser.role });
+
+      const { password, ...userWithoutPassword } = newUser;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(400).json({ error: "Failed to create user" });
+    }
+  });
+
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
