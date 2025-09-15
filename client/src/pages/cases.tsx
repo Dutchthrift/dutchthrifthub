@@ -53,7 +53,7 @@ export default function Cases() {
   });
 
   const updateCaseMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Case> }) => {
+    mutationFn: async ({ id, data, previousData }: { id: string; data: Partial<Case>; previousData?: CaseWithDetails[] }) => {
       const response = await fetch(`/api/cases/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -62,14 +62,31 @@ export default function Cases() {
       if (!response.ok) throw new Error("Failed to update case");
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
+    onSuccess: (updatedCase, { id }) => {
+      // Update the query data with the server response instead of invalidating
+      queryClient.setQueryData(["/api/cases"], (oldData: CaseWithDetails[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.map(caseItem => 
+          caseItem.id === id 
+            ? { ...caseItem, ...updatedCase }
+            : caseItem
+        );
+      });
+      
       toast({
         title: "Case updated",
         description: "Case status has been updated successfully",
       });
     },
-    onError: () => {
+    onError: (error, { id, previousData }) => {
+      // Revert to the previous state on error
+      if (previousData) {
+        queryClient.setQueryData(["/api/cases"], previousData);
+      } else {
+        // Fallback: invalidate queries to refetch correct state
+        queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
+      }
+      
       toast({
         title: "Update failed",
         description: "Failed to update case status",
@@ -126,6 +143,9 @@ export default function Cases() {
       return;
     }
 
+    // Store the previous state for potential rollback
+    const previousData = queryClient.getQueryData(["/api/cases"]) as CaseWithDetails[] | undefined;
+    
     // Optimistic update
     queryClient.setQueryData(["/api/cases"], (oldData: CaseWithDetails[] | undefined) => {
       if (!oldData) return oldData;
@@ -139,7 +159,8 @@ export default function Cases() {
     // Update case status
     updateCaseMutation.mutate({ 
       id: caseId, 
-      data: { status: newStatus as any } 
+      data: { status: newStatus as any },
+      previousData // Pass previous data for potential rollback
     });
   }, [updateCaseMutation, queryClient]);
 
