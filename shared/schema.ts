@@ -179,6 +179,8 @@ export const cases = pgTable("cases", {
   slaDeadline: timestamp("sla_deadline"),
   resolvedAt: timestamp("resolved_at"),
   closedAt: timestamp("closed_at"),
+  archived: boolean("archived").default(false), // Archive status
+  archivedAt: timestamp("archived_at"), // When the case was archived
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

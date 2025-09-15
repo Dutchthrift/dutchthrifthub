@@ -1559,6 +1559,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Archive a case
+  app.patch("/api/cases/:id/archive", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const updatedCase = await storage.updateCase(id, {
+        archived: true,
+        archivedAt: new Date()
+      });
+      
+      if (!updatedCase) {
+        return res.status(404).json({ message: "Case not found" });
+      }
+      
+      await storage.createActivity({
+        type: "case_archived",
+        description: `Archived case: ${updatedCase.title || updatedCase.caseNumber || 'Unknown'}`,
+        userId: updatedCase.assignedUserId || null,
+        metadata: { caseId: updatedCase.id }
+      });
+      
+      res.json(updatedCase);
+    } catch (error) {
+      console.error("Error archiving case:", error);
+      res.status(400).json({ message: "Failed to archive case" });
+    }
+  });
+
+  // Unarchive a case
+  app.patch("/api/cases/:id/unarchive", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const updatedCase = await storage.updateCase(id, {
+        archived: false,
+        archivedAt: null
+      });
+      
+      if (!updatedCase) {
+        return res.status(404).json({ message: "Case not found" });
+      }
+      
+      await storage.createActivity({
+        type: "case_unarchived",
+        description: `Unarchived case: ${updatedCase.title || updatedCase.caseNumber || 'Unknown'}`,
+        userId: updatedCase.assignedUserId || null,
+        metadata: { caseId: updatedCase.id }
+      });
+      
+      res.json(updatedCase);
+    } catch (error) {
+      console.error("Error unarchiving case:", error);
+      res.status(400).json({ message: "Failed to unarchive case" });
+    }
+  });
+
+  // Delete a case
+  app.delete("/api/cases/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get case details before deletion for activity log
+      const caseItem = await storage.getCase(id);
+      if (!caseItem) {
+        return res.status(404).json({ message: "Case not found" });
+      }
+      
+      await storage.deleteCase(id);
+      
+      await storage.createActivity({
+        type: "case_deleted",
+        description: `Deleted case: ${caseItem.title}`,
+        userId: caseItem.assignedUserId,
+        metadata: { caseId: id, caseNumber: caseItem.caseNumber }
+      });
+      
+      res.json({ message: "Case deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting case:", error);
+      res.status(400).json({ message: "Failed to delete case" });
+    }
+  });
+
   app.post("/api/cases/from-email/:threadId", async (req, res) => {
     try {
       const { threadId } = req.params;

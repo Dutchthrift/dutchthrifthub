@@ -31,6 +31,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { CaseForm } from "../components/forms/case-form";
+import { CaseContextMenu } from "../components/cases/case-context-menu";
 
 const CASE_STATUS_CONFIG = {
   new: { label: "New", color: "bg-chart-4", icon: FileText },
@@ -45,6 +46,7 @@ export default function Cases() {
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [showNewCase, setShowNewCase] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [columns, setColumns] = useState(Object.keys(CASE_STATUS_CONFIG));
   const { toast } = useToast();
 
@@ -99,6 +101,13 @@ export default function Cases() {
     if (!cases) return [];
     
     return cases.filter(caseItem => {
+      // Filter by archived status
+      if (showArchived) {
+        if (!caseItem.archived) return false;
+      } else {
+        if (caseItem.archived) return false;
+      }
+      
       if (priorityFilter !== "all" && caseItem.priority !== priorityFilter) return false;
       if (searchQuery && 
           !caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
@@ -106,7 +115,7 @@ export default function Cases() {
           !caseItem.caseNumber.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
-  }, [cases, priorityFilter, searchQuery]);
+  }, [cases, priorityFilter, searchQuery, showArchived]);
 
   const caseStatusCount = useMemo(() => {
     const counts = {
@@ -164,6 +173,98 @@ export default function Cases() {
     });
   }, [updateCaseMutation, queryClient]);
 
+  // Archive mutation
+  const archiveCaseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/cases/${id}/archive`, {
+        method: "PATCH",
+      });
+      if (!response.ok) throw new Error("Failed to archive case");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
+      toast({
+        title: "Case archived",
+        description: "Case has been archived successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Archive failed",
+        description: "Failed to archive case",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Unarchive mutation
+  const unarchiveCaseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/cases/${id}/unarchive`, {
+        method: "PATCH",
+      });
+      if (!response.ok) throw new Error("Failed to unarchive case");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
+      toast({
+        title: "Case unarchived",
+        description: "Case has been unarchived successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Unarchive failed",
+        description: "Failed to unarchive case",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Delete mutation
+  const deleteCaseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/cases/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete case");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
+      toast({
+        title: "Case deleted",
+        description: "Case has been deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete case",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Context menu handlers
+  const handleCaseOpen = (caseId: string) => {
+    window.location.href = `/cases/${caseId}`;
+  };
+
+  const handleCaseArchive = (caseId: string) => {
+    archiveCaseMutation.mutate(caseId);
+  };
+
+  const handleCaseUnarchive = (caseId: string) => {
+    unarchiveCaseMutation.mutate(caseId);
+  };
+
+  const handleCaseDelete = (caseId: string) => {
+    deleteCaseMutation.mutate(caseId);
+  };
+
   const getPriorityVariant = (priority: string | null) => {
     switch (priority) {
       case "urgent": return "destructive";
@@ -189,67 +290,81 @@ export default function Cases() {
   const CaseCard = useCallback(({ caseItem, index }: { caseItem: CaseWithDetails; index: number }) => (
     <Draggable draggableId={caseItem.id} index={index}>
       {(provided, snapshot) => (
-        <Card
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          className={`mb-3 cursor-pointer hover:shadow-md transition-shadow ${
-            snapshot.isDragging ? "rotate-3 shadow-lg" : ""
-          }`}
-          onClick={() => window.location.href = `/cases/${caseItem.id}`}
-          data-testid={`case-card-${caseItem.id}`}
+        <CaseContextMenu
+          caseId={caseItem.id}
+          isArchived={caseItem.archived || false}
+          onOpen={handleCaseOpen}
+          onArchive={handleCaseArchive}
+          onUnarchive={handleCaseUnarchive}
+          onDelete={handleCaseDelete}
         >
-          <CardContent className="p-4">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-medium text-sm line-clamp-2" data-testid={`case-title-${caseItem.id}`}>
-                {caseItem.title}
-              </h3>
-              <Badge variant={getPriorityVariant(caseItem.priority)} className="ml-2 text-xs">
-                {caseItem.priority}
-              </Badge>
-            </div>
-            
-            <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
-              {caseItem.description}
-            </p>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-mono text-muted-foreground" data-testid={`case-number-${caseItem.id}`}>
-                  #{caseItem.caseNumber}
-                </span>
-                {caseItem.slaDeadline && (
-                  <span className={`font-medium ${isOverdue(caseItem.slaDeadline) ? 'text-destructive' : 'text-muted-foreground'}`}>
-                    {isOverdue(caseItem.slaDeadline) ? 'Overdue' : formatDate(caseItem.slaDeadline)}
-                  </span>
-                )}
+          <Card
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            {...provided.dragHandleProps}
+            className={`mb-3 cursor-pointer hover:shadow-md transition-shadow ${
+              snapshot.isDragging ? "rotate-3 shadow-lg" : ""
+            } ${caseItem.archived ? "opacity-60" : ""}`}
+            onClick={() => window.location.href = `/cases/${caseItem.id}`}
+            data-testid={`case-card-${caseItem.id}`}
+          >
+            <CardContent className="p-4">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-medium text-sm line-clamp-2" data-testid={`case-title-${caseItem.id}`}>
+                  {caseItem.title}
+                  {caseItem.archived && (
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      Archived
+                    </Badge>
+                  )}
+                </h3>
+                <Badge variant={getPriorityVariant(caseItem.priority)} className="ml-2 text-xs">
+                  {caseItem.priority}
+                </Badge>
               </div>
+              
+              <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                {caseItem.description}
+              </p>
 
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-muted-foreground">
-                  {caseItem.customer ? (
-                    <span data-testid={`case-customer-${caseItem.id}`}>
-                      {caseItem.customer.firstName} {caseItem.customer.lastName}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-mono text-muted-foreground" data-testid={`case-number-${caseItem.id}`}>
+                    #{caseItem.caseNumber}
+                  </span>
+                  {caseItem.slaDeadline && (
+                    <span className={`font-medium ${isOverdue(caseItem.slaDeadline) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {isOverdue(caseItem.slaDeadline) ? 'Overdue' : formatDate(caseItem.slaDeadline)}
                     </span>
-                  ) : (
-                    <span>{caseItem.customerEmail}</span>
                   )}
                 </div>
-                
-                {caseItem.assignedUser && (
-                  <Avatar className="h-6 w-6">
-                    <AvatarFallback className="text-xs" data-testid={`case-assignee-${caseItem.id}`}>
-                      {(caseItem.assignedUser.firstName?.[0] || '') + (caseItem.assignedUser.lastName?.[0] || '')}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
+
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-muted-foreground">
+                    {caseItem.customer ? (
+                      <span data-testid={`case-customer-${caseItem.id}`}>
+                        {caseItem.customer.firstName} {caseItem.customer.lastName}
+                      </span>
+                    ) : (
+                      <span>{caseItem.customerEmail}</span>
+                    )}
+                  </div>
+                  
+                  {caseItem.assignedUser && (
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="text-xs" data-testid={`case-assignee-${caseItem.id}`}>
+                        {(caseItem.assignedUser.firstName?.[0] || '') + (caseItem.assignedUser.lastName?.[0] || '')}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </CaseContextMenu>
       )}
     </Draggable>
-  ), []);
+  ), [handleCaseOpen, handleCaseArchive, handleCaseUnarchive, handleCaseDelete]);
 
   const Column = useCallback(({ status, cases: columnCases }: { status: string; cases: CaseWithDetails[] }) => {
     const config = CASE_STATUS_CONFIG[status as keyof typeof CASE_STATUS_CONFIG];
@@ -408,6 +523,16 @@ export default function Cases() {
                     <TabsTrigger value="low" data-testid="filter-low-priority">Low</TabsTrigger>
                   </TabsList>
                 </Tabs>
+                
+                <Button
+                  variant={showArchived ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowArchived(!showArchived)}
+                  data-testid="archive-toggle-button"
+                >
+                  <Archive className="mr-2 h-4 w-4" />
+                  {showArchived ? "Show Active" : "Show Archive"}
+                </Button>
               </div>
               
               <Button variant="outline" size="icon" data-testid="advanced-filters-button">

@@ -89,6 +89,7 @@ export interface IStorage {
   getCase(id: string): Promise<Case | undefined>;
   createCase(caseData: InsertCase): Promise<Case>;
   updateCase(id: string, caseData: Partial<InsertCase>): Promise<Case>;
+  deleteCase(id: string): Promise<void>;
   linkEntityToCase(caseId: string, entityType: 'email' | 'repair' | 'todo' | 'order' | 'note', entityId: string): Promise<void>;
   unlinkEntityFromCase(entityType: 'email' | 'repair' | 'todo' | 'order' | 'note', entityId: string): Promise<void>;
   createCaseFromEmailThread(threadId: string): Promise<Case>;
@@ -486,6 +487,25 @@ export class DatabaseStorage implements IStorage {
 
     const result = await db.update(cases).set(updateData as any).where(eq(cases.id, id)).returning();
     return result[0];
+  }
+
+  async deleteCase(id: string): Promise<void> {
+    // First unlink all related entities to avoid foreign key constraint violations
+    
+    // Unlink email threads
+    await db.update(emailThreads).set({ caseId: null }).where(eq(emailThreads.caseId, id));
+    
+    // Unlink repairs
+    await db.update(repairs).set({ caseId: null }).where(eq(repairs.caseId, id));
+    
+    // Unlink todos
+    await db.update(todos).set({ caseId: null }).where(eq(todos.caseId, id));
+    
+    // Unlink internal notes
+    await db.update(internalNotes).set({ caseId: null }).where(eq(internalNotes.caseId, id));
+    
+    // Now safe to delete the case
+    await db.delete(cases).where(eq(cases.id, id));
   }
 
   async linkEntityToCase(caseId: string, entityType: 'email' | 'repair' | 'todo' | 'order' | 'note', entityId: string): Promise<void> {
