@@ -21,6 +21,7 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     
     let workingStr = str;
     
+    // Step 1: If MIME headers present, extract content after blank line
     if (str.includes('Content-Transfer-Encoding:') || str.includes('Content-Type:')) {
       let headerEndIndex = str.indexOf('\n\n');
       if (headerEndIndex === -1) {
@@ -29,21 +30,23 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
       
       if (headerEndIndex > 0) {
         workingStr = str.substring(headerEndIndex + (str.charAt(headerEndIndex + 1) === '\r' ? 4 : 2)).trim();
-      } else {
-        workingStr = str;
       }
     }
     
+    // Step 2: Clean whitespace for base64 check
     const cleanedStr = workingStr.replace(/\s+/g, '');
     
+    // Step 3: Check if it looks like base64 and is long enough
     const base64Pattern = /^[A-Za-z0-9+/=]+$/;
-    if (!base64Pattern.test(cleanedStr)) {
-      return { decoded: str, wasBase64: false };
+    if (cleanedStr.length < 10 || !base64Pattern.test(cleanedStr)) {
+      return { decoded: workingStr, wasBase64: false };
     }
     
+    // Step 4: Try to decode
     try {
       const decoded = atob(cleanedStr);
       
+      // Step 5: Validate decoded content is printable
       const isPrintable = decoded.split('').every(char => {
         const code = char.charCodeAt(0);
         return code >= 32 || code === 9 || code === 10 || code === 13;
@@ -53,9 +56,9 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
         return { decoded, wasBase64: true };
       }
       
-      return { decoded: str, wasBase64: false };
+      return { decoded: workingStr, wasBase64: false };
     } catch (e) {
-      return { decoded: str, wasBase64: false };
+      return { decoded: workingStr, wasBase64: false };
     }
   };
 
