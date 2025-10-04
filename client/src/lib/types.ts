@@ -12,6 +12,56 @@ export type {
   InsertRepair, InsertTodo, InsertInternalNote, InsertActivity, InsertCase
 };
 
+// Shopify Order Data Structure
+export interface ShopifyCustomer {
+  id?: number;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  default_address?: {
+    address1?: string;
+    address2?: string;
+    city?: string;
+    province?: string;
+    zip?: string;
+    country?: string;
+  };
+}
+
+export interface ShopifyLineItem {
+  id?: number;
+  title?: string;
+  quantity?: number;
+  price?: string;
+  sku?: string;
+  variant_title?: string;
+  product_id?: number;
+  variant_id?: number;
+}
+
+export interface ShopifyFulfillment {
+  id?: number;
+  status?: string;
+  tracking_company?: string;
+  tracking_number?: string;
+  tracking_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ShopifyOrderData {
+  customer?: ShopifyCustomer;
+  line_items?: ShopifyLineItem[];
+  fulfillments?: ShopifyFulfillment[];
+  [key: string]: any; // Allow other Shopify fields
+}
+
+// Extended Order type with typed orderData
+export interface OrderWithShopifyData extends Order {
+  orderData?: ShopifyOrderData | null;
+}
+
 export interface DashboardStats {
   unreadEmails: number;
   newRepairs: number;

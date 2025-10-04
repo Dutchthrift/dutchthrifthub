@@ -30,7 +30,7 @@ import {
   Package
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { EmailThread, EmailMessage, Case, Order } from "@/lib/types";
+import type { EmailThread, EmailMessage, Case, OrderWithShopifyData } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { CreateCaseModal } from "@/components/forms/create-case-modal";
@@ -69,13 +69,13 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
   });
 
   // Get all available orders for linking  
-  const { data: allOrders } = useQuery<Order[]>({
+  const { data: allOrders } = useQuery<OrderWithShopifyData[]>({
     queryKey: ["/api/orders"],
     enabled: true,
   });
 
   // Get the linked order details when thread has an orderId
-  const { data: linkedOrder } = useQuery<Order>({
+  const { data: linkedOrder } = useQuery<OrderWithShopifyData>({
     queryKey: ["/api/orders", thread?.orderId],
     enabled: !!thread?.orderId,
   });
