@@ -58,8 +58,8 @@ export interface ShopifyOrderData {
 }
 
 // Extended Order type with typed orderData
-export interface OrderWithShopifyData extends Order {
-  orderData?: ShopifyOrderData | null;
+export interface OrderWithShopifyData extends Omit<Order, 'orderData'> {
+  orderData: ShopifyOrderData | null;
 }
 
 export interface DashboardStats {
