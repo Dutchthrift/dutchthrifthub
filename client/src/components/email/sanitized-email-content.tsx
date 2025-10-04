@@ -22,16 +22,16 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     );
   }
 
-  const sanitizeHtml = (html: string): string => {
+  const sanitizeHtml = (html: string): { sanitized: string; isEmpty: boolean } => {
     const config = {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'ul', 'ol', 'li', 'a', 'img', 'div', 'span', 'table', 'thead', 'tbody',
         'tr', 'td', 'th', 'blockquote', 'code', 'pre', 'hr'
       ],
-      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'target', 'rel'],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel'],
       ALLOW_DATA_ATTR: false,
-      ADD_ATTR: ['target'],
+      ADD_ATTR: ['target', 'rel'],
       FORCE_BODY: true,
     };
 
@@ -50,22 +50,27 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     cleanHtml = cleanHtml.replace(/\s{2,}/g, ' ');
 
     const sanitized = DOMPurify.sanitize(cleanHtml, config);
+    const isEmpty = !sanitized || sanitized.trim().length === 0;
 
-    if (!sanitized || sanitized.trim().length === 0) {
-      return html;
-    }
-
-    return sanitized;
+    return { sanitized, isEmpty };
   };
 
-  const sanitizedHtml = sanitizeHtml(body);
+  const { sanitized, isEmpty } = sanitizeHtml(body);
 
-  const hasHtmlTags = /<[^>]+>/.test(sanitizedHtml);
+  if (isEmpty) {
+    return (
+      <div className="text-muted-foreground italic text-sm">
+        Email content could not be displayed safely
+      </div>
+    );
+  }
+
+  const hasHtmlTags = /<[^>]+>/.test(sanitized);
   
   if (!hasHtmlTags) {
     return (
       <div className="whitespace-pre-wrap text-sm leading-relaxed">
-        {sanitizedHtml}
+        {sanitized}
       </div>
     );
   }
@@ -85,7 +90,7 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
         prose-hr:my-4 prose-hr:border-gray-300 dark:prose-hr:border-gray-600
         text-foreground
       "
-      dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+      dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   );
 }

@@ -35,6 +35,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { CreateCaseModal } from "@/components/forms/create-case-modal";
 import { EmailAttachments } from "./email-attachments";
+import { SanitizedEmailContent } from "./sanitized-email-content";
 
 interface EmailThreadViewProps {
   threadId: string;
@@ -373,13 +374,10 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                     </div>
                   </div>
                   
-                  <div className="prose prose-sm max-w-none">
-                    {message.isHtml ? (
-                      <div dangerouslySetInnerHTML={{ __html: message.body || "" }} />
-                    ) : (
-                      <div className="whitespace-pre-wrap">{message.body}</div>
-                    )}
-                  </div>
+                  <SanitizedEmailContent 
+                    body={message.body || ""} 
+                    isHtml={message.isHtml || false} 
+                  />
                   
                   <EmailAttachments messageId={message.id} />
                 </CardContent>
