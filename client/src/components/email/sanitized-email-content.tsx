@@ -14,10 +14,70 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     );
   }
 
-  if (!isHtml) {
+  const decodeBase64 = (str: string): { decoded: string; wasBase64: boolean } => {
+    if (!str) {
+      return { decoded: str, wasBase64: false };
+    }
+    
+    let workingStr = str;
+    
+    if (str.includes('Content-Transfer-Encoding:') || str.includes('Content-Type:')) {
+      let headerEndIndex = str.indexOf('\n\n');
+      if (headerEndIndex === -1) {
+        headerEndIndex = str.indexOf('\r\n\r\n');
+      }
+      
+      if (headerEndIndex > 0) {
+        workingStr = str.substring(headerEndIndex + (str.charAt(headerEndIndex + 1) === '\r' ? 4 : 2)).trim();
+      } else {
+        workingStr = str;
+      }
+    }
+    
+    const cleanedStr = workingStr.replace(/\s+/g, '');
+    
+    const base64Pattern = /^[A-Za-z0-9+/=]+$/;
+    if (!base64Pattern.test(cleanedStr)) {
+      return { decoded: str, wasBase64: false };
+    }
+    
+    try {
+      const decoded = atob(cleanedStr);
+      
+      const isPrintable = decoded.split('').every(char => {
+        const code = char.charCodeAt(0);
+        return code >= 32 || code === 9 || code === 10 || code === 13;
+      });
+      
+      if (isPrintable) {
+        return { decoded, wasBase64: true };
+      }
+      
+      return { decoded: str, wasBase64: false };
+    } catch (e) {
+      return { decoded: str, wasBase64: false };
+    }
+  };
+
+  const { decoded: decodedBody, wasBase64 } = decodeBase64(body);
+
+  if (!isHtml && !decodedBody.includes('<html') && !decodedBody.includes('<div')) {
+    return (
+      <div>
+        {wasBase64 && <div className="text-xs text-green-600 mb-1">✓ Decoded from base64</div>}
+        <div className="whitespace-pre-wrap text-sm leading-relaxed">
+          {decodedBody}
+        </div>
+      </div>
+    );
+  }
+
+  const actuallyHtml = isHtml || decodedBody.includes('<html') || decodedBody.includes('<div') || decodedBody.includes('<p>');
+
+  if (!actuallyHtml) {
     return (
       <div className="whitespace-pre-wrap text-sm leading-relaxed">
-        {body}
+        {decodedBody}
       </div>
     );
   }
@@ -55,7 +115,7 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     return { sanitized, isEmpty };
   };
 
-  const { sanitized, isEmpty } = sanitizeHtml(body);
+  const { sanitized, isEmpty } = sanitizeHtml(decodedBody);
 
   if (isEmpty) {
     return (
