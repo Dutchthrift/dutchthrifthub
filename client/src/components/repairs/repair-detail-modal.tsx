@@ -30,8 +30,9 @@ import {
   Download,
   Trash2,
   FileText,
+  AlertTriangle,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isPast } from "date-fns";
 import { nl } from "date-fns/locale";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -179,9 +180,19 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               <DialogTitle>Reparatie #{repair.id.slice(0, 8)}</DialogTitle>
               <p className="text-sm text-muted-foreground mt-1">{repair.title}</p>
             </div>
-            <Badge variant="secondary" className={getStatusColor(repair.status)}>
-              {getStatusLabel(repair.status)}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className={getStatusColor(repair.status)}>
+                {getStatusLabel(repair.status)}
+              </Badge>
+              {repair.slaDeadline && 
+               !['completed', 'returned', 'canceled'].includes(repair.status) && 
+               isPast(new Date(repair.slaDeadline)) && (
+                <div className="flex items-center gap-1 text-destructive" data-testid="indicator-overdue">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-xs font-medium">Te laat</span>
+                </div>
+              )}
+            </div>
           </div>
         </DialogHeader>
 

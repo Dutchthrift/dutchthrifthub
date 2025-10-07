@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wrench, Clock, Users, CheckCircle, AlertTriangle } from "lucide-react";
 import type { Repair, User } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
+import { isPast } from "date-fns";
 
 interface RepairAnalyticsProps {
   repairs: Repair[];
@@ -11,6 +12,13 @@ interface RepairAnalyticsProps {
 export function RepairAnalytics({ repairs, users }: RepairAnalyticsProps) {
   // Total repairs
   const totalRepairs = repairs.length;
+
+  // Overdue repairs (active repairs past SLA deadline)
+  const overdueRepairs = repairs.filter(r => {
+    if (!r.slaDeadline) return false;
+    const isActive = !['completed', 'returned', 'canceled'].includes(r.status);
+    return isActive && isPast(new Date(r.slaDeadline));
+  });
 
   // Average repair time (in days) for completed repairs only
   const completedRepairs = repairs.filter(r => 
@@ -128,13 +136,36 @@ export function RepairAnalytics({ repairs, users }: RepairAnalyticsProps) {
         </CardContent>
       </Card>
 
-      <Card data-testid="card-urgent-repairs">
+      <Card data-testid="card-overdue-repairs">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Urgente Reparaties</CardTitle>
+          <CardTitle className="text-sm font-medium">Te Laat</CardTitle>
           <AlertTriangle className="h-4 w-4 text-destructive" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-destructive" data-testid="text-urgent-count">
+          <div className="text-2xl font-bold text-destructive" data-testid="text-overdue-count">
+            {overdueRepairs.length}
+          </div>
+          {overdueRepairs.length > 0 ? (
+            <div className="mt-2 space-y-1">
+              {overdueRepairs.slice(0, 3).map((repair) => (
+                <div key={repair.id} className="text-xs truncate" data-testid={`overdue-repair-${repair.id}`}>
+                  #{repair.id.slice(0, 8)} - {repair.title}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-2">Geen te late reparaties</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-urgent-repairs">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Urgent</CardTitle>
+          <AlertTriangle className="h-4 w-4 text-orange-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-orange-500" data-testid="text-urgent-count">
             {urgentRepairs}
           </div>
           {urgentRepairsList.length > 0 ? (

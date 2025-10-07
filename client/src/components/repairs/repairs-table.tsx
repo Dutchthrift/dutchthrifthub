@@ -16,8 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Eye, Edit, Trash2, MessageSquare } from "lucide-react";
-import { format } from "date-fns";
+import { MoreHorizontal, Eye, Edit, Trash2, MessageSquare, AlertTriangle } from "lucide-react";
+import { format, isPast } from "date-fns";
 import { nl } from "date-fns/locale";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -136,6 +136,12 @@ export function RepairsTable({ repairs, users, onRepairClick, onAddNote }: Repai
     return user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username : 'Onbekend';
   };
 
+  const isOverdue = (repair: Repair) => {
+    if (!repair.slaDeadline) return false;
+    const isActive = !['completed', 'returned', 'canceled'].includes(repair.status);
+    return isActive && isPast(new Date(repair.slaDeadline));
+  };
+
   const handleDelete = (e: React.MouseEvent, repairId: string) => {
     e.stopPropagation();
     if (confirm('Weet je zeker dat je deze reparatie wilt verwijderen?')) {
@@ -208,13 +214,21 @@ export function RepairsTable({ repairs, users, onRepairClick, onAddNote }: Repai
                 </TableCell>
                 <TableCell>{getTechnicianName(repair.assignedUserId)}</TableCell>
                 <TableCell>
-                  <Badge 
-                    variant="secondary" 
-                    className={getStatusColor(repair.status)}
-                    data-testid={`badge-status-${repair.id}`}
-                  >
-                    {getStatusLabel(repair.status)}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      variant="secondary" 
+                      className={getStatusColor(repair.status)}
+                      data-testid={`badge-status-${repair.id}`}
+                    >
+                      {getStatusLabel(repair.status)}
+                    </Badge>
+                    {isOverdue(repair) && (
+                      <div className="flex items-center gap-1 text-destructive" data-testid={`indicator-overdue-${repair.id}`}>
+                        <AlertTriangle className="h-4 w-4" />
+                        <span className="text-xs font-medium">Te laat</span>
+                      </div>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Badge 
