@@ -38,7 +38,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   // Navigation items based on user role
   const getNavigation = () => {
     const baseNav = [
-      { name: "Home", href: "/", icon: Home, roles: ["ADMIN", "SUPPORT", "TECHNICUS"] },
+      { name: "Dashboard", href: "/", icon: Home, roles: ["ADMIN", "SUPPORT", "TECHNICUS"] },
     ];
 
     const roleBasedNav = [];

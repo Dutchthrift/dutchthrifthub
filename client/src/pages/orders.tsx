@@ -95,7 +95,6 @@ export default function Orders() {
 
   const { data: orderStats } = useQuery<{
     total: number;
-    totalAmount: number;
     pending: number;
     processing: number;
     shipped: number;
@@ -394,12 +393,7 @@ export default function Orders() {
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                €{((orderStats?.totalAmount || 0) / 100).toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {statusCounts.all} orders
-              </p>
+              <div className="text-2xl font-bold">{statusCounts.all}</div>
             </CardContent>
           </Card>
           
