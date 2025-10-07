@@ -65,6 +65,8 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [skuSearch, setSkuSearch] = useState("");
   const [debouncedSkuSearch, setDebouncedSkuSearch] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [orderSearch, setOrderSearch] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -195,6 +197,8 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
     setSlaDeadline(null);
     setSelectedFiles([]);
     setSkuSearch("");
+    setCustomerSearch("");
+    setOrderSearch("");
     onOpenChange(false);
   };
 
@@ -228,6 +232,22 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
           .map((r: any) => [r.productSku, { sku: r.productSku, name: r.productName || '' }])
       ).values()).slice(0, 5) // Show max 5 unique results
     : [];
+
+  // Filter customers - show latest 10 or matching search
+  const filteredCustomers = customerSearch
+    ? customers.filter(c => 
+        `${c.firstName} ${c.lastName}`.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        c.email?.toLowerCase().includes(customerSearch.toLowerCase())
+      ).slice(0, 10)
+    : customers.slice(0, 10);
+
+  // Filter orders - show latest 10 or matching search
+  const filteredOrders = orderSearch
+    ? orders.filter(o => 
+        o.orderNumber?.toString().includes(orderSearch) ||
+        o.id.toLowerCase().includes(orderSearch.toLowerCase())
+      ).slice(0, 10)
+    : orders.slice(0, 10);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -331,42 +351,66 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Klant</Label>
-              <Select
-                onValueChange={(value) => setValue("customerId", value)}
-                value={watch("customerId") || "none"}
-              >
-                <SelectTrigger data-testid="select-customer">
-                  <SelectValue placeholder="Selecteer klant" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Geen klant</SelectItem>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.firstName} {customer.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Zoek klant..."
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-customer-search"
+                  />
+                </div>
+                <Select
+                  onValueChange={(value) => setValue("customerId", value)}
+                  value={watch("customerId") || "none"}
+                >
+                  <SelectTrigger data-testid="select-customer">
+                    <SelectValue placeholder="Selecteer klant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Geen klant</SelectItem>
+                    {filteredCustomers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.firstName} {customer.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label>Order</Label>
-              <Select
-                onValueChange={(value) => setValue("orderId", value)}
-                value={watch("orderId") || "none"}
-              >
-                <SelectTrigger data-testid="select-order">
-                  <SelectValue placeholder="Selecteer order" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Geen order</SelectItem>
-                  {orders.map((order) => (
-                    <SelectItem key={order.id} value={order.id}>
-                      Order #{order.orderNumber}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Zoek order..."
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-order-search"
+                  />
+                </div>
+                <Select
+                  onValueChange={(value) => setValue("orderId", value)}
+                  value={watch("orderId") || "none"}
+                >
+                  <SelectTrigger data-testid="select-order">
+                    <SelectValue placeholder="Selecteer order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Geen order</SelectItem>
+                    {filteredOrders.map((order) => (
+                      <SelectItem key={order.id} value={order.id}>
+                        Order #{order.orderNumber}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
