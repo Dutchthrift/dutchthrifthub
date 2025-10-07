@@ -57,14 +57,18 @@ interface FormData {
 }
 
 const ISSUE_CATEGORIES = [
-  "Schade aan behuizing",
-  "Defect scherm",
-  "Batterij probleem",
-  "Software probleem",
-  "Water schade",
-  "Mechanisch defect",
-  "Elektrisch defect",
-  "Onderdelen vervangen",
+  "Lensdefect - autofocus werkt niet",
+  "Lensdefect - beeldstabilisatie defect",
+  "Lensdefect - diafragma vastgelopen",
+  "Lensdefect - schade aan lenselement",
+  "Camera - sluiter defect",
+  "Camera - sensor vervuiling",
+  "Camera - schade aan behuizing",
+  "Camera - batterij/oplaad probleem",
+  "Camera - display defect",
+  "Camera - knoppen/draaiknoppen defect",
+  "Mechanische schade",
+  "Water/vochtschade",
   "Overig",
 ];
 
@@ -73,6 +77,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
   const [showOrderResults, setShowOrderResults] = useState(false);
+  const [otherCategoryDetails, setOtherCategoryDetails] = useState("");
   const { toast } = useToast();
 
   const { data: customers = [], isError: customersError } = useQuery<Customer[]>({
@@ -182,7 +187,9 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
       slaDeadline: slaDeadline || undefined,
       productSku: data.productSku || undefined,
       productName: data.productName || undefined,
-      issueCategory: data.issueCategory || undefined,
+      issueCategory: data.issueCategory === "Overig" && otherCategoryDetails 
+        ? `Overig: ${otherCategoryDetails}` 
+        : data.issueCategory || undefined,
       customerId: (data.customerId && data.customerId !== "none") ? data.customerId : undefined,
       orderId: (data.orderId && data.orderId !== "none") ? data.orderId : undefined,
       status: "new",
@@ -197,6 +204,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
     setSelectedFiles([]);
     setOrderSearchQuery("");
     setShowOrderResults(false);
+    setOtherCategoryDetails("");
     onOpenChange(false);
   };
 
@@ -285,7 +293,12 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
           <div className="space-y-2">
             <Label>Probleem Categorie</Label>
             <Select
-              onValueChange={(value) => setValue("issueCategory", value)}
+              onValueChange={(value) => {
+                setValue("issueCategory", value);
+                if (value !== "Overig") {
+                  setOtherCategoryDetails("");
+                }
+              }}
               value={watch("issueCategory") || ""}
             >
               <SelectTrigger data-testid="select-issue-category">
@@ -300,6 +313,19 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
               </SelectContent>
             </Select>
           </div>
+
+          {watch("issueCategory") === "Overig" && (
+            <div className="space-y-2">
+              <Label htmlFor="otherDetails">Specificeer het probleem</Label>
+              <Input
+                id="otherDetails"
+                placeholder="Beschrijf het probleem..."
+                value={otherCategoryDetails}
+                onChange={(e) => setOtherCategoryDetails(e.target.value)}
+                data-testid="input-other-category-details"
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Order / Klant</Label>
