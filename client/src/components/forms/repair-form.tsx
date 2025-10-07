@@ -332,7 +332,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                         />
                         Geen order
                       </CommandItem>
-                      {orders.slice(0, 10).map((order) => {
+                      {orders.map((order) => {
                         const customer = customers.find(c => c.id === order.customerId);
                         const customerName = customer 
                           ? `${customer.firstName} ${customer.lastName}`
