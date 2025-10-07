@@ -38,6 +38,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { RepairStatusTimeline } from "./repair-status-timeline";
 
 interface RepairDetailModalProps {
   repair: Repair | null;
@@ -283,6 +284,18 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                     </SelectContent>
                   </Select>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ActivityIcon className="h-4 w-4" />
+                  Reparatie Voortgang
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RepairStatusTimeline currentStatus={repair.status} />
               </CardContent>
             </Card>
 
