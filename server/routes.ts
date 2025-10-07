@@ -613,9 +613,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get order statistics (must come before :id route)
   app.get("/api/orders/stats", async (req, res) => {
     try {
-      const allOrders = await storage.getOrders(1000); // Get more orders for accurate stats
+      const allOrders = await storage.getOrders(999999); // Get all orders for accurate stats
+      
+      // Calculate total amount (sum of all order amounts)
+      const totalAmount = allOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+      
       const stats = {
         total: allOrders.length,
+        totalAmount: totalAmount, // Total monetary amount in cents
         pending: allOrders.filter(o => o.status === 'pending').length,
         processing: allOrders.filter(o => o.status === 'processing').length,
         shipped: allOrders.filter(o => o.status === 'shipped').length,
