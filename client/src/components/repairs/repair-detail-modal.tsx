@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Repair, User, Activity } from "@shared/schema";
 import {
   Dialog,
@@ -52,7 +52,13 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [note, setNote] = useState("");
+  const [currentRepair, setCurrentRepair] = useState<Repair | null>(repair);
   const { toast } = useToast();
+
+  // Update local state when repair prop changes
+  useEffect(() => {
+    setCurrentRepair(repair);
+  }, [repair]);
 
   const { data: activities = [] } = useQuery<Activity[]>({
     queryKey: ['/api/activities', 'repair', repair?.id],
@@ -65,7 +71,10 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
       const res = await apiRequest('PATCH', `/api/repairs/${repair.id}`, data);
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedRepair) => {
+      if (updatedRepair) {
+        setCurrentRepair(updatedRepair);
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/repairs'] });
       toast({
         title: "Status bijgewerkt",
@@ -120,7 +129,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     },
   });
 
-  if (!repair) return null;
+  if (!currentRepair) return null;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -284,7 +293,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
                 <div>
                   <div className="text-sm font-medium mb-3">Status bijwerken</div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {[
                       { value: 'new', label: 'Nieuw' },
                       { value: 'diagnosing', label: 'Diagnose' },
@@ -297,11 +306,11 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                     ].map((status) => (
                       <Button
                         key={status.value}
-                        variant={repair.status === status.value ? "default" : "outline"}
+                        variant={currentRepair.status === status.value ? "default" : "outline"}
                         size="sm"
                         onClick={() => updateStatusMutation.mutate({ status: status.value })}
                         disabled={updateStatusMutation.isPending}
-                        className={repair.status === status.value ? "" : "hover:bg-accent"}
+                        className={`h-8 text-xs ${currentRepair.status === status.value ? "" : "hover:bg-accent"}`}
                         data-testid={`button-status-${status.value}`}
                       >
                         {status.label}
