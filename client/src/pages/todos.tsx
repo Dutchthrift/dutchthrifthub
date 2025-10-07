@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,31 +15,64 @@ import {
   User,
   ExternalLink,
   MoreHorizontal,
-  Clock
+  Clock,
+  AlertCircle,
+  FolderKanban,
+  UserCheck,
+  Zap
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Todo } from "@/lib/types";
 import { TodoForm } from "@/components/forms/todo-form";
+import { KanbanView } from "@/components/todos/kanban-view";
+import { CalendarView } from "@/components/todos/calendar-view";
+import { TaskDetailModal } from "@/components/todos/task-detail-modal";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function Todos() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [taskScope, setTaskScope] = useState<"all" | "my">("all");
   const [showNewTodo, setShowNewTodo] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Todo | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "kanban" | "calendar">("list");
   const { toast } = useToast();
+  const { user } = useAuth();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const canSeeAllTasks = user?.role === "ADMIN" || user?.role === "SUPPORT";
+  const isTechnicus = user?.role === "TECHNICUS";
 
   const { data: todos, isLoading } = useQuery<Todo[]>({
-    queryKey: ["/api/todos"],
+    queryKey: ["/api/todos", { userId: (isTechnicus || (canSeeAllTasks && taskScope === "my")) && user?.id ? user.id : undefined }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      // TECHNICUS always sees only their tasks, ADMIN/SUPPORT see all unless "My Tasks" is selected
+      if ((isTechnicus || (canSeeAllTasks && taskScope === "my")) && user?.id) {
+        params.append("userId", user.id);
+      }
+      const url = `/api/todos${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch todos");
+      return response.json();
+    },
   });
 
   const updateTodoMutation = useMutation({
@@ -105,6 +138,29 @@ export default function Todos() {
     done: todos?.filter(t => t.status === 'done').length || 0,
   };
 
+  // Additional analytics metrics
+  const overdueTasks = todos?.filter(t => {
+    if (!t.dueDate || t.status === 'done') return false;
+    return new Date(t.dueDate) < new Date();
+  }).length || 0;
+
+  const myTasks = todos?.filter(t => t.assignedUserId === user?.id).length || 0;
+
+  const highPriorityTasks = todos?.filter(t => 
+    t.priority === 'urgent' || t.priority === 'high'
+  ).length || 0;
+
+  // Get category breakdown - find top category
+  const categoryCount = todos?.reduce((acc, todo) => {
+    const category = todo.category || 'other';
+    acc[category] = (acc[category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>) || {};
+  
+  const topCategory = Object.entries(categoryCount).sort((a, b) => b[1] - a[1])[0];
+  const topCategoryName = topCategory ? topCategory[0].charAt(0).toUpperCase() + topCategory[0].slice(1) : 'Other';
+  const topCategoryCount = topCategory ? topCategory[1] : 0;
+
   const handleToggleTodo = (todo: Todo) => {
     const newStatus = todo.status === 'done' ? 'todo' : 'done';
     const updateData: Partial<Todo> = {
@@ -134,7 +190,7 @@ export default function Todos() {
       case "urgent":
         return "text-destructive";
       case "high":
-        return "text-chart-1";
+        return "text-destructive";
       case "medium":
         return "text-chart-4";
       case "low":
@@ -160,6 +216,41 @@ export default function Todos() {
     if (!dueDate) return false;
     return new Date(dueDate) < new Date();
   };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if user is typing in an input/textarea
+      const target = e.target as HTMLElement;
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // "n" or "N" key opens new task form (when not typing)
+      if ((e.key === 'n' || e.key === 'N') && !isTyping) {
+        e.preventDefault();
+        setShowNewTodo(true);
+      }
+
+      // "/" key focuses the search input
+      if (e.key === '/' && !isTyping) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+
+      // "Escape" key closes modals/forms
+      if (e.key === 'Escape') {
+        if (showNewTodo) {
+          setShowNewTodo(false);
+        } else if (editingTodo) {
+          setEditingTodo(null);
+        } else if (showDetailModal) {
+          setShowDetailModal(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showNewTodo, editingTodo, showDetailModal]);
 
   return (
     <div className="min-h-screen bg-background" data-testid="todos-page">
@@ -232,6 +323,50 @@ export default function Todos() {
           </Card>
         </div>
 
+        {/* Additional Analytics Cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+          <Card data-testid="todos-stats-overdue">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Overdue Tasks</CardTitle>
+              <AlertCircle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{overdueTasks}</div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="todos-stats-category">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Top Category</CardTitle>
+              <FolderKanban className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{topCategoryCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">{topCategoryName}</p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="todos-stats-mine">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">My Tasks</CardTitle>
+              <UserCheck className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{myTasks}</div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="todos-stats-high-priority">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">High Priority</CardTitle>
+              <Zap className="h-4 w-4 text-chart-1" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{highPriorityTasks}</div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Filters */}
         <Card className="mb-6">
           <CardContent className="p-4">
@@ -240,13 +375,23 @@ export default function Todos() {
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Search todos..."
+                    ref={searchInputRef}
+                    placeholder="Search todos... (Press / to focus)"
                     className="pl-10"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     data-testid="todos-search-input"
                   />
                 </div>
+                
+                {canSeeAllTasks && (
+                  <Tabs value={taskScope} onValueChange={(value) => setTaskScope(value as "all" | "my")}>
+                    <TabsList>
+                      <TabsTrigger value="all" data-testid="filter-all-tasks">All Tasks</TabsTrigger>
+                      <TabsTrigger value="my" data-testid="filter-my-tasks">My Tasks</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                )}
                 
                 <Tabs value={statusFilter} onValueChange={setStatusFilter}>
                   <TabsList>
@@ -275,114 +420,156 @@ export default function Todos() {
           </CardContent>
         </Card>
 
-        {/* Todos List */}
-        <Card data-testid="todos-list">
-          <CardContent className="p-6">
-            {isLoading ? (
-              <div className="space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex items-center space-x-3 p-3 animate-pulse">
-                    <div className="h-4 w-4 bg-muted rounded"></div>
-                    <div className="flex-1 space-y-1">
-                      <div className="h-4 bg-muted rounded"></div>
-                      <div className="h-3 bg-muted rounded w-3/4"></div>
+        {/* View Modes */}
+        {viewMode === "calendar" ? (
+          <CalendarView 
+            todos={filteredTodos}
+            onTaskClick={(todo) => {
+              setSelectedTask(todo);
+              setShowDetailModal(true);
+            }}
+            isLoading={isLoading}
+          />
+        ) : viewMode === "kanban" ? (
+          <KanbanView
+            todos={filteredTodos}
+            onUpdateStatus={(todoId, newStatus) => {
+              updateTodoMutation.mutate({
+                id: todoId,
+                data: {
+                  status: newStatus,
+                  completedAt: newStatus === 'done' ? new Date().toISOString() : null,
+                },
+              });
+            }}
+            onTaskClick={(todo) => {
+              setSelectedTask(todo);
+              setShowDetailModal(true);
+            }}
+            isLoading={isLoading}
+          />
+        ) : (
+          <Card data-testid="todos-list">
+            <CardContent className="p-6">
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-3 p-3 animate-pulse">
+                      <div className="h-4 w-4 bg-muted rounded"></div>
+                      <div className="flex-1 space-y-1">
+                        <div className="h-4 bg-muted rounded"></div>
+                        <div className="h-3 bg-muted rounded w-3/4"></div>
+                      </div>
+                      <div className="h-4 w-4 bg-muted rounded"></div>
                     </div>
-                    <div className="h-4 w-4 bg-muted rounded"></div>
-                  </div>
-                ))}
-              </div>
-            ) : filteredTodos.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No todos found. Create one to get started!
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredTodos.map((todo) => (
-                  <Card
-                    key={todo.id}
-                    className={`transition-all hover:shadow-md ${
-                      todo.status === 'done' ? 'opacity-60' : ''
-                    } ${isOverdue(todo.dueDate) && todo.status !== 'done' ? 'border-destructive' : ''}`}
-                    data-testid={`todo-item-${todo.id}`}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start space-x-3">
-                        <Checkbox 
-                          checked={todo.status === 'done'}
-                          onCheckedChange={() => handleToggleTodo(todo)}
-                          disabled={updateTodoMutation.isPending}
-                          data-testid={`todo-checkbox-${todo.id}`}
-                        />
-                        
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-start justify-between">
-                            <h3 className={`font-medium ${todo.status === 'done' ? 'line-through' : ''}`}>
-                              {todo.title}
-                            </h3>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" data-testid={`todo-actions-${todo.id}`}>
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => setEditingTodo(todo)}>
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <ExternalLink className="mr-2 h-4 w-4" />
-                                  View Links
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  className="text-destructive"
-                                  onClick={() => deleteTodoMutation.mutate(todo.id)}
-                                  disabled={deleteTodoMutation.isPending}
-                                >
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                  ))}
+                </div>
+              ) : filteredTodos.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No todos found. Create one to get started!
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredTodos.map((todo) => (
+                    <Card
+                      key={todo.id}
+                      className={`transition-all hover:shadow-md cursor-pointer ${
+                        todo.status === 'done' ? 'opacity-60' : ''
+                      } ${isOverdue(todo.dueDate) && todo.status !== 'done' ? 'border-destructive' : ''}`}
+                      data-testid={`todo-item-${todo.id}`}
+                      onClick={() => {
+                        setSelectedTask(todo);
+                        setShowDetailModal(true);
+                      }}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start space-x-3">
+                          <Checkbox 
+                            checked={todo.status === 'done'}
+                            onCheckedChange={(e) => {
+                              e.stopPropagation?.();
+                              handleToggleTodo(todo);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            disabled={updateTodoMutation.isPending}
+                            data-testid={`todo-checkbox-${todo.id}`}
+                          />
                           
-                          {todo.description && (
-                            <p className="text-sm text-muted-foreground">{todo.description}</p>
-                          )}
-                          
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <Badge variant={getPriorityVariant(todo.priority || 'medium')}>
-                                {todo.priority ? todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1) : 'Medium'}
-                              </Badge>
-                              
-                              {todo.status === 'in_progress' && (
-                                <Badge variant="outline" className="bg-primary/10 text-primary">
-                                  In Progress
-                                </Badge>
-                              )}
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-start justify-between">
+                              <h3 className={`font-medium ${todo.status === 'done' ? 'line-through' : ''}`}>
+                                {todo.title}
+                              </h3>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    data-testid={`todo-actions-${todo.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => setEditingTodo(todo)}>
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem>
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    View Links
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    className="text-destructive"
+                                    onClick={() => deleteTodoMutation.mutate(todo.id)}
+                                    disabled={deleteTodoMutation.isPending}
+                                  >
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                             
-                            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                              {todo.dueDate && (
-                                <div className={`flex items-center space-x-1 ${
-                                  isOverdue(todo.dueDate) && todo.status !== 'done' ? 'text-destructive' : ''
-                                }`}>
-                                  <Calendar className="h-3 w-3" />
-                                  <span data-testid={`todo-due-date-${todo.id}`}>
-                                    {formatDueDate(todo.dueDate)}
-                                  </span>
-                                </div>
-                              )}
+                            {todo.description && (
+                              <p className="text-sm text-muted-foreground">{todo.description}</p>
+                            )}
+                            
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <Badge variant={getPriorityVariant(todo.priority || 'medium')}>
+                                  {todo.priority ? todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1) : 'Medium'}
+                                </Badge>
+                                
+                                {todo.status === 'in_progress' && (
+                                  <Badge variant="outline" className="bg-primary/10 text-primary">
+                                    In Progress
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                                {todo.dueDate && (
+                                  <div className={`flex items-center space-x-1 ${
+                                    isOverdue(todo.dueDate) && todo.status !== 'done' ? 'text-destructive' : ''
+                                  }`}>
+                                    <Calendar className="h-3 w-3" />
+                                    <span data-testid={`todo-due-date-${todo.id}`}>
+                                      {formatDueDate(todo.dueDate)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </main>
 
       <TodoForm 
@@ -395,6 +582,34 @@ export default function Todos() {
         onOpenChange={(open) => !open && setEditingTodo(null)}
         todo={editingTodo}
       />
+
+      <TaskDetailModal
+        todo={selectedTask}
+        open={showDetailModal}
+        onOpenChange={setShowDetailModal}
+        onUpdate={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+        }}
+      />
+
+      {/* Floating Action Button */}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              onClick={() => setShowNewTodo(true)}
+              size="lg"
+              className="fixed bottom-8 right-8 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 z-50"
+              data-testid="floating-new-task-button"
+            >
+              <Plus className="h-6 w-6" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="text-sm">
+            <p>New Task (Press N)</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 }

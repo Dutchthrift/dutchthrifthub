@@ -224,6 +224,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User list for assignment dropdowns (accessible to all authenticated users)
+  app.get("/api/users/list", requireAuth, async (req: any, res: any) => {
+    try {
+      const users = await storage.getUsers();
+      
+      // Return only necessary fields for dropdowns
+      const userList = users.map(user => ({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role
+      }));
+      
+      res.json(userList);
+    } catch (error) {
+      console.error("Error fetching user list:", error);
+      res.status(500).json({ error: "Failed to fetch user list" });
+    }
+  });
+
   app.post("/api/users", requireAuth, requireRole(["ADMIN"]), async (req: any, res: any) => {
     try {
       // Create schema for frontend data (without username)
@@ -342,7 +363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Todos
-  app.get("/api/todos", async (req, res) => {
+  app.get("/api/todos", requireAuth, async (req: any, res: any) => {
     try {
       const { userId, caseId } = req.query;
       
@@ -351,8 +372,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const relatedItems = await storage.getCaseRelatedItems(caseId as string);
         res.json(relatedItems.todos);
       } else {
-        // Get todos for a user or all todos
-        const todos = await storage.getTodos(userId as string);
+        // Role-based filtering
+        let todos: any[];
+        
+        if (req.user.role === 'ADMIN' || req.user.role === 'SUPPORT') {
+          // ADMIN and SUPPORT see all tasks or filtered by userId if provided
+          todos = await storage.getTodos(userId as string);
+        } else if (req.user.role === 'TECHNICUS') {
+          // TECHNICUS only sees their own tasks
+          todos = await storage.getTodos(req.user.id);
+        } else {
+          // Fallback: return empty array for unknown roles
+          todos = [];
+        }
+        
         res.json(todos);
       }
     } catch (error) {
@@ -361,9 +394,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/todos", async (req, res) => {
+  app.post("/api/todos", requireAuth, async (req: any, res: any) => {
     try {
       const validatedData = insertTodoSchema.parse(req.body);
+      
+      // Set createdBy from authenticated user
+      validatedData.createdBy = req.user.id;
       
       // Convert dueDate string to Date object if provided
       if (validatedData.dueDate && typeof validatedData.dueDate === 'string') {
@@ -380,6 +416,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { todoId: todo.id }
       });
 
+      await auditLog(req, "CREATE", "todos", todo.id, { title: todo.title, category: todo.category });
+
       res.status(201).json(todo);
     } catch (error) {
       console.error("Error creating todo:", error);
@@ -387,12 +425,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/todos/:id", async (req, res) => {
+  app.patch("/api/todos/:id", requireAuth, async (req: any, res: any) => {
     try {
       const { id } = req.params;
       
-      // Convert dueDate string to Date object if provided in update
-      const updateData = { ...req.body };
+      // Create update schema to validate fields including category
+      const updateTodoSchema = z.object({
+        title: z.string().optional(),
+        description: z.string().optional(),
+        category: z.enum(["orders", "purchasing", "marketing", "admin", "other"]).optional(),
+        assignedUserId: z.string().optional(),
+        status: z.enum(["todo", "in_progress", "done"]).optional(),
+        priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+        dueDate: z.union([z.string().datetime(), z.date(), z.null()]).optional(),
+        completedAt: z.union([z.string().datetime(), z.date(), z.null()]).optional(),
+        customerId: z.string().optional(),
+        orderId: z.string().optional(),
+        repairId: z.string().optional(),
+        emailThreadId: z.string().optional(),
+        caseId: z.string().optional(),
+      });
+      
+      // Validate update data
+      const validatedData = updateTodoSchema.parse(req.body);
+      
+      // Convert date strings to Date objects if provided
+      const updateData: any = { ...validatedData };
       if (updateData.dueDate && typeof updateData.dueDate === 'string') {
         updateData.dueDate = new Date(updateData.dueDate);
       }
@@ -410,6 +468,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: { todoId: todo.id }
         });
       }
+
+      await auditLog(req, "UPDATE", "todos", id, validatedData);
 
       res.json(todo);
     } catch (error) {

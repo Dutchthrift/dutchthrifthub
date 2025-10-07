@@ -8,6 +8,7 @@ export const userRoleEnum = pgEnum("user_role", ["ADMIN", "SUPPORT", "TECHNICUS"
 export const priorityEnum = pgEnum("priority", ["low", "medium", "high", "urgent"]);
 export const repairStatusEnum = pgEnum("repair_status", ["new", "in_progress", "waiting_customer", "waiting_part", "ready", "closed"]);
 export const todoStatusEnum = pgEnum("todo_status", ["todo", "in_progress", "done"]);
+export const todoCategoryEnum = pgEnum("todo_category", ["orders", "purchasing", "marketing", "admin", "other"]);
 export const emailStatusEnum = pgEnum("email_status", ["open", "closed", "archived"]);
 export const orderStatusEnum = pgEnum("order_status", ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]);
 export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["pending", "ordered", "received", "cancelled"]);
@@ -120,7 +121,9 @@ export const todos = pgTable("todos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   description: text("description"),
+  category: todoCategoryEnum("category").default("other"),
   assignedUserId: varchar("assigned_user_id").references(() => users.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
   status: todoStatusEnum("status").notNull().default("todo"),
   priority: priorityEnum("priority").default("medium"),
   dueDate: timestamp("due_date"),

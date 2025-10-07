@@ -22,11 +22,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { InsertTodo } from "@shared/schema";
+import { useAuth } from "@/lib/auth";
+import type { InsertTodo, User } from "@shared/schema";
 
 interface TodoFormProps {
   open: boolean;
@@ -37,14 +38,25 @@ interface TodoFormProps {
 interface TodoFormData {
   title: string;
   description: string;
+  category: "orders" | "purchasing" | "marketing" | "admin" | "other";
   priority: "low" | "medium" | "high" | "urgent";
   dueDate: Date | null;
   assignedUserId: string;
+  orderId: string;
+  caseId: string;
+  customerId: string;
+  repairId: string;
 }
 
 export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Fetch users for assignment dropdown
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/users/list"],
+  });
 
   const {
     register,
@@ -57,9 +69,14 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
     defaultValues: {
       title: "",
       description: "",
+      category: "other",
       priority: "medium",
       dueDate: null,
-      assignedUserId: "current-user", // In a real app, get from auth context
+      assignedUserId: user?.id || "",
+      orderId: "",
+      caseId: "",
+      customerId: "",
+      repairId: "",
     },
   });
 
@@ -68,8 +85,13 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
     if (todo) {
       setValue("title", todo.title || "");
       setValue("description", todo.description || "");
+      setValue("category", todo.category || "other");
       setValue("priority", todo.priority || "medium");
-      setValue("assignedUserId", todo.assignedUserId || "current-user");
+      setValue("assignedUserId", todo.assignedUserId || user?.id || "");
+      setValue("orderId", todo.orderId || "");
+      setValue("caseId", todo.caseId || "");
+      setValue("customerId", todo.customerId || "");
+      setValue("repairId", todo.repairId || "");
       
       // Set due date
       if (todo.dueDate) {
@@ -80,10 +102,20 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
       }
     } else {
       // Reset form for new todo
-      reset();
+      reset({
+        title: "",
+        description: "",
+        category: "other",
+        priority: "medium",
+        assignedUserId: user?.id || "",
+        orderId: "",
+        caseId: "",
+        customerId: "",
+        repairId: "",
+      });
       setDueDate(null);
     }
-  }, [todo, setValue, reset]);
+  }, [todo, setValue, reset, user]);
 
   const createTodoMutation = useMutation({
     mutationFn: async (data: InsertTodo) => {
@@ -142,12 +174,27 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
   });
 
   const onSubmit = (data: TodoFormData) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to create a todo",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const todoData: InsertTodo = {
       title: data.title,
       description: data.description || undefined,
+      category: data.category,
       priority: data.priority,
-      assignedUserId: "default-user", // Use default user for now
+      assignedUserId: data.assignedUserId,
+      createdBy: user.id,
       dueDate: dueDate?.toISOString(),
+      orderId: data.orderId || undefined,
+      caseId: data.caseId || undefined,
+      customerId: data.customerId || undefined,
+      repairId: data.repairId || undefined,
     };
 
     if (todo) {
@@ -167,7 +214,7 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]" data-testid="todo-form-dialog">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" data-testid="todo-form-dialog">
         <DialogHeader>
           <DialogTitle>{todo ? "Edit Todo" : "Create New Todo"}</DialogTitle>
           <DialogDescription>
@@ -176,6 +223,7 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
         </DialogHeader>
         
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="title">Title *</Label>
             <Input
@@ -189,6 +237,7 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
             )}
           </div>
 
+          {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
@@ -199,7 +248,27 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
             />
           </div>
 
+          {/* Category and Priority */}
           <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select 
+                onValueChange={(value) => setValue("category", value as any)}
+                value={watch("category")}
+              >
+                <SelectTrigger data-testid="todo-category-select">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="orders">Orders</SelectItem>
+                  <SelectItem value="purchasing">Purchasing</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label>Priority</Label>
               <Select 
@@ -214,6 +283,31 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="high">High</SelectItem>
                   <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Assigned User and Due Date */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Assigned To *</Label>
+              <Select 
+                onValueChange={(value) => setValue("assignedUserId", value)}
+                value={watch("assignedUserId")}
+                disabled={usersLoading}
+              >
+                <SelectTrigger data-testid="todo-assigned-user-select">
+                  <SelectValue placeholder="Select user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.firstName && user.lastName 
+                        ? `${user.firstName} ${user.lastName}` 
+                        : user.email}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -241,6 +335,53 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
                   />
                 </PopoverContent>
               </Popover>
+            </div>
+          </div>
+
+          {/* Entity Linking Section */}
+          <div className="space-y-4 border-t pt-4">
+            <Label className="text-base font-semibold">Entity Linking (Optional)</Label>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="orderId">Order ID</Label>
+                <Input
+                  id="orderId"
+                  placeholder="Enter order ID..."
+                  {...register("orderId")}
+                  data-testid="todo-order-id-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="caseId">Case ID</Label>
+                <Input
+                  id="caseId"
+                  placeholder="Enter case ID..."
+                  {...register("caseId")}
+                  data-testid="todo-case-id-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="customerId">Customer ID</Label>
+                <Input
+                  id="customerId"
+                  placeholder="Enter customer ID..."
+                  {...register("customerId")}
+                  data-testid="todo-customer-id-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="repairId">Repair ID</Label>
+                <Input
+                  id="repairId"
+                  placeholder="Enter repair ID..."
+                  {...register("repairId")}
+                  data-testid="todo-repair-id-input"
+                />
+              </div>
             </div>
           </div>
 
