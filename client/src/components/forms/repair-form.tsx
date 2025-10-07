@@ -71,7 +71,6 @@ const ISSUE_CATEGORIES = [
 export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProps) {
   const [slaDeadline, setSlaDeadline] = useState<Date | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [customerOpen, setCustomerOpen] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
   const { toast } = useToast();
 
@@ -189,7 +188,6 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
     reset();
     setSlaDeadline(null);
     setSelectedFiles([]);
-    setCustomerOpen(false);
     setOrderOpen(false);
     onOpenChange(false);
   };
@@ -213,9 +211,9 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
 
   const technicians = users.filter(u => u.role === 'TECHNICUS' || u.role === 'ADMIN');
 
-  // Get selected customer and order for display
-  const selectedCustomer = customers.find(c => c.id === watch("customerId"));
+  // Get selected order and its customer for display
   const selectedOrder = orders.find(o => o.id === watch("orderId"));
+  const selectedOrderCustomer = selectedOrder ? customers.find(c => c.id === selectedOrder.customerId) : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -290,111 +288,56 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Klant</Label>
-              <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={customerOpen}
-                    className="w-full justify-between"
-                    data-testid="button-customer-combobox"
-                  >
-                    {selectedCustomer
-                      ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}`
-                      : "Selecteer klant..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" side="bottom" align="start">
-                  <Command>
-                    <CommandInput placeholder="Zoek klant..." />
-                    <CommandList>
-                      <CommandEmpty>Geen klant gevonden.</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          value="none"
-                          onSelect={() => {
-                            setValue("customerId", "none");
-                            setCustomerOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={`mr-2 h-4 w-4 ${
-                              watch("customerId") === "none" ? "opacity-100" : "opacity-0"
-                            }`}
-                          />
-                          Geen klant
-                        </CommandItem>
-                        {customers.slice(0, 10).map((customer) => (
-                          <CommandItem
-                            key={customer.id}
-                            value={`${customer.firstName} ${customer.lastName} ${customer.email || ''}`}
-                            onSelect={() => {
-                              setValue("customerId", customer.id);
-                              setCustomerOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                watch("customerId") === customer.id ? "opacity-100" : "opacity-0"
-                              }`}
-                            />
-                            {customer.firstName} {customer.lastName}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Order</Label>
-              <Popover open={orderOpen} onOpenChange={setOrderOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={orderOpen}
-                    className="w-full justify-between"
-                    data-testid="button-order-combobox"
-                  >
-                    {selectedOrder
-                      ? `Order #${selectedOrder.orderNumber}`
-                      : "Selecteer order..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" side="bottom" align="start">
-                  <Command>
-                    <CommandInput placeholder="Zoek order..." />
-                    <CommandList>
-                      <CommandEmpty>Geen order gevonden.</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          value="none"
-                          onSelect={() => {
-                            setValue("orderId", "none");
-                            setOrderOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={`mr-2 h-4 w-4 ${
-                              watch("orderId") === "none" ? "opacity-100" : "opacity-0"
-                            }`}
-                          />
-                          Geen order
-                        </CommandItem>
-                        {orders.slice(0, 10).map((order) => (
+          <div className="space-y-2">
+            <Label>Order / Klant</Label>
+            <Popover open={orderOpen} onOpenChange={setOrderOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={orderOpen}
+                  className="w-full justify-between"
+                  data-testid="button-order-combobox"
+                >
+                  {selectedOrder && selectedOrderCustomer
+                    ? `Order #${selectedOrder.orderNumber} - ${selectedOrderCustomer.firstName} ${selectedOrderCustomer.lastName}`
+                    : "Selecteer order..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" side="bottom" align="start">
+                <Command>
+                  <CommandInput placeholder="Zoek order of klant..." />
+                  <CommandList>
+                    <CommandEmpty>Geen order gevonden.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="none"
+                        onSelect={() => {
+                          setValue("orderId", "none");
+                          setValue("customerId", "none");
+                          setOrderOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={`mr-2 h-4 w-4 ${
+                            watch("orderId") === "none" ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                        Geen order
+                      </CommandItem>
+                      {orders.slice(0, 10).map((order) => {
+                        const customer = customers.find(c => c.id === order.customerId);
+                        const customerName = customer 
+                          ? `${customer.firstName} ${customer.lastName}`
+                          : 'Onbekende klant';
+                        return (
                           <CommandItem
                             key={order.id}
-                            value={`${order.orderNumber} ${order.id}`}
+                            value={`${order.orderNumber} ${customerName}`}
                             onSelect={() => {
                               setValue("orderId", order.id);
+                              setValue("customerId", order.customerId || "none");
                               setOrderOpen(false);
                             }}
                           >
@@ -403,15 +346,15 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                                 watch("orderId") === order.id ? "opacity-100" : "opacity-0"
                               }`}
                             />
-                            Order #{order.orderNumber}
+                            Order #{order.orderNumber} - {customerName}
                           </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
