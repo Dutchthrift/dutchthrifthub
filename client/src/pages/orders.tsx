@@ -146,7 +146,7 @@ export default function Orders() {
           });
       }
     }
-  }, [orders, setLocation, toast]);
+  }, [location, orders, setLocation, toast]);
 
   const syncAllMutation = useMutation({
     mutationFn: async () => {
