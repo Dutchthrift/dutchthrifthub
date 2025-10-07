@@ -111,21 +111,42 @@ export default function Orders() {
   const totalOrders = Array.isArray(ordersData) ? ordersData.length : ordersData?.total || 0;
   const totalPages = Math.ceil(totalOrders / pageSize);
 
-  // Check for orderId in URL and open order details
+  // Check for orderId in URL and fetch/open order details
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get('orderId');
     
-    if (orderId && orders.length > 0) {
-      const order = orders.find(o => o.id === orderId);
-      if (order) {
-        setSelectedOrder(order);
+    if (orderId) {
+      // First check if the order is already in the loaded orders
+      const existingOrder = orders.find(o => o.id === orderId);
+      if (existingOrder) {
+        setSelectedOrder(existingOrder);
         setShowOrderDetails(true);
-        // Clean up URL
         setLocation('/orders');
+      } else {
+        // Fetch the specific order by ID
+        fetch(`/api/orders/${orderId}`)
+          .then(response => {
+            if (!response.ok) throw new Error('Order not found');
+            return response.json();
+          })
+          .then(order => {
+            setSelectedOrder(order);
+            setShowOrderDetails(true);
+            setLocation('/orders');
+          })
+          .catch(error => {
+            console.error('Failed to fetch order:', error);
+            toast({
+              title: "Order not found",
+              description: "The requested order could not be found.",
+              variant: "destructive",
+            });
+            setLocation('/orders');
+          });
       }
     }
-  }, [orders, setLocation]);
+  }, [orders, setLocation, toast]);
 
   const syncAllMutation = useMutation({
     mutationFn: async () => {
