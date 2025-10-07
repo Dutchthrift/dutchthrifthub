@@ -140,7 +140,8 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
 
   const createRepairMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/repairs", "POST", data);
+      const res = await apiRequest("POST", "/api/repairs", data);
+      return await res.json();
     },
     onSuccess: async (newRepair: any) => {
       if (selectedFiles.length > 0) {
@@ -148,7 +149,15 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
         selectedFiles.forEach((file) => {
           formData.append('files', file);
         });
-        await apiRequest(`/api/repairs/${newRepair.id}/upload`, 'POST', formData);
+        // Use fetch directly for FormData to avoid JSON.stringify
+        const uploadRes = await fetch(`/api/repairs/${newRepair.id}/upload`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+        if (!uploadRes.ok) {
+          throw new Error('Failed to upload files');
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/repairs"] });
@@ -185,7 +194,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
       priority: data.priority,
       estimatedCost: data.estimatedCost ? Math.round(data.estimatedCost * 100) : undefined,
       assignedUserId: (data.assignedUserId && data.assignedUserId !== "none") ? data.assignedUserId : undefined,
-      slaDeadline: slaDeadline || undefined,
+      slaDeadline: slaDeadline ? slaDeadline.toISOString() : undefined,
       productSku: data.productSku || undefined,
       productName: data.productName || undefined,
       issueCategory: data.issueCategory === "Overig" && otherCategoryDetails 

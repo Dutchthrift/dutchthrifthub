@@ -593,7 +593,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/repairs", requireAuth, requireRole(["ADMIN", "SUPPORT", "TECHNICUS"]), async (req: any, res) => {
     try {
-      const validatedData = insertRepairSchema.parse(req.body);
+      // Handle date conversion before validation
+      const requestData = { ...req.body };
+      if (requestData.slaDeadline && typeof requestData.slaDeadline === 'string') {
+        requestData.slaDeadline = new Date(requestData.slaDeadline);
+      }
+      
+      const validatedData = insertRepairSchema.parse(requestData);
       const repair = await storage.createRepair(validatedData);
       
       await storage.createActivity({
