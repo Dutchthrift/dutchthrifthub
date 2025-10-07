@@ -206,8 +206,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User Management routes (ADMIN only)
-  app.get("/api/users", requireAuth, requireRole(["ADMIN"]), async (req: any, res: any) => {
+  // User Management routes
+  // Get all users (all authenticated users can view user list for assignment/filtering)
+  app.get("/api/users", requireAuth, async (req: any, res: any) => {
     try {
       const users = await storage.getUsers();
       await auditLog(req, "LIST", "users");
@@ -500,14 +501,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Repairs
-  app.get("/api/repairs", async (req, res) => {
+  app.get("/api/repairs", requireAuth, async (req: any, res) => {
     try {
       const { caseId, status, technicianId, startDate, endDate, priority } = req.query;
       
       if (caseId) {
         // Get repairs linked to a specific case
         const relatedItems = await storage.getCaseRelatedItems(caseId as string);
-        res.json(relatedItems.repairs);
+        
+        // TECHNICUS role: only see own repairs
+        const filteredRepairs = req.user.role === 'TECHNICUS' 
+          ? relatedItems.repairs.filter((repair: any) => repair.assignedUserId === req.user.id)
+          : relatedItems.repairs;
+        
+        res.json(filteredRepairs);
         return;
       }
       
@@ -544,6 +551,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedFilters.startDate) filters.startDate = new Date(validatedFilters.startDate);
       if (validatedFilters.endDate) filters.endDate = new Date(validatedFilters.endDate);
       
+      // TECHNICUS role: only see own repairs
+      if (req.user.role === 'TECHNICUS') {
+        filters.technicianId = req.user.id;
+      }
+      
       const hasFilters = Object.keys(filters).length > 0;
       
       if (hasFilters) {
@@ -559,13 +571,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/repairs/:id", async (req, res) => {
+  app.get("/api/repairs/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       const repair = await storage.getRepair(id);
       if (!repair) {
         return res.status(404).json({ message: "Repair not found" });
       }
+      
+      // TECHNICUS can only view own repairs
+      if (req.user.role === 'TECHNICUS' && repair.assignedUserId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to view this repair" });
+      }
+      
       res.json(repair);
     } catch (error) {
       console.error("Error fetching repair:", error);
@@ -573,7 +591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/repairs", async (req, res) => {
+  app.post("/api/repairs", requireAuth, requireRole(["ADMIN", "SUPPORT", "TECHNICUS"]), async (req: any, res) => {
     try {
       const validatedData = insertRepairSchema.parse(req.body);
       const repair = await storage.createRepair(validatedData);
@@ -581,9 +599,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createActivity({
         type: "repair_created",
         description: `Created repair: ${repair.title}`,
-        userId: repair.assignedUserId,
+        userId: req.user.id,
         metadata: { repairId: repair.id }
       });
+
+      await auditLog(req, "CREATE", "repairs", repair.id, validatedData);
 
       res.status(201).json(repair);
     } catch (error) {
@@ -592,19 +612,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/repairs/:id", async (req, res) => {
+  app.patch("/api/repairs/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
+      
+      // Get existing repair to check permissions
+      const existingRepair = await storage.getRepair(id);
+      if (!existingRepair) {
+        return res.status(404).json({ message: "Repair not found" });
+      }
+      
+      // TECHNICUS can only edit own repairs
+      if (req.user.role === 'TECHNICUS' && existingRepair.assignedUserId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to edit this repair" });
+      }
+      
       const repair = await storage.updateRepair(id, req.body);
       
       if (req.body.status) {
         await storage.createActivity({
           type: "repair_status_updated",
           description: `Updated repair status to ${req.body.status}: ${repair.title}`,
-          userId: repair.assignedUserId,
+          userId: req.user.id,
           metadata: { repairId: repair.id, status: req.body.status }
         });
       }
+
+      await auditLog(req, "UPDATE", "repairs", id, req.body);
 
       res.json(repair);
     } catch (error) {
@@ -614,7 +648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload files (photos/attachments) to a repair
-  app.post("/api/repairs/:id/upload", upload.array('files', 10), async (req, res) => {
+  app.post("/api/repairs/:id/upload", requireAuth, upload.array('files', 10), async (req: any, res) => {
     try {
       const { id } = req.params;
       const { type } = req.body; // 'photo' or 'attachment'
@@ -627,6 +661,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const repair = await storage.getRepair(id);
       if (!repair) {
         return res.status(404).json({ message: "Repair not found" });
+      }
+      
+      // TECHNICUS can only upload to own repairs
+      if (req.user.role === 'TECHNICUS' && repair.assignedUserId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to upload files to this repair" });
       }
 
       const objectStorage = new ObjectStorageService();

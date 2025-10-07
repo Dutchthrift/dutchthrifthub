@@ -22,6 +22,7 @@ import { nl } from "date-fns/locale";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 interface RepairsTableProps {
   repairs: Repair[];
@@ -32,6 +33,7 @@ interface RepairsTableProps {
 
 export function RepairsTable({ repairs, users, onRepairClick, onAddNote }: RepairsTableProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -263,14 +265,16 @@ export function RepairsTable({ repairs, users, onRepairClick, onAddNote }: Repai
                           Notitie toevoegen
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem 
-                        onClick={(e) => handleDelete(e, repair.id)}
-                        className="text-destructive focus:text-destructive"
-                        data-testid={`menu-delete-${repair.id}`}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Verwijderen
-                      </DropdownMenuItem>
+                      {user?.role === 'ADMIN' && (
+                        <DropdownMenuItem 
+                          onClick={(e) => handleDelete(e, repair.id)}
+                          className="text-destructive focus:text-destructive"
+                          data-testid={`menu-delete-${repair.id}`}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Verwijderen
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

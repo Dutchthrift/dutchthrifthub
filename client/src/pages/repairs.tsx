@@ -20,8 +20,10 @@ import { RepairsTable } from "@/components/repairs/repairs-table";
 import { RepairDetailModal } from "@/components/repairs/repair-detail-modal";
 import { RepairAnalytics } from "@/components/repairs/repair-analytics";
 import { format } from "date-fns";
+import { useAuth } from "@/lib/auth";
 
 export default function Repairs() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [technicianFilter, setTechnicianFilter] = useState<string>("");
@@ -128,19 +130,21 @@ export default function Repairs() {
                   </SelectContent>
                 </Select>
 
-                <Select value={technicianFilter} onValueChange={setTechnicianFilter}>
-                  <SelectTrigger className="w-[180px]" data-testid="select-technician-filter">
-                    <SelectValue placeholder="Alle technici" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Alle technici</SelectItem>
-                    {users.filter(u => u.role === 'TECHNICUS' || u.role === 'ADMIN').map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.firstName || ''} {user.lastName || ''} ({user.username})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {user?.role !== 'TECHNICUS' && (
+                  <Select value={technicianFilter} onValueChange={setTechnicianFilter}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-technician-filter">
+                      <SelectValue placeholder="Alle technici" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Alle technici</SelectItem>
+                      {users.filter(u => u.role === 'TECHNICUS' || u.role === 'ADMIN').map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.firstName || ''} {user.lastName || ''} ({user.username})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
 
                 <Popover>
                   <PopoverTrigger asChild>
