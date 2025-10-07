@@ -49,7 +49,7 @@ export function GlobalSearch() {
         setLocation(`/customers/${id}`);
         break;
       case 'order':
-        setLocation('/orders');
+        setLocation(`/orders?orderId=${id}`);
         break;
       case 'thread':
         setLocation('/inbox');

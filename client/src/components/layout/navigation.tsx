@@ -25,7 +25,6 @@ const navigationItems = [
   { href: "/purchase-orders", label: "Inkoop Orders", icon: Package2 },
   { href: "/repairs", label: "Repairs", icon: Wrench },
   { href: "/todos", label: "To-do's", icon: CheckSquare },
-  { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
 ];
 
 export function Navigation() {

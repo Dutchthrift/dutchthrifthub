@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigation } from "@/components/layout/navigation";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +75,7 @@ export default function Orders() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
+  const [location, setLocation] = useLocation();
 
   const { data: ordersData, isLoading } = useQuery<{ orders: Order[], total: number } | Order[]>({
     queryKey: ["/api/orders", currentPage, pageSize, searchQuery],
@@ -95,6 +97,7 @@ export default function Orders() {
 
   const { data: orderStats } = useQuery<{
     total: number;
+    totalAmount: number;
     pending: number;
     processing: number;
     shipped: number;
@@ -107,6 +110,22 @@ export default function Orders() {
   const orders = Array.isArray(ordersData) ? ordersData : ordersData?.orders || [];
   const totalOrders = Array.isArray(ordersData) ? ordersData.length : ordersData?.total || 0;
   const totalPages = Math.ceil(totalOrders / pageSize);
+
+  // Check for orderId in URL and open order details
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('orderId');
+    
+    if (orderId && orders.length > 0) {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        setSelectedOrder(order);
+        setShowOrderDetails(true);
+        // Clean up URL
+        setLocation('/orders');
+      }
+    }
+  }, [orders, setLocation]);
 
   const syncAllMutation = useMutation({
     mutationFn: async () => {
@@ -393,7 +412,12 @@ export default function Orders() {
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{statusCounts.all}</div>
+              <div className="text-2xl font-bold">
+                €{((orderStats?.totalAmount || 0) / 100).toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {orderStats?.total || 0} orders
+              </p>
             </CardContent>
           </Card>
           
