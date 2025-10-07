@@ -329,58 +329,62 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
 
           <div className="space-y-2">
             <Label>Order / Klant</Label>
-            <div className="relative">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder={selectedOrder && selectedOrderCustomer 
-                    ? `Order #${selectedOrder.orderNumber} - ${selectedOrderCustomer.firstName} ${selectedOrderCustomer.lastName}`
-                    : "Zoek order of klant..."}
-                  className="pl-10"
-                  value={orderSearchQuery}
-                  onChange={(e) => setOrderSearchQuery(e.target.value)}
-                  onFocus={() => setShowOrderResults(true)}
-                  onBlur={() => setTimeout(() => setShowOrderResults(false), 200)}
-                  data-testid="input-order-search"
-                />
-              </div>
-
-              {showOrderResults && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
-                  {displayOrders.length > 0 ? (
-                    <div className="p-1">
-                      {displayOrders.map((order: any) => {
-                        const customer = customers.find(c => c.id === order.customerId);
-                        const customerName = customer 
-                          ? `${customer.firstName} ${customer.lastName}`
-                          : order.customerEmail || 'Onbekende klant';
-                        return (
-                          <div
-                            key={order.id}
-                            className="p-2 hover:bg-accent rounded cursor-pointer"
-                            onClick={() => {
-                              setValue("orderId", order.id);
-                              setValue("customerId", order.customerId || "none");
-                              setOrderSearchQuery("");
-                              setShowOrderResults(false);
-                            }}
-                            data-testid={`order-result-${order.id}`}
-                          >
-                            <div className="font-medium">Order #{order.orderNumber}</div>
-                            <div className="text-sm text-muted-foreground">{customerName}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-sm text-muted-foreground">
-                      {orderSearchQuery.length > 2 ? 'Geen order gevonden' : 'Type om te zoeken...'}
-                    </div>
-                  )}
+            <Popover open={showOrderResults} onOpenChange={setShowOrderResults}>
+              <PopoverTrigger asChild>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder={selectedOrder && selectedOrderCustomer 
+                      ? `Order #${selectedOrder.orderNumber} - ${selectedOrderCustomer.firstName} ${selectedOrderCustomer.lastName}`
+                      : "Zoek order of klant..."}
+                    className="pl-10"
+                    value={orderSearchQuery}
+                    onChange={(e) => setOrderSearchQuery(e.target.value)}
+                    onFocus={() => setShowOrderResults(true)}
+                    data-testid="input-order-search"
+                  />
                 </div>
-              )}
-            </div>
+              </PopoverTrigger>
+              <PopoverContent 
+                className="w-[var(--radix-popover-trigger-width)] p-0 max-h-60 overflow-y-auto"
+                side="bottom"
+                align="start"
+                sideOffset={4}
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
+                {displayOrders.length > 0 ? (
+                  <div className="p-1">
+                    {displayOrders.map((order: any) => {
+                      const customer = customers.find(c => c.id === order.customerId);
+                      const customerName = customer 
+                        ? `${customer.firstName} ${customer.lastName}`
+                        : order.customerEmail || 'Onbekende klant';
+                      return (
+                        <div
+                          key={order.id}
+                          className="p-2 hover:bg-accent rounded cursor-pointer"
+                          onMouseDown={() => {
+                            setValue("orderId", order.id);
+                            setValue("customerId", order.customerId || "none");
+                            setOrderSearchQuery("");
+                            setShowOrderResults(false);
+                          }}
+                          data-testid={`order-result-${order.id}`}
+                        >
+                          <div className="font-medium">Order #{order.orderNumber}</div>
+                          <div className="text-sm text-muted-foreground">{customerName}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-4 text-sm text-muted-foreground">
+                    {orderSearchQuery.length > 2 ? 'Geen order gevonden' : 'Type om te zoeken...'}
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
