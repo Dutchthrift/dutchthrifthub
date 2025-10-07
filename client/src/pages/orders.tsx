@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/dialog";
 import { InternalNotes } from "@/components/notes/internal-notes";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ImportProgressDialog } from "@/components/import-progress-dialog";
 
 type SortField = 'orderNumber' | 'customer' | 'totalAmount' | 'status' | 'paymentStatus' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
@@ -70,6 +71,15 @@ export default function Orders() {
   const [pageSize, setPageSize] = useState(20);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [showImportProgress, setShowImportProgress] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    type: string;
+    processed?: number;
+    total?: number;
+    created?: number;
+    updated?: number;
+    message: string;
+  } | null>(null);
   const { toast } = useToast();
 
   const { data: ordersData, isLoading } = useQuery<{ orders: Order[], total: number } | Order[]>({
@@ -145,8 +155,8 @@ export default function Orders() {
     }
   });
 
-  const fullSyncMutation = useMutation({
-    mutationFn: async () => {
+  const startImportWithProgress = async () => {
+    try {
       // Test connection first
       const testResponse = await fetch('/api/shopify/test');
       const testResult = await testResponse.json();
@@ -154,38 +164,65 @@ export default function Orders() {
         throw new Error(testResult.message || 'Shopify connection failed');
       }
 
-      // Perform full sync of ALL data
-      const response = await fetch("/api/shopify/sync-all", { method: "POST" });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to perform full sync");
-      }
-      
-      const data = await response.json();
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders/stats"] });
-      
-      const customerMsg = `${data.customers.total} klanten (${data.customers.created} nieuw, ${data.customers.updated} bijgewerkt)`;
-      const orderMsg = `${data.orders.total} orders (${data.orders.created} nieuw, ${data.orders.updated} bijgewerkt)`;
-      
+      // Show progress dialog
+      setShowImportProgress(true);
+      setImportProgress({ type: 'start', message: 'Verbinden met Shopify...' });
+
+      // Create EventSource to listen to progress updates
+      const eventSource = new EventSource('/api/shopify/import-orders-progress');
+
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        setImportProgress(data);
+
+        if (data.type === 'complete') {
+          eventSource.close();
+          // Refresh data
+          queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/orders/stats"] });
+          
+          // Close dialog after 2 seconds
+          setTimeout(() => {
+            setShowImportProgress(false);
+            setImportProgress(null);
+          }, 2000);
+        }
+
+        if (data.type === 'error') {
+          eventSource.close();
+          toast({
+            title: "Import mislukt",
+            description: data.message,
+            variant: "destructive",
+          });
+          setTimeout(() => {
+            setShowImportProgress(false);
+            setImportProgress(null);
+          }, 2000);
+        }
+      };
+
+      eventSource.onerror = () => {
+        eventSource.close();
+        toast({
+          title: "Verbinding verloren",
+          description: "De verbinding met de server is verloren",
+          variant: "destructive",
+        });
+        setShowImportProgress(false);
+        setImportProgress(null);
+      };
+    } catch (error) {
       toast({
-        title: "Volledige Shopify import voltooid",
-        description: `Import voltooid: ${customerMsg}, ${orderMsg}`,
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Volledige import mislukt",
-        description: error instanceof Error ? error.message : "Failed to import all data from Shopify",
+        title: "Import mislukt",
+        description: error instanceof Error ? error.message : "Failed to start import",
         variant: "destructive",
       });
+      setShowImportProgress(false);
+      setImportProgress(null);
     }
-  });
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -371,19 +408,19 @@ export default function Orders() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
-                  disabled={syncAllMutation.isPending || fullSyncMutation.isPending}
+                  disabled={syncAllMutation.isPending || showImportProgress}
                   data-testid="sync-shopify-button"
                 >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${(syncAllMutation.isPending || fullSyncMutation.isPending) ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`mr-2 h-4 w-4 ${(syncAllMutation.isPending || showImportProgress) ? 'animate-spin' : ''}`} />
                   {syncAllMutation.isPending ? "Sync nieuwe..." : 
-                   fullSyncMutation.isPending ? "Importeer alles..." : "Sync Shopify"}
+                   showImportProgress ? "Importeer alles..." : "Sync Shopify"}
                   <ChevronDown className="ml-2 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem 
                   onClick={() => syncAllMutation.mutate()}
-                  disabled={syncAllMutation.isPending || fullSyncMutation.isPending}
+                  disabled={syncAllMutation.isPending || showImportProgress}
                   data-testid="sync-new-orders"
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
@@ -393,8 +430,8 @@ export default function Orders() {
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => fullSyncMutation.mutate()}
-                  disabled={syncAllMutation.isPending || fullSyncMutation.isPending}
+                  onClick={startImportWithProgress}
+                  disabled={syncAllMutation.isPending || showImportProgress}
                   data-testid="import-all-orders"
                 >
                   <Download className="mr-2 h-4 w-4" />
@@ -885,6 +922,13 @@ export default function Orders() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Import Progress Dialog */}
+        <ImportProgressDialog 
+          open={showImportProgress}
+          onOpenChange={setShowImportProgress}
+          progress={importProgress}
+        />
       </main>
     </div>
   );
