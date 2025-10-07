@@ -11,7 +11,7 @@ export const todoStatusEnum = pgEnum("todo_status", ["todo", "in_progress", "don
 export const todoCategoryEnum = pgEnum("todo_category", ["orders", "purchasing", "marketing", "admin", "other"]);
 export const emailStatusEnum = pgEnum("email_status", ["open", "closed", "archived"]);
 export const orderStatusEnum = pgEnum("order_status", ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]);
-export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["pending", "ordered", "received", "cancelled"]);
+export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["draft", "sent", "awaiting_delivery", "partially_received", "fully_received", "cancelled"]);
 export const caseStatusEnum = pgEnum("case_status", ["new", "in_progress", "waiting_customer", "waiting_part", "resolved", "closed"]);
 
 // Users table
@@ -188,18 +188,69 @@ export const cases = pgTable("cases", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Suppliers table
+export const suppliers = pgTable("suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  supplierCode: text("supplier_code").notNull().unique(), // Relatiecode
+  name: text("name").notNull(), // Naam
+  contactPerson: text("contact_person"), // Contactpersoon
+  email: text("email"),
+  phone: text("phone"), // Telefoon
+  mobile: text("mobile"), // Mobiele telefoon
+  address: text("address"), // Adres
+  postalCode: text("postal_code"), // Postcode
+  city: text("city"), // Plaats
+  website: text("website"), // Website url
+  kvkNumber: text("kvk_number"), // Kvk nummer
+  vatNumber: text("vat_number"), // Btw nummer
+  iban: text("iban"),
+  bic: text("bic"),
+  bankAccount: text("bank_account"), // Bankrekeningnummer
+  paymentTerms: integer("payment_terms").default(0), // Krediettermijn in days
+  correspondenceAddress: text("correspondence_address"), // Correspondentie adres
+  correspondencePostalCode: text("correspondence_postal_code"),
+  correspondenceCity: text("correspondence_city"),
+  correspondenceContact: text("correspondence_contact"),
+  notes: text("notes"), // Memo
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Purchase Orders table
 export const purchaseOrders = pgTable("purchase_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poNumber: text("po_number").notNull().unique(), // Auto-generated PO number
   title: text("title").notNull(),
-  supplierNumber: text("supplier_number").notNull(),
-  supplierName: text("supplier_name").notNull(),
-  purchaseDate: timestamp("purchase_date").notNull(),
-  amount: integer("amount").notNull(), // in cents
+  supplierId: varchar("supplier_id").references(() => suppliers.id).notNull(),
+  orderDate: timestamp("order_date").notNull(),
+  expectedDeliveryDate: timestamp("expected_delivery_date"),
+  receivedDate: timestamp("received_date"),
+  totalAmount: integer("total_amount").notNull(), // in cents
   currency: text("currency").default("EUR"),
+  status: purchaseOrderStatusEnum("status").notNull().default("draft"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  assignedBuyer: varchar("assigned_buyer").references(() => users.id),
+  receivedBy: varchar("received_by").references(() => users.id),
+  caseId: varchar("case_id").references(() => cases.id), // Optional link to case
+  orderId: varchar("order_id").references(() => orders.id), // Optional link to order
   notes: text("notes"),
-  photos: text("photos").array(), // URLs to stored images
-  status: purchaseOrderStatusEnum("status").notNull().default("pending"),
+  invoiceUrl: text("invoice_url"), // URL to invoice file
+  deliveryNoteUrl: text("delivery_note_url"), // URL to delivery note
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Purchase Order Items table
+export const purchaseOrderItems = pgTable("purchase_order_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  purchaseOrderId: varchar("purchase_order_id").references(() => purchaseOrders.id).notNull(),
+  sku: text("sku"),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: integer("unit_price").notNull(), // in cents
+  subtotal: integer("subtotal").notNull(), // in cents (quantity * unitPrice)
+  receivedQuantity: integer("received_quantity").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -279,16 +330,31 @@ export const insertInternalNoteSchema = createInsertSchema(internalNotes).omit({
   updatedAt: true,
 });
 
-export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
+  id: true,
+  poNumber: true, // Auto-generated
+  createdAt: true,
+  updatedAt: true,
 }).extend({
-  purchaseDate: z.union([z.string(), z.date()]).transform(val => 
+  orderDate: z.union([z.string(), z.date()]).transform(val => 
     typeof val === 'string' ? new Date(val) : val
   ),
-  amount: z.number().int().positive(),
-  photos: z.array(z.string()).max(3).optional(),
+  expectedDeliveryDate: z.union([z.string(), z.date()]).optional().transform(val => 
+    val && typeof val === 'string' ? new Date(val) : val
+  ),
+  totalAmount: z.number().int().positive(),
+});
+
+export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertCaseSchema = createInsertSchema(cases).omit({
@@ -356,3 +422,9 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 export type EmailAttachment = typeof emailAttachments.$inferSelect;
 export type InsertEmailAttachment = z.infer<typeof insertEmailAttachmentSchema>;
+
+export type Supplier = typeof suppliers.$inferSelect;
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;

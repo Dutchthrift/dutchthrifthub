@@ -9,10 +9,12 @@ import {
   type Todo, type InsertTodo,
   type InternalNote, type InsertInternalNote,
   type PurchaseOrder, type InsertPurchaseOrder,
+  type Supplier, type InsertSupplier,
+  type PurchaseOrderItem, type InsertPurchaseOrderItem,
   type Case, type InsertCase,
   type Activity, type InsertActivity,
   type AuditLog, type InsertAuditLog,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, cases, activities, auditLogs
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, cases, activities, auditLogs
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql } from "drizzle-orm";
@@ -70,12 +72,28 @@ export interface IStorage {
   updateRepair(id: string, repair: Partial<InsertRepair>): Promise<Repair>;
   getRepairsByStatus(status: string): Promise<Repair[]>;
 
+  // Suppliers
+  getSuppliers(): Promise<Supplier[]>;
+  getSupplier(id: string): Promise<Supplier | undefined>;
+  getSupplierByCode(code: string): Promise<Supplier | undefined>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier>;
+  deleteSupplier(id: string): Promise<void>;
+  importSuppliers(suppliers: InsertSupplier[]): Promise<void>;
+
   // Purchase Orders
   getPurchaseOrders(): Promise<PurchaseOrder[]>;
   getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined>;
   createPurchaseOrder(purchaseOrder: InsertPurchaseOrder): Promise<PurchaseOrder>;
   updatePurchaseOrder(id: string, purchaseOrder: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder>;
   deletePurchaseOrder(id: string): Promise<void>;
+  generatePONumber(): Promise<string>;
+
+  // Purchase Order Items
+  getPurchaseOrderItems(purchaseOrderId: string): Promise<PurchaseOrderItem[]>;
+  createPurchaseOrderItem(item: InsertPurchaseOrderItem): Promise<PurchaseOrderItem>;
+  updatePurchaseOrderItem(id: string, item: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem>;
+  deletePurchaseOrderItem(id: string): Promise<void>;
 
   // Todos
   getTodos(userId?: string): Promise<Todo[]>;
@@ -701,9 +719,63 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Suppliers
+  async getSuppliers(): Promise<Supplier[]> {
+    return await db.select().from(suppliers).where(eq(suppliers.active, true)).orderBy(suppliers.name);
+  }
+
+  async getSupplier(id: string): Promise<Supplier | undefined> {
+    const result = await db.select().from(suppliers).where(eq(suppliers.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getSupplierByCode(code: string): Promise<Supplier | undefined> {
+    const result = await db.select().from(suppliers).where(eq(suppliers.supplierCode, code)).limit(1);
+    return result[0];
+  }
+
+  async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
+    const result = await db.insert(suppliers).values(supplier as any).returning();
+    return result[0];
+  }
+
+  async updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier> {
+    const result = await db.update(suppliers).set({ ...supplier, updatedAt: new Date() } as any).where(eq(suppliers.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteSupplier(id: string): Promise<void> {
+    // Soft delete
+    await db.update(suppliers).set({ active: false, updatedAt: new Date() }).where(eq(suppliers.id, id));
+  }
+
+  async importSuppliers(suppliersData: InsertSupplier[]): Promise<void> {
+    // Batch insert suppliers
+    for (const supplier of suppliersData) {
+      // Check if supplier already exists by code
+      const existing = await this.getSupplierByCode(supplier.supplierCode);
+      if (!existing) {
+        await this.createSupplier(supplier);
+      }
+    }
+  }
+
   // Purchase Orders
   async getPurchaseOrders(): Promise<PurchaseOrder[]> {
     return await db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
+  }
+
+  async generatePONumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const result = await db.select({ poNumber: purchaseOrders.poNumber }).from(purchaseOrders).where(sql`${purchaseOrders.poNumber} LIKE ${`PO-${year}-%`}`).orderBy(desc(purchaseOrders.poNumber)).limit(1);
+    
+    if (result.length === 0) {
+      return `PO-${year}-001`;
+    }
+    
+    const lastNumber = parseInt(result[0].poNumber!.split('-')[2]) || 0;
+    const nextNumber = (lastNumber + 1).toString().padStart(3, '0');
+    return `PO-${year}-${nextNumber}`;
   }
 
   async getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined> {
@@ -723,6 +795,25 @@ export class DatabaseStorage implements IStorage {
 
   async deletePurchaseOrder(id: string): Promise<void> {
     await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
+  }
+
+  // Purchase Order Items
+  async getPurchaseOrderItems(purchaseOrderId: string): Promise<PurchaseOrderItem[]> {
+    return await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId)).orderBy(purchaseOrderItems.createdAt);
+  }
+
+  async createPurchaseOrderItem(item: InsertPurchaseOrderItem): Promise<PurchaseOrderItem> {
+    const result = await db.insert(purchaseOrderItems).values(item as any).returning();
+    return result[0];
+  }
+
+  async updatePurchaseOrderItem(id: string, item: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem> {
+    const result = await db.update(purchaseOrderItems).set({ ...item, updatedAt: new Date() } as any).where(eq(purchaseOrderItems.id, id)).returning();
+    return result[0];
+  }
+
+  async deletePurchaseOrderItem(id: string): Promise<void> {
+    await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.id, id));
   }
 
   // Search

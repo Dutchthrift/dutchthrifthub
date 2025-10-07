@@ -1794,6 +1794,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Suppliers
+  app.get("/api/suppliers", requireAuth, async (req: any, res: any) => {
+    try {
+      const suppliers = await storage.getSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      res.status(500).json({ message: "Failed to fetch suppliers" });
+    }
+  });
+
+  app.get("/api/suppliers/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const supplier = await storage.getSupplier(id);
+      if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+      res.json(supplier);
+    } catch (error) {
+      console.error("Error fetching supplier:", error);
+      res.status(500).json({ message: "Failed to fetch supplier" });
+    }
+  });
+
+  app.post("/api/suppliers", requireAuth, async (req: any, res: any) => {
+    try {
+      const supplier = await storage.createSupplier(req.body);
+      await auditLog(req, "CREATE", "suppliers", supplier.id, { name: supplier.name });
+      res.status(201).json(supplier);
+    } catch (error: any) {
+      console.error("Error creating supplier:", error);
+      res.status(400).json({ message: error.message || "Failed to create supplier" });
+    }
+  });
+
+  app.patch("/api/suppliers/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const supplier = await storage.updateSupplier(id, req.body);
+      await auditLog(req, "UPDATE", "suppliers", id, req.body);
+      res.json(supplier);
+    } catch (error: any) {
+      console.error("Error updating supplier:", error);
+      res.status(400).json({ message: error.message || "Failed to update supplier" });
+    }
+  });
+
+  app.delete("/api/suppliers/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteSupplier(id);
+      await auditLog(req, "DELETE", "suppliers", id);
+      res.json({ message: "Supplier deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting supplier:", error);
+      res.status(400).json({ message: error.message || "Failed to delete supplier" });
+    }
+  });
+
+  app.post("/api/suppliers/import-excel", requireAuth, upload.single("file"), async (req: any, res: any) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(worksheet);
+
+      const suppliers = data.map((row: any) => ({
+        supplierCode: String(row['Relatiecode'] || row['relatiecode'] || ''),
+        name: String(row['Naam'] || row['naam'] || ''),
+        contactPerson: row['Contactpersoon'] || row['contactpersoon'] || null,
+        email: row['Email'] || row['email'] || null,
+        phone: row['Telefoon'] ? String(row['Telefoon']) : null,
+        mobile: row['Mobiele telefoon'] || row['mobiele telefoon'] || null,
+        address: row['Adres'] || row['adres'] || null,
+        postalCode: row['Postcode'] || row['postcode'] || null,
+        city: row['Plaats'] || row['plaats'] || null,
+        website: row['Website url'] || row['website url'] || null,
+        kvkNumber: row['Kvk nummer'] ? String(row['Kvk nummer']) : null,
+        vatNumber: row['Btw nummer'] || row['btw nummer'] || null,
+        iban: row['Iban'] || row['iban'] || row['IBAN'] || null,
+        bic: row['Bic'] || row['bic'] || row['BIC'] || null,
+        bankAccount: row['Bankrekeningnummer'] ? String(row['Bankrekeningnummer']) : null,
+        paymentTerms: row['Krediettermijn'] || 0,
+        correspondenceAddress: row['Correspondentie adres'] || null,
+        correspondencePostalCode: row['Correspondentie adres postcode'] || null,
+        correspondenceCity: row['Correspondentie adres plaats'] || null,
+        correspondenceContact: row['Correspondentie adres contactpersoon'] || null,
+        notes: row['Memo'] || row['memo'] || null,
+        active: true,
+      }));
+
+      await storage.importSuppliers(suppliers);
+      await auditLog(req, "IMPORT", "suppliers", undefined, { count: suppliers.length });
+      
+      res.json({ message: `Successfully imported ${suppliers.length} suppliers` });
+    } catch (error: any) {
+      console.error("Error importing suppliers:", error);
+      res.status(500).json({ message: error.message || "Failed to import suppliers" });
+    }
+  });
+
   // Purchase Orders
   app.get("/api/purchase-orders", async (req, res) => {
     try {
