@@ -1,0 +1,595 @@
+Relatiecode	Naam	Contactpersoon	Adres	Postcode	Plaats	Telefoon	Mobiele telefoon	Fax	Kvk nummer	Creditcard nummer	Website url	Email	Correspondentie adres contactpersoon	Correspondentie adres	Correspondentie adres postcode	Correspondentie adres plaats	Btw nummer	Debiteurennummer	Krediettermijn	Bankrekeningnummer	Iban	Bic	Naam rekeninghouder	Plaats rekeninghouder	Bankieren	Memo
+-1	Intern																		0						False	Contact persoon partijen mobiele telefoons
+1	Handelsbedrijf Oenema	Theo Oenema	Afrikaweg 33G	9407 TL	Assen	0610942176			77231082		www.Dutchthrift.com	Theo@dutchthrift.com	Theo Oenema	Prinsesseweg 79	9717BE	GRONINGEN	860942119B01		0	0	NL63 RABO 0353 4317 10	RABONL2U			False	
+2	Mimoun Arramdani	Mimoun Arramdani	Drakensteyn 12	1187 DK	Amstelveen		+31 6 33227699						Mimoun Arramdani	Drakensteyn 12	1187 DK	Amstelveen			0						False	Contact persoon voor Fotografie
+3	Johan MP	Johan MP	Rozenburgstraat 62	2512 SV	Den Haag								Johan MP	Rozenburgstraat 62	2512 SV	Den Haag			0						False	
+4	Khalid Ameziane	Khalid Ameziane	Irenestraat 33	2291 TG 	Wateringen								Khalid Ameziane	Irenestraat 33	2291 TG 	Wateringen			0						False	Contactpersoon partijen mobiele telefoons
+5	Kevin Schaasberg	Kevin Schaasberg	Burgemeester Keijzerlaan 215	2262 BH	Leidschendam								Kevin Schaasberg	Burgemeester Keijzerlaan 215	2262 BH	Leidschendam			0						False	Contact persoon partijen cameras
+6	Kobus	Kobus											Kobus						0						False	
+7	deV	deV											deV						0						False	
+8	Mark Horst	Mark Horst	Rosa de Werdstraat 32	2331BH 	Leiden								Mark Horst	Rosa de Werdstraat 32	2331BH 	Leiden			0						False	
+9	KBS	KBS											KBS						0						False	
+10	Jan Ten Damme	Jan Ten Damme											Jan Ten Damme						0						False	
+11	Mijnontruimer	Mijnontruimer			Sint jansklooster								Mijnontruimer			Sint jansklooster			0						False	
+12	Maria Heijnekamp	Maria Heijnekamp											Maria Heijnekamp						0						False	
+13	Z. Demy	Vintage	Steenhovenweg 2	3532 AE	Utrecht								Vintage	Steenhovenweg 2	3532 AE	Utrecht			0						False	
+14	Roys	Rh Stap											Rh Stap						0						False	
+15	Iskmon	Monika Iskrzak											Monika Iskrzak						0						False	
+16	Thielprive	Jac Thiel											Jac Thiel						0						False	
+17	Danny 	Danny			Capelle aan den IJsel								Danny			Capelle aan den IJsel			0						False	
+18	DV Store	DV Store			Voorthuizen								DV Store			Voorthuizen			0						False	
+19	Bilal	Bilal	Leinserondweg 16	5495 RV	Veghel		0634622584						Bilal	Leinserondweg 16	5495 RV	Veghel			0						False	
+20	Chris Lenters																								False	
+21	Tiny	Tiny	Uescoweg 7		Zuidbroek								Tiny	Uescoweg 7		Zuidbroek			0						False	
+22	Stormila	Stormila											Stormila						0						False	
+23	Hamza	Hamza											Hamza						0						False	
+24	Budget Thuis B.V.		Reguliersdwarsstraat 58 a	1017BM	AMSTERDAM				34297646		budgetthuis.nl			Reguliersdwarsstraat 58 a	1017BM	AMSTERDAM	819182813B01		0		NL48RABO0190558601	RABONL2U			False	
+25	AUCTANE S.L.U,	Packlink	Paseo Imperial 14	28005	ESB83357863								Packlink	Paseo Imperial 14	28005	ESB83357863	B83357863		0						False	
+26	Hornbach Bouwmarkt + Tuincentrum		Groningerweg 452	9738AB	GRONINGEN				30151645					Groningerweg 452	9738AB	GRONINGEN	807508093B01		30						False	
+27	Xenos B.V.		Dierenriemstraat 136b	9742AK	GRONINGEN				16032653					Dierenriemstraat 136b	9742AK	GRONINGEN			30						False	
+28	Xenos B.V.		Vismarkt 39	9712CB	GRONINGEN				16032653					Vismarkt 39	9712CB	GRONINGEN			30						False	
+29	IKEA Groningen		Sontweg 9	9723AT	GRONINGEN				33166333					Sontweg 9	9723AT	GRONINGEN	004445879B01		30						False	
+30	Wibra Supermarkt B.V.		Dierenriemstraat 198	9742AM	GRONINGEN				08032856					Dierenriemstraat 198	9742AM	GRONINGEN			30						False	
+31	Daily Paper Retail B.V.		Bilderdijkstraat 131h	1053KN	AMSTERDAM				68052022		www.dailypaperclothing.com			Bilderdijkstraat 131h	1053KN	AMSTERDAM			30						False	
+32	The North Face Outlet Roermond		Stadsweide 168	6041TD	ROERMOND				59709383					Stadsweide 168	6041TD	ROERMOND			30						False	
+33	B.P. Tankstation Paddepoel		Pleiadenlaan 4	9742NG	Groningen				02053533					Pleiadenlaan 4	9742NG	Groningen	107840352B01		30						False	
+34	Supertank Heerenveen		Saturnus 6	8448 CC	Heerenveen									Saturnus 6	8448 CC	Heerenveen			30						False	
+35	Shellstation Dekkersland		Rijksweg A28 1097	7951SZ	STAPHORST				39097823					Rijksweg A28 1097	7951SZ	STAPHORST	001038266B01		30						False	
+36	BP De Horne		Rijksweg a 7	8506AA	HASKERHORNE				24489071		www.bp.nl			Rijksweg a 7	8506AA	HASKERHORNE			30						False	
+37	Smit Entrance Control		Paterswoldseweg 20	9726BD	GRONINGEN				75877392		www.smitgroningen.nl			Paterswoldseweg 20	9726BD	GRONINGEN			30						False	
+38	Jouw Winkelkraam		Koopmansplein 3b		ASSEN				89342089					Koopmansplein 3b	9401EL	ASSEN			30						False	
+39	Florentin Groningen		Langestraat 66	9712LT	GRONINGEN				75341395					Langestraat 66	9712LT	GRONINGEN			30						False	
+40	Kringloop+		Diamantlaan 1	9743BA	Groningen				27114801					Diamantlaan 1	9743BA	Groningen			30						False	
+41	Action Groningen		Reitdiephaven 155	9746RC	GRONINGEN				37112677					Reitdiephaven 155	9746RC	GRONINGEN			30						False	
+42	Jumbo Supermarkt		Wilhelminakade 21	9717AB	GRONINGEN				16044409					Wilhelminakade 21	9717AB	GRONINGEN			30						False	
+43	Albert Heijn B.V.		Dierenriemstraat 122		GRONINGEN				35012085					Dierenriemstraat 122	9742AK	GRONINGEN			30						False	
+44	PLUS		Kerklaan 75	9717HB	GRONINGEN				09124392		www.plus.nl			Kerklaan 75	9717HB	GRONINGEN			30						False	
+45	Rijwielbedrijf Vincent van Ellen B.V.		Oude Ebbingestraat 81	9712HG	GRONINGEN				02033279		vincentvanellen.nl			Oude Ebbingestraat 81	9712HG	GRONINGEN			30		NL65INGB0005382835	INGBNL2A			False	
+46	Sligro Food Group N.V.		Corridor 11	5466RB	VEGHEL				16045002					Corridor 11	5466RB	VEGHEL	001159094B01		30		NL35RABO0349320772	RABONL2U			False	
+47	Toolmania B.V.		Langs de Heij 10	6136KR	SITTARD				68878516		www.toolmania.nl			Langs de Heij 10	6136KR	SITTARD	857629694B01		30		NL63INGB0007811169	INGBNL2A			False	
+48	Koninklijke PostNL B.V.		Waldorpstraat 3	2521CA	'S-GRAVENHAGE				27124700		www.postnl.nl			Waldorpstraat 3	2521CA	'S-GRAVENHAGE	009291477B01		30		NL10RABO0373122209	RABONL2U			False	
+49	De Wit Schijndel B.V.		Rooiseweg 22	5481SJ	SCHIJNDEL				16045594					Rooiseweg 22	5481SJ	SCHIJNDEL	006138044B01		30						False	
+50	Gruno Vastgoed B.V.		Guyotplein 51		GRONINGEN				65185137					Guyotplein 51	9712NX	GRONINGEN			30		NL62INGB0007573343	INGBNL2A			False	
+51	stichting beheer Clientgelden Gruno Vastgoed BV		Nieuwe Ebbingestraat 129	9714 AM	Groningen									Nieuwe Ebbingestraat 129	9714 AM	Groningen			30		NL62INGB0007573343	INGBNL2A			False	
+52	home24 SE		Nassauplein 30	2585EC	'S-GRAVENHAGE				55326528		www.home24.nl			Nassauplein 30	2585EC	'S-GRAVENHAGE	823546640B01		30						False	
+53	art and craft 		Kortrijksesteenweg 1056	9051	Gent									Kortrijksesteenweg 1056	9051	Gent			30		BE24441462708138				False	
+54	DPD (Nederland) B.V.		Nijverheidsstraat 44	7461AE	RIJSSEN				09118128					Nijverheidsstraat 44	7461AE	RIJSSEN	809658574B01		30		NL29ABNA0594919371	ABNANL2A			False	
+55	Onlineveilingmeester.nl B.V.		De Hallen 1	9723TW	GRONINGEN				02080122		www.onlineveilingmeester.nl			De Hallen 1	9723TW	GRONINGEN			30						False	
+56	Univé Noord-Nederland Advies B.V.		Jan Bommerstraat 1	9402NR	ASSEN				01129844		www.unive.nl/noordnederland			Jan Bommerstraat 1	9402NR	ASSEN			30		NL85RABO0341896365	RABONL2U			False	
+57	SnelStart		Comeniusstraat 10	1817MS	ALKMAAR				37054131		www.snelstart.nl			Comeniusstraat 10	1817MS	ALKMAAR	008400933B01		30		NL39ABNA0587611502	ABNANL2A			False	
+58	Obelink Vrijetijdsmarkt B.V.		Misterweg 179	7102EN	WINTERSWIJK				08024002		www.obelink.nl			Misterweg 179	7102EN	WINTERSWIJK	001677755B01		30						False	
+59	Gerrit van der Heide		Hofland 119	8401SH	GORREDIJK				01108901		www.gerritvanderheide.com			Hofland 119	8401SH	GORREDIJK	001431330B91		30		NL44RABO0113498284	RABONL2U			False	
+60	SkillSource		Kanaaldijk 2	5735SL	AARLE-RIXTEL				51432846		www.skillsource.nl			Kanaaldijk 2	5735SL	AARLE-RIXTEL	850012314B01		30		NL82RABO0169941124	RABONL2U			False	
+61	Zalando Netherlands B.V.		Klappolder 130	2665LP	BLEISWIJK				85577197					Klappolder 130	2665LP	BLEISWIJK	823904751B01		30						False	
+62	PostNL Pakketten Benelux B.V.		Waldorpstraat 3	2521CA	'S-GRAVENHAGE				34337145		www.postnlpakketten.nl			Waldorpstraat 3	2521CA	'S-GRAVENHAGE	820577005B01		30		NL03RABO0197698417	RABONL2U			False	
+63	Umake		Boekenburglaan 104	2215AG	VOORHOUT				58620044					Boekenburglaan 104	2215AG	VOORHOUT	002236561B76		30						False	
+64	Alibaba.com Singapore E-Commerce Private Limited	3-C Manufacture Drop Ship Store											3-C Manufacture Drop Ship Store						30						False	
+65	Profipack Verpakkingsmaterialen B.V.		Waardsedijk-Oost 8	3417XJ	MONTFOORT				73625590		www.profipack.nl			Waardsedijk-Oost 8	3417XJ	MONTFOORT	859606387B01		30		NL78INGB0008104615	INGBNL2A			False	
+66	Strato AG		Otto Ostrowski Strasse 7	10249	Berlijn									Otto Ostrowski Strasse 7	10249	Berlijn			30		NL07COBA0637035887	COBANL2X			False	
+67	Bonjour Media		Gavelaan 2a	9828PL	Oostwold Westerkwartier				63609835		www.bonjourmedia.nl			Gavelaan 2a	9828PL	Oostwold Westerkwartier	855313092B01		30		NL62RABO0136436617	RABONL2U			False	
+68	Westwing B.V.		Singel 512	1017AX	AMSTERDAM				53963199		www.westwing.nl			Singel 512	1017AX	AMSTERDAM	851092494B01		30						False	
+69	Chicken N Bull		Billitonstraat 59	9715EP	Groningen				76236129					Billitonstraat 59	9715EP	Groningen	249516834B02		30						False	
+70	Uber Portier B.V.		Burgerweeshuispad 301	1076HR	AMSTERDAM				65851307					Burgerweeshuispad 301	1076HR	AMSTERDAM	856287386B01		30						False	
+71	Marktplaats B.V.		Wibautstraat 224	1097DN	AMSTERDAM				28058712					Wibautstraat 224	1097DN	AMSTERDAM			30						False	
+72	Blokker B.V.		Van der Madeweg 13	1114AM	AMSTERDAM-DUIVENDRECHT				33147847					Van der Madeweg 13	1114AM	AMSTERDAM-DUIVENDRECHT	853278234B01		30						False	
+73	Shopify International Limited		2nd Floor, 1-2 Victoria Buildings Haddington Road	D04 XN32	Dublin 4									2nd Floor, 1-2 Victoria Buildings Haddington Road	D04 XN32	Dublin 4	3347697KH		30						False	
+74	IAprog B.V.		Grebbeweg 19b	3902HG	VEENENDAAL				64172023		www.iaprog.nl			Grebbeweg 19b	3902HG	VEENENDAAL	855554381B01		30		NL17RABO0100918549	RABONL2U			False	
+75	eBay GmbH		Albert-Einstein-Ring 2-6	14532	Kleinmachnow									Albert-Einstein-Ring 2-6	14532	Kleinmachnow	200081785		30						False	
+76	Silver Ocean B.V.		Contactweg 159	1014BJ	AMSTERDAM				34201965					Contactweg 159	1014BJ	AMSTERDAM	812893773B01		30		NL26RABO0156335166	RABONL2U			False	
+77	Hans				Purmerend											Purmerend			0						False	
+78	Martin				Leiden											Leiden			0						False	
+79	Inkopen Markt Contant																		0						False	
+80	Gert Marktplaats				Veenendaal											Veenendaal			0						False	
+81	D v. Z. MP		Hagastraat 121	3114 NC	Schiedam									Hagastraat 121	3114 NC	Schiedam			0						False	
+82	Kwantum		Energieweg 11	9743AN	GRONINGEN				18027979					Energieweg 11	9743AN	GRONINGEN	004468338B01		30						False	
+83	Slagerij Oosterhof		Dierenriemstraat 162		Groningen				73832057		www.slagerijoosterhof.nl			Dierenriemstraat 162	9742AL	Groningen			30						False	
+84	Total dorenbos B.V.		Peelo 22A	9403TZ 	Assen									Peelo 22A	9403TZ 	Assen			30						False	
+85	Decathlon Netherlands BV		Olympus 1	6832 EL	Arnhem									Olympus 1	6832 EL	Arnhem			30						False	
+86	Esso Express Zwolle		Deventerstraatweg 10	8012 AH	Zwolle									Deventerstraatweg 10	8012 AH	Zwolle			30						False	
+87	Copy 76		Zonnelaan 86	9742BN	Groningen				67815383		www.copy76.nl			Zonnelaan 86	9742BN	Groningen			30						False	
+88	BP Het Groene Land		Oude Postweg 1	9355 TR	Midwolde									Oude Postweg 1	9355 TR	Midwolde	107887289B01		30						False	
+89	PayPal Nederland B.V.		Barbara Strozzilaan 201	1083HN	AMSTERDAM				34247781					Barbara Strozzilaan 201	1083HN	AMSTERDAM			30						False	
+90	Mollie B.V.		Keizersgracht 126	1015CW	AMSTERDAM				30204462					Keizersgracht 126	1015CW	AMSTERDAM	815839091B01		30		NL21CITI2032328542	CITINL2X			False	
+91	Kroewa Thai		Prinsesseweg 25	9717BB	GRONINGEN				01167970					Prinsesseweg 25	9717BB	GRONINGEN			30						False	
+92	Jeroen MP																		0						False	
+93	bol.com B.V.		Papendorpseweg 100	3528BJ	UTRECHT				32147382		www.bol.com			Papendorpseweg 100	3528BJ	UTRECHT	820471616B01		30		NL45INGB0000257133	INGBNL2A			False	
+94	Lanu producten		Kortland 39	2951GM	ALBLASSERDAM				83778721					Kortland 39	2951GM	ALBLASSERDAM	003871780B42		30						False	
+95	Hema 		Dierenriemstraat 136	9742 AK 	Groningen									Dierenriemstraat 136	9742 AK 	Groningen			30						False	
+96	HBM Machines B.V.		Grote Esch 1010	2841MJ	MOORDRECHT				24352948		www.hbm-machines.com			Grote Esch 1010	2841MJ	MOORDRECHT	812631663B01		30		NL61ABNA0869794000	ABNANL2A			False	
+97	Google Ireland Limited		Borrow Street		Dublin 4									Borrow Street		Dublin 4			30						False	
+98	Vonroc B.V.		Lingenstraat 6	8028PM	ZWOLLE				71933107					Lingenstraat 6	8028PM	ZWOLLE			30						False	
+99	Traficient B.V.		Mercuriusweg 2a	3113AR	SCHIEDAM				32055658		www.traficient.nl			Mercuriusweg 2a	3113AR	SCHIEDAM			30						False	
+100	123Accu B.V.		Koningsbeltweg 52	1329AK	ALMERE				59764198		www.123accu.nl			Koningsbeltweg 52	1329AK	ALMERE			30		NL07RABO0304514454	RABONL2U			False	
+101	Leroy																		0						False	
+102	Johan Elim				Elim											Elim			0						False	
+103	Ger Barends																		0						False	
+104	Raymond MP																		0						False	
+105	Bert MP																		0						False	
+106	Bloemenwinkel Ambachtelijke Bloemist		Siersteenlaan 428-16	9743 ES	Groningen				50183435					Siersteenlaan 428-16	9743 ES	Groningen			30						False	
+107	Albert Heijn 		Siersteenlaan 464	9743 ES	Groningen									Siersteenlaan 464	9743 ES	Groningen			30						False	
+108	Jysk Groningen Sontplein		Sontplein 1 Unit 10	9723 BZ	Groningen									Sontplein 1 Unit 10	9723 BZ	Groningen			30						False	
+109	Khalid Chabab MP																		0						False	
+110	Maurits																		0						False	
+111	Stefan Homan																		0						False	
+112	H & M Hennes & Mauritz Netherlands B.V.		Keizersgracht 281	1016ED	AMSTERDAM				33208311					Keizersgracht 281	1016ED	AMSTERDAM	009294703B01		30						False	
+113	iUsed B.V.		Celsiusbaan 2a	3439NC	NIEUWEGEIN				70518793					Celsiusbaan 2a	3439NC	NIEUWEGEIN	858355498B01		30		NL90RABO0325237786	RABONL2U			False	
+114	Saint MP																		0						False	
+115	Jeroen ten damme																		0						False	
+116	Handelsbedrijf Otte																		0						False	
+117	Barboros MP																		0						False	
+118	Ricardo MP																		0						False	
+119	Retro Finds																		0						False	
+120	Ronald MP																		0						False	
+121	Daan MP																		0						False	
+122	Snarf MP																		0						False	
+123	Tinus MP																		0						False	
+124	Jan MP																		0						False	
+125	J. van den B MP																		0						False	
+126	Arthur MP																		0						False	
+127	Tweede leven																		0						False	
+128	Delano MP																		0						False	
+129	Den Ouden																		0						False	
+130	Kringloop Whatsin																		0						False	
+131	Janis MP																		0						False	
+132	Peter MP																		0						False	
+133	Baars																		0						False	
+134	Peter Klok																		0						False	
+135	AB																		0						False	
+136	Dutch eCom Group																		0						False	
+137	Rens Feijen																		0						False	
+138	Steef																		0						False	
+139	Jesse																		0						False	
+140	Bass MP																		0						False	
+141	Kleij MP																		0						False	
+142	Anna Riedstra MP																		0						False	
+143	Mulder																		0						False	
+144	Hendriks																		0						False	
+145	Kringloop hart in friesland																		0						False	
+146	Baran Kringloop Hoorn																		0						False	
+147	Praxis Doe-het-Zelf Center B.V.		Claes van Gorcumstraat 1	9403BA	ASSEN				33152545					Claes van Gorcumstraat 1	9403BA	ASSEN	004371021B01		30						False	
+148	smartphonehoesjes.nl		Postbus 87	3830 AB	Leusden				58473297					Postbus 87	3830 AB	Leusden	853054770B01		30						False	
+149	Crazylabels B.V.		Lintelerweg 60	7556PD	HENGELO				76798992		www.crazylabels.nl			Lintelerweg 60	7556PD	HENGELO	860793278B01		30		NL49RABO0329274791	RABONL2U			False	
+150	Van der Meer Accountants		Venekoterweg 44	8431HH	OOSTERWOLDE				01079042		www.vandermeeracc.nl			Venekoterweg 44	8431HH	OOSTERWOLDE	806330648B01		30		NL13RABO0363926070	RABONL2U			False	
+151	fial witgoed / Fial Store		Narcisstraat 5	9404 RH	Assen				74736612					Narcisstraat 5	9404 RH	Assen	105826790B02		30		NL39KNAB0258977272	KNABNL2H			False	
+152	Zakelijk Inkomen B.V.		Symfonielaan 18	3438EV	NIEUWEGEIN				65921550					Symfonielaan 18	3438EV	NIEUWEGEIN	856317597B01		30		NL53ABNA0552471739	ABNANL2A			False	
+153	Loes MP																		0						False	
+154	D.E. MP																		0						False	
+155	Rob MP																		0						False	
+156	Kleinegris MP																		0						False	
+157	J.A. Marinus																		0						False	
+158	Ad MP																		0						False	
+159	Melis MP																		0						False	
+160	Danny MP																		0						False	
+161	LK1991 MP																		0						False	
+162	Banjo MP																		0						False	
+163	Scholten MP																		0						False	
+164	Rolo MP																		0						False	
+165	Ad Tolenaars																		0						False	
+166	Bron MP																		0						False	
+167	Melis MP																		0						False	
+168	Jannie Klok																		0						False	
+169	eepj MP																		0						False	
+170	Kringloop Westerkwartier																		0						False	
+171	Kringloop Dorcas Drachten																		0						False	
+172	Henriette MP																		0						False	
+173	Kees MP																		0						False	
+174	Carola MP																		0						False	
+175	Dennis S. MP																		0						False	
+176	Ven MP																		0						False	
+177	Denise MP																		0						False	
+178	Renee Vermanen MP																		0						False	
+179	Ad MP																		0						False	
+180	Bas Hoogenberg																		0						False	
+181	Goudgoed Groningen																		0						False	
+182	Joske MP																		0						False	
+183	de Bruin MP																		0						False	
+184	Trotse mama MP																		0						False	
+185	Kandil MP																		0						False	
+186	Langemaat MP																		0						False	
+187	Storck MP																		0						False	
+188	Andre MP																		0						False	
+189	Sanders MP																		0						False	
+190	CarusoJob MP																		0						False	
+191	a. MP  S te riele																		0						False	
+192	Claudia MP																		0						False	
+193	Freddie MP																		0						False	
+194	D.Th. can Londen MP																		0						False	
+195	Ans Dame MP																		0						False	
+196	R. Verlaak MP																		0						False	
+197	Sharon MP																		0						False	
+198	Lars Wormgoor																		0						False	
+199	Geralie Kampjes MP																		0						False	
+200	Xavier MP																		30						False	
+201	DMP MP																		0						False	
+202	Clarissa MP																		0						False	
+203	Joost MP																		0						False	
+204	Nick MP																		0						False	
+205	Tigelaar MP																		0						False	
+206	Schoemaker MP																		0						False	
+207	GJ MP																		0						False	
+208	Kees MP																		0						False	
+209	Zoomer MP																		0						False	
+210	Ekster Bestek																		0						False	
+211	E. de Vries MP																		0						False	
+212	JvE MP																		0						False	
+213	Van Es MP																		0						False	
+214	KM Collectables MP																		0						False	
+215	Eva MP																		0						False	
+216	Allforsale		Hoppesteegde 5	8426 CR	Appelscha				69998361					Hoppesteegde 5	8426 CR	Appelscha	002373321B69		0		NL43RABO0158184165	RABONL2U			False	
+217	Dorcas Veenendaal																		0						False	
+218	Pieter Siemers MP																		0						False	
+219	Jean MP																		0						False	
+220	NardoLeroy MP																		0						False	
+221	Madelief MP																		0						False	
+222	Cees & Dirk MP																		0						False	
+223	The Pawn Store MP																		0						False	
+224	Used Products Alkmaar																		0						False	
+225	Tiellemans																		0						False	
+226	f.p. MP																		0						False	
+227	Maaike MP																		0						False	
+228	Ilona MP																		0						False	
+229	Johanna MP																		0						False	
+230	Jordi MP																		0						False	
+231	Annemieke MP																		0						False	
+232	Turfboer MP																		0						False	
+233	M. Kleinjan																		0						False	
+234	Visser Groningen MP																		0						False	
+235	Mike MP 																		0						False	
+236	Rob MP																		0						False	
+237	Wattimena MP																		0						False	
+238	Mark vGen																		0						False	
+239	Sam MP																		0						False	
+240	Niek L. MP																		0						False	
+241	Bulkmans MP																		0						False	
+242	Medema MP																		0						False	
+243	Aafje MP																		0						False	
+244	Gerard MP																		0						False	
+245	Harland MP																		0						False	
+246	Richard MP																		0						False	
+247	Michael MP																		0						False	
+248	Pino MP																		0						False	
+249	Martijn MP																		0						False	
+250	Joey MP																		0						False	
+251	Tonny MP																		0						False	
+252	BAUHAUS Groningen		Bornholmstraat 15	9723AW	Groningen				58426019		www.bauhaus-nl.com			Bornholmstraat 15	9723AW	Groningen	853035210B01		30						False	
+253	Karwei Groningen		Osloweg 112	9723BX	GRONINGEN				31039633					Osloweg 112	9723BX	GRONINGEN			30						False	
+254	Gamma Bouwmarkt Groningen Peizerweg		Peizerweg 89	9727AH	GRONINGEN				24234005					Peizerweg 89	9727AH	GRONINGEN			30						False	
+255	avia xpress groningen																		30						False	
+256	argos drachten																006816721B01		30						False	
+257	Media Markt Assen B.V.		Kroonwerk 21	9401BA	ASSEN				56962967		www.mediamarkt.nl			Kroonwerk 21	9401BA	ASSEN			30						False	
+258	Action Assen		Noordersingel 15	9401JV	ASSEN				37112677		www.action.nl			Noordersingel 15	9401JV	ASSEN			30						False	
+259	service station beijum								36002748										30						False	
+260	Zeeman Textielsupers		Dierenriemstraat 184	9742AL	GRONINGEN				28034863		www.zeeman.com			Dierenriemstraat 184	9742AL	GRONINGEN	005154820B01		30						False	
+261	So-low		Dierenriemstraat 198	9742AM	Groningen				23085358					Dierenriemstraat 198	9742AM	Groningen			30						False	
+262	So-low		Dierenriemstraat 198	9742AM	Groningen				23085358					Dierenriemstraat 198	9742AM	Groningen			30						False	
+263	Kart en Bowlingcentrum Groningen B.V.		Kardingerweg 50	9735AH	GRONINGEN				67217060		www.kartbaangroningen.nl			Kardingerweg 50	9735AH	GRONINGEN			30						False	
+264	EG Services (Netherlands) B.V.		Venekoterweg 1a	8431HG	OOSTERWOLDE				27068921					Venekoterweg 1a	8431HG	OOSTERWOLDE			30						False	
+265	Tuinland Assen		Borgstee 70		ASSEN				04052381					Borgstee 70	9403TV	ASSEN	006345177B01		30						False	
+266	Richard's All in Service		Verbindingsweg 13	9781DA	Bedum				60129824					Verbindingsweg 13	9781DA	Bedum			30						False	
+267	Makro Zelfbedieningsgroothandel		Kattegat 1	9723JP	GRONINGEN				33166133					Kattegat 1	9723JP	GRONINGEN	001799435B01		30		NL44INGB0702593702	INGBNL2A			False	
+268	Elektrischefoutjes.nl		Jan R Stuutstraat F 96	9663SK	Nieuwe Pekela				69555796		www.elektrischefoutjes.nl			Jan R Stuutstraat F 96	9663SK	Nieuwe Pekela			30						False	
+269	Daklapack Europe B.V.		Grasweg 77	1031HX	AMSTERDAM				08015851					Grasweg 77	1031HX	AMSTERDAM			30						False	
+270	Stadler & Zuidersma Trading		Buterheideveld 31	8423TB	MAKKINGA				67896235		www.stadlerzuidersmatrading.nl			Buterheideveld 31	8423TB	MAKKINGA	857217355B01		30		NL17INGB0007772615	INGBNL2A			False	
+271	IT Gigant B.V.		Westlandseweg 8	2291PG	WATERINGEN				76697460		www.itgigant.nl			Westlandseweg 8	2291PG	WATERINGEN	860756245B01		30		NL05RABO0337744459	RABONL2U			False	
+272	Vistaprint B.V.		Hudsonweg 8	5928LW	VENLO				12051083					Hudsonweg 8	5928LW	VENLO	812139513B01		30						False	
+273	CreativeWeb		Lorentzlaan 2	3401MX	IJSSELSTEIN				80855229		www.creativeweb.nl			Lorentzlaan 2	3401MX	IJSSELSTEIN	861826589B01		30		NL95INGB0002970778	INGBNL2A			False	
+274	Lightexpert.nl		Het Schakelplein 1-2	5651 GR	Eindhoven				75247313					Het Schakelplein 1-2	5651 GR	Eindhoven	860206828B01		30						False	
+275	Mobile Supplies		Schoutlaan 28c	6002EA	WEERT				70752109		www.mobilesupplies.nl			Schoutlaan 28c	6002EA	WEERT	858445311B01		30		NL88INGB0008271178	INGBNL2A			False	
+276	Wehkamp Retail Group B.V.		Burgemeester Roelenweg 13	8021EV	ZWOLLE				27109571		www.wehkamp.nl			Burgemeester Roelenweg 13	8021EV	ZWOLLE	007414961B01		30						False	
+277	Schreuder Kantoormeubelen		Leemdijk 2d	9422CL	SMILDE				88056767		www.goedkoop-kantoor.nl			Leemdijk 2d	9422CL	SMILDE	864490124B01		30		NL31RABO0319350754	RABONL2U			False	
+278	Rose MP																		0						False	
+279	Otto MP																		0						False	
+280	Zwaluw61 MP																		0						False	
+281	Jan MP																		0						False	
+282	Tom MP																		0						False	
+283	Oscar Kuiken MP																		0						False	
+284	Janic MP																		0						False	
+285	Jan Kok MP																		0						False	
+286	Noord Nederlandse Reinigingsdienst B.V.		Het Helmhout 11	9206AZ	DRACHTEN				01079530		www.nnrd.nl			Het Helmhout 11	9206AZ	DRACHTEN	806530212B01		30		NL72INGB0664886485	INGBNL2A			False	
+287	MPJW MP																		0						False	
+288	W. van Wilpe MP																		0						False	
+289	Wesley MP																		0						False	
+290	Klever MP																		0						False	
+291	CDH MP																		0						False	
+292	Spouw MP																		0						False	
+293	Daniel Plomp MP																		0						False	
+294	Trip MP																		0						False	
+295	Rosan van der Pas MP																		0						False	
+296	P MP																		0						False	
+297	Gran MP																		0						False	
+298	Mira MP																		0						False	
+299	Marc Jacobs MP																		0						False	
+300	Rob MP																		0						False	
+301	jw van Dijk MP																		0						False	
+302	Gerben en Lineke MP																		0						False	
+303	Dorcas Assen																		0						False	
+304	Martijn Aartse MP																		0						False	
+305	JD MP																		0						False	
+306	Jeroen MP																		0						False	
+307	EMVE MP																		0						False	
+308	Reimann MP																		0						False	
+309	Marleen MP																		0						False	
+310	N van Dolderen																		0						False	
+311	Stefan MP																		0						False	
+312	Matthijs MP																		0						False	
+313	Chris de Vries MP																		0						False	
+314	Rina MP																		0						False	
+315	Aiki MP																		0						False	
+316	Frits MP																		0						False	
+317	Mike (buurman Afrikaweg)																		0						False	
+318	AliExpress																826439810B01		0						False	
+319	Liesbeth MP		Ter apelkanaaloost 65		Ter apelkanaal									Ter apelkanaaloost 65		Ter apelkanaal			0						False	
+320	Hans MP																		0						False	
+321	Meike MP																		0						False	
+322	Essent Retail Energie B.V.		Willemsplein 4	5211AK	'S-HERTOGENBOSCH				13041611		www.essent.nl			Willemsplein 4	5211AK	'S-HERTOGENBOSCH	807370447B01		30		NL15BNPA0227742397	BNPANL2A			False	
+323	LH MP																		0						False	
+324	Boloo B.V.		Prins Willem-Alexanderln 301	7311SW	APELDOORN				75993228		www.lusq.co			Prins Willem-Alexanderln 301	7311SW	APELDOORN	860470866B01		30						False	
+325	Nike																		30						False	
+326	Coolblue		Weena 690	3012CN	ROTTERDAM				24330087		www.coolblue.nl			Weena 690	3012CN	ROTTERDAM	810433941B01		30		NL50INGB0683251309	INGBNL2A			False	
+327	Kwantum		Borgstee 6		ASSEN				18027979					Borgstee 6	9403TV	ASSEN			30						False	
+328	autoparts 24																		30		DE94215201001000291052				False	
+329	Securitas Direct B.V.		Burgemeester Stramanweg 108f	1101AA	AMSTERDAM				17158925		www.securitas-direct.nl			Burgemeester Stramanweg 108f	1101AA	AMSTERDAM	812400720B01		30		NL60BNPA0227753518	BNPANL2A			False	
+330	v.o.f. kappen assen																		30						False	
+331	Asser Bowling Centrum Veldkamp		Groningerstraat 95	9402LA	ASSEN				56535082		www.bowleninassen.nl			Groningerstraat 95	9402LA	ASSEN			30						False	
+332	Top Gazon		Borgerderstraat 1a	9449PA	NOOITGEDACHT				04085453		www.topgazon.nl			Borgerderstraat 1a	9449PA	NOOITGEDACHT	817694523B01		30						False	
+333	Eye Hotel B.V.		Maliebaan 80a -3	3581CW	UTRECHT				62210297					Maliebaan 80a -3	3581CW	UTRECHT			30						False	
+334	Autoschade Service Assen		Amerikaweg 30	9407TK	ASSEN				68790783		www.autoschadeservice-assen.nl			Amerikaweg 30	9407TK	ASSEN			30		NL44RABO0117075256	RABONL2U			False	
+335	Jimmy B MP																		0						False	
+336	Photofilmlab MP																		0						False	
+337	Dijkstra MP																		0						False	
+338	Kevin MP																		0						False	
+339	Vlinder MP																		0						False	
+340	Kyra MP																		0						False	
+341	Christina JZF MP																		0						False	
+342	RS MP																		0						False	
+343	kevin MP																		0						False	
+344	Weber																		0						False	
+345	Doorstromers																		0						False	
+346	IT Stuffz																		0						False	
+347	Henk vd Werf																		0						False	
+348	AnalogueCAMBE																		0						False	
+349	Jan MP																		0						False	
+350	Onbekend1																		0						False	
+351	Willem MP																		0						False	
+352	J. Moest																		0						False	
+353	Fleur MP																		0						False	
+354	Alex Beukhof																		0						False	
+355	Milan MP																		0						False	
+356	Jay Amsterdam																		0						False	
+357	Bastian MP																		0						False	
+358	Erik Schulte MP																		0						False	
+359	Bracante & Vintage Barto MP																		0						False	
+360	Zendingswinkel Werkendam																		0						False	
+361	Aldi-Markt		Groningerstraat 340	9402LT	ASSEN				01048011					Groningerstraat 340	9402LT	ASSEN			30						False	
+362	Action Zuidlaren		Stationsweg 33		ZUIDLAREN				37112677					Stationsweg 33	9471GK	ZUIDLAREN	813233409B01		30						False	
+363	Gemeente Assen		Prins Bernhardstraat 1	9402AR	ASSEN				50788590		assen.nl			Prins Bernhardstraat 1	9402AR	ASSEN			30						False	
+364	Woontheater 'de Eclips'		Zendmastweg 18	9405CE	Assen				04041055		www.deeclips.nl			Zendmastweg 18	9405CE	Assen			30						False	
+365	Mega Flora		Kleuvenstee 33	9403LT	Assen				04027293					Kleuvenstee 33	9403LT	Assen			30						False	
+366	Repro Service Lemmen		A.H.G. Fokkerstraat 18d	9403AP	Assen				59584122		www.repro-rsl.nl			A.H.G. Fokkerstraat 18d	9403AP	Assen			30						False	
+367	United Parcel Service Nederland		Zandsteen 22	2132 MR	HOOFDDORP				34089270		www.ups.com			Zandsteen 22	2132 MR	HOOFDDORP			30						False	
+368	DeRappe.com		Korenmolen 65	9401DW	Assen				04076850		www.derappe.com			Korenmolen 65	9401DW	Assen	001303850B95		30		NL32RABO0304848654	RABONL2U			False	
+369	HEMA B.V.		Koopmansplein 1	9401EL	ASSEN				34215639					Koopmansplein 1	9401EL	ASSEN			30						False	
+370	NXT Dronte		Koornmarktpoort 1	8253 TD	Dronten									Koornmarktpoort 1	8253 TD	Dronten			30						False	
+371	Albert Heijn		Bremstraat 5	9404GA	ASSEN				35012085					Bremstraat 5	9404GA	ASSEN			30						False	
+372	Balkan Grill Restaurant		Groningerstraat 59	9401BJ	Assen				04033709		www.balkangrill.nl			Groningerstraat 59	9401BJ	Assen			30						False	
+373	flying tiger 		Vismarkt 16	9711 KS	Groningen									Vismarkt 16	9711 KS	Groningen			30						False	
+374	Pipoos Assen		Koopmansplein 16	9401EL	ASSEN				16086197					Koopmansplein 16	9401EL	ASSEN			30						False	
+375	JYSK B.V.		Borgstee 12b		ASSEN				34241425		www.jysk.nl			Borgstee 12b	9403TV	ASSEN			30						False	
+376	Kruidvat		Kleuvenstee 114	9403LS	ASSEN				31035585					Kleuvenstee 114	9403LS	ASSEN			30						False	
+377	Søstrene Grene Europe B.V.		Grote Markt 44	9711LW	GRONINGEN				67490484					Grote Markt 44	9711LW	GRONINGEN			30						False	
+378	Alex Aalders Bloemist		Nieuwe Huizen 7	9401JS	Assen				04080148					Nieuwe Huizen 7	9401JS	Assen			30						False	
+379	AH Oosterwolde		Stipeplein 14		Oosterwolde									Stipeplein 14		Oosterwolde			30						False	
+380	FedEx Express International B.V.		Taurusavenue 111	2132LS	Hoofddorp				65939859		fedex.com			Taurusavenue 111	2132LS	Hoofddorp			30						False	
+381	op de Brink		Apeldoornseweg 6	8075BN	Elspeet				73133442					Apeldoornseweg 6	8075BN	Elspeet	002267028B92		30						False	
+382	Dillewijn Zwapak		Middel Broekweg 29	2675KB	Honselersdijk				34216838					Middel Broekweg 29	2675KB	Honselersdijk	805356265B01		30		NL72RABO0375985018	RABONL2U			False	
+383	Hotel Mercure antwerpen City South		Desquinlei 94	2018	Anvers									Desquinlei 94	2018	Anvers			30		BE30001670923111				False	
+384	SVG Handelsmaatschappij B.V.		Laan van Verhof 3	2231BZ	Rijnsburg				89982096					Laan van Verhof 3	2231BZ	Rijnsburg			30		NL16RABO0380286424	RABONL2U			False	
+385	Gamma Bouwmarkt Oosterwolde		Veengang 8	8431NJ	OOSTERWOLDE				24234005					Veengang 8	8431NJ	OOSTERWOLDE			30						False	
+386	Action Service & Distributie B.V.		Perenmarkt 15	1681PG	Zwaagdijk-Oost				50969838		action.nl			Perenmarkt 15	1681PG	Zwaagdijk-Oost			30						False	
+387	TICA Aalsmeer B.V.		Randweg 155	1422ND	Uithoorn				34114889		tica.nl			Randweg 155	1422ND	Uithoorn	808383978B01		30		NL74INGB0007357981	INGBNL2A			False	
+388	CameraNU.nl		Het Spijk 8	8321WT	URK				39083060		www.cameranu.nl			Het Spijk 8	8321WT	URK	813480711B01		30		NL95RABO0177841540	RABONL2U			False	
+389	Ramirez Jambor																		0						False	
+390	Corendon amsterdam new-West		Aletta Jacobslaan 7	1066 BP	Amsterdam									Aletta Jacobslaan 7	1066 BP	Amsterdam			30						False	
+391	Diversen Marktplaats																		0						False	
+392	Shoppartners Beheer B.V.		Foxtrot 16	1704EH	Heerhugowaard				37086028					Foxtrot 16	1704EH	Heerhugowaard	819486978B01		30		NL66INGB0001082516	INGBNL2A			False	
+393	WMD Drinkwater B.V.		Lauwers 3	9405BL	ASSEN				67731910		www.wmd.nl			Lauwers 3	9405BL	ASSEN	003148348B01		30		NL58RABO0302899553	RABONL2U			False	
+394	TICA Ede B.V.		Wellensiekstraat 4	6718XZ	EDE				92723667		www.tica.nl			Wellensiekstraat 4	6718XZ	EDE	866152696B01		30		NL02INGB0106195972	INGBNL2A			False	
+395	Trimbach Dozen B.V.		Overikweg 3	5145PA	WAALWIJK				74326449		www.trimbachdozen.nl			Overikweg 3	5145PA	WAALWIJK	859856525B01		30		NL08INGB0006798703	INGBNL2A			False	
+396	We Love Deco B.V.		Pieter Zeemanweg 131	3316GZ	Dordrecht				66961610		partydeco.nl			Pieter Zeemanweg 131	3316GZ	Dordrecht	856771545B01		30						False	
+397	Smulders Deco		Ringbaan-West 248	5038NX	Tilburg				17260673		www.smuldersdeco.nl			Ringbaan-West 248	5038NX	Tilburg	001780683B72		30		NL90INGB0007619884	INGBNL2A			False	
+398	EcoBright B.V.		Dr Huber Noodtstraat 89	7001DV	Doetinchem				83314970		ecobright.be			Dr Huber Noodtstraat 89	7001DV	Doetinchem	862825908B01		30						False	
+399	Hucil Products B.V.		Industriepark 2i	9351PA	LEEK				93694555		www.hucil-chemicals.nl			Industriepark 2i	9351PA	LEEK	866495708B01		30						False	
+400	Amazon																		30						False	
+401	Amazon EU S.à r.l., Dutch Branch		Mr. Treublaan 7	1097DP	Amsterdam									Mr. Treublaan 7	1097DP	Amsterdam			30						False	
+402	7Digits B.V.		Boezemweg 21	2641KG	Pijnacker				59469188		7dingdongpt.com			Boezemweg 21	2641KG	Pijnacker	853506383B01		30		NL86RABO0137363117	RABONL2U			False	
+403	Onlinekabelshop B.V.		Vezelbaan 15	2352DM	LEIDERDORP				78437830					Vezelbaan 15	2352DM	LEIDERDORP	861396200B01		30						False	
+404	YourSurprise.com B.V.		Gouwepoort 3	4301RZ	Zierikzee				22057264		yoursurprise.be			Gouwepoort 3	4301RZ	Zierikzee	820845437B01		30		NL36RABO0160595711	RABONL2U			False	
+405	The Online Factory		Mangaanstraat 25	2544DV	's-Gravenhage				27304447		www.theonlinefactory.nl			Mangaanstraat 25	2544DV	's-Gravenhage	818358129B01		30		NL98RABO0179125281	RABONL2U			False	
+406	De Discounter B.V.		Adriaen Brouwerstraat 15	3042AA	Rotterdam				63617358		shirt-discounter.nl			Adriaen Brouwerstraat 15	3042AA	Rotterdam	862782260B01		30		NL94ABNA0213062666	ABNANL2A			False	
+407	Action Oosterwolde Fr		Stationsstraat 3	8431ET	OOSTERWOLDE				37112677		www.action.nl			Stationsstraat 3	8431ET	OOSTERWOLDE			30						False	
+408	V.O.F. MyCards.nl		Kerkewijk 65	3901EC	VEENENDAAL				58249370		www.mycards.nl			Kerkewijk 65	3901EC	VEENENDAAL	852945796B01		30						False	
+409	TEMU																		30						False	
+410	C. vd Hoorn																		0						False	
+411	Dirk Emmen																		0						False	
+412	Dejavu																		0						False	
+413	Bruce Ede																		0						False	
+414	bn MP																		0						False	
+415	Lamp & licht																		0						False	
+416	Elpirenko MP																		0						False	
+417	niels heerenveen																		0						False	
+418	NMD MP																		0						False	
+419	Gerrit MP																		0						False	
+420	CS MP																		0						False	
+421	Gerrit Jan																		0						False	
+422	The Beautiful Bride Shop		Olivier van Noortlaan 108	3133AT	VLAARDINGEN				80045766		www.marianneroza.nl			Olivier van Noortlaan 108	3133AT	VLAARDINGEN			30						False	
+423	Leen Bakker		Protonstraat 12e	9743AL	GRONINGEN				18118971					Protonstraat 12e	9743AL	GRONINGEN			30						False	
+424	Gamma Bouwmarkt Assen		Stelmakerstraat 32	9403VB	ASSEN				24234005					Stelmakerstraat 32	9403VB	ASSEN			30						False	
+425	Leen Bakker		Protonstraat 12e	9743AL	GRONINGEN				18118971					Protonstraat 12e	9743AL	GRONINGEN			30						False	
+426	ba 3 SILO CL																		30						False	
+427	Tango Overcingellaan Assen		Overcingellaan 9	9401LA	ASSEN				24025263					Overcingellaan 9	9401LA	ASSEN	001250590B01		30						False	
+428	esso express Oosterwolde								27068921								001784249B01		30						False	
+429	Snel Tank Heerde		Zwarteweg 2	8181PD	HEERDE				08012879					Zwarteweg 2	8181PD	HEERDE	004311371B01		30						False	
+430	avia xpress Bovensmilde																		30						False	
+431	Tankeasy Aalsmeer		Brazilielaan 9A	1432DG 	Aalsmeer									Brazilielaan 9A	1432DG 	Aalsmeer			30						False	
+432	Avia Assen		Winklerprinsstraat 26	9403 AZ	Assen									Winklerprinsstraat 26	9403 AZ	Assen			30						False	
+433	Kwantum		Borgstee 6		ASSEN				18027979					Borgstee 6	9403TV	ASSEN			30						False	
+434	De Beren B.V.		Lichtboei 12	1186DE	AMSTELVEEN				33185570					Lichtboei 12	1186DE	AMSTELVEEN			30						False	
+435	Pizzeria Ristorante Bella Italia B.V.		Markt 4	9401GS	ASSEN				55001505					Markt 4	9401GS	ASSEN			30						False	
+436	De Online Binnenstad B.V.		Gedempte Singel 11	9401JM	ASSEN				67465064					Gedempte Singel 11	9401JM	ASSEN	857007774B01		30		NL14ABNA0505058065	ABNANL2A			False	
+437	Vincent																		0						False	
+438	Helma Scholten																		0						False	
+439	Restore																		0						False	
+440	Eltjo's Vintage																		0						False	
+441	Zeekanter																		0						False	
+442	Diana																		0						False	
+443	Ronald van Grinsven																		0						False	
+444	Alex Terziev																		0						False	
+445	Nanita																		0						False	
+446	Jongl																		0						False	
+447	Evadonk																		0						False	
+448	Groothandel Meppel																		0						False	
+449	Reichelt		Elektronikring 1		Sande									Elektronikring 1		Sande			30						False	
+450	dslrbooth																		30						False	
+451	Starstills																		30						False	
+452	Verweij Nijmegen B.V.		Plein 1944 145	6511JH	Nijmegen				09153102		fotoverweij.nl			Plein 1944 145	6511JH	Nijmegen	818056241B01		30		NL83RABO0107125846	RABONL2U			False	
+453	De Kaaswaag		Gedempte Singel 24	9401JP	Assen				04031883		www.dekaaswaag.nl			Gedempte Singel 24	9401JP	Assen	008595677B01		30		NL77RABO0303509244	RABONL2U			False	
+454	brightmania.nl		Blaak 16	3011 TA	Rotterdam									Blaak 16	3011 TA	Rotterdam			30						False	
+455	Vida XL B.V.		Mary Kingsleystraat 1	5928SK	Venlo				52904822		vidaxl.nl			Mary Kingsleystraat 1	5928SK	Venlo			30						False	
+456	magical party		Afrikaweg 53	9407 TP	Assen									Afrikaweg 53	9407 TP	Assen			30						False	
+457	Drogist.nl B.V.		Cookweg 14	4462HE	Goes				71985832					Cookweg 14	4462HE	Goes	825756595B04		30						False	
+458	subtel GMBH			13053	Berlin										13053	Berlin			30		NL84RABO0126630879	RABONL2U			False	
+459	Joel Klok		Oranje 30		Oranje									Oranje 30	9416 TC	Oranje	003216803B48		30		NL13RABO0313718385	RABONL2U			False	
+460	Linda MP																		0						False	totaal: €63,50/aantal: 
+461	R. Marktplaats																		30						False	
+462	TRAMBAAN8		Trambaan 8	8431WB	Oosterwolde Fr				76444406					Trambaan 8	8431WB	Oosterwolde Fr			30						False	
+463	Messchenveld tankstation		peelo 22a		ASSEN				68555555					peelo 22a	9403TZ	ASSEN			30						False	
+464	Trendhopper Assen		Koopmansplein 16	9401 EL	Assen									Koopmansplein 16	9401 EL	Assen			30						False	
+465	Søstrene Grene Europe B.V.		Grote Markt 44	9711LW	GRONINGEN				67490484					Grote Markt 44	9711LW	GRONINGEN			30						False	
+466	coco sebas		Koopmansplein		Assen									Koopmansplein		Assen			30						False	
+467	Boekhandel Bruna		Kruisstraat 7	9401JJ	Assen				04032325		www.doppio-espresso.nl			Kruisstraat 7	9401JJ	Assen			30						False	
+468	Leen Bakker		Sontplein 3a	9723BZ	GRONINGEN				18118971					Sontplein 3a	9723BZ	GRONINGEN			30						False	
+469	Stichting Mamamini		Damsterdiep 307	9713EH	Groningen				02048399		mamamini.nl			Damsterdiep 307	9713EH	Groningen			30						False	
+470	GoudGoed		Damsterdiep 269	9713EE	GRONINGEN				02060268					Damsterdiep 269	9713EE	GRONINGEN			30						False	
+471	Karwei Assen		Zeilmakerstraat 16	9403VA	ASSEN				31039633					Zeilmakerstraat 16	9403VA	ASSEN			30						False	
+472	Leen Bakker		Sontplein 3a	9723BZ	GRONINGEN				18118971					Sontplein 3a	9723BZ	GRONINGEN			30						False	
+473	Lidl		Kleuvenstee 8	9403LR	ASSEN				32061446					Kleuvenstee 8	9403LR	ASSEN			30						False	
+474	The Online Retail Company B.V.		Hoofdstraat 190	9601EM	Hoogezand				81436947					Hoofdstraat 190	9601EM	Hoogezand	862091147B01		30		NL83RABO0138557144	RABONL2U			False	
+475	Best for Interiors VOF		Telgterweg 6	3881LM	PUTTEN				84823267		www.bestforinteriors.nl			Telgterweg 6	3881LM	PUTTEN	863392143B01		30		NL81RABO0359837557	RABONL2U			False	
+476	villa hoera		Kanaaldijk-Noord 111	5642JA	Eindhoven				68455577					Kanaaldijk-Noord 111	5642JA	Eindhoven	857452320B01		30						False	
+477	Candle Cocktail		Zadelmaker 2	3335VP	ZWIJNDRECHT				91650984					Zadelmaker 2	3335VP	ZWIJNDRECHT	865724817B01		30						False	
+478	Gebr. Barelds		de Wouden 112	9405HM	ASSEN				90813545		www.gebrbarelds.nl			de Wouden 112	9405HM	ASSEN	865461673B01		30		NL83ABNA0123787459	ABNANL2A			False	
+479	Lichtletterverhuur Groningen		Kerspel 1a	9951VC	WINSUM				80905064		www.lichtletterverhuurgroningen.nl			Kerspel 1a	9951VC	WINSUM	866409464B01		30		NL30KNAB0602568021	KNABNL2H			False	
+480	Marie-Stella-Maris Care B.V.		Generaal Vetterstraat 75	1059BT	Amsterdam				59924756		marie-stella-maris.com			Generaal Vetterstraat 75	1059BT	Amsterdam	853696913B01		30		NL49RABO0357757483	RABONL2U			False	
+481	E.K. Gordijnen Atelier		Bergweg 3	8431GA	Oosterwolde Fr				56934416		www.agagordijnenatelier.nl			Bergweg 3	8431GA	Oosterwolde Fr	001177490B10		30		NL38RABO0371936462	RABONL2U			False	
+482	sfeermetlicht.nl		De Nieuwe Erven 3	5431NV	CUIJK				87033194		www.sfeermetlicht.nl			De Nieuwe Erven 3	5431NV	CUIJK	004348908B80		30		NL98RABO0199438730	RABONL2U			False	
+483	Peter Print B.V.		Lubeckweg 2	9723HE	GRONINGEN				57983046					Lubeckweg 2	9723HE	GRONINGEN	852821311B01		30		NL91RABO0301214360	RABONL2U			False	
+484	Nimara B.V.		Harlingerstraatweg 83	8913AK	LEEUWARDEN				68191146					Harlingerstraatweg 83	8913AK	LEEUWARDEN			30						False	
+485	Deco-online.be				Wijnegem											Wijnegem			30						False	
+486	B.G.A.		De Malthezer 13	5735JH	AARLE-RIXTEL				17181948		www.bga-vof.nl			De Malthezer 13	5735JH	AARLE-RIXTEL			30						False	
+487	Mundo Recreatie B.V.		Oostpolderweg 15	4413NN	Krabbendijke				62140868		aerobed.nl			Oostpolderweg 15	4413NN	Krabbendijke			30						False	
+488	ilovespeelgoed B.V.		Gietijzerstraat 56	3534AV	Utrecht				75175819		ilovespeelgoed.nl			Gietijzerstraat 56	3534AV	Utrecht			30						False	
+489	Cakes By Karin		Koldakker 44	9407BN	ASSEN				78603048		www.cakesbykarin.nl			Koldakker 44	9407BN	ASSEN	003350904B13		30		NL89INGB0006612751	INGBNL2A			False	
+490	Mondkapjeswinkel B.V.		Veluwemeer 16	2729PC	ZOETERMEER				78248752		www.mondkapjeswinkel.nl			Veluwemeer 16	2729PC	ZOETERMEER	861317646B01		30		NL39INGB0631231668	INGBNL2A			False	
+491	JYSK B.V.		Borgstee 12b	9403TV	ASSEN				34241425					Borgstee 12b	9403TV	ASSEN			30						False	
+492	Leen Bakker		Borgstee 8	9403TV	ASSEN				18118971					Borgstee 8	9403TV	ASSEN			30						False	
+493	mcdonald's Stadskanaal																		30						False	
+494	Picnic B.V.		Nieuwmarkt 4	1012CR	Amsterdam				55801730					Nieuwmarkt 4	1012CR	Amsterdam			30						False	
+495	Henk MP OPLICHTER																		0						False	
+496	tankstation Olijve		Hoofdweg 233		Bovensmilde									Hoofdweg 233		Bovensmilde			30						False	
+497	Shell Industrieweg Assen		Industrieweg 46a	9403AB	ASSEN				74019422					Industrieweg 46a	9403AB	ASSEN			30						False	
+498	Snack en Broodjeshuis Jongman		Kleuvenstee 72	9403LS	Assen				04050094		www.snackenbroodjeshuisjongman.nl			Kleuvenstee 72	9403LS	Assen			30						False	
+499	Woho B.V.		De Steenberg 8	7678CN	GEESTEREN				71633219		www.wohi.nl			De Steenberg 8	7678CN	GEESTEREN	858790567B01		30						False	
+500	Saarloos																		0						False	
+501	JanD																		0						False	
+502	Peter																		0						False	
+503	Hemsens																		0						False	
+504	Bets																		0						False	
+505	David Slonimski																		0						False	
+506	Jan MP																		0						False	
+507	Joen																		0						False	
+508	Damian																		0						False	
+509	Marcel MP																		0						False	
+510	Meneer M																		0						False	
+511	H.S																		0						False	
+512	Folkert																		0						False	
+513	MKB Schraven																		0						False	
+514	J. Batavus																		0						False	
+515	Meijland																		0						False	
+516	W. van Bokhoven																		0						False	
+517	Aram																		0						False	
+518	Aram Reparatie																		0						False	
+519	NWK																		0						False	
+520	Rob																		0						False	
+521	Abel																		0						False	
+522	Laura's super store																		0						False	
+523	Jens																		0						False	
+524	JBL																		0						False	
+525	T.K.N.O																		0						False	
+526	K.W.																		0						False	
+527	Pascal KA																		0						False	
+528	Station master																		0						False	
+529	Mtih																		0						False	
+530	Vincent Consignatie																		0						False	
+531	John																		0						False	
+532	Mike / B. Zarki																		0						False	
+533	City Hotel De Jonge		Brinkstraat 85	9401HZ	Assen									Brinkstraat 85	9401HZ	Assen			30						False	
+534	Tuindorado Shop		Stipepassage 8	8431WD	OOSTERWOLDE				01105608					Stipepassage 8	8431WD	OOSTERWOLDE			30						False	
+535	Nouchie		Stationsweg 23	9471GK	ZUIDLAREN				81472994		www.nouchie.nl			Stationsweg 23	9471GK	ZUIDLAREN			30						False	
+536	Albert Heijn Hillenga		Scharmbarg 107	9407EC	Assen									Scharmbarg 107	9407EC	Assen			30						False	
+537	Argos Hoogersmilde		Rijksweg 171	9423PC	Hoogersmilde									Rijksweg 171	9423PC	Hoogersmilde			30						False	
+538	De Heeren van 17		Zandstraat 1	3901CH	Veenendaal				70823200		www.deheerenvan17.nl			Zandstraat 1	3901CH	Veenendaal			30		NL40RABO0369487176	RABONL2U			False	
+539	JYSK		Atoomweg 2-4	9743AK	GRONINGEN				34241425		www.jysk.nl			Atoomweg 2-4	9743AK	GRONINGEN	815283726B01		30						False	
+540	TotalEnergies		Peelo 22A	9403 TZ	Assen									Peelo 22A	9403 TZ	Assen			30						False	
+541	BP De Panjerd		Rijksweg A28 3	7924PV	VEENINGEN				24489071		www.bp.nl			Rijksweg A28 3	7924PV	VEENINGEN			30						False	
+542	Yume Assen B.V.		Veemarktplein 3	9401WD	ASSEN				57170479					Veemarktplein 3	9401WD	ASSEN			30						False	
+543	Gamma Bouwmarkt Zwolle		Rieteweg 18	8041AK	ZWOLLE				24234005					Rieteweg 18	8041AK	ZWOLLE			30						False	
+544	Liff Assen B.V.		Brink 14	9401HS	ASSEN				54331226					Brink 14	9401HS	ASSEN			30						False	
+545	Hof van Saksen B.V.		Veldweg 22	9449PW	Nooitgedacht				04068823					Veldweg 22	9449PW	Nooitgedacht			30						False	
+546	De Veenbloem B.V.		Veenhoopsweg 253	9422AB	Smilde				58709630					Veenhoopsweg 253	9422AB	Smilde			30						False	
+547	HP Nederland B.V.		Krijgsman 75	1186DR	Amstelveen				62544721		completewerkplek.nl			Krijgsman 75	1186DR	Amstelveen			30						False	
+548	compridis		 Koraalrood 153	2718 SB 	Zoetermeer									 Koraalrood 153	2718 SB 	Zoetermeer			30						False	
+549	Henk MP																		0						False	
+550	Verfplaza B.V.		Asselbergsstraat 8	4815AB	BREDA				84653469					Asselbergsstraat 8	4815AB	BREDA			30		NL09INGB0674864263	INGBNL2A			False	
+551	HEMA Oosterwolde		Stationsstraat 26	8431EV	Oosterwolde									Stationsstraat 26	8431EV	Oosterwolde			30						False	
+552	digitale-camera-accessoires.nl																		30						False	
+553	LalaShops.nl		Kessenichstraat 7	6004TP	Weert				71400109		www.lalashops.nl			Kessenichstraat 7	6004TP	Weert			30						False	
+554	Blue Media		Afrikaweg 33a	9407TL	Assen				04071454		www.blue-media.nl			Afrikaweg 33a	9407TL	Assen			30						False	
+555	Postadres Nederland		Johan de Wittlaan 7	2517JR	'S-GRAVENHAGE				71864512					Johan de Wittlaan 7	2517JR	'S-GRAVENHAGE	003794995B79		30		NL65ABNA0102432554	ABNANL2A			False	
+556	grenspostadres.nl		Wildervanksterdallen 65	9648TC	Wildervank				72723475					Wildervanksterdallen 65	9648TC	Wildervank	003794995B79		30		NL65ABNA0102432554	ABNANL2A			False	
+557	Slingershop.nl	Tino	Vosboerweg 111	7556BT	HENGELO				52107582		www.trino.shop		Tino	Vosboerweg 111	7556BT	HENGELO	001748412B93		30						False	
+558	Kom je springen		Industrieweg 12c	8426 AB	Appelscha									Industrieweg 12c	8426 AB	Appelscha			30						False	
+559	Bake My Day Groningen		Nieuwe Ebbingestraat 6	9712NK	GRONINGEN				62968335		www.bakemydaygroningen.nl			Nieuwe Ebbingestraat 6	9712NK	GRONINGEN	002176820B74		30		NL53KNAB0775050970	KNABNL2H			False	
+560	BGA Group AB		Utmarksvägen 2	802 91 Gävle	Zweden									Utmarksvägen 2	802 91 Gävle	Zweden			30						False	
+561	Hip Verhuur		Meint Veningastraat 25	9601KC	Hoogezand				93174462		hipverhuur.nl			Meint Veningastraat 25	9601KC	Hoogezand	005003657B89		30		NL78RABO0376785063	RABONL2U			False	
+562	Springkussenverhuur Oosterwolde		Boskamp 13	8431PS	Oosterwolde				96709456					Boskamp 13	8431PS	Oosterwolde			30		NL96RABO0110630416	RABONL2U			False	
+563	JK Attractieverhuur		De Kranse 11	8748GK	WITMARSUM				75522284		www.jkattractieverhuur.nl			De Kranse 11	8748GK	WITMARSUM	860311776B01		30		NL44RABO0308785959	RABONL2U			False	
+564	EDV Online B.V.		Inductorstraat 9	3903KA	Veenendaal				69004005		bistrotafel.nl			Inductorstraat 9	3903KA	Veenendaal	857686410B01		30		NL55SNSB0957094191	SNSBNL2A			False	
+565	Hermie online BV		Industrielaan 5	9900 Eeklo	Belgie									Industrielaan 5	9900 Eeklo	Belgie			30						False	
+566	Het glazen muiltje 		Kalmoes 8	9411 cm	Beilen									Kalmoes 8	9411 cm	Beilen	005251502B96		30		NL40RABO0310129869	RABONL2U			False	
+567	Meta platforms		1601 Willow Road, Menlo Park	 CA 94025	Verenigde Staten									1601 Willow Road, Menlo Park	 CA 94025	Verenigde Staten			30						False	
+568	Wim																		0						False	
+569	Heidi																		0						False	
+570	PIET																		0						False	
+571	ZAT Handel																		0						False	
+572	BWR																		0						False	
+573	OK Donkerbroek Express		Balkweg 1	8435VP	DONKERBROEK				64607712		https://www.oliecentrale.nl			Balkweg 1	8435VP	DONKERBROEK			30						False	
+574	Laif & Nuver B.V.		Rodeweeshuisstraat 7	9712ET	Groningen				77760697					Rodeweeshuisstraat 7	9712ET	Groningen			30						False	
+575	For Your Taste Only		Maasstraat 118	1078HN	Amsterdam				58821600		www.onlybio.nl			Maasstraat 118	1078HN	Amsterdam			30						False	
+576	Herberg De Fazant		Hoofdweg 118	9484TB	OUDEMOLEN DR				64937356		www.herbergdefazant.nl			Hoofdweg 118	9484TB	OUDEMOLEN DR			30						False	
+577	Poiesz Supermarkten B.V.		Paganinilaan 29	9402VH	ASSEN				01100780					Paganinilaan 29	9402VH	ASSEN			30						False	
+578	Foto Service Baron		Groningerstraat 4	9401BK	Assen				04031266		www.digitalefoto.nl			Groningerstraat 4	9401BK	Assen			30						False	
+579	De Snuusterij		Vaart Zz 51	8426AE	Appelscha				66394295		www.desnuusterij.nl			Vaart Zz 51	8426AE	Appelscha			30						False	
+580	Bever		Groningerstraat 9	9401BG	ASSEN				27091280					Groningerstraat 9	9401BG	ASSEN			30						False	
+581	BP Tankstation Balken Kolk		Balkenweg 2	9405CC	ASSEN				02053533		www.bp-honderd.nl			Balkenweg 2	9405CC	ASSEN			30						False	
+582	OK Donkerbroek Express		Balkweg 1	8435VP	DONKERBROEK				64607712		https://www.oliecentrale.nl			Balkweg 1	8435VP	DONKERBROEK			30						False	
+583	Tinq Haulerwijk		Oosterwoldseweg 7	8433 PS	Haulerwijk									Oosterwoldseweg 7	8433 PS	Haulerwijk			30						False	
+584	Odido Shop		Mercuriusplein 102	9401DM	ASSEN				24351615		www.t-mobile.nl			Mercuriusplein 102	9401DM	ASSEN			30						False	
+585	Emiel Pit																		0						False	
+586	Lummen																		0						False	
+587	Mike																		0						False	
+588	Roeltje																		0						False	
+589	Eric																		0						False	
+590	Schouten/Siebel																		30						False	
+591	Tim MP																		30						False	
+592	Grietje																		0						False	
+593	Hermann Blumell																		0						False	

@@ -1,0 +1,120 @@
+Design and build a Purchase Orders page for an internal operations hub that manages supplier purchases for a webshop.
+The goal is to create a powerful interface for managing, creating, and tracking purchase orders with suppliers.
+
+Use React + Tailwind + shadcn/ui, and design it with a clean, dashboard-like layout consistent with the rest of the hub.
+
+🧩 Core Sections:
+
+Purchase Orders Overview
+
+Table or grid view showing:
+
+PO Number
+
+Supplier Name
+
+Order Date
+
+Status (Draft / Ordered / Received / Canceled)
+
+Expected Delivery Date
+
+Total Amount
+
+Created By / Assigned Buyer
+
+Add filters and sorting for supplier, date, status, and total amount.
+
+Include inline quick actions (mark as received, edit, delete).
+
+Purchase Order Details (Modal or Drawer)
+
+Supplier information (contact name, email, phone)
+
+Ordered items list:
+
+SKU / Product name
+
+Quantity
+
+Unit price
+
+Subtotal
+
+Delivery information:
+
+Expected vs. received date
+
+Received by
+
+File uploads (invoice, delivery note)
+
+Activity history (status changes)
+
+Internal notes
+
+Button: Mark as Received
+
+Create New Purchase Order Form
+
+Fields:
+
+Supplier (dropdown)
+
+Add items (search by SKU or add manually)
+
+Quantity & unit price
+
+Expected delivery date
+
+Internal notes
+
+Optional: link to case or order
+
+Automatically generate PO number.
+
+Status Management
+
+Statuses: Draft / Sent / Awaiting delivery / Partially received / Fully received / Canceled
+
+Visual timeline for status history (optional).
+
+Analytics Section
+
+Total purchase cost per supplier
+
+Outstanding or overdue orders
+
+Orders received this week
+
+Monthly spend chart
+
+Filter presets for quick access.
+
+Roles & Permissions
+
+Admin: full access
+
+Buyer: create and edit
+
+Viewer: read-only
+
+UI/UX Enhancements
+
+Color coding by status
+
+Floating “+ New Purchase Order” button
+
+Quick search with keyboard shortcuts
+
+Responsive design for desktop and mobile
+
+Bonus Features
+
+“Reorder from supplier” shortcut
+
+Generate PDF or email purchase order
+
+Invoice matching
+
+Automatic stock updates when marked as received
