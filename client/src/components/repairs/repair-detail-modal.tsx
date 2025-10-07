@@ -68,7 +68,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const updateStatusMutation = useMutation({
     mutationFn: async (data: { status: string }) => {
       if (!repair) return;
-      const res = await apiRequest('PATCH', `/api/repairs/${repair.id}`, data);
+      const res = await apiRequest('PATCH', `/api/repairs/${currentRepair.id}`, data);
       return await res.json();
     },
     onSuccess: (updatedRepair) => {
@@ -91,7 +91,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
         formData.append('files', file);
       });
       // Use fetch directly for FormData
-      const res = await fetch(`/api/repairs/${repair.id}/upload`, {
+      const res = await fetch(`/api/repairs/${currentRepair.id}/upload`, {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -115,7 +115,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
       const res = await apiRequest('POST', '/api/activities', {
         type: 'note_added',
         description: noteText,
-        metadata: { entityType: 'repair', entityId: repair.id },
+        metadata: { entityType: 'repair', entityId: currentRepair.id },
       });
       return await res.json();
     },
@@ -185,9 +185,9 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     }
   };
 
-  const partsUsed = Array.isArray(repair.partsUsed) ? repair.partsUsed : [];
-  const attachments = Array.isArray(repair.attachments) ? repair.attachments : [];
-  const photos = Array.isArray(repair.photos) ? repair.photos : [];
+  const partsUsed = Array.isArray(currentRepair.partsUsed) ? currentRepair.partsUsed : [];
+  const attachments = Array.isArray(currentRepair.attachments) ? currentRepair.attachments : [];
+  const photos = Array.isArray(currentRepair.photos) ? currentRepair.photos : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -195,16 +195,16 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div>
-              <DialogTitle>Reparatie #{repair.id.slice(0, 8)}</DialogTitle>
-              <p className="text-sm text-muted-foreground mt-1">{repair.title}</p>
+              <DialogTitle>Reparatie #{currentRepair.id.slice(0, 8)}</DialogTitle>
+              <p className="text-sm text-muted-foreground mt-1">{currentRepair.title}</p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className={getStatusColor(repair.status)}>
-                {getStatusLabel(repair.status)}
+              <Badge variant="secondary" className={getStatusColor(currentRepair.status)}>
+                {getStatusLabel(currentRepair.status)}
               </Badge>
-              {repair.slaDeadline && 
-               !['completed', 'returned', 'canceled'].includes(repair.status) && 
-               isPast(new Date(repair.slaDeadline)) && (
+              {currentRepair.slaDeadline && 
+               !['completed', 'returned', 'canceled'].includes(currentRepair.status) && 
+               isPast(new Date(currentRepair.slaDeadline)) && (
                 <div className="flex items-center gap-1 text-destructive" data-testid="indicator-overdue">
                   <AlertTriangle className="h-4 w-4" />
                   <span className="text-xs font-medium">Te laat</span>
@@ -240,26 +240,26 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="text-sm font-medium">Product</div>
-                    <div className="text-sm text-muted-foreground">{repair.productName || repair.title}</div>
-                    {repair.productSku && (
-                      <div className="text-xs text-muted-foreground">SKU: {repair.productSku}</div>
+                    <div className="text-sm text-muted-foreground">{currentRepair.productName || currentRepair.title}</div>
+                    {currentRepair.productSku && (
+                      <div className="text-xs text-muted-foreground">SKU: {currentRepair.productSku}</div>
                     )}
                   </div>
                   <div>
                     <div className="text-sm font-medium">Probleem Categorie</div>
-                    <div className="text-sm text-muted-foreground">{repair.issueCategory || '-'}</div>
+                    <div className="text-sm text-muted-foreground">{currentRepair.issueCategory || '-'}</div>
                   </div>
                   <div>
                     <div className="text-sm font-medium">Technicus</div>
-                    <div className="text-sm text-muted-foreground">{getTechnicianName(repair.assignedUserId)}</div>
+                    <div className="text-sm text-muted-foreground">{getTechnicianName(currentRepair.assignedUserId)}</div>
                   </div>
                   <div>
                     <div className="text-sm font-medium">Prioriteit</div>
                     <div className="text-sm">
                       <Badge variant="outline">
-                        {repair.priority === 'urgent' ? 'Urgent' : 
-                         repair.priority === 'high' ? 'Hoog' : 
-                         repair.priority === 'medium' ? 'Gemiddeld' : 'Laag'}
+                        {currentRepair.priority === 'urgent' ? 'Urgent' : 
+                         currentRepair.priority === 'high' ? 'Hoog' : 
+                         currentRepair.priority === 'medium' ? 'Gemiddeld' : 'Laag'}
                       </Badge>
                     </div>
                   </div>
@@ -267,7 +267,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
                 <div>
                   <div className="text-sm font-medium">Beschrijving</div>
-                  <div className="text-sm text-muted-foreground mt-1">{repair.description || '-'}</div>
+                  <div className="text-sm text-muted-foreground mt-1">{currentRepair.description || '-'}</div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -277,7 +277,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                       Ontvangen op
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {repair.createdAt ? format(new Date(repair.createdAt), "d MMMM yyyy", { locale: nl }) : '-'}
+                      {currentRepair.createdAt ? format(new Date(currentRepair.createdAt), "d MMMM yyyy", { locale: nl }) : '-'}
                     </div>
                   </div>
                   <div>
@@ -286,7 +286,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                       Laatst bijgewerkt
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {repair.updatedAt ? format(new Date(repair.updatedAt), "d MMMM yyyy HH:mm", { locale: nl }) : '-'}
+                      {currentRepair.updatedAt ? format(new Date(currentRepair.updatedAt), "d MMMM yyyy HH:mm", { locale: nl }) : '-'}
                     </div>
                   </div>
                 </div>
@@ -333,7 +333,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               </CardContent>
             </Card>
 
-            {(repair.customerId || repair.orderId) && (
+            {(currentRepair.customerId || currentRepair.orderId) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
@@ -342,16 +342,16 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {repair.customerId && (
+                  {currentRepair.customerId && (
                     <div>
                       <div className="text-sm font-medium">Klant ID</div>
-                      <div className="text-sm text-muted-foreground font-mono">#{repair.customerId.slice(0, 8)}</div>
+                      <div className="text-sm text-muted-foreground font-mono">#{currentRepair.customerId.slice(0, 8)}</div>
                     </div>
                   )}
-                  {repair.orderId && (
+                  {currentRepair.orderId && (
                     <div>
                       <div className="text-sm font-medium">Order ID</div>
-                      <div className="text-sm text-muted-foreground font-mono">#{repair.orderId.slice(0, 8)}</div>
+                      <div className="text-sm text-muted-foreground font-mono">#{currentRepair.orderId.slice(0, 8)}</div>
                     </div>
                   )}
                 </CardContent>
@@ -394,7 +394,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               </CardContent>
             </Card>
 
-            {repair.estimatedCost && (
+            {currentRepair.estimatedCost && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
@@ -405,7 +405,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                 <CardContent>
                   <div className="flex justify-between items-center">
                     <div className="text-sm font-medium">Geschatte kosten</div>
-                    <div className="text-lg font-bold">€{(repair.estimatedCost / 100).toFixed(2)}</div>
+                    <div className="text-lg font-bold">€{(currentRepair.estimatedCost / 100).toFixed(2)}</div>
                   </div>
                 </CardContent>
               </Card>
