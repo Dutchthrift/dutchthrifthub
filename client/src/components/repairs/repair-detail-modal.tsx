@@ -283,26 +283,31 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                 </div>
 
                 <div>
-                  <div className="text-sm font-medium mb-2">Status bijwerken</div>
-                  <Select
-                    value={repair.status}
-                    onValueChange={(value) => updateStatusMutation.mutate({ status: value })}
-                    data-testid="select-status"
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">Nieuw</SelectItem>
-                      <SelectItem value="diagnosing">Diagnose</SelectItem>
-                      <SelectItem value="waiting_parts">Wacht op onderdelen</SelectItem>
-                      <SelectItem value="repair_in_progress">In reparatie</SelectItem>
-                      <SelectItem value="quality_check">Kwaliteitscontrole</SelectItem>
-                      <SelectItem value="completed">Voltooid</SelectItem>
-                      <SelectItem value="returned">Geretourneerd</SelectItem>
-                      <SelectItem value="canceled">Geannuleerd</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="text-sm font-medium mb-3">Status bijwerken</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: 'new', label: 'Nieuw' },
+                      { value: 'diagnosing', label: 'Diagnose' },
+                      { value: 'waiting_parts', label: 'Wacht op onderdelen' },
+                      { value: 'repair_in_progress', label: 'In reparatie' },
+                      { value: 'quality_check', label: 'Kwaliteitscontrole' },
+                      { value: 'completed', label: 'Voltooid' },
+                      { value: 'returned', label: 'Geretourneerd' },
+                      { value: 'canceled', label: 'Geannuleerd' },
+                    ].map((status) => (
+                      <Button
+                        key={status.value}
+                        variant={repair.status === status.value ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => updateStatusMutation.mutate({ status: status.value })}
+                        disabled={updateStatusMutation.isPending}
+                        className={repair.status === status.value ? "" : "hover:bg-accent"}
+                        data-testid={`button-status-${status.value}`}
+                      >
+                        {status.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
