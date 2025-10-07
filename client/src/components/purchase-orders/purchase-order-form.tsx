@@ -169,20 +169,48 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Leverancier</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-supplier">
-                          <SelectValue placeholder="Selecteer leverancier" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {suppliers.map((supplier) => (
-                          <SelectItem key={supplier.id} value={supplier.id}>
-                            {supplier.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <Input
+                        list="suppliers-list"
+                        placeholder="Zoek leverancier op code of naam..."
+                        value={
+                          field.value
+                            ? suppliers.find(s => s.id === field.value)
+                                ? `${suppliers.find(s => s.id === field.value)?.supplierCode} - ${suppliers.find(s => s.id === field.value)?.name}`
+                                : ''
+                            : ''
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Find supplier by code or name
+                          const supplier = suppliers.find(s => 
+                            value.includes(s.supplierCode) || 
+                            value.toLowerCase().includes(s.name.toLowerCase())
+                          );
+                          if (supplier) {
+                            field.onChange(supplier.id);
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const value = e.target.value;
+                          const supplier = suppliers.find(s => 
+                            value.includes(s.supplierCode) || 
+                            value.toLowerCase().includes(s.name.toLowerCase())
+                          );
+                          if (supplier) {
+                            field.onChange(supplier.id);
+                          }
+                        }}
+                        data-testid="input-supplier-search"
+                      />
+                    </FormControl>
+                    <datalist id="suppliers-list">
+                      {suppliers.map((supplier) => (
+                        <option key={supplier.id} value={`${supplier.supplierCode} - ${supplier.name}`}>
+                          {supplier.supplierCode} - {supplier.name}
+                        </option>
+                      ))}
+                    </datalist>
                     <FormMessage />
                   </FormItem>
                 )}
