@@ -62,7 +62,8 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const updateStatusMutation = useMutation({
     mutationFn: async (data: { status: string }) => {
       if (!repair) return;
-      return await apiRequest(`/api/repairs/${repair.id}`, 'PATCH', data);
+      const res = await apiRequest('PATCH', `/api/repairs/${repair.id}`, data);
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/repairs'] });
@@ -80,7 +81,14 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
       Array.from(files).forEach((file) => {
         formData.append('files', file);
       });
-      return await apiRequest(`/api/repairs/${repair.id}/upload`, 'POST', formData);
+      // Use fetch directly for FormData
+      const res = await fetch(`/api/repairs/${repair.id}/upload`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to upload files');
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/repairs'] });
@@ -95,11 +103,12 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const addNoteMutation = useMutation({
     mutationFn: async (noteText: string) => {
       if (!repair) return;
-      return await apiRequest('/api/activities', 'POST', {
+      const res = await apiRequest('POST', '/api/activities', {
         type: 'note_added',
         description: noteText,
         metadata: { entityType: 'repair', entityId: repair.id },
       });
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
@@ -210,7 +219,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-4">
+          <TabsContent value="overview" className="space-y-4 min-h-[400px]">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -336,7 +345,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
             )}
           </TabsContent>
 
-          <TabsContent value="parts" className="space-y-4">
+          <TabsContent value="parts" className="space-y-4 min-h-[400px]">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -389,7 +398,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
             )}
           </TabsContent>
 
-          <TabsContent value="files" className="space-y-4">
+          <TabsContent value="files" className="space-y-4 min-h-[400px]">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -478,7 +487,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
             </Card>
           </TabsContent>
 
-          <TabsContent value="activity" className="space-y-4">
+          <TabsContent value="activity" className="space-y-4 min-h-[400px]">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
