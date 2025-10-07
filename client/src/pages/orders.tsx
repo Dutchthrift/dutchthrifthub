@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Navigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +80,7 @@ export default function Orders() {
     updated?: number;
     message: string;
   } | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
   const { toast } = useToast();
 
   const { data: ordersData, isLoading } = useQuery<{ orders: Order[], total: number } | Order[]>({
@@ -170,6 +171,7 @@ export default function Orders() {
 
       // Create EventSource to listen to progress updates
       const eventSource = new EventSource('/api/shopify/import-orders-progress');
+      eventSourceRef.current = eventSource;
 
       eventSource.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -177,6 +179,7 @@ export default function Orders() {
 
         if (data.type === 'complete') {
           eventSource.close();
+          eventSourceRef.current = null;
           // Refresh data
           queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
           queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
@@ -191,6 +194,7 @@ export default function Orders() {
 
         if (data.type === 'error') {
           eventSource.close();
+          eventSourceRef.current = null;
           toast({
             title: "Import mislukt",
             description: data.message,
@@ -205,6 +209,7 @@ export default function Orders() {
 
       eventSource.onerror = () => {
         eventSource.close();
+        eventSourceRef.current = null;
         toast({
           title: "Verbinding verloren",
           description: "De verbinding met de server is verloren",
@@ -220,6 +225,18 @@ export default function Orders() {
         variant: "destructive",
       });
       setShowImportProgress(false);
+      setImportProgress(null);
+    }
+  };
+
+  const handleCloseImportDialog = (open: boolean) => {
+    if (!open && eventSourceRef.current) {
+      // Close the EventSource if dialog is manually closed
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setShowImportProgress(open);
+    if (!open) {
       setImportProgress(null);
     }
   };
@@ -926,7 +943,7 @@ export default function Orders() {
         {/* Import Progress Dialog */}
         <ImportProgressDialog 
           open={showImportProgress}
-          onOpenChange={setShowImportProgress}
+          onOpenChange={handleCloseImportDialog}
           progress={importProgress}
         />
       </main>
