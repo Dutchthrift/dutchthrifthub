@@ -289,29 +289,57 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-status">
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="draft">Concept</SelectItem>
-                      <SelectItem value="sent">Verzonden</SelectItem>
-                      <SelectItem value="awaiting_delivery">Onderweg</SelectItem>
-                      <SelectItem value="received">Ontvangen</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-status">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="draft">Concept</SelectItem>
+                        <SelectItem value="sent">Verzonden</SelectItem>
+                        <SelectItem value="awaiting_delivery">Onderweg</SelectItem>
+                        <SelectItem value="fully_received">Ontvangen</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormItem>
+                <FormLabel>Bedrag (€)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={lineItems.length > 0 ? totalAmount.toFixed(2) : ""}
+                    onChange={(e) => {
+                      // If user manually enters amount, clear line items
+                      if (lineItems.length === 0) {
+                        const amount = parseFloat(e.target.value) || 0;
+                        form.setValue('totalAmount', Math.round(amount * 100));
+                      }
+                    }}
+                    disabled={lineItems.length > 0}
+                    data-testid="input-amount"
+                  />
+                </FormControl>
+                {lineItems.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Berekend uit regel items
+                  </p>
+                )}
+              </FormItem>
+            </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
