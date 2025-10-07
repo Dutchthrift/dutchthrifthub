@@ -53,7 +53,19 @@ interface LineItem {
 export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFormProps) {
   const { toast } = useToast();
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [supplierSearch, setSupplierSearch] = useState("");
   const { user } = useAuth();
+
+  // Get 10 most recent suppliers
+  const recentSuppliers = suppliers.slice(0, 10);
+  
+  // Filter suppliers based on search
+  const filteredSuppliers = supplierSearch.trim() === ""
+    ? recentSuppliers
+    : suppliers.filter(s => 
+        s.supplierCode.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+        s.name.toLowerCase().includes(supplierSearch.toLowerCase())
+      ).slice(0, 10);
 
   const form = useForm({
     resolver: zodResolver(insertPurchaseOrderSchema.omit({ poNumber: true })),
@@ -169,48 +181,61 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Leverancier</FormLabel>
-                    <FormControl>
-                      <Input
-                        list="suppliers-list"
-                        placeholder="Zoek leverancier op code of naam..."
-                        value={
-                          field.value
-                            ? suppliers.find(s => s.id === field.value)
-                                ? `${suppliers.find(s => s.id === field.value)?.supplierCode} - ${suppliers.find(s => s.id === field.value)?.name}`
-                                : ''
-                            : ''
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          // Find supplier by code or name
-                          const supplier = suppliers.find(s => 
-                            value.includes(s.supplierCode) || 
-                            value.toLowerCase().includes(s.name.toLowerCase())
-                          );
-                          if (supplier) {
-                            field.onChange(supplier.id);
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const value = e.target.value;
-                          const supplier = suppliers.find(s => 
-                            value.includes(s.supplierCode) || 
-                            value.toLowerCase().includes(s.name.toLowerCase())
-                          );
-                          if (supplier) {
-                            field.onChange(supplier.id);
-                          }
-                        }}
-                        data-testid="input-supplier-search"
-                      />
-                    </FormControl>
-                    <datalist id="suppliers-list">
-                      {suppliers.map((supplier) => (
-                        <option key={supplier.id} value={`${supplier.supplierCode} - ${supplier.name}`}>
-                          {supplier.supplierCode} - {supplier.name}
-                        </option>
-                      ))}
-                    </datalist>
+                    <div className="relative">
+                      <FormControl>
+                        <Input
+                          placeholder="Zoek leverancier op code of naam..."
+                          value={supplierSearch}
+                          onChange={(e) => setSupplierSearch(e.target.value)}
+                          onFocus={() => setSupplierSearch("")}
+                          data-testid="input-supplier-search"
+                        />
+                      </FormControl>
+                      {supplierSearch && filteredSuppliers.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-md shadow-lg max-h-60 overflow-auto">
+                          {filteredSuppliers.map((supplier) => (
+                            <div
+                              key={supplier.id}
+                              className="px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                              onClick={() => {
+                                field.onChange(supplier.id);
+                                setSupplierSearch(`${supplier.supplierCode} - ${supplier.name}`);
+                              }}
+                              data-testid={`supplier-option-${supplier.id}`}
+                            >
+                              <div className="font-medium text-sm">{supplier.supplierCode}</div>
+                              <div className="text-xs text-muted-foreground">{supplier.name}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {!supplierSearch && !field.value && (
+                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-md shadow-lg max-h-60 overflow-auto">
+                          <div className="px-3 py-2 text-xs text-muted-foreground border-b">
+                            10 meest recente leveranciers
+                          </div>
+                          {recentSuppliers.map((supplier) => (
+                            <div
+                              key={supplier.id}
+                              className="px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                              onClick={() => {
+                                field.onChange(supplier.id);
+                                setSupplierSearch(`${supplier.supplierCode} - ${supplier.name}`);
+                              }}
+                              data-testid={`supplier-option-${supplier.id}`}
+                            >
+                              <div className="font-medium text-sm">{supplier.supplierCode}</div>
+                              <div className="text-xs text-muted-foreground">{supplier.name}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {field.value && supplierSearch && !supplierSearch.includes('-') && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Geselecteerd: {suppliers.find(s => s.id === field.value)?.supplierCode} - {suppliers.find(s => s.id === field.value)?.name}
+                        </div>
+                      )}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
