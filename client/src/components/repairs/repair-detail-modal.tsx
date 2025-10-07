@@ -329,7 +329,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <RepairStatusTimeline currentStatus={repair.status} />
+                <RepairStatusTimeline currentStatus={currentRepair.status} />
               </CardContent>
             </Card>
 
