@@ -305,9 +305,15 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0" side="bottom" align="start">
+              <PopoverContent 
+                className="w-[var(--radix-popover-trigger-width)] p-0" 
+                side="bottom" 
+                align="start"
+                sideOffset={4}
+                avoidCollisions={false}
+              >
                 <Command>
-                  <CommandInput placeholder="Zoek order of klant..." />
+                  <CommandInput placeholder="Zoek order of klant..." className="h-9" />
                   <CommandList>
                     <CommandEmpty>Geen order gevonden.</CommandEmpty>
                     <CommandGroup>
