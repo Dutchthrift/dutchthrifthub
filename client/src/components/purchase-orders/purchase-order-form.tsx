@@ -31,7 +31,7 @@ import type { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Upload, FileText } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 type PurchaseOrderFormData = z.infer<typeof insertPurchaseOrderSchema>;
@@ -55,6 +55,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
   const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const { user } = useAuth();
 
   // Get 10 most recent suppliers
@@ -405,6 +406,65 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                 </FormItem>
               )}
             />
+
+            <div className="space-y-3">
+              <FormLabel>Bijlagen (optioneel)</FormLabel>
+              <div className="border-2 border-dashed rounded-lg p-4">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx,.xlsx,.xls"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    setUploadedFiles([...uploadedFiles, ...files]);
+                  }}
+                  className="hidden"
+                  id="file-upload"
+                  data-testid="input-file-upload"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="flex flex-col items-center justify-center cursor-pointer"
+                >
+                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                  <span className="text-sm text-muted-foreground">
+                    Klik om bestanden te uploaden
+                  </span>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    Afbeeldingen, PDF, Excel documenten
+                  </span>
+                </label>
+              </div>
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  {uploadedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 bg-muted rounded-md"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <span className="text-sm">{file.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
+                        }}
+                        data-testid={`button-remove-file-${index}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel">
