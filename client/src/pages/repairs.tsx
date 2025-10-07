@@ -25,8 +25,8 @@ import { useAuth } from "@/lib/auth";
 export default function Repairs() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [technicianFilter, setTechnicianFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [technicianFilter, setTechnicianFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
   const [dateTo, setDateTo] = useState<Date | null>(null);
   const [showNewRepair, setShowNewRepair] = useState(false);
@@ -41,8 +41,8 @@ export default function Repairs() {
   });
 
   const filteredRepairs = repairs.filter(repair => {
-    if (statusFilter && repair.status !== statusFilter) return false;
-    if (technicianFilter && repair.assignedUserId !== technicianFilter) return false;
+    if (statusFilter && statusFilter !== "all" && repair.status !== statusFilter) return false;
+    if (technicianFilter && technicianFilter !== "all" && repair.assignedUserId !== technicianFilter) return false;
     if (searchQuery && 
         !repair.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
         !repair.description?.toLowerCase().includes(searchQuery.toLowerCase()) &&
@@ -55,13 +55,13 @@ export default function Repairs() {
 
   const clearFilters = () => {
     setSearchQuery("");
-    setStatusFilter("");
-    setTechnicianFilter("");
+    setStatusFilter("all");
+    setTechnicianFilter("all");
     setDateFrom(null);
     setDateTo(null);
   };
 
-  const hasActiveFilters = searchQuery || statusFilter || technicianFilter || dateFrom || dateTo;
+  const hasActiveFilters = searchQuery || (statusFilter && statusFilter !== "all") || (technicianFilter && technicianFilter !== "all") || dateFrom || dateTo;
 
   return (
     <div className="min-h-screen bg-background" data-testid="repairs-page">
@@ -118,7 +118,7 @@ export default function Repairs() {
                     <SelectValue placeholder="Alle statussen" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Alle statussen</SelectItem>
+                    <SelectItem value="all">Alle statussen</SelectItem>
                     <SelectItem value="new">Nieuw</SelectItem>
                     <SelectItem value="diagnosing">Diagnose</SelectItem>
                     <SelectItem value="waiting_parts">Wacht op onderdelen</SelectItem>
@@ -136,7 +136,7 @@ export default function Repairs() {
                       <SelectValue placeholder="Alle technici" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Alle technici</SelectItem>
+                      <SelectItem value="all">Alle technici</SelectItem>
                       {users.filter(u => u.role === 'TECHNICUS' || u.role === 'ADMIN').map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.firstName || ''} {user.lastName || ''} ({user.username})
