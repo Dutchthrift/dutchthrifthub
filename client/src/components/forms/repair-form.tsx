@@ -72,6 +72,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
   const [slaDeadline, setSlaDeadline] = useState<Date | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [orderOpen, setOrderOpen] = useState(false);
+  const [orderSearchValue, setOrderSearchValue] = useState("");
   const { toast } = useToast();
 
   const { data: customers = [], isError: customersError } = useQuery<Customer[]>({
@@ -189,6 +190,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
     setSlaDeadline(null);
     setSelectedFiles([]);
     setOrderOpen(false);
+    setOrderSearchValue("");
     onOpenChange(false);
   };
 
@@ -214,6 +216,9 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
   // Get selected order and its customer for display
   const selectedOrder = orders.find(o => o.id === watch("orderId"));
   const selectedOrderCustomer = selectedOrder ? customers.find(c => c.id === selectedOrder.customerId) : null;
+
+  // Show latest 10 orders by default, all orders when searching
+  const ordersToShow = orderSearchValue ? orders : orders.slice(0, 10);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -313,7 +318,12 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                 avoidCollisions={false}
               >
                 <Command>
-                  <CommandInput placeholder="Zoek order of klant..." className="h-9" />
+                  <CommandInput 
+                    placeholder="Zoek order of klant..." 
+                    className="h-9"
+                    value={orderSearchValue}
+                    onValueChange={setOrderSearchValue}
+                  />
                   <CommandList>
                     <CommandEmpty>Geen order gevonden.</CommandEmpty>
                     <CommandGroup>
@@ -323,6 +333,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                           setValue("orderId", "none");
                           setValue("customerId", "none");
                           setOrderOpen(false);
+                          setOrderSearchValue("");
                         }}
                       >
                         <Check
@@ -332,7 +343,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                         />
                         Geen order
                       </CommandItem>
-                      {orders.map((order) => {
+                      {ordersToShow.map((order) => {
                         const customer = customers.find(c => c.id === order.customerId);
                         const customerName = customer 
                           ? `${customer.firstName} ${customer.lastName}`
@@ -345,6 +356,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                               setValue("orderId", order.id);
                               setValue("customerId", order.customerId || "none");
                               setOrderOpen(false);
+                              setOrderSearchValue("");
                             }}
                           >
                             <Check
