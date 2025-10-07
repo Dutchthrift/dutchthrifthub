@@ -1,0 +1,126 @@
+Design and build a Repairs Management Page for an internal operations hub that tracks product repairs and returns for a webshop.
+The goal is to manage, monitor, and document every repair from intake to completion — including technician assignments, issue tracking, and customer communication.
+
+Use React + Tailwind + shadcn/ui, following a modern dashboard style consistent with the rest of the hub.
+
+🧩 Core Sections:
+
+Repairs Overview
+
+Table view showing:
+
+Repair ID
+
+Product (name, SKU)
+
+Customer name / order number
+
+Issue summary
+
+Assigned technician
+
+Status (New / In Progress / Waiting Parts / Completed / Returned / Canceled)
+
+Priority
+
+Date received
+
+Last updated
+
+Filters for status, technician, date, and priority.
+
+Inline quick actions (update status, add note, delete).
+
+Repair Details (Modal or Drawer)
+
+Product and customer information
+
+Issue description and notes
+
+Photos / attachments of damage
+
+Parts used and costs
+
+Activity timeline (status history, notes, updates)
+
+Buttons:
+
+Update status
+
+Add note or upload file
+
+Mark as completed
+
+Create New Repair Form
+
+Fields:
+
+Product SKU or name
+
+Customer name and order number
+
+Issue description
+
+Date received
+
+Assigned technician
+
+Priority
+
+Upload photos (damage, defect)
+
+Notes
+
+Default status: “New”.
+
+Status Workflow
+
+Workflow stages:
+
+New → Diagnosing → Waiting for Parts → Repair in Progress → Quality Check → Completed → Returned → Canceled
+
+Display with a visual progress bar or timeline.
+
+Analytics Dashboard
+
+Total repairs (month/week)
+
+Average repair time
+
+Repairs per technician
+
+Pending vs. completed
+
+Common issue tags or categories
+
+Roles & Permissions
+
+Admin: full control
+
+Technician: only own repairs
+
+Customer Service: view & create repairs
+
+UI/UX Enhancements
+
+Color-coded statuses
+
+Floating “+ New Repair” button
+
+Quick search & filter toolbar
+
+Responsive design for tablet/mobile
+
+Inline notifications for overdue repairs
+
+Bonus Features
+
+Automatically generate repair tickets from cases
+
+QR code scanning for repair tracking
+
+PDF summary export
+
+Email updates to customers when repair status changes
+
+Integration with purchase orders (for part ordering)
