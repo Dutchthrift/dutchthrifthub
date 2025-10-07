@@ -54,6 +54,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
   const { toast } = useToast();
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
+  const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
   const { user } = useAuth();
 
   // Get 10 most recent suppliers
@@ -186,53 +187,68 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                         <Input
                           placeholder="Zoek leverancier op code of naam..."
                           value={supplierSearch}
-                          onChange={(e) => setSupplierSearch(e.target.value)}
-                          onFocus={() => setSupplierSearch("")}
+                          onChange={(e) => {
+                            setSupplierSearch(e.target.value);
+                            setIsSupplierDropdownOpen(true);
+                          }}
+                          onFocus={() => {
+                            setIsSupplierDropdownOpen(true);
+                            if (field.value) {
+                              setSupplierSearch("");
+                            }
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => setIsSupplierDropdownOpen(false), 200);
+                          }}
                           data-testid="input-supplier-search"
                         />
                       </FormControl>
-                      {supplierSearch && filteredSuppliers.length > 0 && (
+                      {isSupplierDropdownOpen && (
                         <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-md shadow-lg max-h-60 overflow-auto">
-                          {filteredSuppliers.map((supplier) => (
-                            <div
-                              key={supplier.id}
-                              className="px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                              onClick={() => {
-                                field.onChange(supplier.id);
-                                setSupplierSearch(`${supplier.supplierCode} - ${supplier.name}`);
-                              }}
-                              data-testid={`supplier-option-${supplier.id}`}
-                            >
-                              <div className="font-medium text-sm">{supplier.supplierCode}</div>
-                              <div className="text-xs text-muted-foreground">{supplier.name}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {!supplierSearch && !field.value && (
-                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-md shadow-lg max-h-60 overflow-auto">
-                          <div className="px-3 py-2 text-xs text-muted-foreground border-b">
-                            10 meest recente leveranciers
-                          </div>
-                          {recentSuppliers.map((supplier) => (
-                            <div
-                              key={supplier.id}
-                              className="px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                              onClick={() => {
-                                field.onChange(supplier.id);
-                                setSupplierSearch(`${supplier.supplierCode} - ${supplier.name}`);
-                              }}
-                              data-testid={`supplier-option-${supplier.id}`}
-                            >
-                              <div className="font-medium text-sm">{supplier.supplierCode}</div>
-                              <div className="text-xs text-muted-foreground">{supplier.name}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {field.value && supplierSearch && !supplierSearch.includes('-') && (
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          Geselecteerd: {suppliers.find(s => s.id === field.value)?.supplierCode} - {suppliers.find(s => s.id === field.value)?.name}
+                          {supplierSearch ? (
+                            filteredSuppliers.length > 0 ? (
+                              filteredSuppliers.map((supplier) => (
+                                <div
+                                  key={supplier.id}
+                                  className="px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  onClick={() => {
+                                    field.onChange(supplier.id);
+                                    setSupplierSearch(`${supplier.supplierCode} - ${supplier.name}`);
+                                    setIsSupplierDropdownOpen(false);
+                                  }}
+                                  data-testid={`supplier-option-${supplier.id}`}
+                                >
+                                  <div className="font-medium text-sm">{supplier.supplierCode}</div>
+                                  <div className="text-xs text-muted-foreground">{supplier.name}</div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="px-3 py-2 text-sm text-muted-foreground">
+                                Geen leveranciers gevonden
+                              </div>
+                            )
+                          ) : (
+                            <>
+                              <div className="px-3 py-2 text-xs text-muted-foreground border-b">
+                                10 meest recente leveranciers
+                              </div>
+                              {recentSuppliers.map((supplier) => (
+                                <div
+                                  key={supplier.id}
+                                  className="px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  onClick={() => {
+                                    field.onChange(supplier.id);
+                                    setSupplierSearch(`${supplier.supplierCode} - ${supplier.name}`);
+                                    setIsSupplierDropdownOpen(false);
+                                  }}
+                                  data-testid={`supplier-option-${supplier.id}`}
+                                >
+                                  <div className="font-medium text-sm">{supplier.supplierCode}</div>
+                                  <div className="text-xs text-muted-foreground">{supplier.name}</div>
+                                </div>
+                              ))}
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
