@@ -413,10 +413,10 @@ export default function Orders() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                €{((orderStats?.totalAmount || 0) / 100).toFixed(2)}
+                {orderStats?.total || 0}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {orderStats?.total || 0} orders
+                orders
               </p>
             </CardContent>
           </Card>
