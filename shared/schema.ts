@@ -6,7 +6,7 @@ import { z } from "zod";
 // Enums
 export const userRoleEnum = pgEnum("user_role", ["ADMIN", "SUPPORT", "TECHNICUS"]);
 export const priorityEnum = pgEnum("priority", ["low", "medium", "high", "urgent"]);
-export const repairStatusEnum = pgEnum("repair_status", ["new", "in_progress", "waiting_customer", "waiting_part", "ready", "closed"]);
+export const repairStatusEnum = pgEnum("repair_status", ["new", "diagnosing", "waiting_parts", "repair_in_progress", "quality_check", "completed", "returned", "canceled"]);
 export const todoStatusEnum = pgEnum("todo_status", ["todo", "in_progress", "done"]);
 export const todoCategoryEnum = pgEnum("todo_category", ["orders", "purchasing", "marketing", "admin", "other"]);
 export const emailStatusEnum = pgEnum("email_status", ["open", "closed", "archived"]);
@@ -98,6 +98,9 @@ export const repairs = pgTable("repairs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   description: text("description"),
+  productSku: text("product_sku"),
+  productName: text("product_name"),
+  issueCategory: text("issue_category"),
   customerId: varchar("customer_id").references(() => customers.id),
   orderId: varchar("order_id").references(() => orders.id),
   emailThreadId: varchar("email_thread_id").references(() => emailThreads.id),
@@ -107,10 +110,13 @@ export const repairs = pgTable("repairs", {
   estimatedCost: integer("estimated_cost"), // in cents
   actualCost: integer("actual_cost"), // in cents
   partsNeeded: text("parts_needed").array(),
+  partsUsed: jsonb("parts_used"), // array of {name, cost, quantity}
   photos: text("photos").array(), // URLs to stored photos
+  attachments: text("attachments").array(), // URLs to other file attachments
   timeline: jsonb("timeline"), // array of status updates
   slaDeadline: timestamp("sla_deadline"),
   completedAt: timestamp("completed_at"),
+  returnedAt: timestamp("returned_at"),
   caseId: varchar("case_id").references(() => cases.id), // Link repairs to cases
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
