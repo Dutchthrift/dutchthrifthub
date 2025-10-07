@@ -18,9 +18,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Upload, X, Search } from "lucide-react";
+import { CalendarIcon, Upload, X, Search, Check, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -63,19 +71,9 @@ const ISSUE_CATEGORIES = [
 export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProps) {
   const [slaDeadline, setSlaDeadline] = useState<Date | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [skuSearch, setSkuSearch] = useState("");
-  const [debouncedSkuSearch, setDebouncedSkuSearch] = useState("");
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [orderSearch, setOrderSearch] = useState("");
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSkuSearch(skuSearch);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [skuSearch]);
 
   const { data: customers = [], isError: customersError } = useQuery<Customer[]>({
     queryKey: ['/api/customers'],
@@ -85,11 +83,6 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
   const { data: orders = [], isError: ordersError } = useQuery<Order[]>({
     queryKey: ['/api/orders'],
     enabled: open,
-  });
-
-  const { data: allRepairs = [] } = useQuery<any[]>({
-    queryKey: ['/api/repairs'],
-    enabled: open && debouncedSkuSearch.length > 0,
   });
 
   useEffect(() => {
@@ -196,9 +189,8 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
     reset();
     setSlaDeadline(null);
     setSelectedFiles([]);
-    setSkuSearch("");
-    setCustomerSearch("");
-    setOrderSearch("");
+    setCustomerOpen(false);
+    setOrderOpen(false);
     onOpenChange(false);
   };
 
@@ -221,33 +213,9 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
 
   const technicians = users.filter(u => u.role === 'TECHNICUS' || u.role === 'ADMIN');
 
-  // Search through existing repairs for matching product SKUs
-  const filteredProducts = debouncedSkuSearch
-    ? Array.from(new Map(
-        allRepairs
-          .filter((r: any) => 
-            r.productSku?.toLowerCase().includes(debouncedSkuSearch.toLowerCase()) ||
-            r.productName?.toLowerCase().includes(debouncedSkuSearch.toLowerCase())
-          )
-          .map((r: any) => [r.productSku, { sku: r.productSku, name: r.productName || '' }])
-      ).values()).slice(0, 5) // Show max 5 unique results
-    : [];
-
-  // Filter customers - show latest 10 or matching search
-  const filteredCustomers = customerSearch
-    ? customers.filter(c => 
-        `${c.firstName} ${c.lastName}`.toLowerCase().includes(customerSearch.toLowerCase()) ||
-        c.email?.toLowerCase().includes(customerSearch.toLowerCase())
-      ).slice(0, 10)
-    : customers.slice(0, 10);
-
-  // Filter orders - show latest 10 or matching search
-  const filteredOrders = orderSearch
-    ? orders.filter(o => 
-        o.orderNumber?.toString().includes(orderSearch) ||
-        o.id.toLowerCase().includes(orderSearch.toLowerCase())
-      ).slice(0, 10)
-    : orders.slice(0, 10);
+  // Get selected customer and order for display
+  const selectedCustomer = customers.find(c => c.id === watch("customerId"));
+  const selectedOrder = orders.find(o => o.id === watch("orderId"));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -274,39 +242,13 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="productSku">Product SKU Zoeken</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="productSku"
-                placeholder="Zoek op SKU code..."
-                value={skuSearch}
-                onChange={(e) => {
-                  setSkuSearch(e.target.value);
-                  setValue("productSku", e.target.value);
-                }}
-                className="pl-10"
-                data-testid="input-product-sku-search"
-              />
-            </div>
-            {filteredProducts.length > 0 && skuSearch && (
-              <div className="border rounded-md p-2 mt-1 bg-background">
-                {filteredProducts.map((product) => (
-                  <div
-                    key={product.sku}
-                    className="p-2 hover:bg-muted rounded cursor-pointer"
-                    onClick={() => {
-                      setValue("productSku", product.sku);
-                      setValue("productName", product.name);
-                      setSkuSearch(product.sku);
-                    }}
-                  >
-                    <div className="font-medium">{product.sku}</div>
-                    <div className="text-sm text-muted-foreground">{product.name}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <Label htmlFor="productSku">Artikelnummer</Label>
+            <Input
+              id="productSku"
+              placeholder="Artikelnummer"
+              {...register("productSku")}
+              data-testid="input-product-sku"
+            />
           </div>
 
           <div className="space-y-2">
@@ -351,66 +293,124 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Klant</Label>
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Zoek klant..."
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    className="pl-10"
-                    data-testid="input-customer-search"
-                  />
-                </div>
-                <Select
-                  onValueChange={(value) => setValue("customerId", value)}
-                  value={watch("customerId") || "none"}
-                >
-                  <SelectTrigger data-testid="select-customer">
-                    <SelectValue placeholder="Selecteer klant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Geen klant</SelectItem>
-                    {filteredCustomers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.firstName} {customer.lastName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={customerOpen}
+                    className="w-full justify-between"
+                    data-testid="button-customer-combobox"
+                  >
+                    {selectedCustomer
+                      ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}`
+                      : "Selecteer klant..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Zoek klant..." />
+                    <CommandList>
+                      <CommandEmpty>Geen klant gevonden.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="none"
+                          onSelect={() => {
+                            setValue("customerId", "none");
+                            setCustomerOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${
+                              watch("customerId") === "none" ? "opacity-100" : "opacity-0"
+                            }`}
+                          />
+                          Geen klant
+                        </CommandItem>
+                        {customers.slice(0, 10).map((customer) => (
+                          <CommandItem
+                            key={customer.id}
+                            value={`${customer.firstName} ${customer.lastName} ${customer.email || ''}`}
+                            onSelect={() => {
+                              setValue("customerId", customer.id);
+                              setCustomerOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                watch("customerId") === customer.id ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {customer.firstName} {customer.lastName}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
               <Label>Order</Label>
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Zoek order..."
-                    value={orderSearch}
-                    onChange={(e) => setOrderSearch(e.target.value)}
-                    className="pl-10"
-                    data-testid="input-order-search"
-                  />
-                </div>
-                <Select
-                  onValueChange={(value) => setValue("orderId", value)}
-                  value={watch("orderId") || "none"}
-                >
-                  <SelectTrigger data-testid="select-order">
-                    <SelectValue placeholder="Selecteer order" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Geen order</SelectItem>
-                    {filteredOrders.map((order) => (
-                      <SelectItem key={order.id} value={order.id}>
-                        Order #{order.orderNumber}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Popover open={orderOpen} onOpenChange={setOrderOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={orderOpen}
+                    className="w-full justify-between"
+                    data-testid="button-order-combobox"
+                  >
+                    {selectedOrder
+                      ? `Order #${selectedOrder.orderNumber}`
+                      : "Selecteer order..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Zoek order..." />
+                    <CommandList>
+                      <CommandEmpty>Geen order gevonden.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="none"
+                          onSelect={() => {
+                            setValue("orderId", "none");
+                            setOrderOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${
+                              watch("orderId") === "none" ? "opacity-100" : "opacity-0"
+                            }`}
+                          />
+                          Geen order
+                        </CommandItem>
+                        {orders.slice(0, 10).map((order) => (
+                          <CommandItem
+                            key={order.id}
+                            value={`${order.orderNumber} ${order.id}`}
+                            onSelect={() => {
+                              setValue("orderId", order.id);
+                              setOrderOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                watch("orderId") === order.id ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            Order #{order.orderNumber}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
