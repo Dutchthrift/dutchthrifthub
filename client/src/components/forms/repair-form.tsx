@@ -126,9 +126,9 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
       productSku: "",
       productName: "",
       issueCategory: "",
-      assignedUserId: "",
-      customerId: "",
-      orderId: "",
+      assignedUserId: "none",
+      customerId: "none",
+      orderId: "none",
     },
   });
 
@@ -177,13 +177,13 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
       description: data.description || undefined,
       priority: data.priority,
       estimatedCost: data.estimatedCost ? Math.round(data.estimatedCost * 100) : undefined,
-      assignedUserId: data.assignedUserId || undefined,
+      assignedUserId: (data.assignedUserId && data.assignedUserId !== "none") ? data.assignedUserId : undefined,
       slaDeadline: slaDeadline || undefined,
       productSku: data.productSku || undefined,
       productName: data.productName || undefined,
       issueCategory: data.issueCategory || undefined,
-      customerId: data.customerId || undefined,
-      orderId: data.orderId || undefined,
+      customerId: (data.customerId && data.customerId !== "none") ? data.customerId : undefined,
+      orderId: (data.orderId && data.orderId !== "none") ? data.orderId : undefined,
       status: "new",
     };
 
@@ -333,13 +333,13 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
               <Label>Klant</Label>
               <Select
                 onValueChange={(value) => setValue("customerId", value)}
-                value={watch("customerId") || ""}
+                value={watch("customerId") || "none"}
               >
                 <SelectTrigger data-testid="select-customer">
                   <SelectValue placeholder="Selecteer klant" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Geen klant</SelectItem>
+                  <SelectItem value="none">Geen klant</SelectItem>
                   {customers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id}>
                       {customer.firstName} {customer.lastName}
@@ -353,13 +353,13 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
               <Label>Order</Label>
               <Select
                 onValueChange={(value) => setValue("orderId", value)}
-                value={watch("orderId") || ""}
+                value={watch("orderId") || "none"}
               >
                 <SelectTrigger data-testid="select-order">
                   <SelectValue placeholder="Selecteer order" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Geen order</SelectItem>
+                  <SelectItem value="none">Geen order</SelectItem>
                   {orders.map((order) => (
                     <SelectItem key={order.id} value={order.id}>
                       Order #{order.orderNumber}
@@ -412,13 +412,13 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
             <Label>Technicus</Label>
             <Select
               onValueChange={(value) => setValue("assignedUserId", value)}
-              value={watch("assignedUserId") || ""}
+              value={watch("assignedUserId") || "none"}
             >
               <SelectTrigger data-testid="select-technician">
                 <SelectValue placeholder="Selecteer technicus" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Niet toegewezen</SelectItem>
+                <SelectItem value="none">Niet toegewezen</SelectItem>
                 {technicians.map((tech) => (
                   <SelectItem key={tech.id} value={tech.id}>
                     {tech.firstName || ''} {tech.lastName || ''} ({tech.username})
