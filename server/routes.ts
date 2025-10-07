@@ -7,6 +7,7 @@ import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertP
 import { syncEmails, sendEmail } from "./services/emailService";
 import { shopifyClient } from "./services/shopifyClient";
 import { OrderMatchingService } from "./services/orderMatchingService";
+import { ObjectStorageService } from "./objectStorage";
 import multer from "multer";
 import Papa from "papaparse";
 
@@ -501,14 +502,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Repairs
   app.get("/api/repairs", async (req, res) => {
     try {
-      const { caseId } = req.query;
+      const { caseId, status, technicianId, startDate, endDate, priority } = req.query;
       
       if (caseId) {
         // Get repairs linked to a specific case
         const relatedItems = await storage.getCaseRelatedItems(caseId as string);
         res.json(relatedItems.repairs);
+        return;
+      }
+      
+      // Define filter schema for validation
+      const filterSchema = z.object({
+        status: z.enum(['new', 'diagnosing', 'waiting_parts', 'repair_in_progress', 'quality_check', 'completed', 'returned', 'canceled']).optional(),
+        technicianId: z.string().uuid().optional(),
+        priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      });
+      
+      // Validate query parameters
+      const validationResult = filterSchema.safeParse({ status, technicianId, priority, startDate, endDate });
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ message: "Invalid filter parameters", errors: validationResult.error.errors });
+      }
+      
+      const validatedFilters = validationResult.data;
+      
+      // Build filters object
+      const filters: {
+        status?: string;
+        technicianId?: string;
+        priority?: string;
+        startDate?: Date;
+        endDate?: Date;
+      } = {};
+      
+      if (validatedFilters.status) filters.status = validatedFilters.status;
+      if (validatedFilters.technicianId) filters.technicianId = validatedFilters.technicianId;
+      if (validatedFilters.priority) filters.priority = validatedFilters.priority;
+      if (validatedFilters.startDate) filters.startDate = new Date(validatedFilters.startDate);
+      if (validatedFilters.endDate) filters.endDate = new Date(validatedFilters.endDate);
+      
+      const hasFilters = Object.keys(filters).length > 0;
+      
+      if (hasFilters) {
+        const repairs = await storage.getRepairsWithFilters(filters);
+        res.json(repairs);
       } else {
-        // Get all repairs
         const repairs = await storage.getRepairs();
         res.json(repairs);
       }
@@ -569,6 +610,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating repair:", error);
       res.status(400).json({ message: "Failed to update repair" });
+    }
+  });
+
+  // Upload files (photos/attachments) to a repair
+  app.post("/api/repairs/:id/upload", upload.array('files', 10), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { type } = req.body; // 'photo' or 'attachment'
+      const files = req.files as Express.Multer.File[];
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: "No files provided" });
+      }
+
+      const repair = await storage.getRepair(id);
+      if (!repair) {
+        return res.status(404).json({ message: "Repair not found" });
+      }
+
+      const objectStorage = new ObjectStorageService();
+      const uploadedUrls: string[] = [];
+
+      for (const file of files) {
+        const filename = `repairs/${id}/${type}s/${Date.now()}-${file.originalname}`;
+        const url = await objectStorage.uploadFile(file.buffer, filename, file.mimetype);
+        uploadedUrls.push(url);
+      }
+
+      // Update repair with new file URLs
+      const currentFiles = type === 'photo' ? (repair.photos || []) : (repair.attachments || []);
+      const updatedFiles = [...currentFiles, ...uploadedUrls];
+
+      await storage.updateRepair(id, {
+        [type === 'photo' ? 'photos' : 'attachments']: updatedFiles
+      });
+
+      res.json({ urls: uploadedUrls });
+    } catch (error) {
+      console.error("Error uploading files to repair:", error);
+      res.status(500).json({ message: "Failed to upload files" });
     }
   });
 

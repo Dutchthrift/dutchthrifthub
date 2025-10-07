@@ -71,6 +71,15 @@ export interface IStorage {
   createRepair(repair: InsertRepair): Promise<Repair>;
   updateRepair(id: string, repair: Partial<InsertRepair>): Promise<Repair>;
   getRepairsByStatus(status: string): Promise<Repair[]>;
+  getRepairsByTechnician(technicianId: string): Promise<Repair[]>;
+  getRepairsByDateRange(startDate: Date, endDate: Date): Promise<Repair[]>;
+  getRepairsWithFilters(filters: {
+    status?: string;
+    technicianId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    priority?: string;
+  }): Promise<Repair[]>;
 
   // Suppliers
   getSuppliers(): Promise<Supplier[]>;
@@ -382,6 +391,53 @@ export class DatabaseStorage implements IStorage {
 
   async getRepairsByStatus(status: string): Promise<Repair[]> {
     return await db.select().from(repairs).where(eq(repairs.status, status as any));
+  }
+
+  async getRepairsByTechnician(technicianId: string): Promise<Repair[]> {
+    return await db.select().from(repairs).where(eq(repairs.assignedUserId, technicianId)).orderBy(desc(repairs.createdAt));
+  }
+
+  async getRepairsByDateRange(startDate: Date, endDate: Date): Promise<Repair[]> {
+    return await db.select().from(repairs)
+      .where(and(
+        sql`${repairs.createdAt} >= ${startDate}`,
+        sql`${repairs.createdAt} <= ${endDate}`
+      ))
+      .orderBy(desc(repairs.createdAt));
+  }
+
+  async getRepairsWithFilters(filters: {
+    status?: string;
+    technicianId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    priority?: string;
+  }): Promise<Repair[]> {
+    const conditions = [];
+    
+    if (filters.status) {
+      conditions.push(eq(repairs.status, filters.status as any));
+    }
+    if (filters.technicianId) {
+      conditions.push(eq(repairs.assignedUserId, filters.technicianId));
+    }
+    if (filters.startDate) {
+      conditions.push(sql`${repairs.createdAt} >= ${filters.startDate}`);
+    }
+    if (filters.endDate) {
+      conditions.push(sql`${repairs.createdAt} <= ${filters.endDate}`);
+    }
+    if (filters.priority) {
+      conditions.push(eq(repairs.priority, filters.priority as any));
+    }
+
+    if (conditions.length === 0) {
+      return await db.select().from(repairs).orderBy(desc(repairs.createdAt));
+    }
+
+    return await db.select().from(repairs)
+      .where(and(...conditions))
+      .orderBy(desc(repairs.createdAt));
   }
 
   // Todos
@@ -843,9 +899,8 @@ export class DatabaseStorage implements IStorage {
       )).limit(10),
 
       db.select().from(purchaseOrders).where(or(
-        ilike(purchaseOrders.title, searchTerm),
-        ilike(purchaseOrders.supplierName, searchTerm),
-        ilike(purchaseOrders.supplierNumber, searchTerm)
+        ilike(purchaseOrders.poNumber, searchTerm),
+        ilike(purchaseOrders.notes, searchTerm)
       )).limit(10)
     ]);
 

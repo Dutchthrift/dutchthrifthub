@@ -44,15 +44,17 @@ export default function Repairs() {
 
   const repairStatusCount = {
     new: filteredRepairs?.filter(r => r.status === 'new').length || 0,
-    in_progress: filteredRepairs?.filter(r => r.status === 'in_progress').length || 0,
-    waiting_customer: filteredRepairs?.filter(r => r.status === 'waiting_customer').length || 0,
-    waiting_part: filteredRepairs?.filter(r => r.status === 'waiting_part').length || 0,
-    ready: filteredRepairs?.filter(r => r.status === 'ready').length || 0,
-    closed: filteredRepairs?.filter(r => r.status === 'closed').length || 0,
+    diagnosing: filteredRepairs?.filter(r => r.status === 'diagnosing').length || 0,
+    waiting_parts: filteredRepairs?.filter(r => r.status === 'waiting_parts').length || 0,
+    repair_in_progress: filteredRepairs?.filter(r => r.status === 'repair_in_progress').length || 0,
+    quality_check: filteredRepairs?.filter(r => r.status === 'quality_check').length || 0,
+    completed: filteredRepairs?.filter(r => r.status === 'completed').length || 0,
+    returned: filteredRepairs?.filter(r => r.status === 'returned').length || 0,
+    canceled: filteredRepairs?.filter(r => r.status === 'canceled').length || 0,
   };
 
-  const totalWaiting = repairStatusCount.waiting_customer + repairStatusCount.waiting_part;
-  const totalActive = repairStatusCount.new + repairStatusCount.in_progress + totalWaiting + repairStatusCount.ready;
+  const totalActive = repairStatusCount.new + repairStatusCount.diagnosing + repairStatusCount.waiting_parts + repairStatusCount.repair_in_progress + repairStatusCount.quality_check;
+  const totalCompleted = repairStatusCount.completed + repairStatusCount.returned;
 
   return (
     <div className="min-h-screen bg-background" data-testid="repairs-page">
@@ -94,50 +96,50 @@ export default function Repairs() {
           <Card data-testid="repairs-stats-new">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">New</CardTitle>
-              <div className="h-3 w-3 rounded-full bg-chart-4"></div>
+              <div className="h-3 w-3 rounded-full bg-blue-500"></div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{repairStatusCount.new}</div>
             </CardContent>
           </Card>
 
-          <Card data-testid="repairs-stats-progress">
+          <Card data-testid="repairs-stats-diagnosing">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-              <div className="h-3 w-3 rounded-full bg-primary"></div>
+              <CardTitle className="text-sm font-medium">Diagnosing</CardTitle>
+              <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{repairStatusCount.in_progress}</div>
+              <div className="text-2xl font-bold">{repairStatusCount.diagnosing}</div>
             </CardContent>
           </Card>
 
-          <Card data-testid="repairs-stats-waiting">
+          <Card data-testid="repairs-stats-in-progress">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Waiting</CardTitle>
-              <div className="h-3 w-3 rounded-full bg-chart-1"></div>
+              <CardTitle className="text-sm font-medium">In Repair</CardTitle>
+              <div className="h-3 w-3 rounded-full bg-orange-500"></div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalWaiting}</div>
+              <div className="text-2xl font-bold">{repairStatusCount.repair_in_progress}</div>
             </CardContent>
           </Card>
 
-          <Card data-testid="repairs-stats-ready">
+          <Card data-testid="repairs-stats-quality-check">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ready</CardTitle>
-              <div className="h-3 w-3 rounded-full bg-chart-2"></div>
+              <CardTitle className="text-sm font-medium">Quality Check</CardTitle>
+              <div className="h-3 w-3 rounded-full bg-purple-500"></div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{repairStatusCount.ready}</div>
+              <div className="text-2xl font-bold">{repairStatusCount.quality_check}</div>
             </CardContent>
           </Card>
 
-          <Card data-testid="repairs-stats-closed">
+          <Card data-testid="repairs-stats-completed">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Closed</CardTitle>
-              <div className="h-3 w-3 rounded-full bg-muted-foreground"></div>
+              <CardTitle className="text-sm font-medium">Completed</CardTitle>
+              <div className="h-3 w-3 rounded-full bg-green-500"></div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{repairStatusCount.closed}</div>
+              <div className="text-2xl font-bold">{totalCompleted}</div>
             </CardContent>
           </Card>
         </div>
