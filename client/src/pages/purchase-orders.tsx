@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Navigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,53 +10,25 @@ import {
   Plus,
   Filter, 
   Download, 
-  RefreshCw,
   Package2,
-  Eye,
-  MoreHorizontal,
-  MessageSquare,
-  ChevronDown,
-  ChevronUp,
-  Edit3,
-  Trash2,
-  Calendar,
   Building2,
-  Euro
+  Euro,
+  TrendingUp,
+  ShoppingCart,
+  Clock,
+  CheckCircle,
+  Truck,
+  List,
+  LayoutGrid
 } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import type { PurchaseOrder } from "@shared/schema";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { useQuery } from "@tanstack/react-query";
+import type { PurchaseOrder, Supplier } from "@shared/schema";
+import { PurchaseOrderForm } from "@/components/purchase-orders/purchase-order-form";
+import { PurchaseOrderDetailModal } from "@/components/purchase-orders/purchase-order-detail-modal";
+import { PurchaseOrdersTable } from "@/components/purchase-orders/purchase-orders-table";
+import { PurchaseOrdersCards } from "@/components/purchase-orders/purchase-orders-cards";
+import { SupplierImportDialog } from "@/components/purchase-orders/supplier-import-dialog";
+import { useAuth } from "@/lib/auth";
 import {
   Select,
   SelectContent,
@@ -64,844 +36,332 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { insertPurchaseOrderSchema } from "@shared/schema";
-import type { z } from "zod";
-import { InternalNotes } from "@/components/notes/internal-notes";
-import { ImageUpload } from "@/components/ui/image-upload";
-
-type PurchaseOrderFormData = z.infer<typeof insertPurchaseOrderSchema>;
-
-type SortField = 'title' | 'supplierName' | 'supplierNumber' | 'purchaseDate' | 'amount' | 'status';
-type SortDirection = 'asc' | 'desc';
 
 export default function PurchaseOrders() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sortField, setSortField] = useState<SortField>('purchaseDate');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState<PurchaseOrder | null>(null);
-  const { toast } = useToast();
+  const [supplierFilter, setSupplierFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [showNewPO, setShowNewPO] = useState(false);
+  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
 
-  const { data: purchaseOrders, isLoading } = useQuery<PurchaseOrder[]>({
+  const canCreate = user?.role === "ADMIN" || user?.role === "SUPPORT";
+
+  const { data: purchaseOrders, isLoading: isLoadingPOs } = useQuery<PurchaseOrder[]>({
     queryKey: ["/api/purchase-orders"],
   });
 
-  const form = useForm<PurchaseOrderFormData>({
-    resolver: zodResolver(insertPurchaseOrderSchema),
-    defaultValues: {
-      title: "",
-      supplierNumber: "",
-      supplierName: "",
-      purchaseDate: new Date().toISOString().split('T')[0],
-      amount: 0,
-      currency: "EUR",
-      status: "pending",
-      photos: [],
-      notes: "",
-    },
+  const { data: suppliers, isLoading: isLoadingSuppliers } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers"],
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (data: PurchaseOrderFormData) => {
-      const response = await apiRequest("POST", "/api/purchase-orders", data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
-      toast({ title: "Inkoop order aangemaakt", description: "De inkoop order is succesvol aangemaakt." });
-      setIsCreateDialogOpen(false);
-      form.reset();
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Fout bij aanmaken", 
-        description: error.message || "Er is een fout opgetreden bij het aanmaken van de inkoop order.",
-        variant: "destructive"
-      });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<PurchaseOrderFormData> }) => {
-      const response = await apiRequest("PATCH", `/api/purchase-orders/${id}`, data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
-      toast({ title: "Inkoop order bijgewerkt", description: "De inkoop order is succesvol bijgewerkt." });
-      setIsEditDialogOpen(false);
-      setSelectedPurchaseOrder(null);
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Fout bij bijwerken", 
-        description: error.message || "Er is een fout opgetreden bij het bijwerken van de inkoop order.",
-        variant: "destructive"
-      });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/purchase-orders/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
-      toast({ title: "Inkoop order verwijderd", description: "De inkoop order is succesvol verwijderd." });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Fout bij verwijderen", 
-        description: error.message || "Er is een fout opgetreden bij het verwijderen van de inkoop order.",
-        variant: "destructive"
-      });
-    },
-  });
-
-  const onSubmit = (data: PurchaseOrderFormData) => {
-    if (selectedPurchaseOrder) {
-      updateMutation.mutate({ id: selectedPurchaseOrder.id, data });
-    } else {
-      createMutation.mutate(data);
+  const filteredPOs = purchaseOrders?.filter(po => {
+    if (statusFilter !== "all" && po.status !== statusFilter) return false;
+    if (supplierFilter !== "all" && po.supplierId !== supplierFilter) return false;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        po.title?.toLowerCase().includes(query) ||
+        po.poNumber?.toLowerCase().includes(query) ||
+        suppliers?.find(s => s.id === po.supplierId)?.name?.toLowerCase().includes(query)
+      );
     }
-  };
-
-  const handleEdit = (purchaseOrder: PurchaseOrder) => {
-    setSelectedPurchaseOrder(purchaseOrder);
-    form.reset({
-      title: purchaseOrder.title,
-      supplierNumber: purchaseOrder.supplierNumber,
-      supplierName: purchaseOrder.supplierName,
-      purchaseDate: typeof purchaseOrder.purchaseDate === 'string' 
-        ? purchaseOrder.purchaseDate 
-        : new Date(purchaseOrder.purchaseDate).toISOString().split('T')[0],
-      amount: purchaseOrder.amount,
-      currency: purchaseOrder.currency || "EUR",
-      status: purchaseOrder.status || "pending",
-      photos: purchaseOrder.photos || [],
-      notes: purchaseOrder.notes || "",
-    });
-    setIsEditDialogOpen(true);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm("Weet je zeker dat je deze inkoop order wilt verwijderen?")) {
-      deleteMutation.mutate(id);
-    }
-  };
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'pending': return 'secondary';
-      case 'ordered': return 'default';
-      case 'received': return 'default';
-      case 'cancelled': return 'destructive';
-      default: return 'secondary';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending': return 'In afwachting';
-      case 'ordered': return 'Besteld';
-      case 'received': return 'Ontvangen';
-      case 'cancelled': return 'Geannuleerd';
-      default: return status;
-    }
-  };
-
-  const filteredPurchaseOrders = purchaseOrders?.filter(po => {
-    const matchesSearch = !searchQuery || 
-      po.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      po.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      po.supplierNumber.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || po.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
+    return true;
   }) || [];
 
-  const sortedPurchaseOrders = [...filteredPurchaseOrders].sort((a, b) => {
-    let aValue, bValue;
-    
-    switch (sortField) {
-      case 'title':
-        aValue = a.title;
-        bValue = b.title;
-        break;
-      case 'supplierName':
-        aValue = a.supplierName;
-        bValue = b.supplierName;
-        break;
-      case 'supplierNumber':
-        aValue = a.supplierNumber;
-        bValue = b.supplierNumber;
-        break;
-      case 'purchaseDate':
-        aValue = new Date(a.purchaseDate).getTime();
-        bValue = new Date(b.purchaseDate).getTime();
-        break;
-      case 'amount':
-        aValue = a.amount;
-        bValue = b.amount;
-        break;
-      case 'status':
-        aValue = a.status || '';
-        bValue = b.status || '';
-        break;
-      default:
-        aValue = a.title;
-        bValue = b.title;
-    }
-    
-    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
+  // Analytics calculations
+  const statusCounts = {
+    all: purchaseOrders?.length || 0,
+    draft: purchaseOrders?.filter(po => po.status === 'draft').length || 0,
+    sent: purchaseOrders?.filter(po => po.status === 'sent').length || 0,
+    awaiting_delivery: purchaseOrders?.filter(po => po.status === 'awaiting_delivery').length || 0,
+    received: purchaseOrders?.filter(po => po.status === 'fully_received').length || 0,
+  };
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
+  const totalAmount = purchaseOrders?.reduce((sum, po) => sum + ((po.totalAmount || 0) / 100), 0) || 0;
+  
+  const pendingDeliveries = purchaseOrders?.filter(po => 
+    po.status === 'awaiting_delivery' && po.expectedDeliveryDate
+  ).length || 0;
+
+  const overdueDeliveries = purchaseOrders?.filter(po => {
+    if (po.status !== 'awaiting_delivery' || !po.expectedDeliveryDate) return false;
+    return new Date(po.expectedDeliveryDate) < new Date();
+  }).length || 0;
+
+  // Top supplier by spending
+  const supplierSpending = purchaseOrders?.reduce((acc, po) => {
+    if (po.supplierId) {
+      acc[po.supplierId] = (acc[po.supplierId] || 0) + ((po.totalAmount || 0) / 100);
+    }
+    return acc;
+  }, {} as Record<string, number>) || {};
+
+  const topSupplier = Object.entries(supplierSpending).sort((a, b) => b[1] - a[1])[0];
+  const topSupplierName = topSupplier 
+    ? suppliers?.find(s => s.id === topSupplier[0])?.name || 'Onbekend'
+    : 'Geen';
+  const topSupplierAmount = topSupplier ? topSupplier[1] : 0;
+
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case "draft": return "secondary";
+      case "sent": return "default";
+      case "awaiting_delivery": return "outline";
+      case "received": return "default";
+      default: return "secondary";
     }
   };
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('nl-NL', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount / 100);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "draft": return "text-gray-600 bg-gray-100 dark:bg-gray-800";
+      case "sent": return "text-blue-600 bg-blue-100 dark:bg-blue-900";
+      case "awaiting_delivery": return "text-orange-600 bg-orange-100 dark:bg-orange-900";
+      case "received": return "text-green-600 bg-green-100 dark:bg-green-900";
+      default: return "text-gray-600 bg-gray-100";
+    }
   };
 
-  const formatDate = (date: string | Date) => {
-    return new Intl.DateTimeFormat('nl-NL', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(new Date(date));
+  const handlePOClick = (po: PurchaseOrder) => {
+    setSelectedPO(po);
+    setShowDetailModal(true);
   };
+
+  const isLoading = isLoadingPOs || isLoadingSuppliers;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+    <div className="min-h-screen bg-background">
       <Navigation />
       
-      <main className="container mx-auto p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="text-page-title">
+              <Package2 className="h-8 w-8" />
               Inkoop Orders
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Beheer al je inkoop orders en leveranciers
+            <p className="text-sm text-muted-foreground mt-1">
+              Beheer inkoop orders en leveranciers
             </p>
           </div>
-          
-          <div className="flex flex-wrap gap-2">
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-create-purchase-order">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nieuwe Inkoop Order
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Nieuwe Inkoop Order</DialogTitle>
-                  <DialogDescription>
-                    Maak een nieuwe inkoop order aan
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="title"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Titel</FormLabel>
-                          <FormControl>
-                            <Input data-testid="input-title" placeholder="Beschrijving van de inkoop" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="supplierNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Leverancier nummer</FormLabel>
-                            <FormControl>
-                              <Input data-testid="input-supplier-number" placeholder="L001" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="supplierName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Leverancier naam</FormLabel>
-                            <FormControl>
-                              <Input data-testid="input-supplier-name" placeholder="Leverancier BV" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="purchaseDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Datum inkoop</FormLabel>
-                            <FormControl>
-                              <Input 
-                                data-testid="input-purchase-date"
-                                type="date" 
-                                value={typeof field.value === 'string' ? field.value : 
-                                       field.value instanceof Date ? field.value.toISOString().split('T')[0] : ''}
-                                onChange={(e) => field.onChange(e.target.value)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="amount"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Inkoop bedrag (€)</FormLabel>
-                            <FormControl>
-                              <Input 
-                                data-testid="input-amount"
-                                type="number" 
-                                step="0.01"
-                                placeholder="0.00"
-                                value={field.value / 100}
-                                onChange={(e) => field.onChange(Math.round(parseFloat(e.target.value || "0") * 100))}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select value={field.value} onValueChange={field.onChange}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-status">
-                                <SelectValue placeholder="Selecteer status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="pending">In afwachting</SelectItem>
-                              <SelectItem value="ordered">Besteld</SelectItem>
-                              <SelectItem value="received">Ontvangen</SelectItem>
-                              <SelectItem value="cancelled">Geannuleerd</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="photos"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Afbeeldingen</FormLabel>
-                          <FormControl>
-                            <ImageUpload
-                              images={field.value || []}
-                              onChange={field.onChange}
-                              maxImages={5}
-                              maxSizeMB={5}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Opmerkingen</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              data-testid="textarea-notes"
-                              placeholder="Eventuele opmerkingen..."
-                              className="min-h-[80px]"
-                              {...field}
-                              value={field.value || ""}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="flex justify-end space-x-2 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setIsCreateDialogOpen(false);
-                          form.reset();
-                        }}
-                        data-testid="button-cancel"
-                      >
-                        Annuleren
-                      </Button>
-                      <Button 
-                        type="submit" 
-                        disabled={createMutation.isPending}
-                        data-testid="button-save"
-                      >
-                        {createMutation.isPending ? "Aanmaken..." : "Aanmaken"}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+          <div className="flex gap-2">
+            {canCreate && <SupplierImportDialog />}
+            {canCreate && (
+              <Button onClick={() => setShowNewPO(true)} data-testid="button-new-po">
+                <Plus className="h-4 w-4 mr-2" />
+                Nieuwe Order
+              </Button>
+            )}
           </div>
         </div>
 
-        <Tabs defaultValue="all" className="w-full">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <TabsList data-testid="tabs-status-filter">
-              <TabsTrigger value="all" onClick={() => setStatusFilter("all")}>
-                Alle ({purchaseOrders?.length || 0})
-              </TabsTrigger>
-              <TabsTrigger value="pending" onClick={() => setStatusFilter("pending")}>
-                In afwachting ({purchaseOrders?.filter(po => po.status === 'pending').length || 0})
-              </TabsTrigger>
-              <TabsTrigger value="ordered" onClick={() => setStatusFilter("ordered")}>
-                Besteld ({purchaseOrders?.filter(po => po.status === 'ordered').length || 0})
-              </TabsTrigger>
-              <TabsTrigger value="received" onClick={() => setStatusFilter("received")}>
-                Ontvangen ({purchaseOrders?.filter(po => po.status === 'received').length || 0})
-              </TabsTrigger>
-            </TabsList>
+        {/* Analytics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                Totaal Orders
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="stat-total-orders">{statusCounts.all}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {statusCounts.draft} concept, {statusCounts.sent} verzonden
+              </p>
+            </CardContent>
+          </Card>
 
-            <div className="flex flex-wrap gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  data-testid="input-search"
-                  placeholder="Zoek inkoop orders..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64"
-                />
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Euro className="h-4 w-4 text-muted-foreground" />
+                Totale Waarde
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="stat-total-value">
+                €{totalAmount.toLocaleString('nl-NL', { minimumFractionDigits: 2 })}
               </div>
-            </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Alle orders gecombineerd
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Truck className="h-4 w-4 text-muted-foreground" />
+                Leveringen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="stat-pending-deliveries">{pendingDeliveries}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {overdueDeliveries > 0 && (
+                  <span className="text-red-600">{overdueDeliveries} te laat</span>
+                )}
+                {overdueDeliveries === 0 && "Alles op schema"}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                Top Leverancier
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm font-bold truncate" data-testid="stat-top-supplier">{topSupplierName}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                €{topSupplierAmount.toLocaleString('nl-NL', { minimumFractionDigits: 2 })}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters and View Toggle */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              ref={searchInputRef}
+              placeholder="Zoek op titel, PO nummer, leverancier..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-po"
+            />
           </div>
 
-          <TabsContent value="all" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package2 className="h-5 w-5" />
-                  Inkoop Orders
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="text-center py-8">
-                    <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-gray-400" />
-                    <p className="text-gray-500">Orders laden...</p>
-                  </div>
-                ) : sortedPurchaseOrders.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Package2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Geen inkoop orders</h3>
-                    <p className="text-gray-500 mb-4">Je hebt nog geen inkoop orders aangemaakt</p>
-                    <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-first">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Eerste inkoop order aanmaken
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead 
-                            className="cursor-pointer select-none" 
-                            onClick={() => handleSort('title')}
-                          >
-                            <div className="flex items-center gap-1">
-                              Titel
-                              {sortField === 'title' && (
-                                sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                              )}
-                            </div>
-                          </TableHead>
-                          <TableHead 
-                            className="cursor-pointer select-none" 
-                            onClick={() => handleSort('supplierName')}
-                          >
-                            <div className="flex items-center gap-1">
-                              Leverancier
-                              {sortField === 'supplierName' && (
-                                sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                              )}
-                            </div>
-                          </TableHead>
-                          <TableHead 
-                            className="cursor-pointer select-none" 
-                            onClick={() => handleSort('purchaseDate')}
-                          >
-                            <div className="flex items-center gap-1">
-                              Datum
-                              {sortField === 'purchaseDate' && (
-                                sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                              )}
-                            </div>
-                          </TableHead>
-                          <TableHead 
-                            className="cursor-pointer select-none" 
-                            onClick={() => handleSort('amount')}
-                          >
-                            <div className="flex items-center gap-1">
-                              Bedrag
-                              {sortField === 'amount' && (
-                                sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                              )}
-                            </div>
-                          </TableHead>
-                          <TableHead 
-                            className="cursor-pointer select-none" 
-                            onClick={() => handleSort('status')}
-                          >
-                            <div className="flex items-center gap-1">
-                              Status
-                              {sortField === 'status' && (
-                                sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                              )}
-                            </div>
-                          </TableHead>
-                          <TableHead className="w-[100px]">Acties</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {sortedPurchaseOrders.map((purchaseOrder) => (
-                          <TableRow key={purchaseOrder.id} data-testid={`row-purchase-order-${purchaseOrder.id}`}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-3">
-                                {purchaseOrder.photos && purchaseOrder.photos.length > 0 && (
-                                  <div className="flex-shrink-0">
-                                    <img
-                                      src={purchaseOrder.photos[0]}
-                                      alt="Inkoop order"
-                                      className="h-12 w-12 object-cover rounded border"
-                                      data-testid={`image-preview-${purchaseOrder.id}`}
-                                    />
-                                  </div>
-                                )}
-                                <div className="space-y-1">
-                                  <div className="font-medium" data-testid={`text-title-${purchaseOrder.id}`}>
-                                    {purchaseOrder.title}
-                                  </div>
-                                  <div className="text-sm text-gray-500 flex items-center gap-2">
-                                    <span data-testid={`text-supplier-number-${purchaseOrder.id}`}>
-                                      #{purchaseOrder.supplierNumber}
-                                    </span>
-                                    {purchaseOrder.photos && purchaseOrder.photos.length > 1 && (
-                                      <span className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                                        +{purchaseOrder.photos.length - 1} foto's
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Building2 className="h-4 w-4 text-gray-400" />
-                                <span data-testid={`text-supplier-name-${purchaseOrder.id}`}>
-                                  {purchaseOrder.supplierName}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                                <span data-testid={`text-date-${purchaseOrder.id}`}>
-                                  {formatDate(purchaseOrder.purchaseDate)}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Euro className="h-4 w-4 text-gray-400" />
-                                <span className="font-mono" data-testid={`text-amount-${purchaseOrder.id}`}>
-                                  {formatAmount(purchaseOrder.amount)}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge 
-                                variant={getStatusBadgeVariant(purchaseOrder.status || 'pending')}
-                                data-testid={`badge-status-${purchaseOrder.id}`}
-                              >
-                                {getStatusLabel(purchaseOrder.status || 'pending')}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    className="h-8 w-8 p-0"
-                                    data-testid={`button-actions-${purchaseOrder.id}`}
-                                  >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() => handleEdit(purchaseOrder)}
-                                    data-testid={`action-edit-${purchaseOrder.id}`}
-                                  >
-                                    <Edit3 className="h-4 w-4 mr-2" />
-                                    Bewerken
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleDelete(purchaseOrder.id)}
-                                    className="text-red-600"
-                                    data-testid={`action-delete-${purchaseOrder.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Verwijderen
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-status-filter">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle statussen</SelectItem>
+              <SelectItem value="draft">Concept</SelectItem>
+              <SelectItem value="sent">Verzonden</SelectItem>
+              <SelectItem value="awaiting_delivery">Onderweg</SelectItem>
+              <SelectItem value="received">Ontvangen</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-supplier-filter">
+              <SelectValue placeholder="Leverancier" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle leveranciers</SelectItem>
+              {suppliers?.map(supplier => (
+                <SelectItem key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex gap-1 border rounded-md p-1">
+            <Button
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("table")}
+              data-testid="button-view-table"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "cards" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("cards")}
+              data-testid="button-view-cards"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Status Tabs */}
+        <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+          <TabsList>
+            <TabsTrigger value="all" data-testid="tab-all-pos">
+              Alle ({statusCounts.all})
+            </TabsTrigger>
+            <TabsTrigger value="draft" data-testid="tab-draft">
+              Concept ({statusCounts.draft})
+            </TabsTrigger>
+            <TabsTrigger value="sent" data-testid="tab-sent">
+              Verzonden ({statusCounts.sent})
+            </TabsTrigger>
+            <TabsTrigger value="awaiting_delivery" data-testid="tab-awaiting-delivery">
+              Onderweg ({statusCounts.awaiting_delivery})
+            </TabsTrigger>
+            <TabsTrigger value="received" data-testid="tab-received">
+              Ontvangen ({statusCounts.received})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value={statusFilter} className="mt-6">
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="text-muted-foreground">Laden...</div>
+              </div>
+            ) : filteredPOs.length === 0 ? (
+              <div className="text-center py-12">
+                <Package2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium">Geen orders gevonden</h3>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {searchQuery ? "Probeer een andere zoekopdracht" : "Maak je eerste inkoop order aan"}
+                </p>
+              </div>
+            ) : viewMode === "table" ? (
+              <PurchaseOrdersTable
+                purchaseOrders={filteredPOs}
+                suppliers={suppliers || []}
+                onPOClick={handlePOClick}
+                getStatusColor={getStatusColor}
+              />
+            ) : (
+              <PurchaseOrdersCards
+                purchaseOrders={filteredPOs}
+                suppliers={suppliers || []}
+                onPOClick={handlePOClick}
+                getStatusColor={getStatusColor}
+              />
+            )}
           </TabsContent>
         </Tabs>
+      </div>
 
-        {/* Edit Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Inkoop Order Bewerken</DialogTitle>
-              <DialogDescription>
-                Wijzig de gegevens van de inkoop order
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Titel</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Beschrijving van de inkoop" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="supplierNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Leverancier nummer</FormLabel>
-                        <FormControl>
-                          <Input placeholder="L001" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="supplierName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Leverancier naam</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Leverancier BV" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="purchaseDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Datum inkoop</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="date" 
-                            value={typeof field.value === 'string' ? field.value : 
-                                   field.value instanceof Date ? field.value.toISOString().split('T')[0] : ''}
-                            onChange={(e) => field.onChange(e.target.value)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="amount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Inkoop bedrag (€)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            step="0.01"
-                            placeholder="0.00"
-                            value={field.value / 100}
-                            onChange={(e) => field.onChange(Math.round(parseFloat(e.target.value || "0") * 100))}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecteer status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="pending">In afwachting</SelectItem>
-                          <SelectItem value="ordered">Besteld</SelectItem>
-                          <SelectItem value="received">Ontvangen</SelectItem>
-                          <SelectItem value="cancelled">Geannuleerd</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="photos"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Afbeeldingen</FormLabel>
-                      <FormControl>
-                        <ImageUpload
-                          images={field.value || []}
-                          onChange={field.onChange}
-                          maxImages={5}
-                          maxSizeMB={5}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+      {/* Create/Edit Dialog */}
+      {showNewPO && (
+        <PurchaseOrderForm
+          open={showNewPO}
+          onClose={() => setShowNewPO(false)}
+          suppliers={suppliers || []}
+        />
+      )}
 
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Opmerkingen</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Eventuele opmerkingen..."
-                          className="min-h-[80px]"
-                          {...field}
-                          value={field.value || ""}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex justify-end space-x-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsEditDialogOpen(false);
-                      setSelectedPurchaseOrder(null);
-                      form.reset();
-                    }}
-                  >
-                    Annuleren
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={updateMutation.isPending}
-                  >
-                    {updateMutation.isPending ? "Bijwerken..." : "Bijwerken"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </main>
+      {/* Detail Modal */}
+      {showDetailModal && selectedPO && (
+        <PurchaseOrderDetailModal
+          purchaseOrder={selectedPO}
+          open={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedPO(null);
+          }}
+          suppliers={suppliers || []}
+        />
+      )}
     </div>
   );
 }
