@@ -71,8 +71,8 @@ const ISSUE_CATEGORIES = [
 export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProps) {
   const [slaDeadline, setSlaDeadline] = useState<Date | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [orderOpen, setOrderOpen] = useState(false);
-  const [orderSearchValue, setOrderSearchValue] = useState("");
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [showOrderResults, setShowOrderResults] = useState(false);
   const { toast } = useToast();
 
   const { data: customers = [], isError: customersError } = useQuery<Customer[]>({
@@ -83,6 +83,12 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
   const { data: orders = [], isError: ordersError } = useQuery<Order[]>({
     queryKey: ['/api/orders'],
     enabled: open,
+  });
+
+  // Search orders API
+  const { data: orderSearchResults } = useQuery<any>({
+    queryKey: [`/api/search?q=${orderSearchQuery}`],
+    enabled: orderSearchQuery.length > 2,
   });
 
   useEffect(() => {
@@ -189,8 +195,8 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
     reset();
     setSlaDeadline(null);
     setSelectedFiles([]);
-    setOrderOpen(false);
-    setOrderSearchValue("");
+    setOrderSearchQuery("");
+    setShowOrderResults(false);
     onOpenChange(false);
   };
 
@@ -217,8 +223,10 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
   const selectedOrder = orders.find(o => o.id === watch("orderId"));
   const selectedOrderCustomer = selectedOrder ? customers.find(c => c.id === selectedOrder.customerId) : null;
 
-  // Show latest 10 orders by default, all orders when searching
-  const ordersToShow = orderSearchValue ? orders : orders.slice(0, 10);
+  // Get search results or latest 10 orders
+  const displayOrders = orderSearchQuery.length > 2 && orderSearchResults?.orders 
+    ? orderSearchResults.orders 
+    : orders.slice(0, 10);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -295,84 +303,58 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
 
           <div className="space-y-2">
             <Label>Order / Klant</Label>
-            <Popover open={orderOpen} onOpenChange={setOrderOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={orderOpen}
-                  className="w-full justify-between"
-                  data-testid="button-order-combobox"
-                >
-                  {selectedOrder && selectedOrderCustomer
+            <div className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder={selectedOrder && selectedOrderCustomer 
                     ? `Order #${selectedOrder.orderNumber} - ${selectedOrderCustomer.firstName} ${selectedOrderCustomer.lastName}`
-                    : "Selecteer order..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent 
-                className="w-[var(--radix-popover-trigger-width)] p-0" 
-                side="bottom" 
-                align="start"
-                sideOffset={4}
-                avoidCollisions={false}
-              >
-                <Command>
-                  <CommandInput 
-                    placeholder="Zoek order of klant..." 
-                    className="h-9"
-                    value={orderSearchValue}
-                    onValueChange={setOrderSearchValue}
-                  />
-                  <CommandList>
-                    <CommandEmpty>Geen order gevonden.</CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        value="none"
-                        onSelect={() => {
-                          setValue("orderId", "none");
-                          setValue("customerId", "none");
-                          setOrderOpen(false);
-                          setOrderSearchValue("");
-                        }}
-                      >
-                        <Check
-                          className={`mr-2 h-4 w-4 ${
-                            watch("orderId") === "none" ? "opacity-100" : "opacity-0"
-                          }`}
-                        />
-                        Geen order
-                      </CommandItem>
-                      {ordersToShow.map((order) => {
+                    : "Zoek order of klant..."}
+                  className="pl-10"
+                  value={orderSearchQuery}
+                  onChange={(e) => setOrderSearchQuery(e.target.value)}
+                  onFocus={() => setShowOrderResults(true)}
+                  onBlur={() => setTimeout(() => setShowOrderResults(false), 200)}
+                  data-testid="input-order-search"
+                />
+              </div>
+
+              {showOrderResults && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+                  {displayOrders.length > 0 ? (
+                    <div className="p-1">
+                      {displayOrders.map((order: any) => {
                         const customer = customers.find(c => c.id === order.customerId);
                         const customerName = customer 
                           ? `${customer.firstName} ${customer.lastName}`
-                          : 'Onbekende klant';
+                          : order.customerEmail || 'Onbekende klant';
                         return (
-                          <CommandItem
+                          <div
                             key={order.id}
-                            value={`${order.orderNumber} ${customerName}`}
-                            onSelect={() => {
+                            className="p-2 hover:bg-accent rounded cursor-pointer"
+                            onClick={() => {
                               setValue("orderId", order.id);
                               setValue("customerId", order.customerId || "none");
-                              setOrderOpen(false);
-                              setOrderSearchValue("");
+                              setOrderSearchQuery("");
+                              setShowOrderResults(false);
                             }}
+                            data-testid={`order-result-${order.id}`}
                           >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                watch("orderId") === order.id ? "opacity-100" : "opacity-0"
-                              }`}
-                            />
-                            Order #{order.orderNumber} - {customerName}
-                          </CommandItem>
+                            <div className="font-medium">Order #{order.orderNumber}</div>
+                            <div className="text-sm text-muted-foreground">{customerName}</div>
+                          </div>
                         );
                       })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                    </div>
+                  ) : (
+                    <div className="p-4 text-sm text-muted-foreground">
+                      {orderSearchQuery.length > 2 ? 'Geen order gevonden' : 'Type om te zoeken...'}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
