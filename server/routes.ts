@@ -370,7 +370,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (caseId) {
         // Get todos linked to a specific case
         const relatedItems = await storage.getCaseRelatedItems(caseId as string);
-        res.json(relatedItems.todos);
+        let todos = relatedItems.todos;
+        
+        // Apply role-based filtering even for case-linked todos
+        if (req.user.role === 'TECHNICUS') {
+          // TECHNICUS only sees their own tasks
+          todos = todos.filter((todo: any) => todo.assignedUserId === req.user.id);
+        }
+        // ADMIN and SUPPORT can see all case-linked todos
+        
+        res.json(todos);
       } else {
         // Role-based filtering
         let todos: any[];
