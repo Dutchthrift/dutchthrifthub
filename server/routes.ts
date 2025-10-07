@@ -7,6 +7,8 @@ import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertP
 import { syncEmails, sendEmail } from "./services/emailService";
 import { shopifyClient } from "./services/shopifyClient";
 import { OrderMatchingService } from "./services/orderMatchingService";
+import multer from "multer";
+import Papa from "papaparse";
 
 // Extend Request type to include session
 interface AuthenticatedRequest extends Request {
@@ -83,6 +85,9 @@ const auditLog = async (req: any, action: string, resource: string, resourceId?:
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize order matching service
   const orderMatchingService = new OrderMatchingService(storage);
+  
+  // Configure multer for file uploads (memory storage for CSV)
+  const upload = multer({ storage: multer.memoryStorage() });
 
   // Authentication routes
   app.post("/api/auth/signin", async (req, res) => {
@@ -1045,6 +1050,205 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error syncing orders:", error);
       res.status(500).json({ message: "Failed to sync orders", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // CSV Import endpoint for orders (ADMIN only)
+  app.post("/api/orders/import-csv", requireAuth, requireRole(["ADMIN"]), upload.single('file'), async (req: any, res: any) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      console.log('📂 Starting CSV import...');
+      const csvContent = req.file.buffer.toString('utf-8');
+      
+      // Parse CSV
+      const parseResult = Papa.parse(csvContent, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header: string) => header.trim()
+      });
+
+      if (parseResult.errors.length > 0) {
+        console.error('CSV parsing errors:', parseResult.errors);
+        return res.status(400).json({ 
+          error: 'CSV parsing failed', 
+          details: parseResult.errors.slice(0, 5)
+        });
+      }
+
+      const rows = parseResult.data as any[];
+      console.log(`📊 Parsed ${rows.length} rows from CSV`);
+
+      // Group rows by order number (Name column contains order number like #8546)
+      const orderGroups = new Map<string, any[]>();
+      for (const row of rows) {
+        const orderNumber = row['Name']?.toString().trim();
+        if (!orderNumber) continue;
+        
+        if (!orderGroups.has(orderNumber)) {
+          orderGroups.set(orderNumber, []);
+        }
+        orderGroups.get(orderNumber)!.push(row);
+      }
+
+      console.log(`📦 Found ${orderGroups.size} unique orders`);
+
+      let stats = {
+        processed: 0,
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        errors: [] as string[]
+      };
+
+      // Map CSV status to our enum
+      const mapCSVStatus = (financialStatus: string, fulfillmentStatus: string): 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded' => {
+        const financial = financialStatus?.toLowerCase() || '';
+        const fulfillment = fulfillmentStatus?.toLowerCase() || '';
+        
+        if (fulfillment === 'fulfilled') return 'delivered';
+        if (fulfillment === 'partial') return 'shipped';
+        if (financial === 'paid' || financial === 'authorized') {
+          return fulfillment === 'unfulfilled' || !fulfillment ? 'processing' : 'shipped';
+        }
+        if (financial === 'pending') return 'pending';
+        if (financial === 'refunded' || financial === 'partially_refunded') return 'refunded';
+        if (financial === 'voided') return 'cancelled';
+        return 'pending';
+      };
+
+      // Process each order
+      for (const [orderNumber, orderRows] of Array.from(orderGroups.entries())) {
+        try {
+          // Use first row for order-level data
+          const firstRow = orderRows[0];
+          const email = firstRow['Email']?.toString().trim();
+          
+          if (!email) {
+            stats.skipped++;
+            stats.errors.push(`Order ${orderNumber}: No email address`);
+            continue;
+          }
+
+          // Parse amounts (handle both formats: "19.48" and "19,48")
+          const parseAmount = (value: string) => {
+            if (!value) return 0;
+            const cleaned = value.toString().replace(',', '.');
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? 0 : Math.round(parsed * 100); // Convert to cents
+          };
+
+          const total = parseAmount(firstRow['Total'] || '0');
+          const subtotal = parseAmount(firstRow['Subtotal'] || '0');
+          const shipping = parseAmount(firstRow['Shipping'] || '0');
+          const currency = firstRow['Currency']?.toString().trim() || 'EUR';
+          
+          const financialStatus = firstRow['Financial Status']?.toString().trim() || '';
+          const fulfillmentStatus = firstRow['Fulfillment Status']?.toString().trim() || '';
+          const createdAt = firstRow['Created at']?.toString().trim() || '';
+
+          // Extract customer info
+          const billingName = firstRow['Billing Name']?.toString().trim() || '';
+          const nameParts = billingName.split(' ');
+          const firstName = nameParts[0] || null;
+          const lastName = nameParts.slice(1).join(' ') || null;
+          const phone = firstRow['Billing Phone']?.toString().trim() || null;
+
+          // Create or get customer
+          let customer = await storage.getCustomerByEmail(email);
+          if (!customer) {
+            customer = await storage.createCustomer({
+              email,
+              firstName,
+              lastName,
+              phone
+            });
+          }
+
+          // Check if order already exists by order number
+          const existingOrder = await storage.getOrderByOrderNumber(orderNumber);
+          
+          // Collect line items from all rows for this order
+          const lineItems = orderRows
+            .filter((row: any) => row['Lineitem name'])
+            .map((row: any) => ({
+              name: row['Lineitem name'],
+              quantity: parseInt(row['Lineitem quantity'] || '1'),
+              price: row['Lineitem price'],
+              sku: row['Lineitem sku']
+            }));
+
+          const orderData = {
+            shopifyOrderId: orderNumber, // Use order number as Shopify ID for CSV imports
+            orderNumber: orderNumber.replace('#', ''), // Remove # prefix
+            customerId: customer.id,
+            customerEmail: email,
+            totalAmount: total,
+            currency,
+            status: mapCSVStatus(financialStatus, fulfillmentStatus),
+            fulfillmentStatus: fulfillmentStatus || null,
+            paymentStatus: financialStatus || null,
+            orderData: {
+              csv_import: true,
+              billing_name: billingName,
+              subtotal,
+              shipping,
+              created_at: createdAt,
+              line_items: lineItems,
+              billing_address: {
+                name: billingName,
+                address1: firstRow['Billing Address1'],
+                city: firstRow['Billing City'],
+                zip: firstRow['Billing Zip'],
+                country: firstRow['Billing Country']
+              },
+              shipping_address: {
+                name: firstRow['Shipping Name'],
+                address1: firstRow['Shipping Address1'],
+                city: firstRow['Shipping City'],
+                zip: firstRow['Shipping Zip'],
+                country: firstRow['Shipping Country']
+              }
+            }
+          };
+
+          if (!existingOrder) {
+            await storage.createOrder(orderData);
+            stats.created++;
+          } else {
+            await storage.updateOrder(existingOrder.id, orderData);
+            stats.updated++;
+          }
+
+          stats.processed++;
+        } catch (orderError) {
+          console.error(`Error processing order ${orderNumber}:`, orderError);
+          stats.skipped++;
+          stats.errors.push(`Order ${orderNumber}: ${orderError instanceof Error ? orderError.message : String(orderError)}`);
+        }
+      }
+
+      console.log(`✅ CSV import completed: ${stats.created} created, ${stats.updated} updated, ${stats.skipped} skipped`);
+
+      res.json({
+        success: true,
+        processed: stats.processed,
+        created: stats.created,
+        updated: stats.updated,
+        skipped: stats.skipped,
+        errors: stats.errors.slice(0, 10), // Limit error messages
+        totalErrors: stats.errors.length,
+        message: `CSV import completed: ${stats.created} created, ${stats.updated} updated, ${stats.skipped} skipped from ${orderGroups.size} orders`
+      });
+
+    } catch (error) {
+      console.error('CSV import failed:', error);
+      res.status(500).json({
+        error: 'CSV import failed',
+        message: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 

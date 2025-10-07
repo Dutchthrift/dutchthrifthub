@@ -20,7 +20,8 @@ import {
   ChevronUp,
   ChevronsUpDown,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Upload
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Order } from "@/lib/types";
@@ -70,6 +71,8 @@ export default function Orders() {
   const [pageSize, setPageSize] = useState(20);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   const { data: ordersData, isLoading } = useQuery<{ orders: Order[], total: number } | Order[]>({
@@ -140,6 +143,42 @@ export default function Orders() {
       toast({
         title: "Sync mislukt",
         description: error instanceof Error ? error.message : "Failed to sync from Shopify",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const importCSVMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/orders/import-csv', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'CSV import failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders/stats"] });
+      setShowImportDialog(false);
+      setSelectedFile(null);
+      toast({
+        title: "CSV Import Successful",
+        description: `Imported: ${data.created} created, ${data.updated} updated, ${data.skipped} skipped`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "CSV Import Failed",
+        description: error instanceof Error ? error.message : "Failed to import CSV",
         variant: "destructive",
       });
     }
@@ -324,6 +363,15 @@ export default function Orders() {
             <Button variant="outline" data-testid="export-orders-button">
               <Download className="mr-2 h-4 w-4" />
               Export CSV
+            </Button>
+            
+            <Button 
+              variant="outline"
+              onClick={() => setShowImportDialog(true)}
+              data-testid="import-csv-button"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Import CSV
             </Button>
             
             <Button 
@@ -812,6 +860,64 @@ export default function Orders() {
                 </Card>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* CSV Import Dialog */}
+        <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Import Orders from CSV</DialogTitle>
+              <DialogDescription>
+                Upload a Shopify order export CSV file to import orders into the system. The system will automatically create or update orders and customers.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  disabled={importCSVMutation.isPending}
+                  data-testid="csv-file-input"
+                />
+                {selectedFile && (
+                  <p className="text-sm text-muted-foreground">
+                    Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowImportDialog(false);
+                    setSelectedFile(null);
+                  }}
+                  disabled={importCSVMutation.isPending}
+                  data-testid="cancel-import-button"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => selectedFile && importCSVMutation.mutate(selectedFile)}
+                  disabled={!selectedFile || importCSVMutation.isPending}
+                  data-testid="confirm-import-button"
+                >
+                  {importCSVMutation.isPending ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Import Orders
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </main>
