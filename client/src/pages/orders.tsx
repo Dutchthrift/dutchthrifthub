@@ -784,7 +784,7 @@ export default function Orders() {
                   Complete order information and history
                 </DialogDescription>
               </div>
-              {selectedOrder && !selectedOrder.caseId && (
+              {selectedOrder && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -997,7 +997,7 @@ export default function Orders() {
         <CreateCaseModal 
           open={showCreateCase} 
           onOpenChange={setShowCreateCase}
-          order={selectedOrder || undefined}
+          order={selectedOrder as any}
         />
       </main>
     </div>

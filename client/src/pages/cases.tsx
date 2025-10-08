@@ -346,9 +346,21 @@ export default function Cases() {
                     #{caseItem.caseNumber}
                   </span>
                   {caseItem.slaDeadline && (
-                    <span className={`font-medium ${isOverdue(caseItem.slaDeadline) ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {isOverdue(caseItem.slaDeadline) ? 'Overdue' : formatDate(caseItem.slaDeadline)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-medium ${isOverdue(caseItem.slaDeadline) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                        {isOverdue(caseItem.slaDeadline) ? 'Overdue' : formatDate(caseItem.slaDeadline)}
+                      </span>
+                      {isOverdue(caseItem.slaDeadline) && (
+                        <Badge
+                          variant="destructive"
+                          className="text-xs flex items-center gap-1 animate-pulse"
+                          data-testid={`badge-sla-overdue-${caseItem.id}`}
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          SLA
+                        </Badge>
+                      )}
+                    </div>
                   )}
                 </div>
 

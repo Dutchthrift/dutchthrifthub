@@ -205,7 +205,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread, order }: Crea
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Prioriteit</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="case-priority-select">
                           <SelectValue placeholder="Selecteer prioriteit" />
