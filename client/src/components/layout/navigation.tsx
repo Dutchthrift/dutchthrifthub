@@ -16,6 +16,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { GlobalSearch } from "@/components/search/global-search";
 import { CommandPalette } from "@/components/search/command-palette";
 import { useState } from "react";
+import { useAuth } from "@/lib/auth";
 
 const navigationItems = [
   { href: "/", label: "Home", icon: Home },
@@ -31,6 +32,11 @@ export function Navigation() {
   const [location] = useLocation();
   const { setTheme } = useTheme();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <>
@@ -114,7 +120,7 @@ export function Navigation() {
                   System Theme
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem data-testid="user-menu-logout">
+                <DropdownMenuItem onClick={handleLogout} data-testid="user-menu-logout">
                   Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
