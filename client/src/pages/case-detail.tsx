@@ -54,6 +54,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { InternalNotes } from "@/components/notes/internal-notes";
+import { EmailCompose } from "@/components/email/email-compose";
 
 const CASE_STATUS_OPTIONS = [
   { value: "new", label: "New" },
@@ -823,6 +824,10 @@ export default function CaseDetail() {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                <Button className="w-full justify-start" variant="outline" onClick={() => setShowEmailDialog(true)} data-testid="button-send-email-quick-action">
+                  <Mail className="mr-2 h-4 w-4" />
+                  Send Email
+                </Button>
                 <Button className="w-full justify-start" variant="outline" onClick={() => setShowAssignDialog(true)} data-testid="assign-case-button">
                   <User className="mr-2 h-4 w-4" />
                   Assign Case
@@ -1084,6 +1089,14 @@ export default function CaseDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Send Email Dialog */}
+      <EmailCompose
+        open={showEmailDialog}
+        onOpenChange={setShowEmailDialog}
+        to={caseData?.customerEmail || ""}
+        subject={`Re: Case #${caseData?.caseNumber || caseId}`}
+      />
     </div>
   );
 }
