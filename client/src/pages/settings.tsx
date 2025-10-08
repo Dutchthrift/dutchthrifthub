@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Settings as SettingsIcon, Mail, Plug, Server, Save } from "lucide-react";
+import { Navigation } from "@/components/layout/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -126,9 +127,10 @@ export default function Settings() {
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-background">
+      <Navigation />
+      <main className="p-6">
+        <div className="mb-6">
           <div className="flex items-center space-x-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
               <SettingsIcon className="h-5 w-5 text-primary" />
@@ -139,9 +141,8 @@ export default function Settings() {
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex-1 overflow-auto p-6">
+        <div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="general" data-testid="tab-general">
@@ -562,7 +563,8 @@ export default function Settings() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
