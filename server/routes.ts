@@ -276,12 +276,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { password, ...userWithoutPassword } = newUser;
       res.status(201).json(userWithoutPassword);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating user:", error);
-      if (error.code === '23505') { // Unique constraint violation
-        res.status(409).json({ error: "Email or username already exists" });
-      } else if (error.name === 'ZodError') {
+      if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid user data", details: error.errors });
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+        res.status(409).json({ error: "Email or username already exists" });
       } else {
         res.status(400).json({ error: "Failed to create user" });
       }
@@ -317,11 +317,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return user without password
       const { password, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Update user error:", error);
-      if (error.name === 'ZodError') {
+      if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid update data", details: error.errors });
-      } else if (error.code === '23505') { // Unique constraint violation
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
         res.status(409).json({ error: "Email already exists" });
       } else {
         res.status(500).json({ error: "Failed to update user" });
@@ -678,7 +678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uploadedUrls: string[] = [];
 
       for (const file of files) {
-        const filename = `${Date.now()}-${file.originalname}`;
+        const filename = `repair-${id}-${type}-${Date.now()}-${file.originalname}`;
         const url = await objectStorage.saveAttachment(filename, file.buffer, file.mimetype);
         uploadedUrls.push(url);
       }
