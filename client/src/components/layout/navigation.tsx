@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Camera, Home, Inbox, ShoppingCart, Package2, Wrench, CheckSquare, BarChart3, Briefcase, Search, Bell, ChevronDown } from "lucide-react";
+import { Camera, Home, Inbox, ShoppingCart, Package2, Wrench, CheckSquare, BarChart3, Briefcase, Search, Bell, ChevronDown, Settings, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,6 +95,33 @@ export function Navigation() {
           <div className="ml-auto flex items-center space-x-4">
             {/* Search */}
             <GlobalSearch />
+
+            {/* Admin Dropdown - Only visible to ADMIN users */}
+            {user?.role === "ADMIN" && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild data-testid="admin-menu-trigger">
+                  <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                    <Settings className="h-4 w-4" />
+                    <span className="text-sm">Admin</span>
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" data-testid="admin-menu-content">
+                  <DropdownMenuItem asChild data-testid="admin-menu-users">
+                    <Link href="/users" className="flex items-center cursor-pointer">
+                      <Users className="h-4 w-4 mr-2" />
+                      User Management
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild data-testid="admin-menu-settings">
+                    <Link href="/settings" className="flex items-center cursor-pointer">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             {/* Notifications */}
             <Button
