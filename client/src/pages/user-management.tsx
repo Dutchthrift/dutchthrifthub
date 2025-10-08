@@ -63,7 +63,7 @@ export default function UserManagement() {
 
   // Create user mutation
   const createUserMutation = useMutation({
-    mutationFn: (userData: UserForm) => apiRequest("/api/users", "POST", userData),
+    mutationFn: (userData: UserForm) => apiRequest("POST", "/api/users", userData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setCreateDialogOpen(false);
@@ -84,7 +84,7 @@ export default function UserManagement() {
 
   // Update user mutation
   const updateUserMutation = useMutation({
-    mutationFn: ({ id, ...userData }: EditUserForm & { id: string }) => apiRequest(`/api/users/${id}`, "PATCH", userData),
+    mutationFn: ({ id, ...userData }: EditUserForm & { id: string }) => apiRequest("PATCH", `/api/users/${id}`, userData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setEditDialogOpen(false);
@@ -106,7 +106,7 @@ export default function UserManagement() {
 
   // Delete user mutation
   const deleteUserMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/users/${id}`, "DELETE"),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({
