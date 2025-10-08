@@ -349,6 +349,18 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                   Mark as Read
                 </Button>
               )}
+              {(!linkedCases || linkedCases.length === 0) && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowCreateCase(true)}
+                  className="border-cases/30 dark:border-cases/30 hover:bg-cases/10 dark:hover:bg-cases/10 text-cases"
+                  data-testid="button-create-case-from-email"
+                >
+                  <Briefcase className="h-4 w-4 mr-1" />
+                  Create Case
+                </Button>
+              )}
               <Button 
                 variant="default" 
                 size="sm" 
