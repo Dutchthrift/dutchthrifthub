@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import ProtectedRoute from "@/components/auth/protected-route";
-import AdminLayout from "@/components/layout/admin-layout";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Inbox from "@/pages/inbox";
@@ -19,80 +18,123 @@ import CustomerDetail from "@/pages/customer-detail";
 import CaseDetail from "@/pages/case-detail";
 import UserManagement from "@/pages/user-management";
 
-// Higher-order component that wraps pages with admin layout and protection
-function createProtectedPage(PageComponent, allowedRoles) {
-  return function ProtectedPageWrapper(props) {
-    return (
-      <ProtectedRoute 
-        component={(pageProps) => (
-          <AdminLayout>
-            <PageComponent {...pageProps} />
-          </AdminLayout>
-        )}
-        roles={allowedRoles}
-        {...props} 
-      />
-    );
-  };
-}
-
 function Router() {
   return (
     <Switch>
       {/* Dashboard - accessible by all authenticated users */}
       <Route 
         path="/" 
-        component={createProtectedPage(Dashboard, ["ADMIN", "SUPPORT", "TECHNICUS"])} 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={Dashboard}
+            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
+            {...props} 
+          />
+        )} 
       />
 
       {/* User Management - ADMIN only */}
       <Route 
         path="/users" 
-        component={createProtectedPage(UserManagement, ["ADMIN"])}
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={UserManagement}
+            roles={["ADMIN"]}
+            {...props} 
+          />
+        )}
       />
 
       {/* Repairs - ADMIN and TECHNICUS only */}
       <Route 
         path="/repairs" 
-        component={createProtectedPage(Repairs, ["ADMIN", "TECHNICUS"])} 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={Repairs}
+            roles={["ADMIN", "TECHNICUS"]}
+            {...props} 
+          />
+        )} 
       />
 
       {/* Cases - ADMIN and SUPPORT only */}
       <Route 
         path="/cases" 
-        component={createProtectedPage(Cases, ["ADMIN", "SUPPORT"])} 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={Cases}
+            roles={["ADMIN", "SUPPORT"]}
+            {...props} 
+          />
+        )} 
       />
 
       <Route 
         path="/cases/:id" 
-        component={createProtectedPage(CaseDetail, ["ADMIN", "SUPPORT"])} 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={CaseDetail}
+            roles={["ADMIN", "SUPPORT"]}
+            {...props} 
+          />
+        )} 
       />
 
       {/* Inbox - ADMIN and SUPPORT only */}
       <Route 
         path="/inbox" 
-        component={createProtectedPage(Inbox, ["ADMIN", "SUPPORT"])} 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={Inbox}
+            roles={["ADMIN", "SUPPORT"]}
+            {...props} 
+          />
+        )} 
       />
 
       {/* Other protected routes */}
       <Route 
         path="/orders" 
-        component={createProtectedPage(Orders, ["ADMIN", "SUPPORT", "TECHNICUS"])} 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={Orders}
+            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
+            {...props} 
+          />
+        )} 
       />
 
       <Route 
         path="/purchase-orders" 
-        component={createProtectedPage(PurchaseOrders, ["ADMIN", "SUPPORT", "TECHNICUS"])} 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={PurchaseOrders}
+            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
+            {...props} 
+          />
+        )} 
       />
 
       <Route 
         path="/todos" 
-        component={createProtectedPage(Todos, ["ADMIN", "SUPPORT", "TECHNICUS"])} 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={Todos}
+            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
+            {...props} 
+          />
+        )} 
       />
 
       <Route 
         path="/customers/:id" 
-        component={createProtectedPage(CustomerDetail, ["ADMIN", "SUPPORT", "TECHNICUS"])} 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={CustomerDetail}
+            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
+            {...props} 
+          />
+        )} 
       />
 
       <Route component={NotFound} />
