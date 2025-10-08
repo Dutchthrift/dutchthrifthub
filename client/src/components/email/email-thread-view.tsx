@@ -37,6 +37,7 @@ import { CreateCaseModal } from "@/components/forms/create-case-modal";
 import { EmailAttachments } from "./email-attachments";
 import { SanitizedEmailContent } from "./sanitized-email-content";
 import { EmailThreadSkeleton } from "./email-thread-skeleton";
+import { cn } from "@/lib/utils";
 
 interface EmailThreadViewProps {
   threadId: string;
@@ -289,50 +290,50 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
   }
 
   return (
-    <div className="h-full flex gap-6" data-testid="email-thread-view">
+    <div className="h-full flex gap-3" data-testid="email-thread-view">
       <div className="flex-1 flex flex-col">
         {/* Thread Header */}
-        <div className="bg-background border-b border-border pb-4 mb-4" data-testid="email-thread-header">
-          <div className="flex items-start justify-between mb-3">
+        <div className="bg-background border-b border-border pb-2 mb-3 px-4 pt-3" data-testid="email-thread-header">
+          <div className="flex items-start justify-between mb-2">
             <div className="flex-1">
-              <h2 className="text-xl font-semibold text-foreground mb-2">
+              <h2 className="text-base font-semibold text-foreground mb-1.5">
                 {thread.subject || "No Subject"}
               </h2>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
                 <Badge 
                   variant={thread.status === 'open' ? 'default' : 'secondary'}
-                  className={thread.status === 'open' ? 'bg-green-600 hover:bg-green-700' : ''}
+                  className={cn("text-xs py-0 h-5", thread.status === 'open' ? 'bg-green-600 hover:bg-green-700' : '')}
                 >
                   {thread.status}
                 </Badge>
                 {thread.priority !== 'medium' && (
                   <Badge 
                     variant={thread.priority === 'urgent' ? 'destructive' : 'default'}
-                    className={thread.priority === 'high' ? 'bg-orange-500 hover:bg-orange-600' : ''}
+                    className={cn("text-xs py-0 h-5", thread.priority === 'high' ? 'bg-orange-500 hover:bg-orange-600' : '')}
                   >
                     {thread.priority}
                   </Badge>
                 )}
                 {thread.hasAttachment && (
-                  <Badge variant="outline" className="border-blue-300 dark:border-blue-700">
+                  <Badge variant="outline" className="border-blue-300 dark:border-blue-700 text-xs py-0 h-5">
                     <Paperclip className="h-3 w-3 mr-1" />
                     Attachments
                   </Badge>
                 )}
                 {linkedCases && linkedCases.length > 0 && (
-                  <Badge variant="outline" className="border-purple-300 dark:border-purple-700">
+                  <Badge variant="outline" className="border-purple-300 dark:border-purple-700 text-xs py-0 h-5">
                     Case #{linkedCases[0].caseNumber}
                   </Badge>
                 )}
                 {thread.orderId && (
-                  <Badge variant="outline" className="border-indigo-300 dark:border-indigo-700">
+                  <Badge variant="outline" className="border-indigo-300 dark:border-indigo-700 text-xs py-0 h-5">
                     <ShoppingCart className="h-3 w-3 mr-1" />
                     Order
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
-                <User className="h-4 w-4" />
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <User className="h-3 w-3" />
                 <span>{thread.customerEmail}</span>
               </div>
             </div>
@@ -469,7 +470,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
       </div>
 
       {/* Customer Context Sidebar */}
-      <div className="w-80 space-y-4" data-testid="customer-context-sidebar">
+      <div className="w-64 space-y-3" data-testid="customer-context-sidebar">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center">

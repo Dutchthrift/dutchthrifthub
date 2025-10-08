@@ -280,9 +280,9 @@ export default function Inbox() {
         </div>
 
         {/* Middle Column - Email List */}
-        <div className="flex-1 flex flex-col border-r">
+        <div className="w-80 flex flex-col border-r flex-shrink-0">
           {/* Header */}
-          <div className="border-b bg-card p-4">
+          <div className="border-b bg-card p-3">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Button
@@ -377,8 +377,8 @@ export default function Inbox() {
 
         {/* Right Panel - Thread View */}
         <div className={cn(
-          "transition-all duration-300 flex-shrink-0 flex flex-col",
-          rightPanelCollapsed ? "w-0 overflow-hidden" : "w-[600px]"
+          "transition-all duration-300 flex flex-col",
+          rightPanelCollapsed ? "w-0 overflow-hidden" : "flex-1"
         )}>
           {!rightPanelCollapsed && (
             <>
