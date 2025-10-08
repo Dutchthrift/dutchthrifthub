@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { CaseForm } from "../components/forms/case-form";
 import { CaseContextMenu } from "../components/cases/case-context-menu";
+import { CaseDetailDrawer } from "../components/cases/case-detail-drawer";
 
 const CASE_STATUS_CONFIG = {
   new: { label: "New", color: "bg-chart-4", icon: FileText },
@@ -48,6 +49,7 @@ export default function Cases() {
   const [showNewCase, setShowNewCase] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [columns, setColumns] = useState(Object.keys(CASE_STATUS_CONFIG));
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: cases, isLoading } = useQuery<CaseWithDetails[]>({
@@ -250,7 +252,7 @@ export default function Cases() {
 
   // Context menu handlers
   const handleCaseOpen = (caseId: string) => {
-    window.location.href = `/cases/${caseId}`;
+    setSelectedCaseId(caseId);
   };
 
   const handleCaseArchive = (caseId: string) => {
@@ -305,7 +307,7 @@ export default function Cases() {
             className={`mb-3 cursor-pointer hover:shadow-md transition-shadow ${
               snapshot.isDragging ? "rotate-3 shadow-lg" : ""
             } ${caseItem.archived ? "opacity-60" : ""}`}
-            onClick={() => window.location.href = `/cases/${caseItem.id}`}
+            onClick={() => setSelectedCaseId(caseItem.id)}
             data-testid={`case-card-${caseItem.id}`}
           >
             <CardContent className="p-4">
@@ -577,6 +579,13 @@ export default function Cases() {
           )}
         </div>
       </main>
+
+      {/* Case Detail Drawer */}
+      <CaseDetailDrawer
+        caseId={selectedCaseId}
+        open={!!selectedCaseId}
+        onOpenChange={(open) => !open && setSelectedCaseId(null)}
+      />
     </div>
   );
 }
