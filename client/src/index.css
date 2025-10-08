@@ -39,14 +39,14 @@
   --ring: hsl(221 83% 53%);
   
   /* Section-specific colors */
-  --inbox-primary: hsl(195 85% 55%);
-  --inbox-bg: hsl(195 95% 97%);
-  --orders-primary: hsl(265 70% 60%);
-  --orders-bg: hsl(265 90% 97%);
-  --repairs-primary: hsl(25 90% 60%);
-  --repairs-bg: hsl(25 95% 97%);
-  --cases-primary: hsl(145 65% 50%);
-  --cases-bg: hsl(145 85% 97%);
+  --inbox-primary: 195 85% 55%;
+  --inbox-bg: 195 95% 97%;
+  --orders-primary: 265 70% 60%;
+  --orders-bg: 265 90% 97%;
+  --repairs-primary: 25 90% 60%;
+  --repairs-bg: 25 95% 97%;
+  --cases-primary: 145 65% 50%;
+  --cases-bg: 145 85% 97%;
   
   /* Enhanced chart colors */
   --chart-1: hsl(15 85% 62%);
@@ -115,14 +115,14 @@
   --ring: hsl(221 83% 58%);
   
   /* Section-specific colors - Darker variants */
-  --inbox-primary: hsl(195 85% 50%);
-  --inbox-bg: hsl(195 50% 15%);
-  --orders-primary: hsl(265 70% 55%);
-  --orders-bg: hsl(265 40% 15%);
-  --repairs-primary: hsl(25 90% 55%);
-  --repairs-bg: hsl(25 50% 15%);
-  --cases-primary: hsl(145 65% 45%);
-  --cases-bg: hsl(145 40% 15%);
+  --inbox-primary: 195 85% 50%;
+  --inbox-bg: 195 50% 15%;
+  --orders-primary: 265 70% 55%;
+  --orders-bg: 265 40% 15%;
+  --repairs-primary: 25 90% 55%;
+  --repairs-bg: 25 50% 15%;
+  --cases-primary: 145 65% 45%;
+  --cases-bg: 145 40% 15%;
   
   /* Enhanced chart colors */
   --chart-1: hsl(15 85% 58%);
