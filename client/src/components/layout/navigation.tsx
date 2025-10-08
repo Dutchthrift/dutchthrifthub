@@ -32,10 +32,24 @@ export function Navigation() {
   const [location] = useLocation();
   const { setTheme } = useTheme();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
 
   const handleLogout = async () => {
     await signOut();
+  };
+
+  const getUserInitials = () => {
+    if (!user) return "??";
+    if (user.firstName && user.lastName) {
+      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    }
+    if (user.firstName) {
+      return user.firstName[0].toUpperCase();
+    }
+    if (user.email) {
+      return user.email[0].toUpperCase();
+    }
+    return "??";
   };
 
   return (
@@ -100,7 +114,7 @@ export function Navigation() {
               <DropdownMenuTrigger asChild data-testid="user-menu-trigger">
                 <Button variant="ghost" className="flex items-center space-x-2">
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback>JD</AvatarFallback>
+                    <AvatarFallback>{getUserInitials()}</AvatarFallback>
                   </Avatar>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </Button>
