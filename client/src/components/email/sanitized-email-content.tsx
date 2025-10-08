@@ -156,30 +156,49 @@ export function SanitizedEmailContent({ body, isHtml, encoding }: SanitizedEmail
   }
 
   return (
-    <div 
-      className="prose prose-sm max-w-none dark:prose-invert
-        prose-p:my-2 prose-p:leading-relaxed
-        prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold
-        prose-ul:my-2 prose-ol:my-2 prose-ul:pl-4 prose-ol:pl-4
-        prose-li:my-1
-        prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-a:break-words
-        prose-img:rounded-md prose-img:shadow-sm prose-img:max-w-full prose-img:h-auto
-        prose-blockquote:border-l-4 prose-blockquote:border-gray-300 dark:prose-blockquote:border-gray-600 prose-blockquote:pl-4 prose-blockquote:italic
-        prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:break-words prose-code:text-sm
-        prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:p-3 prose-pre:rounded-md prose-pre:overflow-x-auto
-        prose-hr:my-4 prose-hr:border-gray-300 dark:prose-hr:border-gray-600
-        prose-table:border-collapse prose-table:w-auto prose-table:my-4
-        prose-td:border prose-td:border-gray-300 dark:prose-td:border-gray-600 prose-td:px-3 prose-td:py-2
-        prose-th:border prose-th:border-gray-300 dark:prose-th:border-gray-600 prose-th:px-3 prose-th:py-2 prose-th:bg-gray-100 dark:prose-th:bg-gray-800
-        text-foreground
-        break-words overflow-wrap-anywhere
-      "
-      style={{ 
-        wordBreak: 'break-word', 
-        overflowWrap: 'anywhere',
-        maxWidth: '100%' 
-      }}
-      dangerouslySetInnerHTML={{ __html: sanitized }}
-    />
+    <div className="overflow-x-auto max-w-full">
+      <style>{`
+        .email-content-wrapper table {
+          max-width: 100% !important;
+          width: auto !important;
+          table-layout: auto !important;
+        }
+        .email-content-wrapper td,
+        .email-content-wrapper th {
+          max-width: 300px !important;
+          word-wrap: break-word !important;
+          word-break: break-word !important;
+          overflow-wrap: anywhere !important;
+        }
+        .email-content-wrapper * {
+          max-width: 100% !important;
+        }
+      `}</style>
+      <div 
+        className="email-content-wrapper prose prose-sm max-w-none dark:prose-invert
+          prose-p:my-2 prose-p:leading-relaxed
+          prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold
+          prose-ul:my-2 prose-ol:my-2 prose-ul:pl-4 prose-ol:pl-4
+          prose-li:my-1
+          prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-a:break-words
+          prose-img:rounded-md prose-img:shadow-sm prose-img:max-w-full prose-img:h-auto
+          prose-blockquote:border-l-4 prose-blockquote:border-gray-300 dark:prose-blockquote:border-gray-600 prose-blockquote:pl-4 prose-blockquote:italic
+          prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:break-words prose-code:text-sm
+          prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:p-3 prose-pre:rounded-md prose-pre:overflow-x-auto
+          prose-hr:my-4 prose-hr:border-gray-300 dark:prose-hr:border-gray-600
+          prose-table:border-collapse prose-table:max-w-full prose-table:my-4 prose-table:table-auto
+          prose-td:border prose-td:border-gray-300 dark:prose-td:border-gray-600 prose-td:px-2 prose-td:py-1 prose-td:text-xs
+          prose-th:border prose-th:border-gray-300 dark:prose-th:border-gray-600 prose-th:px-2 prose-th:py-1 prose-th:bg-gray-100 dark:prose-th:bg-gray-800 prose-th:text-xs
+          text-foreground
+          break-words overflow-wrap-anywhere
+        "
+        style={{ 
+          wordBreak: 'break-word', 
+          overflowWrap: 'anywhere',
+          maxWidth: '100%' 
+        }}
+        dangerouslySetInnerHTML={{ __html: sanitized }}
+      />
+    </div>
   );
 }
