@@ -282,7 +282,7 @@ export default function Inbox() {
         {/* Middle Column - Email List */}
         <div className="w-80 flex flex-col border-r flex-shrink-0">
           {/* Header */}
-          <div className="border-b bg-card p-3">
+          <div className="border-b bg-inbox p-3">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Button

@@ -394,34 +394,36 @@ export default function Orders() {
       <Navigation />
       
       <main className="flex-1 p-6">
-        <div className="flex items-center justify-between mb-6" data-testid="orders-header">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
-            <p className="text-muted-foreground">View and manage customer orders from Shopify</p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" data-testid="export-orders-button">
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-            
-            <Button 
-              variant="outline"
-              onClick={() => setShowImportDialog(true)}
-              data-testid="import-csv-button"
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Import CSV
-            </Button>
-            
-            <Button 
-              onClick={() => syncAllMutation.mutate()}
-              disabled={syncAllMutation.isPending}
-              data-testid="sync-shopify-button"
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${syncAllMutation.isPending ? 'animate-spin' : ''}`} />
-              {syncAllMutation.isPending ? "Syncing..." : "Sync Shopify"}
-            </Button>
+        <div className="bg-orders rounded-lg p-6 mb-6" data-testid="orders-header">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-orders">Orders</h1>
+              <p className="text-foreground/80">View and manage customer orders from Shopify</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" data-testid="export-orders-button">
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </Button>
+              
+              <Button 
+                variant="outline"
+                onClick={() => setShowImportDialog(true)}
+                data-testid="import-csv-button"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Import CSV
+              </Button>
+              
+              <Button 
+                onClick={() => syncAllMutation.mutate()}
+                disabled={syncAllMutation.isPending}
+                data-testid="sync-shopify-button"
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${syncAllMutation.isPending ? 'animate-spin' : ''}`} />
+                {syncAllMutation.isPending ? "Syncing..." : "Sync Shopify"}
+              </Button>
+            </div>
           </div>
         </div>
 

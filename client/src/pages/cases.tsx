@@ -411,25 +411,27 @@ export default function Cases() {
       <Navigation />
       
       <main className="flex-1 p-6">
-        <div className="flex items-center justify-between mb-6" data-testid="cases-header">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Cases</h1>
-            <p className="text-muted-foreground">Manage customer cases and track progress</p>
+        <div className="bg-cases rounded-lg p-6 mb-6" data-testid="cases-header">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-cases">Cases</h1>
+              <p className="text-foreground/80">Manage customer cases and track progress</p>
+            </div>
+            <Dialog open={showNewCase} onOpenChange={setShowNewCase}>
+              <DialogTrigger asChild>
+                <Button data-testid="new-case-button">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Case
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Create New Case</DialogTitle>
+                </DialogHeader>
+                <CaseForm onSuccess={() => setShowNewCase(false)} />
+              </DialogContent>
+            </Dialog>
           </div>
-          <Dialog open={showNewCase} onOpenChange={setShowNewCase}>
-            <DialogTrigger asChild>
-              <Button data-testid="new-case-button">
-                <Plus className="mr-2 h-4 w-4" />
-                New Case
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Create New Case</DialogTitle>
-              </DialogHeader>
-              <CaseForm onSuccess={() => setShowNewCase(false)} />
-            </DialogContent>
-          </Dialog>
         </div>
 
         {/* Stats Cards */}

@@ -68,15 +68,17 @@ export default function Repairs() {
       <Navigation />
       
       <main className="flex-1 p-6">
-        <div className="flex items-center justify-between mb-6" data-testid="repairs-header">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Reparaties</h1>
-            <p className="text-muted-foreground">Beheer reparatieverzoeken en volg de voortgang</p>
+        <div className="bg-repairs rounded-lg p-6 mb-6" data-testid="repairs-header">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-repairs">Reparaties</h1>
+              <p className="text-foreground/80">Beheer reparatieverzoeken en volg de voortgang</p>
+            </div>
+            <Button onClick={() => setShowNewRepair(true)} data-testid="button-new-repair">
+              <Plus className="mr-2 h-4 w-4" />
+              Nieuwe Reparatie
+            </Button>
           </div>
-          <Button onClick={() => setShowNewRepair(true)} data-testid="button-new-repair">
-            <Plus className="mr-2 h-4 w-4" />
-            Nieuwe Reparatie
-          </Button>
         </div>
 
         {/* Analytics Dashboard */}
