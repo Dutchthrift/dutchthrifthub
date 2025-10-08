@@ -60,7 +60,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
     resolver: zodResolver(createCaseFormSchema),
     defaultValues: {
       title: emailThread?.subject || "",
-      description: emailThread?.messages?.[0]?.body || "",
+      description: "",
       priority: "medium" as const,
       status: "new" as const,
     },

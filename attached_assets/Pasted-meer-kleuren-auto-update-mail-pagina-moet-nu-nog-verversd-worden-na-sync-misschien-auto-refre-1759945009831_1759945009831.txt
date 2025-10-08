@@ -1,0 +1,243 @@
+meer kleuren
+--
+auto update mail? pagina moet nu nog verversd worden na sync. misschien auto refresh na sync?
+--
+
+
+Transform the Case Detail Page from a static view into a fully functional workspace where team members can:
+
+View, edit, and update case information
+
+Link and manage related entities (orders, emails, repairs, to-dos)
+
+Communicate, track timeline events, and set SLAs
+
+Trigger actions (send email, add notes, mark resolved, etc.)
+
+⚠️ Current Problems
+
+“Case Information” is read-only — you can’t edit or update fields easily.
+
+Quick actions (Assign Case, Link Items, Add Note, Set SLA) are non-functional placeholders.
+
+“Timeline” is empty and doesn’t log updates, notes, or linked events.
+
+“Related Items” doesn’t show live data — no interactive linking or opening of related orders/emails.
+
+“Send Email” button doesn’t open a compose modal or reply window.
+
+No visibility into team activity, notes, or automation events.
+
+✅ Improvement Objectives
+
+Add real functions to every Quick Action.
+
+Make case details editable inline or via modal.
+
+Show a real-time timeline (email, order, note, or status updates).
+
+Allow creation of new related items from within the case.
+
+Sync directly with Inbox, Orders, Repairs, and To-dos.
+
+Integrate “Send Email” and “Reply” from inside the case.
+
+🧱 Implementation Steps
+1. Editable Case Information
+
+Replace the static info box with inline editable fields or an edit modal.
+
+Component: CaseInfo.tsx
+
+<EditableField label="Title" value={case.title} onSave={(v) => updateCase({ id, title: v })} />
+<EditableField label="Description" multiline value={case.description} onSave={(v) => updateCase({ id, description: v })} />
+<Select label="Assigned To" options={users} onChange={(val) => updateCase({ id, assignedTo: val })} />
+<DatePicker label="SLA Deadline" value={case.slaDeadline} onChange={(val) => updateCase({ id, slaDeadline: val })} />
+
+
+Use optimistic updates for responsiveness.
+
+2. Quick Actions Implementation
+🧩 Assign Case
+
+Opens a modal with dropdown of users.
+
+Updates assignedTo in DB and adds event to timeline.
+
+🧩 Link Items
+
+Modal with tabs:
+
+Orders → searchable list (auto-link via order ID)
+
+Emails → list of threads by same customer email
+
+Repairs → list of open repairs
+
+To-dos → assign related tasks
+
+Selecting an item creates a record in case_links table:
+
+{ caseId, linkedType: 'order', linkedId: orderId }
+
+🧩 Add Note
+
+Opens textarea modal → save to case_notes table.
+
+Adds a timeline event (Note added by ...).
+
+🧩 Set SLA
+
+Opens a small modal → choose date/time.
+
+Auto-calculates due date and shows warning if overdue.
+
+3. Timeline Functionality
+
+Component: CaseTimeline.tsx
+
+Render chronological events:
+
+Case created
+
+Status changes
+
+Linked order/repair added
+
+Email received/sent
+
+Notes or SLA updates
+
+Each event: icon + timestamp + user + description.
+
+Store in case_events table:
+
+{ id, caseId, type: 'note' | 'status' | 'email' | 'link', message, createdBy, createdAt }
+
+4. Related Items Section
+
+Make the “Related Items” section interactive.
+
+Emails tab
+
+List linked email threads (subject, sender, date).
+
+Click → open in Inbox drawer or modal.
+
+Orders tab
+
+Show small order summary (ID, total, status).
+
+“View order” button opens order page.
+
+Repairs tab
+
+Show linked repairs (technician, status).
+
+“View repair” → open repair detail.
+
+To-dos tab
+
+Show all to-dos linked to this case.
+
+Option: “Create new task”.
+
+Notes tab
+
+Show internal notes with timestamps.
+
+5. Send Email / Reply Integration
+
+Replace current button with an email compose modal.
+
+Default “To” = customer email from case.
+
+Pre-fill subject: Re: ${case.title}
+
+Use the same rich text editor (React-Quill or Tiptap) from Inbox fix.
+
+On send → post to emails API and log event in timeline.
+
+<Button onClick={() => openEmailModal(customerEmail)}>
+  <MailIcon className="mr-2" /> Send Email
+</Button>
+
+6. Status Management
+
+Add a “Change Status” dropdown in the header:
+
+Options: New, In Progress, Waiting, Resolved, Closed
+
+Changing status → updates DB + logs timeline event.
+
+7. Case Statistics
+
+Replace static numbers with live counts from relational queries:
+
+SELECT COUNT(*) FROM emails WHERE caseId = ...
+SELECT COUNT(*) FROM orders WHERE caseId = ...
+SELECT COUNT(*) FROM repairs WHERE caseId = ...
+
+
+Auto-update after linking/unlinking.
+
+8. Database Adjustments
+
+Add supporting tables:
+
+case_links: { id, caseId, linkedType, linkedId }
+case_notes: { id, caseId, content, createdBy, createdAt }
+case_events: { id, caseId, type, message, createdBy, createdAt }
+
+
+Foreign keys to orders, repairs, emails, todos.
+
+9. UI/UX Enhancements
+
+Use tabs or accordions for cleaner layout (shadcn/ui Tabs).
+
+Sticky right panel for Quick Actions.
+
+Add skeleton loaders for data fetching.
+
+Show customer avatar and contact details in Case header.
+
+Add “Back to Cases” breadcrumb on top.
+
+10. File Structure Proposal
+/src/pages/cases/[id]/
+  CaseDetail.tsx
+  CaseInfo.tsx
+  CaseActions.tsx
+  CaseTimeline.tsx
+  CaseRelated.tsx
+  CaseNotes.tsx
+  CaseEmailModal.tsx
+  CaseService.ts
+
+🧩 Extra Smart Integrations (Optional but Recommended)
+
+Auto-create case from Inbox:
+When a new email references an order number, create or link a case automatically.
+
+Sync with To-Dos:
+“Create follow-up task” directly from a case.
+
+AI Summary (future):
+Summarize case activity in plain English (“Customer reported faulty lens, refund issued.”).
+
+✅ Expected Result
+
+After implementing this:
+
+Every case is interactive, not static.
+
+All “Quick Actions” perform real updates.
+
+Timeline reflects actual case history.
+
+Emails, orders, repairs, and to-dos are fully linked.
+
+You can manage an entire customer issue without leaving the page.
+
+The experience feels like a mini CRM inside your DutchThrift Hub.

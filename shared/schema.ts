@@ -14,6 +14,8 @@ export const emailFolderEnum = pgEnum("email_folder", ["inbox", "sent"]);
 export const orderStatusEnum = pgEnum("order_status", ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]);
 export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["draft", "sent", "awaiting_delivery", "partially_received", "fully_received", "cancelled"]);
 export const caseStatusEnum = pgEnum("case_status", ["new", "in_progress", "waiting_customer", "waiting_part", "resolved", "closed"]);
+export const caseEventTypeEnum = pgEnum("case_event_type", ["created", "status_change", "note_added", "link_added", "link_removed", "sla_set", "assigned", "email_sent", "email_received"]);
+export const caseLinkTypeEnum = pgEnum("case_link_type", ["order", "email", "repair", "todo"]);
 
 // Users table
 export const users = pgTable("users", {
@@ -198,6 +200,37 @@ export const cases = pgTable("cases", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Case Links table - Links cases to related entities
+export const caseLinks = pgTable("case_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").references(() => cases.id).notNull(),
+  linkType: caseLinkTypeEnum("link_type").notNull(),
+  linkedId: varchar("linked_id").notNull(), // ID of the linked entity (order, email, repair, or todo)
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Case Notes table - Internal notes for cases
+export const caseNotes = pgTable("case_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").references(() => cases.id).notNull(),
+  content: text("content").notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Case Events table - Timeline of all case activities
+export const caseEvents = pgTable("case_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").references(() => cases.id).notNull(),
+  eventType: caseEventTypeEnum("event_type").notNull(),
+  message: text("message").notNull(), // Description of what happened
+  metadata: jsonb("metadata"), // Additional context (e.g., old/new values for status changes)
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Suppliers table
 export const suppliers = pgTable("suppliers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -378,6 +411,22 @@ export const insertCaseSchema = createInsertSchema(cases).omit({
   closedAt: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
 });
 
+export const insertCaseLinkSchema = createInsertSchema(caseLinks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCaseNoteSchema = createInsertSchema(caseNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCaseEventSchema = createInsertSchema(caseEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertActivitySchema = createInsertSchema(activities).omit({
   id: true,
   createdAt: true,
@@ -423,6 +472,15 @@ export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
 
 export type Case = typeof cases.$inferSelect;
 export type InsertCase = z.infer<typeof insertCaseSchema>;
+
+export type CaseLink = typeof caseLinks.$inferSelect;
+export type InsertCaseLink = z.infer<typeof insertCaseLinkSchema>;
+
+export type CaseNote = typeof caseNotes.$inferSelect;
+export type InsertCaseNote = z.infer<typeof insertCaseNoteSchema>;
+
+export type CaseEvent = typeof caseEvents.$inferSelect;
+export type InsertCaseEvent = z.infer<typeof insertCaseEventSchema>;
 
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
