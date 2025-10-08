@@ -70,30 +70,59 @@ export default function Inbox() {
   }) || [];
 
   const getThreadStatusColor = (thread: EmailThread) => {
-    if (thread.priority === "urgent") return "bg-destructive";
-    if (thread.priority === "high") return "bg-chart-1";
-    if (thread.isUnread) return "bg-primary";
-    if (thread.status === "closed") return "bg-muted-foreground";
-    return "bg-chart-2";
+    if (thread.priority === "urgent") return "bg-red-500";
+    if (thread.priority === "high") return "bg-orange-500";
+    if (thread.isUnread) return "bg-blue-600";
+    if (thread.status === "closed") return "bg-gray-400";
+    return "bg-green-500";
   };
 
-  const formatLastActivity = (date: string) => {
-    const activityDate = new Date(date);
+  const getInitials = (email: string) => {
+    if (!email) return "?";
+    const name = email.split("@")[0];
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const getAvatarColor = (email: string) => {
+    const colors = [
+      "bg-blue-500",
+      "bg-green-500",
+      "bg-purple-500",
+      "bg-pink-500",
+      "bg-indigo-500",
+      "bg-teal-500",
+    ];
+    const hash = email.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
+  const formatLastActivity = (date: string | Date) => {
+    const activityDate = typeof date === 'string' ? new Date(date) : date;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
     
-    // Format as "HH:MM DD-MM-YYYY"
-    const time = activityDate.toLocaleTimeString('nl-NL', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-    
-    const dateStr = activityDate.toLocaleDateString('nl-NL', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-    
-    return `${time}\n${dateStr}`;
+    if (activityDate >= today) {
+      return activityDate.toLocaleTimeString('nl-NL', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+    } else if (activityDate >= yesterday) {
+      return 'Yesterday';
+    } else if (activityDate.getFullYear() === now.getFullYear()) {
+      return activityDate.toLocaleDateString('nl-NL', {
+        day: 'numeric',
+        month: 'short'
+      });
+    } else {
+      return activityDate.toLocaleDateString('nl-NL', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    }
   };
 
   return (
@@ -112,11 +141,16 @@ export default function Inbox() {
               onClick={() => syncEmailsMutation.mutate()}
               disabled={syncEmailsMutation.isPending}
               data-testid="sync-emails-button"
+              className="border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${syncEmailsMutation.isPending ? 'animate-spin' : ''}`} />
               Sync Emails
             </Button>
-            <Button onClick={() => setShowCompose(true)} data-testid="compose-email-button">
+            <Button 
+              onClick={() => setShowCompose(true)} 
+              data-testid="compose-email-button"
+              className="bg-blue-600 hover:bg-blue-700"
+            >
               <Mail className="mr-2 h-4 w-4" />
               Compose
             </Button>
@@ -140,11 +174,33 @@ export default function Inbox() {
               </div>
               
               <Tabs value={filter} onValueChange={setFilter}>
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="all" data-testid="filter-all">All</TabsTrigger>
-                  <TabsTrigger value="unread" data-testid="filter-unread">Unread</TabsTrigger>
-                  <TabsTrigger value="replied" data-testid="filter-replied">Replied</TabsTrigger>
-                  <TabsTrigger value="attachments" data-testid="filter-attachments">
+                <TabsList className="grid w-full grid-cols-4 bg-muted">
+                  <TabsTrigger 
+                    value="all" 
+                    data-testid="filter-all"
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                  >
+                    All
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="unread" 
+                    data-testid="filter-unread"
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                  >
+                    Unread
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="replied" 
+                    data-testid="filter-replied"
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                  >
+                    Replied
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="attachments" 
+                    data-testid="filter-attachments"
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                  >
                     <Paperclip className="h-4 w-4" />
                   </TabsTrigger>
                 </TabsList>
@@ -169,45 +225,71 @@ export default function Inbox() {
                 </div>
               ) : (
                 filteredThreads.map((thread) => (
-                  <Card
+                  <div
                     key={thread.id}
-                    className={`cursor-pointer transition-colors hover:bg-accent ${
-                      selectedThread === thread.id ? 'ring-2 ring-primary' : ''
-                    }`}
+                    className={`group cursor-pointer transition-all border-b border-border hover:shadow-sm
+                      ${selectedThread === thread.id 
+                        ? 'bg-blue-50 dark:bg-blue-950/20 border-l-4 border-l-blue-600' 
+                        : 'hover:bg-accent border-l-4 border-l-transparent'
+                      }
+                      ${thread.isUnread ? 'bg-background' : 'bg-muted/30'}
+                    `}
                     onClick={() => setSelectedThread(thread.id)}
                     data-testid={`email-thread-${thread.id}`}
                   >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          <div className={`w-2 h-2 rounded-full ${getThreadStatusColor(thread)}`}></div>
-                          <span className="font-medium text-sm truncate">
-                            {thread.subject || "No Subject"}
-                          </span>
-                          {thread.hasAttachment && (
-                            <Paperclip className="h-3 w-3 text-muted-foreground" />
-                          )}
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {formatLastActivity(thread.lastActivity || new Date().toISOString())}
-                        </span>
+                    <div className="p-3 flex items-start gap-3">
+                      {/* Avatar */}
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-full ${getAvatarColor(thread.customerEmail || '')} flex items-center justify-center text-white font-medium text-sm`}>
+                        {getInitials(thread.customerEmail || '')}
                       </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground truncate">
-                          {thread.customerEmail}
-                        </span>
-                        <div className="flex items-center space-x-1">
-                          {thread.orderId && (
-                            <Badge variant="outline" className="text-xs">Order</Badge>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        {/* Header row */}
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className={`text-sm truncate ${thread.isUnread ? 'font-bold text-foreground' : 'font-normal text-foreground'}`}>
+                              {thread.customerEmail || "Unknown"}
+                            </span>
+                            {thread.hasAttachment && (
+                              <Paperclip className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            )}
+                            {thread.orderId && (
+                              <Badge variant="outline" className="text-xs px-1 py-0">Order</Badge>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
+                            {formatLastActivity(thread.lastActivity || new Date().toISOString())}
+                          </span>
+                        </div>
+
+                        {/* Subject */}
+                        <div className={`text-sm mb-1 truncate ${thread.isUnread ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground'}`}>
+                          {thread.subject || "No Subject"}
+                        </div>
+
+                        {/* Status badges */}
+                        <div className="flex items-center gap-2">
+                          {thread.priority !== "medium" && (
+                            <Badge 
+                              variant={thread.priority === "urgent" ? "destructive" : "default"}
+                              className="text-xs px-1.5 py-0"
+                            >
+                              {thread.priority}
+                            </Badge>
+                          )}
+                          {thread.status === "closed" && (
+                            <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                              Closed
+                            </Badge>
                           )}
                           {thread.isUnread && (
-                            <div className="w-2 h-2 bg-primary rounded-full"></div>
+                            <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                           )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 ))
               )}
             </div>

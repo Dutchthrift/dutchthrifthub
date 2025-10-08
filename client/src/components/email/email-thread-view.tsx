@@ -227,25 +227,46 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
     }
   };
 
-  // Fixed timestamp formatting - Dutch format HH:MM DD-MM-YYYY
   const formatMessageTime = (date: string | Date | null) => {
     if (!date) return "Unknown time";
-    const messageDate = typeof date === 'string' ? new Date(date) : date;
+    const msgDate = typeof date === 'string' ? new Date(date) : date;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
-    // Format as "HH:MM DD-MM-YYYY"
-    const time = messageDate.toLocaleTimeString('nl-NL', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-    
-    const dateStr = messageDate.toLocaleDateString('nl-NL', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-    
-    return `${time} ${dateStr}`;
+    if (msgDate >= today) {
+      return msgDate.toLocaleTimeString('nl-NL', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+    } else {
+      return msgDate.toLocaleDateString('nl-NL', {
+        day: 'numeric',
+        month: 'short',
+        year: msgDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+  };
+
+  const getInitials = (email: string) => {
+    if (!email) return "?";
+    const name = email.split("@")[0];
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const getAvatarColor = (email: string) => {
+    const colors = [
+      "bg-blue-500",
+      "bg-green-500",
+      "bg-purple-500",
+      "bg-pink-500",
+      "bg-indigo-500",
+      "bg-teal-500",
+    ];
+    const hash = email.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
   };
 
   if (isLoading) {
@@ -279,116 +300,132 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
     <div className="h-full flex gap-6" data-testid="email-thread-view">
       <div className="flex-1 flex flex-col">
         {/* Thread Header */}
-        <Card className="mb-4" data-testid="email-thread-header">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <CardTitle className="flex items-center space-x-2">
-                  <span>{thread.subject || "No Subject"}</span>
-                  {linkedCases && linkedCases.length > 0 && (
-                    <Badge variant="outline" className="ml-2">
-                      Gekoppeld aan Case #{linkedCases[0].caseNumber}
-                    </Badge>
-                  )}
-                </CardTitle>
-                <div className="flex items-center space-x-2 mt-2">
-                  <Badge variant={thread.status === 'open' ? 'default' : 'secondary'}>
-                    {thread.status}
-                  </Badge>
-                  <Badge variant={thread.priority === 'high' ? 'destructive' : 'outline'}>
+        <div className="bg-background border-b border-border pb-4 mb-4" data-testid="email-thread-header">
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold text-foreground mb-2">
+                {thread.subject || "No Subject"}
+              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge 
+                  variant={thread.status === 'open' ? 'default' : 'secondary'}
+                  className={thread.status === 'open' ? 'bg-green-600 hover:bg-green-700' : ''}
+                >
+                  {thread.status}
+                </Badge>
+                {thread.priority !== 'medium' && (
+                  <Badge 
+                    variant={thread.priority === 'urgent' ? 'destructive' : 'default'}
+                    className={thread.priority === 'high' ? 'bg-orange-500 hover:bg-orange-600' : ''}
+                  >
                     {thread.priority}
                   </Badge>
-                  {thread.hasAttachment && (
-                    <Badge variant="outline">
-                      <Paperclip className="h-3 w-3 mr-1" />
-                      Attachment
-                    </Badge>
-                  )}
-                  {thread.isUnread && (
-                    <Badge variant="secondary">Unread</Badge>
-                  )}
-                </div>
-                <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
-                  <div className="flex items-center space-x-1">
-                    <User className="h-4 w-4" />
-                    <span>{thread.customerEmail}</span>
-                  </div>
-                  {thread.orderId && (
-                    <div className="flex items-center space-x-1">
-                      <ExternalLink className="h-4 w-4" />
-                      <span>Linked to Order</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                {thread.isUnread && (
-                  <Button variant="outline" size="sm" onClick={markAsRead}>
-                    Mark as Read
-                  </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => setShowReply(true)}>
-                  <Reply className="h-4 w-4 mr-1" />
-                  Reply
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Forward className="h-4 w-4 mr-1" />
-                  Forward
-                </Button>
-                <Button variant="outline" size="sm" onClick={closeThread}>
-                  <Archive className="h-4 w-4 mr-1" />
-                  Close
-                </Button>
+                {thread.hasAttachment && (
+                  <Badge variant="outline" className="border-blue-300 dark:border-blue-700">
+                    <Paperclip className="h-3 w-3 mr-1" />
+                    Attachments
+                  </Badge>
+                )}
+                {linkedCases && linkedCases.length > 0 && (
+                  <Badge variant="outline" className="border-purple-300 dark:border-purple-700">
+                    Case #{linkedCases[0].caseNumber}
+                  </Badge>
+                )}
+                {thread.orderId && (
+                  <Badge variant="outline" className="border-indigo-300 dark:border-indigo-700">
+                    <ShoppingCart className="h-3 w-3 mr-1" />
+                    Order
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span>{thread.customerEmail}</span>
               </div>
             </div>
-          </CardHeader>
-        </Card>
+            
+            <div className="flex items-center gap-2">
+              {thread.isUnread && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={markAsRead}
+                  className="border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
+                >
+                  Mark as Read
+                </Button>
+              )}
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => setShowReply(true)}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Reply className="h-4 w-4 mr-1" />
+                Reply
+              </Button>
+              <Button variant="outline" size="sm">
+                <Forward className="h-4 w-4 mr-1" />
+                Forward
+              </Button>
+              <Button variant="outline" size="sm" onClick={closeThread}>
+                <Archive className="h-4 w-4 mr-1" />
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+        <div className="flex-1 overflow-y-auto space-y-3 mb-4">
           {thread.messages && thread.messages.length > 0 ? (
             thread.messages.map((message, index) => (
-              <Card key={message.id} data-testid={`email-message-${message.id}`}>
-                <CardContent className="p-4">
+              <div 
+                key={message.id} 
+                className={`bg-background border border-border rounded-lg hover:shadow-sm transition-shadow ${
+                  message.isOutbound ? 'bg-blue-50/50 dark:bg-blue-950/10' : ''
+                }`}
+                data-testid={`email-message-${message.id}`}
+              >
+                <div className="p-4">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>
-                          {message.fromEmail.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                    <div className="flex items-center gap-3">
+                      <div className={`flex-shrink-0 w-9 h-9 rounded-full ${getAvatarColor(message.fromEmail)} flex items-center justify-center text-white font-medium text-xs`}>
+                        {getInitials(message.fromEmail)}
+                      </div>
                       <div>
-                        <div className="font-medium text-sm">{message.fromEmail}</div>
+                        <div className="font-medium text-sm text-foreground">{message.fromEmail}</div>
                         <div className="text-xs text-muted-foreground">
                           to {message.toEmail}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>{formatMessageTime(message.sentAt)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{formatMessageTime(message.sentAt)}</span>
                       {message.isOutbound && (
-                        <Badge variant="outline" className="text-xs">Sent</Badge>
+                        <Badge variant="outline" className="text-xs bg-blue-100 dark:bg-blue-950 border-blue-300 dark:border-blue-800">
+                          Sent
+                        </Badge>
                       )}
                     </div>
                   </div>
                   
-                  <SanitizedEmailContent 
-                    body={message.body || ""} 
-                    isHtml={message.isHtml || false} 
-                  />
+                  <div className="mt-3 bg-white dark:bg-gray-950 rounded-md p-3 border border-gray-200 dark:border-gray-800">
+                    <SanitizedEmailContent 
+                      body={message.body || ""} 
+                      isHtml={message.isHtml || false} 
+                    />
+                  </div>
                   
                   <EmailAttachments messageId={message.id} />
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))
           ) : (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                No messages in this thread
-              </CardContent>
-            </Card>
+            <div className="bg-muted/50 rounded-lg p-8 text-center text-muted-foreground">
+              No messages in this thread
+            </div>
           )}
         </div>
 

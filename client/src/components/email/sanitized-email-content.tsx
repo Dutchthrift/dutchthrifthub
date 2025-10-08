@@ -14,6 +14,26 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     );
   }
 
+  const cleanMimeHeaders = (str: string): string => {
+    let cleaned = str;
+    
+    // Remove all MIME headers and boundaries
+    cleaned = cleaned.replace(/Content-Type:[^\n]*\n?/gi, '');
+    cleaned = cleaned.replace(/Content-Transfer-Encoding:[^\n]*\n?/gi, '');
+    cleaned = cleaned.replace(/Content-Disposition:[^\n]*\n?/gi, '');
+    cleaned = cleaned.replace(/Content-ID:[^\n]*\n?/gi, '');
+    cleaned = cleaned.replace(/MIME-Version:[^\n]*\n?/gi, '');
+    cleaned = cleaned.replace(/--[a-zA-Z0-9_-]{10,}[^\n]*\n?/g, '');
+    cleaned = cleaned.replace(/boundary="[^"]*"/gi, '');
+    cleaned = cleaned.replace(/charset="[^"]*"/gi, '');
+    
+    // Remove multipart declarations
+    cleaned = cleaned.replace(/This is a multi-part message in MIME format[^\n]*\n?/gi, '');
+    cleaned = cleaned.replace(/multipart\/[a-z]+;[^\n]*\n?/gi, '');
+    
+    return cleaned.trim();
+  };
+
   const decodeBase64 = (str: string): { decoded: string; wasBase64: boolean } => {
     if (!str) {
       return { decoded: str, wasBase64: false };
@@ -21,32 +41,34 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     
     let workingStr = str;
     
-    // Step 1: If MIME headers present, extract content after blank line
-    if (str.includes('Content-Transfer-Encoding:') || str.includes('Content-Type:')) {
-      let headerEndIndex = str.indexOf('\n\n');
-      if (headerEndIndex === -1) {
-        headerEndIndex = str.indexOf('\r\n\r\n');
-      }
-      
-      if (headerEndIndex > 0) {
-        workingStr = str.substring(headerEndIndex + (str.charAt(headerEndIndex + 1) === '\r' ? 4 : 2)).trim();
+    // Step 1: Clean MIME headers first
+    workingStr = cleanMimeHeaders(workingStr);
+    
+    // Step 2: If there's a clear MIME header block at the start, skip only that block
+    // Look for the pattern of headers followed by blank line (but don't split the whole content)
+    const headerEndMatch = workingStr.match(/^(.*?\n)\n([\s\S]*)$/);
+    if (headerEndMatch && /^[A-Za-z-]+:\s*.+/m.test(headerEndMatch[1])) {
+      // Only skip the first header block, keep rest of content intact
+      const firstLineAfterHeaders = headerEndMatch[2];
+      if (firstLineAfterHeaders && firstLineAfterHeaders.trim().length > 0) {
+        workingStr = firstLineAfterHeaders;
       }
     }
     
-    // Step 2: Clean whitespace for base64 check
+    // Step 3: Clean whitespace for base64 check
     const cleanedStr = workingStr.replace(/\s+/g, '');
     
-    // Step 3: Check if it looks like base64 and is long enough
+    // Step 4: Check if it looks like base64 and is long enough
     const base64Pattern = /^[A-Za-z0-9+/=]+$/;
     if (cleanedStr.length < 10 || !base64Pattern.test(cleanedStr)) {
       return { decoded: workingStr, wasBase64: false };
     }
     
-    // Step 4: Try to decode
+    // Step 5: Try to decode
     try {
       const decoded = atob(cleanedStr);
       
-      // Step 5: Validate decoded content is printable
+      // Step 6: Validate decoded content is printable
       const isPrintable = decoded.split('').every(char => {
         const code = char.charCodeAt(0);
         return code >= 32 || code === 9 || code === 10 || code === 13;
@@ -62,15 +84,12 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     }
   };
 
-  const { decoded: decodedBody, wasBase64 } = decodeBase64(body);
+  const { decoded: decodedBody } = decodeBase64(body);
 
   if (!isHtml && !decodedBody.includes('<html') && !decodedBody.includes('<div')) {
     return (
-      <div>
-        {wasBase64 && <div className="text-xs text-green-600 mb-1">✓ Decoded from base64</div>}
-        <div className="whitespace-pre-wrap text-sm leading-relaxed">
-          {decodedBody}
-        </div>
+      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+        {decodedBody}
       </div>
     );
   }
@@ -79,7 +98,7 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
 
   if (!actuallyHtml) {
     return (
-      <div className="whitespace-pre-wrap text-sm leading-relaxed">
+      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
         {decodedBody}
       </div>
     );
@@ -90,7 +109,7 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'ul', 'ol', 'li', 'a', 'img', 'div', 'span', 'table', 'thead', 'tbody',
-        'tr', 'td', 'th', 'blockquote', 'code', 'pre', 'hr'
+        'tr', 'td', 'th', 'blockquote', 'code', 'pre', 'hr', 'b', 'i'
       ],
       ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel'],
       ALLOW_DATA_ATTR: false,
@@ -100,15 +119,16 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
 
     let cleanHtml = html;
 
-    cleanHtml = cleanHtml.replace(/Content-Type:[^\n]*/gi, '');
-    cleanHtml = cleanHtml.replace(/Content-Transfer-Encoding:[^\n]*/gi, '');
-    cleanHtml = cleanHtml.replace(/--[a-zA-Z0-9_-]{10,}[^\n]*/g, '');
-    cleanHtml = cleanHtml.replace(/boundary="[^"]*"/gi, '');
+    // Additional MIME cleanup for HTML content
+    cleanHtml = cleanMimeHeaders(cleanHtml);
     
+    // Remove style tags and inline styles
     cleanHtml = cleanHtml.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
     cleanHtml = cleanHtml.replace(/style="[^"]*"/gi, '');
     cleanHtml = cleanHtml.replace(/class="[^"]*"/gi, '');
+    cleanHtml = cleanHtml.replace(/id="[^"]*"/gi, '');
     
+    // Clean up excessive whitespace
     cleanHtml = cleanHtml.replace(/&nbsp;/g, ' ');
     cleanHtml = cleanHtml.replace(/\s{2,}/g, ' ');
 
@@ -132,7 +152,7 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
   
   if (!hasHtmlTags) {
     return (
-      <div className="whitespace-pre-wrap text-sm leading-relaxed">
+      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
         {sanitized}
       </div>
     );
