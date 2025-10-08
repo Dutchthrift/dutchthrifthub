@@ -16,7 +16,11 @@ import {
   CheckCircle,
   Archive,
   Users,
-  FileText
+  FileText,
+  Package,
+  Wrench,
+  Mail,
+  CheckSquare
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -340,6 +344,36 @@ export default function Cases() {
                     </span>
                   )}
                 </div>
+
+                {/* Linked Entities Badges */}
+                {caseItem._count && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {caseItem._count.orders > 0 && (
+                      <Badge variant="outline" className="text-xs bg-orders/10 text-orders border-orders/20">
+                        <Package className="h-3 w-3 mr-1" />
+                        {caseItem._count.orders}
+                      </Badge>
+                    )}
+                    {caseItem._count.repairs > 0 && (
+                      <Badge variant="outline" className="text-xs bg-repairs/10 text-repairs border-repairs/20">
+                        <Wrench className="h-3 w-3 mr-1" />
+                        {caseItem._count.repairs}
+                      </Badge>
+                    )}
+                    {caseItem._count.emails > 0 && (
+                      <Badge variant="outline" className="text-xs bg-inbox/10 text-inbox border-inbox/20">
+                        <Mail className="h-3 w-3 mr-1" />
+                        {caseItem._count.emails}
+                      </Badge>
+                    )}
+                    {caseItem._count.todos > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        <CheckSquare className="h-3 w-3 mr-1" />
+                        {caseItem._count.todos}
+                      </Badge>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-muted-foreground">

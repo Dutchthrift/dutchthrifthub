@@ -99,4 +99,10 @@ export interface ActivityWithUser extends Activity {
 export interface CaseWithDetails extends Case {
   customer?: Customer;
   assignedUser?: User;
+  _count?: {
+    emails: number;
+    orders: number;
+    repairs: number;
+    todos: number;
+  };
 }
