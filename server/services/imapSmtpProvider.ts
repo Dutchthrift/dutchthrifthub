@@ -70,8 +70,7 @@ export class ImapSmtpProvider implements EmailProvider {
           flags: true,
           bodyStructure: true,
           internalDate: true,
-          uid: true,
-          bodyParts: ['TEXT']
+          uid: true
         })) {
           
           // Check if message has attachments
@@ -88,127 +87,50 @@ export class ImapSmtpProvider implements EmailProvider {
             envelope.to?.[0]?.address || ''
           ) : `${message.uid}@${this.imapConfig.host}`;
 
-          // Extract actual email body content
+          // Extract actual email body content by walking bodyStructure
           let bodyText = '';
           let isHtml = false;
           
           try {
-            console.log('Message bodyParts available:', message.bodyParts ? message.bodyParts.size : 0);
+            // Find text parts in the body structure
+            const textParts = this.findTextParts(message.bodyStructure);
+            console.log(`Found ${textParts.length} text parts for UID ${message.uid}`);
             
-            // Try to get text/html first, then text/plain
-            if (message.bodyParts && message.bodyParts.size > 0) {
-              for (let [partId, bodyPart] of Array.from(message.bodyParts.entries())) {
-                console.log('Processing bodyPart:', partId, 'length:', bodyPart ? bodyPart.toString().length : 0);
-                if (bodyPart) {
-                  let content = bodyPart.toString();
-                  if (content && content.trim().length > 0) {
-                    
-                    // Parse multipart MIME content to extract clean text/HTML
-                    if (content.includes('Content-Type:') && content.includes('--')) {
-                      // This is multipart MIME content, extract the actual message
-                      const lines = content.split('\n');
-                      let inTextSection = false;
-                      let inHtmlSection = false;
-                      let cleanContent = '';
-                      let currentSection = '';
-                      
-                      for (const line of lines) {
-                        if (line.startsWith('--') && line.length > 10) {
-                          // MIME boundary - save current section and reset
-                          if (inHtmlSection && currentSection.trim()) {
-                            cleanContent = currentSection.trim();
-                            isHtml = true;
-                            break; // Prefer HTML over plain text
-                          } else if (inTextSection && currentSection.trim() && !cleanContent) {
-                            cleanContent = currentSection.trim();
-                            isHtml = false;
-                          }
-                          inTextSection = false;
-                          inHtmlSection = false;
-                          currentSection = '';
-                        } else if (line.includes('Content-Type: text/plain')) {
-                          inTextSection = true;
-                          inHtmlSection = false;
-                          currentSection = '';
-                        } else if (line.includes('Content-Type: text/html')) {
-                          inHtmlSection = true;
-                          inTextSection = false;
-                          currentSection = '';
-                        } else if ((inTextSection || inHtmlSection) && line.trim() !== '' && !line.includes('Content-Type:') && !line.includes('charset=')) {
-                          // Actual content line
-                          currentSection += line + '\n';
-                        }
-                      }
-                      
-                      // Handle final section
-                      if (inHtmlSection && currentSection.trim()) {
-                        cleanContent = currentSection.trim();
-                        isHtml = true;
-                      } else if (inTextSection && currentSection.trim() && !cleanContent) {
-                        cleanContent = currentSection.trim();
-                        isHtml = false;
-                      }
-                      
-                      if (cleanContent) {
-                        bodyText = cleanContent;
-                        console.log('Extracted clean content, length:', bodyText.length, 'isHtml:', isHtml);
-                      } else {
-                        // Fallback: use raw content
-                        bodyText = content;
-                        isHtml = partId.includes('html') || content.includes('<html>') || content.includes('<div>');
-                      }
-                    } else {
-                      // Simple content, use as-is
-                      bodyText = content;
-                      isHtml = partId.includes('html') || content.includes('<html>') || content.includes('<div>');
-                    }
-                    
-                    console.log('Found body content, length:', bodyText.length, 'isHtml:', isHtml);
-                    break;
-                  }
-                }
+            // Prefer HTML, fallback to plain text
+            let htmlPart = textParts.find(p => p.type === 'text/html');
+            let plainPart = textParts.find(p => p.type === 'text/plain');
+            
+            const partToUse = htmlPart || plainPart;
+            
+            if (partToUse) {
+              console.log(`Downloading ${partToUse.type} part ${partToUse.partId} for UID ${message.uid}`);
+              
+              // Download the part content as a stream
+              const { content: stream } = await client.download(message.uid, partToUse.partId);
+              
+              // Collect stream into buffer
+              const chunks: Buffer[] = [];
+              for await (const chunk of stream) {
+                chunks.push(chunk);
               }
+              const contentBuffer = Buffer.concat(chunks);
+              
+              // Decode based on encoding
+              bodyText = this.decodeContent(contentBuffer, partToUse.encoding);
+              isHtml = partToUse.type === 'text/html';
+              
+              console.log(`Successfully extracted body (${partToUse.type}), length: ${bodyText.length}`);
             }
           } catch (error) {
             console.error('Error extracting body from message:', error);
           }
           
-          // Improved content - try multiple sources and provide better fallbacks
+          // Final fallback if no body extracted
           if (!bodyText || bodyText.trim().length === 0) {
-            // Try bodyStructure for simple messages
-            if (message.bodyStructure) {
-              console.log('Trying bodyStructure as fallback');
-              try {
-                const bodyLock = await client.getMailboxLock('INBOX');
-                const fullMessage = await client.fetchOne(message.uid, {
-                  source: true,
-                  bodyParts: ['1']
-                });
-                bodyLock.release();
-                
-                if (fullMessage && fullMessage.bodyParts && fullMessage.bodyParts.size > 0) {
-                  for (let [partId, bodyPart] of Array.from(fullMessage.bodyParts.entries())) {
-                    if (bodyPart) {
-                      bodyText = bodyPart.toString();
-                      if (bodyText.trim().length > 0) break;
-                    }
-                  }
-                }
-              } catch (fetchError) {
-                console.error('Error fetching full message:', fetchError);
-              }
-            }
-          }
-          
-          // Final fallback - better than completely generic placeholder
-          if (!bodyText || bodyText.trim().length === 0) {
-            // At least provide some meaningful content
             const subject = envelope?.subject || 'No subject';
             const fromAddr = envelope?.from?.[0]?.address || 'unknown';
             bodyText = `[Content not available] Message from ${fromAddr} with subject: "${subject}"`;
-            console.log('Using enhanced fallback for message:', message.uid);
-          } else {
-            console.log('Successfully extracted email body, length:', bodyText.length);
+            console.log('Using fallback placeholder for message:', message.uid);
           }
           
           const rawEmail: RawEmail = {
@@ -480,6 +402,65 @@ export class ImapSmtpProvider implements EmailProvider {
       default:
         console.log(`⚠️ Could not detect MIME type for ${filename}, using application/octet-stream`);
         return 'application/octet-stream';
+    }
+  }
+
+  // Find text parts (text/plain or text/html) in body structure
+  private findTextParts(bodyStructure: any): Array<{ partId: string; type: string; encoding: string }> {
+    const textParts: Array<{ partId: string; type: string; encoding: string }> = [];
+    
+    const walkParts = (part: any) => {
+      if (!part) return;
+      
+      // Check if this is a text part
+      if (part.type === 'text/plain' || part.type === 'text/html') {
+        const partId = part.part || '1';
+        const encoding = part.encoding?.toLowerCase() || 'utf-8';
+        textParts.push({ partId, type: part.type, encoding });
+      }
+      
+      // Recursively process child nodes
+      if (part.childNodes && Array.isArray(part.childNodes)) {
+        for (const childPart of part.childNodes) {
+          walkParts(childPart);
+        }
+      }
+    };
+    
+    // Start walking from root
+    if (bodyStructure.childNodes) {
+      for (const childPart of bodyStructure.childNodes) {
+        walkParts(childPart);
+      }
+    } else {
+      walkParts(bodyStructure);
+    }
+    
+    return textParts;
+  }
+
+  // Decode content based on encoding
+  private decodeContent(content: Buffer, encoding: string): string {
+    try {
+      const encodingLower = encoding.toLowerCase();
+      
+      if (encodingLower === 'base64') {
+        return Buffer.from(content.toString(), 'base64').toString('utf-8');
+      } else if (encodingLower === 'quoted-printable') {
+        // Basic quoted-printable decoder
+        let decoded = content.toString('binary');
+        decoded = decoded.replace(/=\r?\n/g, ''); // Remove soft line breaks
+        decoded = decoded.replace(/=([0-9A-F]{2})/gi, (_, hex) => 
+          String.fromCharCode(parseInt(hex, 16))
+        );
+        return decoded;
+      } else {
+        // 7bit, 8bit, or binary - just convert to string
+        return content.toString('utf-8');
+      }
+    } catch (error) {
+      console.error('Error decoding content:', error);
+      return content.toString('utf-8');
     }
   }
 
