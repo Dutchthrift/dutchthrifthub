@@ -1,4 +1,7 @@
 import DOMPurify from 'isomorphic-dompurify';
+// @ts-ignore - no types available
+import { decode as decodeQuotedPrintable } from 'quoted-printable';
+import { decode as decodeBase64 } from 'js-base64';
 
 interface SanitizedEmailContentProps {
   body: string;
@@ -14,104 +17,94 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     );
   }
 
-  const cleanMimeHeaders = (str: string): string => {
-    let cleaned = str;
-    
-    // Remove all MIME headers and boundaries
-    cleaned = cleaned.replace(/Content-Type:[^\n]*\n?/gi, '');
-    cleaned = cleaned.replace(/Content-Transfer-Encoding:[^\n]*\n?/gi, '');
-    cleaned = cleaned.replace(/Content-Disposition:[^\n]*\n?/gi, '');
-    cleaned = cleaned.replace(/Content-ID:[^\n]*\n?/gi, '');
-    cleaned = cleaned.replace(/MIME-Version:[^\n]*\n?/gi, '');
-    cleaned = cleaned.replace(/--[a-zA-Z0-9_-]{10,}[^\n]*\n?/g, '');
-    cleaned = cleaned.replace(/boundary="[^"]*"/gi, '');
-    cleaned = cleaned.replace(/charset="[^"]*"/gi, '');
-    
-    // Remove multipart declarations
-    cleaned = cleaned.replace(/This is a multi-part message in MIME format[^\n]*\n?/gi, '');
-    cleaned = cleaned.replace(/multipart\/[a-z]+;[^\n]*\n?/gi, '');
-    
-    return cleaned.trim();
-  };
+  const decodeEmailBody = (rawContent: string): string => {
+    let decoded = rawContent;
 
-  const decodeBase64 = (str: string): { decoded: string; wasBase64: boolean } => {
-    if (!str) {
-      return { decoded: str, wasBase64: false };
-    }
-    
-    let workingStr = str;
-    
-    // Step 1: Clean MIME headers first
-    workingStr = cleanMimeHeaders(workingStr);
-    
-    // Step 2: If there's a clear MIME header block at the start, skip only that block
-    // Look for the pattern of headers followed by blank line (but don't split the whole content)
-    const headerEndMatch = workingStr.match(/^(.*?\n)\n([\s\S]*)$/);
-    if (headerEndMatch && /^[A-Za-z-]+:\s*.+/m.test(headerEndMatch[1])) {
-      // Only skip the first header block, keep rest of content intact
-      const firstLineAfterHeaders = headerEndMatch[2];
-      if (firstLineAfterHeaders && firstLineAfterHeaders.trim().length > 0) {
-        workingStr = firstLineAfterHeaders;
+    // Step 1: Check for and decode base64 content
+    // Base64 content is typically clean alphanumeric with no special chars
+    if (!decoded.includes('=') && !decoded.includes('<') && decoded.length > 50) {
+      const base64Pattern = /^[A-Za-z0-9+/=\s]+$/;
+      if (base64Pattern.test(decoded.replace(/\s/g, ''))) {
+        try {
+          const cleanBase64 = decoded.replace(/\s/g, '');
+          decoded = decodeBase64(cleanBase64);
+        } catch (e) {
+          // Not base64, continue
+        }
       }
     }
-    
-    // Step 3: Clean whitespace for base64 check
-    const cleanedStr = workingStr.replace(/\s+/g, '');
-    
-    // Step 4: Check if it looks like base64 and is long enough
-    const base64Pattern = /^[A-Za-z0-9+/=]+$/;
-    if (cleanedStr.length < 10 || !base64Pattern.test(cleanedStr)) {
-      return { decoded: workingStr, wasBase64: false };
-    }
-    
-    // Step 5: Try to decode
-    try {
-      const decoded = atob(cleanedStr);
-      
-      // Step 6: Validate decoded content is printable
-      const isPrintable = decoded.split('').every(char => {
-        const code = char.charCodeAt(0);
-        return code >= 32 || code === 9 || code === 10 || code === 13;
-      });
-      
-      if (isPrintable) {
-        return { decoded, wasBase64: true };
+
+    // Step 2: Check for and decode quoted-printable content
+    // Quoted-printable has =XX patterns or =\r\n soft line breaks
+    if (decoded.includes('=0A') || decoded.includes('=C2') || decoded.includes('=3D') || /=\r?\n/.test(decoded)) {
+      try {
+        decoded = decodeQuotedPrintable(decoded);
+      } catch (e) {
+        console.error('Error decoding quoted-printable:', e);
       }
-      
-      return { decoded: workingStr, wasBase64: false };
-    } catch (e) {
-      return { decoded: workingStr, wasBase64: false };
     }
+
+    // Step 3: Clean any remaining MIME headers that might be in the content
+    const lines = decoded.split('\n');
+    let contentStartIndex = 0;
+    
+    // Skip MIME headers at the beginning
+    for (let i = 0; i < Math.min(lines.length, 20); i++) {
+      const line = lines[i].trim();
+      // Check if this looks like a MIME header
+      if (line.match(/^[A-Za-z-]+:\s*.+/) || line.startsWith('--') || line === '') {
+        contentStartIndex = i + 1;
+      } else {
+        // We've hit actual content
+        break;
+      }
+    }
+
+    if (contentStartIndex > 0 && contentStartIndex < lines.length) {
+      decoded = lines.slice(contentStartIndex).join('\n');
+    }
+
+    // Step 4: Remove common MIME artifacts
+    decoded = decoded.replace(/Content-Type:[^\n]*\n?/gi, '');
+    decoded = decoded.replace(/Content-Transfer-Encoding:[^\n]*\n?/gi, '');
+    decoded = decoded.replace(/Content-Disposition:[^\n]*\n?/gi, '');
+    decoded = decoded.replace(/Mime-Version:[^\n]*\n?/gi, '');
+    decoded = decoded.replace(/charset="?[^"\n]*"?\n?/gi, '');
+    decoded = decoded.replace(/--[a-zA-Z0-9_-]{10,}[^\n]*\n?/g, '');
+
+    return decoded.trim();
   };
 
-  const { decoded: decodedBody } = decodeBase64(body);
+  // Decode the email body
+  const decodedBody = decodeEmailBody(body);
 
-  if (!isHtml && !decodedBody.includes('<html') && !decodedBody.includes('<div')) {
+  // Check if this is HTML content
+  const isActuallyHtml = isHtml || 
+    decodedBody.includes('<!DOCTYPE') || 
+    decodedBody.includes('<html') || 
+    decodedBody.includes('<body') ||
+    decodedBody.includes('<div') || 
+    decodedBody.includes('<p>') ||
+    decodedBody.includes('<table');
+
+  // Render plain text emails
+  if (!isActuallyHtml) {
     return (
-      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground break-words">
         {decodedBody}
       </div>
     );
   }
 
-  const actuallyHtml = isHtml || decodedBody.includes('<html') || decodedBody.includes('<div') || decodedBody.includes('<p>');
-
-  if (!actuallyHtml) {
-    return (
-      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-        {decodedBody}
-      </div>
-    );
-  }
-
-  const sanitizeHtml = (html: string): { sanitized: string; isEmpty: boolean } => {
+  // Sanitize and render HTML emails
+  const sanitizeHtml = (html: string): string => {
     const config = {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'ul', 'ol', 'li', 'a', 'img', 'div', 'span', 'table', 'thead', 'tbody',
-        'tr', 'td', 'th', 'blockquote', 'code', 'pre', 'hr', 'b', 'i'
+        'tr', 'td', 'th', 'blockquote', 'code', 'pre', 'hr', 'b', 'i', 'font'
       ],
-      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel'],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel', 'width', 'height'],
       ALLOW_DATA_ATTR: false,
       ADD_ATTR: ['target', 'rel'],
       FORCE_BODY: true,
@@ -119,41 +112,28 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
 
     let cleanHtml = html;
 
-    // Additional MIME cleanup for HTML content
-    cleanHtml = cleanMimeHeaders(cleanHtml);
-    
-    // Remove style tags and inline styles
+    // Remove style tags (but keep the content structure)
     cleanHtml = cleanHtml.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-    cleanHtml = cleanHtml.replace(/style="[^"]*"/gi, '');
-    cleanHtml = cleanHtml.replace(/class="[^"]*"/gi, '');
-    cleanHtml = cleanHtml.replace(/id="[^"]*"/gi, '');
+    
+    // Remove inline styles but keep the tags
+    cleanHtml = cleanHtml.replace(/\s*style="[^"]*"/gi, '');
+    
+    // Remove classes
+    cleanHtml = cleanHtml.replace(/\s*class="[^"]*"/gi, '');
     
     // Clean up excessive whitespace
     cleanHtml = cleanHtml.replace(/&nbsp;/g, ' ');
-    cleanHtml = cleanHtml.replace(/\s{2,}/g, ' ');
 
     const sanitized = DOMPurify.sanitize(cleanHtml, config);
-    const isEmpty = !sanitized || sanitized.trim().length === 0;
-
-    return { sanitized, isEmpty };
+    return sanitized;
   };
 
-  const { sanitized, isEmpty } = sanitizeHtml(decodedBody);
+  const sanitized = sanitizeHtml(decodedBody);
 
-  if (isEmpty) {
+  if (!sanitized || sanitized.trim().length === 0) {
     return (
       <div className="text-muted-foreground italic text-sm">
-        Email content could not be displayed safely
-      </div>
-    );
-  }
-
-  const hasHtmlTags = /<[^>]+>/.test(sanitized);
-  
-  if (!hasHtmlTags) {
-    return (
-      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-        {sanitized}
+        Email content could not be displayed
       </div>
     );
   }
@@ -162,19 +142,26 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     <div 
       className="prose prose-sm max-w-none dark:prose-invert
         prose-p:my-2 prose-p:leading-relaxed
-        prose-headings:mt-4 prose-headings:mb-2
-        prose-ul:my-2 prose-ol:my-2
+        prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold
+        prose-ul:my-2 prose-ol:my-2 prose-ul:pl-4 prose-ol:pl-4
         prose-li:my-1
         prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-a:break-words
-        prose-img:rounded-md prose-img:shadow-sm prose-img:max-w-full
+        prose-img:rounded-md prose-img:shadow-sm prose-img:max-w-full prose-img:h-auto
         prose-blockquote:border-l-4 prose-blockquote:border-gray-300 dark:prose-blockquote:border-gray-600 prose-blockquote:pl-4 prose-blockquote:italic
-        prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:break-words
+        prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:break-words prose-code:text-sm
         prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:p-3 prose-pre:rounded-md prose-pre:overflow-x-auto
         prose-hr:my-4 prose-hr:border-gray-300 dark:prose-hr:border-gray-600
+        prose-table:border-collapse prose-table:w-auto prose-table:my-4
+        prose-td:border prose-td:border-gray-300 dark:prose-td:border-gray-600 prose-td:px-3 prose-td:py-2
+        prose-th:border prose-th:border-gray-300 dark:prose-th:border-gray-600 prose-th:px-3 prose-th:py-2 prose-th:bg-gray-100 dark:prose-th:bg-gray-800
         text-foreground
         break-words overflow-wrap-anywhere
       "
-      style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+      style={{ 
+        wordBreak: 'break-word', 
+        overflowWrap: 'anywhere',
+        maxWidth: '100%' 
+      }}
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   );
