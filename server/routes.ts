@@ -1543,44 +1543,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Email threads with filtering
   app.get("/api/email-threads", async (req, res) => {
     try {
-      const { caseId, folder, starred, archived, isUnread, hasOrder } = req.query;
+      const { caseId, folder, starred, archived, isUnread, hasOrder, limit } = req.query;
       
       if (caseId) {
         // Get email threads linked to a specific case
         const relatedItems = await storage.getCaseRelatedItems(caseId as string);
         res.json(relatedItems.emails);
       } else {
-        // Get all email threads and apply filters
-        let threads = await storage.getEmailThreads();
-        
-        // Apply folder filter
-        if (folder) {
-          threads = threads.filter(t => t.folder === folder);
-        }
-        
-        // Apply starred filter
-        if (starred === 'true') {
-          threads = threads.filter(t => t.starred === true);
-        }
-        
-        // Apply archived filter
-        if (archived === 'true') {
-          threads = threads.filter(t => t.archived === true);
-        } else if (archived === 'false') {
-          threads = threads.filter(t => t.archived === false);
-        }
-        
-        // Apply unread filter
-        if (isUnread === 'true') {
-          threads = threads.filter(t => t.isUnread === true);
-        }
-        
-        // Apply order filter
-        if (hasOrder === 'true') {
-          threads = threads.filter(t => t.orderId !== null);
-        } else if (hasOrder === 'false') {
-          threads = threads.filter(t => t.orderId === null);
-        }
+        // Get email threads with database-level filtering
+        const threads = await storage.getEmailThreads({
+          limit: limit ? parseInt(limit as string) : undefined,
+          folder: folder as string,
+          starred: starred === 'true' ? true : starred === 'false' ? false : undefined,
+          archived: archived === 'true' ? true : archived === 'false' ? false : undefined,
+          isUnread: isUnread === 'true' ? true : isUnread === 'false' ? false : undefined,
+          hasOrder: hasOrder === 'true' ? true : hasOrder === 'false' ? false : undefined,
+        });
         
         res.json(threads);
       }
