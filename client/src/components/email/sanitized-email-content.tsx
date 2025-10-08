@@ -165,14 +165,16 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
         prose-headings:mt-4 prose-headings:mb-2
         prose-ul:my-2 prose-ol:my-2
         prose-li:my-1
-        prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
-        prose-img:rounded-md prose-img:shadow-sm
+        prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-a:break-words
+        prose-img:rounded-md prose-img:shadow-sm prose-img:max-w-full
         prose-blockquote:border-l-4 prose-blockquote:border-gray-300 dark:prose-blockquote:border-gray-600 prose-blockquote:pl-4 prose-blockquote:italic
-        prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
-        prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:p-3 prose-pre:rounded-md
+        prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:break-words
+        prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:p-3 prose-pre:rounded-md prose-pre:overflow-x-auto
         prose-hr:my-4 prose-hr:border-gray-300 dark:prose-hr:border-gray-600
         text-foreground
+        break-words overflow-wrap-anywhere
       "
+      style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   );

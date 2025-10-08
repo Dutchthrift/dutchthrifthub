@@ -442,21 +442,36 @@ export class ImapSmtpProvider implements EmailProvider {
   // Decode content based on encoding
   private decodeContent(content: Buffer, encoding: string): string {
     try {
+      let textContent = content.toString('utf-8');
+      
+      // Strip MIME headers if present (headers end with double newline)
+      const headerEndIndex = textContent.indexOf('\r\n\r\n');
+      if (headerEndIndex > -1 && headerEndIndex < 500) { // Headers should be in first 500 chars
+        textContent = textContent.substring(headerEndIndex + 4);
+      } else {
+        const altHeaderEndIndex = textContent.indexOf('\n\n');
+        if (altHeaderEndIndex > -1 && altHeaderEndIndex < 500) {
+          textContent = textContent.substring(altHeaderEndIndex + 2);
+        }
+      }
+      
       const encodingLower = encoding.toLowerCase();
       
       if (encodingLower === 'base64') {
-        return Buffer.from(content.toString(), 'base64').toString('utf-8');
+        // Remove whitespace and decode
+        const cleanBase64 = textContent.replace(/\s/g, '');
+        return Buffer.from(cleanBase64, 'base64').toString('utf-8');
       } else if (encodingLower === 'quoted-printable') {
-        // Basic quoted-printable decoder
-        let decoded = content.toString('binary');
+        // Decode quoted-printable
+        let decoded = textContent;
         decoded = decoded.replace(/=\r?\n/g, ''); // Remove soft line breaks
         decoded = decoded.replace(/=([0-9A-F]{2})/gi, (_, hex) => 
           String.fromCharCode(parseInt(hex, 16))
         );
         return decoded;
       } else {
-        // 7bit, 8bit, or binary - just convert to string
-        return content.toString('utf-8');
+        // 7bit, 8bit, or binary - already converted to string
+        return textContent;
       }
     } catch (error) {
       console.error('Error decoding content:', error);
