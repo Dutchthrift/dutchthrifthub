@@ -624,7 +624,13 @@ export default function Orders() {
                     <TableRow key={order.id} data-testid={`order-row-${order.id}`}>
                       <TableCell className="font-medium">
                         <div className="flex items-center space-x-2">
-                          <span>#{order.orderNumber}</span>
+                          <button
+                            onClick={() => handleViewDetails(order)}
+                            className="text-primary hover:underline font-medium transition-colors"
+                            data-testid={`order-number-${order.id}`}
+                          >
+                            #{order.orderNumber}
+                          </button>
                           {(order.orderData as any)?.line_items?.length > 1 && (
                             <Badge variant="outline" className="text-xs">
                               +{(order.orderData as any).line_items.length - 1}
