@@ -1,0 +1,219 @@
+🧠 Replit AI Improvement Plan — Inbox Page (DutchThrift Hub)
+🎯 Goal
+
+Rebuild and refactor the Inbox Page to create a clean, Gmail-style interface that:
+
+Properly decodes and renders all emails (no broken HTML)
+
+Feels modern, fast, and easy to use
+
+Integrates seamlessly with orders and cases
+
+Fixes the compose issue (plain text sent as HTML)
+
+🧩 Current Issues
+
+Emails display broken — encoded text like =0A and raw HTML tags are visible.
+
+Thread view unreadable — nested <html> and <body> tags are not sanitized.
+
+UI layout unbalanced — the sidebar, list, and thread have inconsistent spacing and alignment.
+
+User experience poor — no clear separation between messages, difficult to navigate.
+
+Compose sends plain text as HTML — Outlook and Gmail display unformatted messages.
+
+✅ Improvement Objectives
+
+Decode and sanitize all incoming emails properly.
+
+Rebuild the layout into a 3-column Gmail-style structure.
+
+Make the email thread fully scrollable, clean, and readable.
+
+Add Gmail-style reply and order linking.
+
+Replace the plain textarea with a modern rich text editor.
+
+🧱 Implementation Steps
+1. Email Decoding Fix
+
+Create a helper file utils/decodeEmail.ts:
+
+import { decode as decodeQP } from 'quoted-printable';
+import { decode as decodeBase64 } from 'js-base64';
+import DOMPurify from 'dompurify';
+import { convert } from 'html-to-text';
+
+export function decodeEmailBody(rawData: string, encoding = 'base64') {
+  let decoded = rawData;
+
+  if (encoding === 'base64') decoded = decodeBase64(rawData);
+  if (decoded.includes('=0A') || decoded.includes('=C2')) decoded = decodeQP(decoded);
+
+  // Remove full HTML wrappers
+  decoded = decoded
+    .replace(/<html[^>]*>/gi, '')
+    .replace(/<\/html>/gi, '')
+    .replace(/<body[^>]*>/gi, '')
+    .replace(/<\/body>/gi, '');
+
+  const safeHtml = DOMPurify.sanitize(decoded, { WHOLE_DOCUMENT: false });
+  return safeHtml || convert(decoded);
+}
+
+
+Install dependencies:
+
+npm install quoted-printable js-base64 dompurify html-to-text
+
+
+Use this function inside the thread renderer:
+
+<div
+  className="email-body prose dark:prose-invert max-w-none"
+  dangerouslySetInnerHTML={{ __html: decodeEmailBody(emailBody) }}
+/>
+
+2. Layout Redesign
+
+Rebuild the Inbox page with a three-column Gmail-style layout:
+
+Column	Component	Description
+Left	InboxSidebar.tsx	Navigation: Inbox, Sent, Starred, Archived, Filters
+Middle	MailList.tsx	Scrollable list of email threads
+Right	ThreadView.tsx	Full thread view and reply editor
+
+Use Tailwind grid layout:
+
+<div className="grid grid-cols-[240px_1fr_2fr] h-screen">
+  <InboxSidebar />
+  <MailList />
+  <ThreadView />
+</div>
+
+3. Email Thread Redesign
+
+Each email in a thread should be shown as a card:
+
+<Card className="mb-4 border border-gray-800 bg-gray-900/70">
+  <CardHeader>
+    <div className="flex justify-between">
+      <div>
+        <h3 className="font-medium">{senderName}</h3>
+        <p className="text-xs text-gray-400">{senderEmail}</p>
+      </div>
+      <span className="text-xs text-gray-500">{formattedDate}</span>
+    </div>
+  </CardHeader>
+  <CardContent>
+    <div dangerouslySetInnerHTML={{ __html: decodeEmailBody(content) }} />
+  </CardContent>
+</Card>
+
+
+Make the thread scrollable:
+
+<div className="overflow-y-auto h-full px-6 py-4">{children}</div>
+
+
+Add a sticky reply bar at the bottom:
+
+<div className="sticky bottom-0 bg-gray-950 border-t border-gray-800 p-3">
+  <EmailCompose />
+</div>
+
+4. Email Compose Fix
+
+Problem: Plain text from textarea sent with contentType: 'HTML'.
+
+Fix (Quick):
+Convert plain text → HTML before sending:
+
+function plainTextToHtml(text: string) {
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const withBreaks = escaped.replace(/\n/g, '<br>');
+  return `<html><body style="font-family: Arial, sans-serif;">${withBreaks}</body></html>`;
+}
+
+
+Use:
+
+const htmlBody = plainTextToHtml(message);
+sendEmail({ to, subject, htmlBody, contentType: 'HTML' });
+
+
+Better fix (Optional):
+Replace textarea with a rich text editor (React Quill):
+
+npm install react-quill
+
+
+Then:
+
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+
+5. Order Integration
+
+Automatically detect order numbers in email subject/body (/Order\s+#?(\d+)/i).
+
+Show a small green badge (e.g. “Order #1234”) next to the subject.
+
+Add a “Link to Order” button in the thread header.
+
+Allow “Switch Order” via a dropdown.
+
+6. UX Enhancements
+
+Add loading skeletons for MailList and ThreadView.
+
+Highlight selected email (e.g. bg-blue-900/40).
+
+Use keyboard navigation (↑ ↓ Enter to move, R to reply).
+
+Add collapsible thread messages for long conversations.
+
+Optional: add order summary sidebar on the right side of ThreadView.
+
+7. Styling Consistency
+
+Limit font styles inside email body (.email-body * { all: revert; })
+
+Use neutral dark background with low contrast borders.
+
+Reduce sidebar width and increase whitespace between list items.
+
+Align all timestamps on the right.
+
+8. File Structure Proposal
+/src/pages/inbox/
+  InboxLayout.tsx
+  InboxSidebar.tsx
+  MailList.tsx
+  ThreadView.tsx
+  EmailCard.tsx
+  EmailCompose.tsx
+  useEmailDecoder.ts
+
+9. Optional Future Improvements
+
+Add “Create Case” or “Create Task” from an email.
+
+SLA indicator (e.g. “waiting for reply 3 days”).
+
+Thread collapse / expand toggle.
+
+Archive button in top bar.
+
+✅ Expected Result
+
+All emails render correctly (no raw HTML or encoded characters).
+
+Gmail-like layout with smooth UX.
+
+Compose window sends properly formatted HTML emails.
+
+Users can link and switch orders directly from the thread.
+
+Clean, consistent dark theme UI that matches the rest of the hub.
