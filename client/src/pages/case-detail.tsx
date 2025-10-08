@@ -81,6 +81,12 @@ export default function CaseDetail() {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState("");
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [showSlaDialog, setShowSlaDialog] = useState(false);
+  const [slaDeadline, setSlaDeadline] = useState("");
+  const [linkType, setLinkType] = useState<"email" | "order" | "repair" | "todo" | "">("");
+  const [linkedId, setLinkedId] = useState("");
   const { toast } = useToast();
 
   const { data: caseData, isLoading } = useQuery<CaseWithDetails>({
@@ -148,6 +154,58 @@ export default function CaseDetail() {
     enabled: !!caseId,
   });
 
+  const { data: users = [] } = useQuery<any[]>({
+    queryKey: ["/api/users/list"],
+  });
+
+  const { data: caseLinks = [] } = useQuery<any[]>({
+    queryKey: ["/api/cases", caseId, "links"],
+    enabled: !!caseId && showLinkDialog,
+  });
+
+  const { data: allEmails = [] } = useQuery<any[]>({
+    queryKey: ["/api/email-threads"],
+    enabled: showLinkDialog && linkType === "email",
+  });
+
+  const { data: allOrdersResponse } = useQuery<any>({
+    queryKey: ["/api/orders", { page: 1, limit: 1000 }],
+    queryFn: async () => {
+      const response = await fetch("/api/orders?page=1&limit=1000");
+      if (!response.ok) throw new Error("Failed to fetch orders");
+      return response.json();
+    },
+    enabled: showLinkDialog && linkType === "order",
+  });
+
+  const allOrders = allOrdersResponse?.orders || [];
+
+  const { data: allRepairsResponse } = useQuery<any>({
+    queryKey: ["/api/repairs"],
+    queryFn: async () => {
+      const response = await fetch("/api/repairs");
+      if (!response.ok) throw new Error("Failed to fetch repairs");
+      const data = await response.json();
+      return Array.isArray(data) ? data : (data.repairs || []);
+    },
+    enabled: showLinkDialog && linkType === "repair",
+  });
+
+  const allRepairs = Array.isArray(allRepairsResponse) ? allRepairsResponse : (allRepairsResponse?.repairs || allRepairsResponse || []);
+
+  const { data: allTodosResponse } = useQuery<any>({
+    queryKey: ["/api/todos"],
+    queryFn: async () => {
+      const response = await fetch("/api/todos");
+      if (!response.ok) throw new Error("Failed to fetch todos");
+      const data = await response.json();
+      return Array.isArray(data) ? data : (data.todos || []);
+    },
+    enabled: showLinkDialog && linkType === "todo",
+  });
+
+  const allTodos = Array.isArray(allTodosResponse) ? allTodosResponse : (allTodosResponse?.todos || allTodosResponse || []);
+
   const updateCaseMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Case> }) => {
       const response = await fetch(`/api/cases/${id}`, {
@@ -198,6 +256,98 @@ export default function CaseDetail() {
       toast({
         title: "Failed to add note",
         description: "Could not add note to case",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const assignCaseMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch(`/api/cases/${caseId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedTo: userId }),
+      });
+      if (!response.ok) throw new Error("Failed to assign case");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "events"] });
+      setShowAssignDialog(false);
+      setSelectedUserId("");
+      toast({
+        title: "Case assigned",
+        description: "Case has been assigned successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to assign case",
+        description: "Could not assign case to user",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const setSlaMutation = useMutation({
+    mutationFn: async (deadline: string) => {
+      const response = await fetch(`/api/cases/${caseId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slaDeadline: deadline }),
+      });
+      if (!response.ok) throw new Error("Failed to set SLA deadline");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "events"] });
+      setShowSlaDialog(false);
+      setSlaDeadline("");
+      toast({
+        title: "SLA deadline set",
+        description: "SLA deadline has been set successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to set SLA",
+        description: "Could not set SLA deadline",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const linkItemMutation = useMutation({
+    mutationFn: async ({ type, id }: { type: string; id: string }) => {
+      const response = await fetch(`/api/cases/${caseId}/links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ linkType: type, linkedId: id }),
+      });
+      if (!response.ok) throw new Error("Failed to link item");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "links"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/email-threads", "caseId", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", "caseId", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/repairs", "caseId", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/todos", "caseId", caseId] });
+      setShowLinkDialog(false);
+      setLinkType("");
+      setLinkedId("");
+      toast({
+        title: "Item linked",
+        description: "Item has been linked to case successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to link item",
+        description: "Could not link item to case",
         variant: "destructive",
       });
     }
@@ -280,6 +430,23 @@ export default function CaseDetail() {
     if (!date) return 'Not available';
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     return dateObj.toLocaleString();
+  };
+
+  const getAvailableItems = () => {
+    const linkedIds = caseLinks.map((link: any) => link.linkedId);
+    
+    switch (linkType) {
+      case "email":
+        return allEmails.filter((item: any) => !linkedIds.includes(item.id));
+      case "order":
+        return allOrders.filter((item: any) => !linkedIds.includes(item.id));
+      case "repair":
+        return allRepairs.filter((item: any) => !linkedIds.includes(item.id));
+      case "todo":
+        return allTodos.filter((item: any) => !linkedIds.includes(item.id));
+      default:
+        return [];
+    }
   };
 
   if (isLoading) {
@@ -656,7 +823,7 @@ export default function CaseDetail() {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button className="w-full justify-start" variant="outline" data-testid="assign-case-button">
+                <Button className="w-full justify-start" variant="outline" onClick={() => setShowAssignDialog(true)} data-testid="assign-case-button">
                   <User className="mr-2 h-4 w-4" />
                   Assign Case
                 </Button>
@@ -668,7 +835,7 @@ export default function CaseDetail() {
                   <MessageSquare className="mr-2 h-4 w-4" />
                   Add Note
                 </Button>
-                <Button className="w-full justify-start" variant="outline" data-testid="set-sla-button">
+                <Button className="w-full justify-start" variant="outline" onClick={() => setShowSlaDialog(true)} data-testid="set-sla-button">
                   <Clock className="mr-2 h-4 w-4" />
                   Set SLA
                 </Button>
@@ -738,6 +905,180 @@ export default function CaseDetail() {
                 data-testid="save-note-button"
               >
                 {addNoteMutation.isPending ? "Saving..." : "Save Note"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Case Dialog */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent data-testid="assign-case-dialog">
+          <DialogHeader>
+            <DialogTitle>Assign Case</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select User</label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger data-testid="user-select">
+                  <SelectValue placeholder="Choose a user to assign..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user: any) => (
+                    <SelectItem key={user.id} value={user.id} data-testid={`user-option-${user.id}`}>
+                      {user.firstName} {user.lastName} ({user.username})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAssignDialog(false);
+                  setSelectedUserId("");
+                }}
+                data-testid="cancel-assign-button"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => assignCaseMutation.mutate(selectedUserId)}
+                disabled={!selectedUserId || assignCaseMutation.isPending}
+                data-testid="save-assign-button"
+              >
+                {assignCaseMutation.isPending ? "Assigning..." : "Assign Case"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Set SLA Dialog */}
+      <Dialog open={showSlaDialog} onOpenChange={setShowSlaDialog}>
+        <DialogContent data-testid="set-sla-dialog">
+          <DialogHeader>
+            <DialogTitle>Set SLA Deadline</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Deadline Date</label>
+              <Input
+                type="datetime-local"
+                value={slaDeadline}
+                onChange={(e) => setSlaDeadline(e.target.value)}
+                data-testid="sla-deadline-input"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSlaDialog(false);
+                  setSlaDeadline("");
+                }}
+                data-testid="cancel-sla-button"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => setSlaMutation.mutate(slaDeadline)}
+                disabled={!slaDeadline || setSlaMutation.isPending}
+                data-testid="save-sla-button"
+              >
+                {setSlaMutation.isPending ? "Setting..." : "Set Deadline"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Items Dialog */}
+      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+        <DialogContent data-testid="link-items-dialog">
+          <DialogHeader>
+            <DialogTitle>Link Item to Case</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Item Type</label>
+              <Select value={linkType} onValueChange={(value: any) => {
+                setLinkType(value);
+                setLinkedId("");
+              }}>
+                <SelectTrigger data-testid="link-type-select">
+                  <SelectValue placeholder="Select item type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="email" data-testid="link-type-email">Email</SelectItem>
+                  <SelectItem value="order" data-testid="link-type-order">Order</SelectItem>
+                  <SelectItem value="repair" data-testid="link-type-repair">Repair</SelectItem>
+                  <SelectItem value="todo" data-testid="link-type-todo">Todo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {linkType && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Item</label>
+                <Select value={linkedId} onValueChange={setLinkedId}>
+                  <SelectTrigger data-testid="linked-item-select">
+                    <SelectValue placeholder={`Select ${linkType}...`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAvailableItems().length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">
+                        No available {linkType}s to link
+                      </div>
+                    ) : (
+                      <>
+                        {linkType === "email" && getAvailableItems().map((email: any) => (
+                          <SelectItem key={email.id} value={email.id} data-testid={`link-email-${email.id}`}>
+                            {email.subject}
+                          </SelectItem>
+                        ))}
+                        {linkType === "order" && getAvailableItems().map((order: any) => (
+                          <SelectItem key={order.id} value={order.id} data-testid={`link-order-${order.id}`}>
+                            Order #{order.orderNumber}
+                          </SelectItem>
+                        ))}
+                        {linkType === "repair" && getAvailableItems().map((repair: any) => (
+                          <SelectItem key={repair.id} value={repair.id} data-testid={`link-repair-${repair.id}`}>
+                            {repair.title}
+                          </SelectItem>
+                        ))}
+                        {linkType === "todo" && getAvailableItems().map((todo: any) => (
+                          <SelectItem key={todo.id} value={todo.id} data-testid={`link-todo-${todo.id}`}>
+                            {todo.title}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowLinkDialog(false);
+                  setLinkType("");
+                  setLinkedId("");
+                }}
+                data-testid="cancel-link-button"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => linkItemMutation.mutate({ type: linkType, id: linkedId })}
+                disabled={!linkType || !linkedId || linkItemMutation.isPending}
+                data-testid="save-link-button"
+              >
+                {linkItemMutation.isPending ? "Linking..." : "Link Item"}
               </Button>
             </div>
           </div>
