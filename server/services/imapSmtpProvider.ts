@@ -35,6 +35,11 @@ export class ImapSmtpProvider implements EmailProvider {
     
     const client = new ImapFlow(this.imapConfig);
     
+    // Add error handler to prevent crashes
+    client.on('error', (err) => {
+      console.error('IMAP client error:', err);
+    });
+    
     try {
       console.log('Attempting IMAP connection...');
       await client.connect();

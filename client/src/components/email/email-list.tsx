@@ -1,5 +1,6 @@
 import { EmailThread } from "@shared/schema";
 import { EmailListItem } from "./email-list-item";
+import { EmailListSkeleton } from "./email-list-skeleton";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
@@ -27,14 +28,7 @@ export function EmailList({
   hasMore,
 }: EmailListProps) {
   if (isLoading && threads.length === 0) {
-    return (
-      <div className="flex-1 flex items-center justify-center" data-testid="email-list-loading">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Loading emails...</p>
-        </div>
-      </div>
-    );
+    return <EmailListSkeleton />;
   }
 
   if (!isLoading && threads.length === 0) {

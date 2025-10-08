@@ -103,10 +103,7 @@ export default function Inbox() {
 
   const updateThreadMutation = useMutation({
     mutationFn: async ({ threadId, updates }: { threadId: string; updates: Partial<EmailThread> }) => {
-      return apiRequest(`/api/email-threads/${threadId}`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-      });
+      return apiRequest("PATCH", `/api/email-threads/${threadId}`, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/email-threads"], exact: false });
@@ -115,10 +112,7 @@ export default function Inbox() {
 
   const bulkActionMutation = useMutation({
     mutationFn: async ({ action, threadIds }: { action: string; threadIds: string[] }) => {
-      return apiRequest(`/api/email-threads/bulk/${action}`, {
-        method: "POST",
-        body: JSON.stringify({ threadIds }),
-      });
+      return apiRequest("POST", `/api/email-threads/bulk/${action}`, { threadIds });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/email-threads"], exact: false });
@@ -406,7 +400,6 @@ export default function Inbox() {
                 {selectedThreadData ? (
                   <EmailThreadView 
                     threadId={selectedThreadData.id}
-                    onReply={() => setShowCompose(true)}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">

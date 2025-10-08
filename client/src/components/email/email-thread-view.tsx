@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import {
   Select,
   SelectContent,
@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CreateCaseModal } from "@/components/forms/create-case-modal";
 import { EmailAttachments } from "./email-attachments";
 import { SanitizedEmailContent } from "./sanitized-email-content";
+import { EmailThreadSkeleton } from "./email-thread-skeleton";
 
 interface EmailThreadViewProps {
   threadId: string;
@@ -270,16 +271,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
   };
 
   if (isLoading) {
-    return (
-      <Card className="h-full" data-testid="email-thread-loading">
-        <CardContent className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading email thread...</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <EmailThreadSkeleton />;
   }
 
   if (!thread) {
@@ -436,12 +428,11 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
               <CardTitle className="text-sm">Reply to {thread.customerEmail}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Textarea
+              <RichTextEditor
+                content={replyText}
+                onChange={setReplyText}
                 placeholder="Type your reply..."
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
                 className="min-h-[100px]"
-                data-testid="reply-textarea"
               />
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
