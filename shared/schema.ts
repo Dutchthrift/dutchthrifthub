@@ -9,7 +9,8 @@ export const priorityEnum = pgEnum("priority", ["low", "medium", "high", "urgent
 export const repairStatusEnum = pgEnum("repair_status", ["new", "diagnosing", "waiting_parts", "repair_in_progress", "quality_check", "completed", "returned", "canceled"]);
 export const todoStatusEnum = pgEnum("todo_status", ["todo", "in_progress", "done"]);
 export const todoCategoryEnum = pgEnum("todo_category", ["orders", "purchasing", "marketing", "admin", "other"]);
-export const emailStatusEnum = pgEnum("email_status", ["open", "closed", "archived"]);
+export const emailStatusEnum = pgEnum("email_status", ["open", "closed"]);
+export const emailFolderEnum = pgEnum("email_folder", ["inbox", "sent"]);
 export const orderStatusEnum = pgEnum("order_status", ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]);
 export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["draft", "sent", "awaiting_delivery", "partially_received", "fully_received", "cancelled"]);
 export const caseStatusEnum = pgEnum("case_status", ["new", "in_progress", "waiting_customer", "waiting_part", "resolved", "closed"]);
@@ -68,6 +69,9 @@ export const emailThreads = pgTable("email_threads", {
   priority: priorityEnum("priority").default("medium"),
   hasAttachment: boolean("has_attachment").default(false),
   isUnread: boolean("is_unread").default(true),
+  folder: emailFolderEnum("folder").notNull().default("inbox"),
+  starred: boolean("starred").default(false),
+  archived: boolean("archived").default(false),
   lastActivity: timestamp("last_activity").defaultNow(),
   slaDeadline: timestamp("sla_deadline"),
   orderId: varchar("order_id").references(() => orders.id),
