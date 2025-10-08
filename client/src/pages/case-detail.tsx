@@ -79,6 +79,8 @@ export default function CaseDetail() {
   const [editDescription, setEditDescription] = useState("");
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
+  const [newNoteContent, setNewNoteContent] = useState("");
   const { toast } = useToast();
 
   const { data: caseData, isLoading } = useQuery<CaseWithDetails>({
@@ -136,6 +138,16 @@ export default function CaseDetail() {
     enabled: !!caseId,
   });
 
+  const { data: caseNotes = [] } = useQuery<any[]>({
+    queryKey: ["/api/cases", caseId, "notes"],
+    enabled: !!caseId,
+  });
+
+  const { data: caseEvents = [] } = useQuery<any[]>({
+    queryKey: ["/api/cases", caseId, "events"],
+    enabled: !!caseId,
+  });
+
   const updateCaseMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Case> }) => {
       const response = await fetch(`/api/cases/${id}`, {
@@ -157,6 +169,35 @@ export default function CaseDetail() {
       toast({
         title: "Update failed",
         description: "Failed to update case",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const addNoteMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const response = await fetch(`/api/cases/${caseId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!response.ok) throw new Error("Failed to add note");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "notes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "events"] });
+      setNewNoteContent("");
+      setShowAddNoteDialog(false);
+      toast({
+        title: "Note added",
+        description: "Note has been added successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to add note",
+        description: "Could not add note to case",
         variant: "destructive",
       });
     }
@@ -440,13 +481,20 @@ export default function CaseDetail() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {caseData.timeline ? (
+                {caseEvents && caseEvents.length > 0 ? (
                   <div className="space-y-4">
-                    {JSON.parse(caseData.timeline as string).map((event: any, index: number) => (
-                      <div key={index} className="flex items-start space-x-3 border-l-2 border-muted pl-4">
+                    {caseEvents.map((event: any) => (
+                      <div key={event.id} className="flex items-start space-x-3 border-l-2 border-muted pl-4" data-testid={`timeline-event-${event.id}`}>
                         <div className="flex-1">
-                          <p className="text-sm">{event.description}</p>
-                          <p className="text-xs text-muted-foreground">{formatDateTime(event.timestamp)}</p>
+                          <p className="text-sm font-medium">{event.message}</p>
+                          {event.metadata && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {JSON.stringify(event.metadata)}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDateTime(event.createdAt)} • {event.createdByUser?.username || 'System'}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -574,7 +622,26 @@ export default function CaseDetail() {
                   </TabsContent>
 
                   <TabsContent value="notes" className="space-y-4" data-testid="notes-content">
-                    <InternalNotes entityType="case" entityId={caseId!} />
+                    {/* Case Notes */}
+                    {caseNotes && caseNotes.length > 0 && (
+                      <div className="space-y-3 mb-6">
+                        <h4 className="font-medium text-sm">Case Notes</h4>
+                        {caseNotes.map((note: any) => (
+                          <div key={note.id} className="border rounded p-4" data-testid={`case-note-${note.id}`}>
+                            <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {formatDateTime(note.createdAt)} • {note.createdByUser?.username || 'Unknown'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Internal Notes */}
+                    <div>
+                      <h4 className="font-medium text-sm mb-3">Internal Notes</h4>
+                      <InternalNotes entityType="case" entityId={caseId!} />
+                    </div>
                   </TabsContent>
                 </CardContent>
               </Tabs>
@@ -597,7 +664,7 @@ export default function CaseDetail() {
                   <LinkIcon className="mr-2 h-4 w-4" />
                   Link Items
                 </Button>
-                <Button className="w-full justify-start" variant="outline" data-testid="add-note-button">
+                <Button className="w-full justify-start" variant="outline" onClick={() => setShowAddNoteDialog(true)} data-testid="add-note-button">
                   <MessageSquare className="mr-2 h-4 w-4" />
                   Add Note
                 </Button>
@@ -632,13 +699,50 @@ export default function CaseDetail() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm">Notes</span>
-                  <span className="text-sm font-medium">{internalNotes?.length || 0}</span>
+                  <span className="text-sm font-medium">{(caseNotes?.length || 0) + (internalNotes?.length || 0)}</span>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
       </main>
+
+      {/* Add Note Dialog */}
+      <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
+        <DialogContent data-testid="add-note-dialog">
+          <DialogHeader>
+            <DialogTitle>Add Note to Case</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Enter your note here..."
+              value={newNoteContent}
+              onChange={(e) => setNewNoteContent(e.target.value)}
+              rows={6}
+              data-testid="note-content-input"
+            />
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAddNoteDialog(false);
+                  setNewNoteContent("");
+                }}
+                data-testid="cancel-note-button"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => addNoteMutation.mutate(newNoteContent)}
+                disabled={!newNoteContent.trim() || addNoteMutation.isPending}
+                data-testid="save-note-button"
+              >
+                {addNoteMutation.isPending ? "Saving..." : "Save Note"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
