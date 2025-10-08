@@ -1,0 +1,191 @@
+Rebuild the Inbox Page of the internal operations hub to recreate a modern Gmail-style email interface, with full order integration, a clean layout, and correct email rendering (fixing the quoted-printable issue).
+
+The current inbox shows raw encoded email text (e.g. =0A=0A=0A) — this must be fixed so every email displays like in Gmail or Outlook.
+
+Use React + Tailwind + shadcn/ui, following the design consistency of the rest of the hub.
+
+🧩 Page Layout (Gmail-style 3-column design)
+
+Left Sidebar
+
+Folders: Inbox, Sent, Archived, Starred, Unread
+
+Filters: With Order / Without Order
+
+Search bar (top)
+
+“+ New Email” button (optional for replies or internal sends)
+
+Middle Column – Email List
+
+List of email threads showing:
+
+Checkbox (select)
+
+Sender name / email
+
+Subject line
+
+Snippet of last message
+
+Date/time
+
+Linked order badge (if applicable)
+
+Unread = bold subject
+
+Hover actions: Reply, Assign to Order, Archive
+
+Keyboard navigation (↑ ↓ Enter)
+
+Pagination or infinite scroll
+
+Right Column – Email Thread View
+
+Gmail-like conversation thread
+
+Sender info, date/time, and message content (properly decoded)
+
+Attachments display
+
+Reply box at bottom (rich text editor)
+
+Top actions: Reply, Forward, Mark as Done, Link to Order, Switch Order, Star/Archive
+
+🔗 Order Integration
+
+Automatic Linking
+
+Auto-detect order numbers in email subjects or body (e.g. “Order #1234”)
+
+Auto-link detected orders in database
+
+Show a green “Order #1234” badge next to the subject line
+
+Manual Linking
+
+“Link to Order” button inside thread view
+
+Opens modal to search and attach to order/customer
+
+Option to Switch Order from dropdown or modal
+
+💬 Reply & Notes
+
+Gmail-style reply area (rich text)
+
+Internal staff notes visible only to team
+
+Attachments support (drag & drop)
+
+Quick template replies (like “Order shipped” or “Refund processed”)
+
+⚙️ Core Functional Features
+
+Mark as read/unread, star, archive, delete
+
+Bulk selection and actions
+
+Search by subject, sender, or order number
+
+Auto-refresh/polling for new emails
+
+Keyboard shortcuts (r = reply, a = archive)
+
+Pagination or infinite scroll
+
+Internal notifications for new emails or replies
+
+🧠 Email Decoding Fix (important)
+
+Problem:
+Emails currently show encoded characters like =0A, =C2=A0, or unreadable content, because the system displays raw MIME encoded text instead of decoded email bodies.
+
+Solution:
+Before rendering, detect the email encoding type and decode it properly.
+
+Implementation Guide:
+
+Decode the email body before rendering
+
+import { decode as decodeQuotedPrintable } from 'quoted-printable';
+import { decode as decodeBase64 } from 'js-base64';
+import { convert } from 'html-to-text';
+import DOMPurify from 'dompurify';
+
+function decodeEmailBody(rawData, encoding = 'base64') {
+  let decoded = rawData;
+
+  // Step 1: base64 decode if needed
+  if (encoding === 'base64') {
+    decoded = decodeBase64(rawData);
+  }
+
+  // Step 2: quoted-printable decode if detected
+  if (decoded.includes('=0A') || decoded.includes('=C2')) {
+    decoded = decodeQuotedPrintable(decoded);
+  }
+
+  // Step 3: render HTML safely
+  if (decoded.includes('<html') || decoded.includes('<body')) {
+    return DOMPurify.sanitize(decoded);
+  } else {
+    return convert(decoded);
+  }
+}
+
+
+Render decoded HTML safely
+
+<div
+  className="prose dark:prose-invert max-w-none"
+  dangerouslySetInnerHTML={{ __html: decodedEmailBody }}
+/>
+
+
+Handle multiple MIME parts
+
+Parse both text/plain and text/html
+
+Loop through payload.parts to find the correct part
+
+Always prefer HTML if available
+
+Ensure UTF-8 decoding
+
+new TextDecoder('utf-8').decode(decodedBuffer);
+
+
+Recommended npm packages:
+
+npm install quoted-printable js-base64 dompurify html-to-text
+
+🎨 UI/UX Enhancements
+
+Clean Gmail-like layout (light background, subtle shadows, rounded corners)
+
+Color cues:
+
+Blue → unread
+
+Green → linked to order
+
+Collapsible sidebars for mobile view
+
+Hover transitions for clarity
+
+Optional order summary sidebar:
+
+Order ID, status, customer name, last update
+
+📈 Bonus Features
+
+Create a Case or To-Do directly from an email
+
+Smart matching by customer email or SKU mention
+
+SLA reminder (e.g. “No reply for 3 days”)
+
+Integration with order and repair modules
+
+Export conversation as PDF

@@ -276,7 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { password, ...userWithoutPassword } = newUser;
       res.status(201).json(userWithoutPassword);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating user:", error);
       if (error.code === '23505') { // Unique constraint violation
         res.status(409).json({ error: "Email or username already exists" });
@@ -317,7 +317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return user without password
       const { password, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Update user error:", error);
       if (error.name === 'ZodError') {
         res.status(400).json({ error: "Invalid update data", details: error.errors });
@@ -678,8 +678,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uploadedUrls: string[] = [];
 
       for (const file of files) {
-        const filename = `repairs/${id}/${type}s/${Date.now()}-${file.originalname}`;
-        const url = await objectStorage.uploadFile(file.buffer, filename, file.mimetype);
+        const filename = `${Date.now()}-${file.originalname}`;
+        const url = await objectStorage.saveAttachment(filename, file.buffer, file.mimetype);
         uploadedUrls.push(url);
       }
 
