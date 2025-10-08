@@ -126,17 +126,16 @@ export function InternalNotes({ entityType, entityId, entityTitle }: InternalNot
         {/* Add New Note Form */}
         {isExpanded && (
           <div className="space-y-3 p-4 border rounded-lg bg-muted/20" data-testid="note-form">
-            <Textarea
+            <RichTextEditor
+              content={newNote}
+              onChange={setNewNote}
               placeholder="Add an internal note for your team..."
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              className="min-h-[100px] resize-none"
-              data-testid="note-textarea"
+              className="min-h-[100px]"
             />
             <div className="flex items-center gap-2">
               <Button
                 onClick={handleSubmitNote}
-                disabled={!newNote.trim() || createNoteMutation.isPending}
+                disabled={!newNote.replace(/<[^>]*>/g, '').trim() || createNoteMutation.isPending}
                 size="sm"
                 data-testid="submit-note-button"
               >
@@ -180,11 +179,10 @@ export function InternalNotes({ entityType, entityId, entityTitle }: InternalNot
                       <Clock className="h-3 w-3 ml-2" />
                       <span>{note.createdAt ? formatDistanceToNow(new Date(note.createdAt), { addSuffix: true }) : 'Unknown time'}</span>
                     </div>
-                    <div className="prose prose-sm max-w-none">
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                        {note.content}
-                      </p>
-                    </div>
+                    <div 
+                      className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: note.content }}
+                    />
                     {note.mentions && note.mentions.length > 0 && (
                       <div className="flex gap-1">
                         {note.mentions.map((mentionId: string) => (
