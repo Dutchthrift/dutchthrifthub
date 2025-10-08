@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { Navigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmailSidebar } from "@/components/email/email-sidebar";
@@ -258,9 +257,7 @@ export default function Inbox() {
 
   return (
     <div className="min-h-screen bg-background" data-testid="inbox-page">
-      <Navigation />
-      
-      <main className="flex h-[calc(100vh-64px)]">
+      <main className="flex h-screen">
         {/* Left Sidebar */}
         <div className={cn(
           "border-r transition-all duration-300 flex-shrink-0",
