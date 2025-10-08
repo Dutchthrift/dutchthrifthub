@@ -30,12 +30,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertCaseSchema } from "@shared/schema";
-import type { EmailThread, User, OrderWithShopifyData } from "@/lib/types";
-import { z } from "zod";
+import type { EmailThread, User } from "@/lib/types";
 
 interface ThreadWithMessages extends EmailThread {
   messages?: { body?: string | null; }[];
 }
+import { z } from "zod";
 
 const createCaseFormSchema = insertCaseSchema.extend({
   assignedToId: z.string().optional(),
@@ -47,45 +47,20 @@ interface CreateCaseModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   emailThread?: ThreadWithMessages;
-  order?: OrderWithShopifyData;
 }
 
-export function CreateCaseModal({ open, onOpenChange, emailThread, order }: CreateCaseModalProps) {
+export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseModalProps) {
   const { toast } = useToast();
 
   const { data: users } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
 
-  const getDefaultTitle = () => {
-    if (emailThread?.subject) return emailThread.subject;
-    if (order) return `Order #${order.orderNumber} - Support Case`;
-    return "";
-  };
-
-  const getDefaultDescription = () => {
-    if (emailThread?.messages?.[0]?.body) return emailThread.messages[0].body;
-    if (order) {
-      const customerName = (order.orderData as any)?.customer 
-        ? `${(order.orderData as any).customer.first_name} ${(order.orderData as any).customer.last_name}` 
-        : order.customerEmail;
-      return `Support case created for order #${order.orderNumber} - Customer: ${customerName}`;
-    }
-    return "";
-  };
-
-  const getCustomerEmail = () => {
-    if (emailThread?.customerEmail) return emailThread.customerEmail;
-    if (order?.customerEmail) return order.customerEmail;
-    return "";
-  };
-
   const form = useForm<CreateCaseFormValues>({
     resolver: zodResolver(createCaseFormSchema),
     defaultValues: {
-      title: getDefaultTitle(),
-      description: getDefaultDescription(),
-      customerEmail: getCustomerEmail(),
+      title: emailThread?.subject || "",
+      description: emailThread?.messages?.[0]?.body || "",
       priority: "medium" as const,
       status: "new" as const,
     },
@@ -126,26 +101,9 @@ export function CreateCaseModal({ open, onOpenChange, emailThread, order }: Crea
         }
       }
 
-      // Link the order to the case if provided
-      if (order?.id) {
-        try {
-          // Link the order to the case by updating the order's caseId
-          const linkResponse = await fetch(`/api/orders/${order.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ caseId: newCase.id }),
-          });
-          
-          if (!linkResponse.ok) throw new Error("Failed to link order to case");
-        } catch (error) {
-          console.error("Failed to link order to case:", error);
-        }
-      }
-
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/email-threads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       
       toast({
         title: "Case aangemaakt",
@@ -205,7 +163,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread, order }: Crea
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Prioriteit</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="case-priority-select">
                           <SelectValue placeholder="Selecteer prioriteit" />

@@ -16,11 +16,7 @@ import {
   CheckCircle,
   Archive,
   Users,
-  FileText,
-  Package,
-  Wrench,
-  Mail,
-  CheckSquare
+  FileText
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -36,7 +32,6 @@ import {
 } from "@/components/ui/dialog";
 import { CaseForm } from "../components/forms/case-form";
 import { CaseContextMenu } from "../components/cases/case-context-menu";
-import { CaseDetailDrawer } from "../components/cases/case-detail-drawer";
 
 const CASE_STATUS_CONFIG = {
   new: { label: "New", color: "bg-chart-4", icon: FileText },
@@ -52,9 +47,7 @@ export default function Cases() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [showNewCase, setShowNewCase] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [linkedFilter, setLinkedFilter] = useState<"all" | "with_order" | "with_repair" | "with_email">("all");
   const [columns, setColumns] = useState(Object.keys(CASE_STATUS_CONFIG));
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: cases, isLoading } = useQuery<CaseWithDetails[]>({
@@ -116,19 +109,13 @@ export default function Cases() {
       }
       
       if (priorityFilter !== "all" && caseItem.priority !== priorityFilter) return false;
-      
-      // Filter by linked entities
-      if (linkedFilter === "with_order" && (!caseItem._count || caseItem._count.orders === 0)) return false;
-      if (linkedFilter === "with_repair" && (!caseItem._count || caseItem._count.repairs === 0)) return false;
-      if (linkedFilter === "with_email" && (!caseItem._count || caseItem._count.emails === 0)) return false;
-      
       if (searchQuery && 
           !caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
           !caseItem.description?.toLowerCase().includes(searchQuery.toLowerCase()) &&
           !caseItem.caseNumber.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
-  }, [cases, priorityFilter, linkedFilter, searchQuery, showArchived]);
+  }, [cases, priorityFilter, searchQuery, showArchived]);
 
   const caseStatusCount = useMemo(() => {
     const counts = {
@@ -263,7 +250,7 @@ export default function Cases() {
 
   // Context menu handlers
   const handleCaseOpen = (caseId: string) => {
-    setSelectedCaseId(caseId);
+    window.location.href = `/cases/${caseId}`;
   };
 
   const handleCaseArchive = (caseId: string) => {
@@ -318,7 +305,7 @@ export default function Cases() {
             className={`mb-3 cursor-pointer hover:shadow-md transition-shadow ${
               snapshot.isDragging ? "rotate-3 shadow-lg" : ""
             } ${caseItem.archived ? "opacity-60" : ""}`}
-            onClick={() => setSelectedCaseId(caseItem.id)}
+            onClick={() => window.location.href = `/cases/${caseItem.id}`}
             data-testid={`case-card-${caseItem.id}`}
           >
             <CardContent className="p-4">
@@ -346,53 +333,11 @@ export default function Cases() {
                     #{caseItem.caseNumber}
                   </span>
                   {caseItem.slaDeadline && (
-                    <div className="flex items-center gap-2">
-                      <span className={`font-medium ${isOverdue(caseItem.slaDeadline) ? 'text-destructive' : 'text-muted-foreground'}`}>
-                        {isOverdue(caseItem.slaDeadline) ? 'Overdue' : formatDate(caseItem.slaDeadline)}
-                      </span>
-                      {isOverdue(caseItem.slaDeadline) && (
-                        <Badge
-                          variant="destructive"
-                          className="text-xs flex items-center gap-1 animate-pulse"
-                          data-testid={`badge-sla-overdue-${caseItem.id}`}
-                        >
-                          <AlertTriangle className="h-3 w-3" />
-                          SLA
-                        </Badge>
-                      )}
-                    </div>
+                    <span className={`font-medium ${isOverdue(caseItem.slaDeadline) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {isOverdue(caseItem.slaDeadline) ? 'Overdue' : formatDate(caseItem.slaDeadline)}
+                    </span>
                   )}
                 </div>
-
-                {/* Linked Entities Badges */}
-                {caseItem._count && (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {caseItem._count.orders > 0 && (
-                      <Badge variant="outline" className="text-xs bg-orders/10 text-orders border-orders/20">
-                        <Package className="h-3 w-3 mr-1" />
-                        {caseItem._count.orders}
-                      </Badge>
-                    )}
-                    {caseItem._count.repairs > 0 && (
-                      <Badge variant="outline" className="text-xs bg-repairs/10 text-repairs border-repairs/20">
-                        <Wrench className="h-3 w-3 mr-1" />
-                        {caseItem._count.repairs}
-                      </Badge>
-                    )}
-                    {caseItem._count.emails > 0 && (
-                      <Badge variant="outline" className="text-xs bg-inbox/10 text-inbox border-inbox/20">
-                        <Mail className="h-3 w-3 mr-1" />
-                        {caseItem._count.emails}
-                      </Badge>
-                    )}
-                    {caseItem._count.todos > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        <CheckSquare className="h-3 w-3 mr-1" />
-                        {caseItem._count.todos}
-                      </Badge>
-                    )}
-                  </div>
-                )}
 
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-muted-foreground">
@@ -580,24 +525,6 @@ export default function Cases() {
                     <TabsTrigger value="low" data-testid="filter-low-priority">Low</TabsTrigger>
                   </TabsList>
                 </Tabs>
-
-                <Tabs value={linkedFilter} onValueChange={(value) => setLinkedFilter(value as typeof linkedFilter)}>
-                  <TabsList>
-                    <TabsTrigger value="all" data-testid="filter-all-linked">All</TabsTrigger>
-                    <TabsTrigger value="with_order" data-testid="filter-with-order">
-                      <Package className="h-3 w-3 mr-1" />
-                      With Order
-                    </TabsTrigger>
-                    <TabsTrigger value="with_repair" data-testid="filter-with-repair">
-                      <Wrench className="h-3 w-3 mr-1" />
-                      With Repair
-                    </TabsTrigger>
-                    <TabsTrigger value="with_email" data-testid="filter-with-email">
-                      <Mail className="h-3 w-3 mr-1" />
-                      With Email
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
                 
                 <Button
                   variant={showArchived ? "default" : "outline"}
@@ -609,6 +536,10 @@ export default function Cases() {
                   {showArchived ? "Show Active" : "Show Archive"}
                 </Button>
               </div>
+              
+              <Button variant="outline" size="icon" data-testid="advanced-filters-button">
+                <Filter className="h-4 w-4" />
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -646,13 +577,6 @@ export default function Cases() {
           )}
         </div>
       </main>
-
-      {/* Case Detail Drawer */}
-      <CaseDetailDrawer
-        caseId={selectedCaseId}
-        open={!!selectedCaseId}
-        onOpenChange={(open) => !open && setSelectedCaseId(null)}
-      />
     </div>
   );
 }

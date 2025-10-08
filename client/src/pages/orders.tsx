@@ -59,8 +59,6 @@ import {
 } from "@/components/ui/dialog";
 import { InternalNotes } from "@/components/notes/internal-notes";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { CreateCaseModal } from "@/components/forms/create-case-modal";
-import { Briefcase } from "lucide-react";
 
 type SortField = 'orderNumber' | 'customer' | 'totalAmount' | 'status' | 'paymentStatus' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
@@ -75,7 +73,6 @@ export default function Orders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [showCreateCase, setShowCreateCase] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
@@ -777,27 +774,11 @@ export default function Orders() {
         {/* Order Details Dialog */}
         <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader className="flex flex-row items-center justify-between">
-              <div>
-                <DialogTitle>Order Details #{selectedOrder?.orderNumber}</DialogTitle>
-                <DialogDescription>
-                  Complete order information and history
-                </DialogDescription>
-              </div>
-              {selectedOrder && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setShowCreateCase(true);
-                  }}
-                  className="border-cases/30 dark:border-cases/30 hover:bg-cases/10 dark:hover:bg-cases/10 text-cases"
-                  data-testid="button-create-case-from-order"
-                >
-                  <Briefcase className="h-4 w-4 mr-1" />
-                  Create Case
-                </Button>
-              )}
+            <DialogHeader>
+              <DialogTitle>Order Details #{selectedOrder?.orderNumber}</DialogTitle>
+              <DialogDescription>
+                Complete order information and history
+              </DialogDescription>
             </DialogHeader>
             
             {selectedOrder && (
@@ -992,13 +973,6 @@ export default function Orders() {
             </div>
           </DialogContent>
         </Dialog>
-
-        {/* Create Case Modal */}
-        <CreateCaseModal 
-          open={showCreateCase} 
-          onOpenChange={setShowCreateCase}
-          order={selectedOrder as any}
-        />
       </main>
     </div>
   );
