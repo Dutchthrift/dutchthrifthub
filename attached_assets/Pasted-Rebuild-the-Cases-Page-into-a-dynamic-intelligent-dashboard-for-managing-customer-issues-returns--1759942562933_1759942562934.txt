@@ -1,0 +1,239 @@
+Rebuild the Cases Page into a dynamic, intelligent dashboard for managing customer issues, returns, and communications — fully integrated with Orders, Inbox, Repairs, and To-Do’s.
+
+This revamp should:
+
+Allow linking cases directly to orders, emails, and repairs.
+
+Provide a clear Kanban overview by status.
+
+Include quick case creation from emails or orders.
+
+Improve readability, usability, and team workflow tracking.
+
+🧩 Current Problems
+
+Static layout – looks clean, but lacks interactivity and case detail visibility.
+
+No linking logic – cases aren’t connected to orders, emails, or customers.
+
+No filtering by linked entities (e.g. “Show cases with orders” / “From Inbox”).
+
+No quick access to communication history.
+
+No progress indicators or internal notes.
+
+✅ Improvement Objectives
+
+Add order & repair linking (both automatic and manual).
+
+Redesign the case details drawer for full context (order info, email thread, actions).
+
+Make cases draggable (Kanban) across statuses.
+
+Integrate smart case creation (from orders, inbox, or manually).
+
+Improve visual hierarchy and user flow.
+
+🧱 Implementation Steps
+1. Database / API Adjustments
+
+Add relational links between Cases and other models:
+
+// Example Case model (Drizzle / Supabase)
+export const cases = pgTable('cases', {
+  id: serial('id').primaryKey(),
+  title: text('title'),
+  description: text('description'),
+  status: text('status'), // New, In Progress, Waiting, Resolved, Closed
+  priority: text('priority'),
+  orderId: integer('order_id').references(() => orders.id),
+  repairId: integer('repair_id').references(() => repairs.id),
+  emailThreadId: integer('email_thread_id'),
+  customerEmail: text('customer_email'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at'),
+  assignedTo: text('assigned_to'),
+});
+
+
+When a case is created, the system auto-links an order or email if detected (via SKU, order ID, or sender).
+
+2. Layout Redesign
+
+Transform into a responsive Kanban workspace (like Trello + Gmail Support Desk).
+
+🧩 Layout Zones:
+Section	Component	Purpose
+Top Stats Bar	CaseSummaryCards.tsx	Shows counts (New, In Progress, Waiting, Resolved, Closed)
+Filter Bar	CaseFilters.tsx	Filter by priority, urgency, linked orders, date
+Kanban Board	CaseBoard.tsx	Columns for each case status, draggable cards
+Details Drawer	CaseDrawer.tsx	Slide-over panel showing case details and links
+3. Kanban Board Enhancements
+
+Implement with @hello-pangea/dnd for drag & drop.
+
+Columns:
+
+🟡 New
+
+🔵 In Progress
+
+🟠 Waiting Customer
+
+🟣 Waiting Part
+
+🟢 Resolved
+
+⚫ Closed
+
+Each card shows:
+
+<Card>
+  <h3 className="font-medium">{case.title}</h3>
+  <p className="text-xs text-gray-400">{case.customerEmail}</p>
+  {case.orderId && <Badge variant="success">Order #{case.orderId}</Badge>}
+  {case.repairId && <Badge variant="purple">Repair #{case.repairId}</Badge>}
+  <span className="text-xs text-gray-500">{case.updatedAt}</span>
+</Card>
+
+
+Dragging a card between columns triggers a PATCH request:
+
+await updateCaseStatus(caseId, newStatus);
+
+4. Case Details Drawer (Right Side Panel)
+
+When clicking a card:
+
+Show a slide-over drawer (<Sheet /> from shadcn/ui)
+
+Include tabs:
+
+🧾 Overview → title, description, status, priority, assignee
+
+🛒 Linked Order → order summary + link to full order page
+
+🧰 Linked Repair → repair ID, technician, status
+
+📧 Email Thread → last 5 related messages (via customer email)
+
+🗒️ Notes / History → internal notes + timeline
+
+Example:
+
+<Tabs defaultValue="overview">
+  <TabsList>
+    <TabsTrigger value="overview">Overview</TabsTrigger>
+    <TabsTrigger value="order">Order</TabsTrigger>
+    <TabsTrigger value="emails">Emails</TabsTrigger>
+    <TabsTrigger value="notes">Notes</TabsTrigger>
+  </TabsList>
+  <TabsContent value="overview"> ... </TabsContent>
+</Tabs>
+
+5. Case Creation Modal
+
+Click “New Case” → opens modal or drawer:
+
+Fields:
+
+Title
+
+Description
+
+Priority (Low / Medium / High / Urgent)
+
+Related Order ID (searchable)
+
+Related Email (autocomplete)
+
+Assigned To (user select)
+
+If created from Inbox, auto-fill email + customer info.
+
+If created from Order, auto-link order.
+
+6. Order & Inbox Integration
+
+Automatic linking:
+If an email in Inbox mentions an order number, create or link a case automatically.
+Example: "Order #8324 delayed" → case links to that order.
+
+Manual linking:
+Add “Attach to Case” button in the Inbox thread or Order detail page.
+
+7. Filtering & Search
+
+Add a dynamic search input for:
+
+Case title
+
+Order ID
+
+Customer email
+
+Add quick filters:
+
+All | Urgent | High | Medium | Low
+
+With Order | Without Order
+
+Show Archived
+
+8. Analytics Summary (Top Bar)
+
+Add small metric cards:
+
+<SummaryCard title="Total Active" value={activeCases} icon={<InboxIcon />} />
+<SummaryCard title="New" value={newCases} color="yellow" />
+<SummaryCard title="In Progress" value={inProgressCases} color="blue" />
+...
+
+9. UI/UX Improvements
+
+Hover effects + subtle drop shadows on cards.
+
+Smooth drag animations (Framer Motion).
+
+Collapsible columns for low-use statuses.
+
+Persistent filters (stored in localStorage).
+
+Dark mode adaptation (consistent with Inbox style).
+
+10. File Structure Proposal
+/src/pages/cases/
+  CaseLayout.tsx
+  CaseSummaryCards.tsx
+  CaseFilters.tsx
+  CaseBoard.tsx
+  CaseCard.tsx
+  CaseDrawer.tsx
+  CaseCreateModal.tsx
+  CaseService.ts
+
+11. Optional Future Features
+
+SLA tracking (e.g. “Customer waiting >3 days”).
+
+Assign cases to team members automatically based on type.
+
+Integrate with To-Do’s (“Create task from case”).
+
+AI case summarizer (auto-generate title/description from email).
+
+Export case data to CSV for reports.
+
+✅ Expected Result
+
+After implementation, the Cases page should:
+
+Look like a modern, interactive support dashboard.
+
+Show a clear overview of all cases with drag & drop updates.
+
+Automatically link with orders, repairs, and inbox messages.
+
+Allow full case management and tracking in one place.
+
+Be fully aligned with your hub’s dark/light theme and layout structure.
