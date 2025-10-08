@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { storage } from "./storage";
-import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertPurchaseOrderSchema, insertCaseSchema, insertUserSchema, insertAuditLogSchema } from "@shared/schema";
+import { insertTodoSchema, insertRepairSchema, insertInternalNoteSchema, insertPurchaseOrderSchema, insertCaseSchema, insertCaseLinkSchema, insertCaseNoteSchema, insertUserSchema, insertAuditLogSchema } from "@shared/schema";
 import { syncEmails, sendEmail } from "./services/emailService";
 import { shopifyClient } from "./services/shopifyClient";
 import { OrderMatchingService } from "./services/orderMatchingService";
@@ -2667,6 +2667,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating case from email thread:", error);
       res.status(400).json({ message: error instanceof Error ? error.message : "Failed to create case from email thread" });
+    }
+  });
+
+  // Case Links
+  app.get("/api/cases/:id/links", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const links = await storage.getCaseLinks(id);
+      res.json(links);
+    } catch (error) {
+      console.error("Error fetching case links:", error);
+      res.status(500).json({ message: "Failed to fetch case links" });
+    }
+  });
+
+  app.post("/api/cases/:id/links", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertCaseLinkSchema.parse({
+        caseId: id,
+        linkType: req.body.linkType,
+        linkedId: req.body.linkedId,
+        createdBy: req.user.id
+      });
+      
+      const link = await storage.createCaseLink(validatedData);
+      
+      await storage.createCaseEvent({
+        caseId: id,
+        eventType: "link_added",
+        message: `Linked ${validatedData.linkType} to case`,
+        metadata: { linkType: validatedData.linkType, linkedId: validatedData.linkedId },
+        createdBy: req.user.id
+      });
+      
+      res.status(201).json(link);
+    } catch (error) {
+      console.error("Error creating case link:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to create case link" });
+    }
+  });
+
+  app.delete("/api/cases/:id/links/:linkId", requireAuth, async (req: any, res) => {
+    try {
+      const { id, linkId } = req.params;
+      
+      await storage.deleteCaseLink(linkId);
+      
+      await storage.createCaseEvent({
+        caseId: id,
+        eventType: "link_removed",
+        message: `Removed link from case`,
+        createdBy: req.user.id
+      });
+      
+      res.json({ message: "Link removed successfully" });
+    } catch (error) {
+      console.error("Error deleting case link:", error);
+      res.status(400).json({ message: "Failed to delete case link" });
+    }
+  });
+
+  // Case Notes
+  app.get("/api/cases/:id/notes", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const notes = await storage.getCaseNotes(id);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching case notes:", error);
+      res.status(500).json({ message: "Failed to fetch case notes" });
+    }
+  });
+
+  app.post("/api/cases/:id/notes", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertCaseNoteSchema.parse({
+        caseId: id,
+        content: req.body.content,
+        createdBy: req.user.id
+      });
+      
+      const note = await storage.createCaseNote(validatedData);
+      
+      await storage.createCaseEvent({
+        caseId: id,
+        eventType: "note_added",
+        message: `Added a note to case`,
+        createdBy: req.user.id
+      });
+      
+      res.status(201).json(note);
+    } catch (error) {
+      console.error("Error creating case note:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to create case note" });
+    }
+  });
+
+  // Case Events (Timeline)
+  app.get("/api/cases/:id/events", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const events = await storage.getCaseEvents(id);
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching case events:", error);
+      res.status(500).json({ message: "Failed to fetch case events" });
     }
   });
 

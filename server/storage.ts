@@ -12,9 +12,12 @@ import {
   type Supplier, type InsertSupplier,
   type PurchaseOrderItem, type InsertPurchaseOrderItem,
   type Case, type InsertCase,
+  type CaseLink, type InsertCaseLink,
+  type CaseNote, type InsertCaseNote,
+  type CaseEvent, type InsertCaseEvent,
   type Activity, type InsertActivity,
   type AuditLog, type InsertAuditLog,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, cases, activities, auditLogs
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql } from "drizzle-orm";
@@ -139,6 +142,19 @@ export interface IStorage {
     todos: Todo[];
     notes: InternalNote[];
   }>;
+
+  // Case Links
+  getCaseLinks(caseId: string): Promise<CaseLink[]>;
+  createCaseLink(link: InsertCaseLink): Promise<CaseLink>;
+  deleteCaseLink(linkId: string): Promise<void>;
+
+  // Case Notes
+  getCaseNotes(caseId: string): Promise<CaseNote[]>;
+  createCaseNote(note: InsertCaseNote): Promise<CaseNote>;
+
+  // Case Events
+  getCaseEvents(caseId: string): Promise<CaseEvent[]>;
+  createCaseEvent(event: InsertCaseEvent): Promise<CaseEvent>;
 
   // Activities
   getActivities(limit?: number): Promise<Activity[]>;
@@ -771,6 +787,40 @@ export class DatabaseStorage implements IStorage {
       todos: caseTodos,
       notes: caseNotes
     };
+  }
+
+  // Case Links
+  async getCaseLinks(caseId: string): Promise<CaseLink[]> {
+    return await db.select().from(caseLinks).where(eq(caseLinks.caseId, caseId));
+  }
+
+  async createCaseLink(link: InsertCaseLink): Promise<CaseLink> {
+    const result = await db.insert(caseLinks).values(link).returning();
+    return result[0];
+  }
+
+  async deleteCaseLink(linkId: string): Promise<void> {
+    await db.delete(caseLinks).where(eq(caseLinks.id, linkId));
+  }
+
+  // Case Notes
+  async getCaseNotes(caseId: string): Promise<CaseNote[]> {
+    return await db.select().from(caseNotes).where(eq(caseNotes.caseId, caseId)).orderBy(desc(caseNotes.createdAt));
+  }
+
+  async createCaseNote(note: InsertCaseNote): Promise<CaseNote> {
+    const result = await db.insert(caseNotes).values(note).returning();
+    return result[0];
+  }
+
+  // Case Events
+  async getCaseEvents(caseId: string): Promise<CaseEvent[]> {
+    return await db.select().from(caseEvents).where(eq(caseEvents.caseId, caseId)).orderBy(desc(caseEvents.createdAt));
+  }
+
+  async createCaseEvent(event: InsertCaseEvent): Promise<CaseEvent> {
+    const result = await db.insert(caseEvents).values(event).returning();
+    return result[0];
   }
 
   // Activities
