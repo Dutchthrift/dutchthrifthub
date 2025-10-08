@@ -17,6 +17,7 @@ import Todos from "@/pages/todos";
 import CustomerDetail from "@/pages/customer-detail";
 import CaseDetail from "@/pages/case-detail";
 import UserManagement from "@/pages/user-management";
+import Settings from "@/pages/settings";
 
 function Router() {
   return (
@@ -39,6 +40,18 @@ function Router() {
         component={(props: any) => (
           <ProtectedRoute 
             component={UserManagement}
+            roles={["ADMIN"]}
+            {...props} 
+          />
+        )}
+      />
+
+      {/* Settings - ADMIN only */}
+      <Route 
+        path="/settings" 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={Settings}
             roles={["ADMIN"]}
             {...props} 
           />
