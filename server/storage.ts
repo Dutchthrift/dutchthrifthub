@@ -48,11 +48,19 @@ export interface IStorage {
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order>;
 
   // Email Threads
-  getEmailThreads(limit?: number): Promise<EmailThread[]>;
+  getEmailThreads(filters?: {
+    limit?: number;
+    folder?: string;
+    starred?: boolean;
+    archived?: boolean;
+    isUnread?: boolean;
+    hasOrder?: boolean;
+  }): Promise<EmailThread[]>;
   getEmailThread(id: string): Promise<EmailThread | undefined>;
   getEmailThreadByThreadId(threadId: string): Promise<EmailThread | undefined>;
   createEmailThread(thread: InsertEmailThread): Promise<EmailThread>;
   updateEmailThread(id: string, thread: Partial<InsertEmailThread>): Promise<EmailThread>;
+  deleteEmailThread(id: string): Promise<void>;
 
   // Email Messages
   getEmailMessages(threadId: string): Promise<EmailMessage[]>;
@@ -321,8 +329,59 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Email Threads
-  async getEmailThreads(limit: number = 50): Promise<EmailThread[]> {
-    return await db.select().from(emailThreads).orderBy(desc(emailThreads.lastActivity)).limit(limit);
+  async getEmailThreads(filters?: {
+    limit?: number;
+    folder?: string;
+    starred?: boolean;
+    archived?: boolean;
+    isUnread?: boolean;
+    hasOrder?: boolean;
+  }): Promise<EmailThread[]> {
+    const { limit = 50, folder, starred, archived, isUnread, hasOrder } = filters || {};
+    
+    let query = db.select().from(emailThreads);
+    const conditions = [];
+    
+    // Handle virtual folders that map to combinations of flags
+    if (folder === 'inbox') {
+      conditions.push(eq(emailThreads.folder, 'inbox'));
+      conditions.push(eq(emailThreads.archived, false));
+    } else if (folder === 'sent') {
+      conditions.push(eq(emailThreads.folder, 'sent'));
+    } else if (folder === 'archived') {
+      conditions.push(eq(emailThreads.archived, true));
+    } else if (folder === 'starred') {
+      conditions.push(eq(emailThreads.starred, true));
+    } else if (folder === 'unread') {
+      conditions.push(eq(emailThreads.isUnread, true));
+    } else if (folder && ['inbox', 'sent'].includes(folder)) {
+      conditions.push(eq(emailThreads.folder, folder as any));
+    }
+    
+    // Additional filters
+    if (starred !== undefined) {
+      conditions.push(eq(emailThreads.starred, starred));
+    }
+    if (archived !== undefined) {
+      conditions.push(eq(emailThreads.archived, archived));
+    }
+    if (isUnread !== undefined) {
+      conditions.push(eq(emailThreads.isUnread, isUnread));
+    }
+    if (hasOrder !== undefined) {
+      if (hasOrder) {
+        conditions.push(sql`${emailThreads.orderId} IS NOT NULL`);
+      } else {
+        conditions.push(sql`${emailThreads.orderId} IS NULL`);
+      }
+    }
+    
+    // Apply all conditions
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(emailThreads.lastActivity)).limit(limit);
   }
 
   async getEmailThread(id: string): Promise<EmailThread | undefined> {
@@ -352,6 +411,10 @@ export class DatabaseStorage implements IStorage {
     
     const result = await db.update(emailThreads).set(updateData).where(eq(emailThreads.id, id)).returning();
     return result[0];
+  }
+
+  async deleteEmailThread(id: string): Promise<void> {
+    await db.delete(emailThreads).where(eq(emailThreads.id, id));
   }
 
   // Email Messages

@@ -1540,18 +1540,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Email threads
+  // Email threads with filtering
   app.get("/api/email-threads", async (req, res) => {
     try {
-      const { caseId } = req.query;
+      const { caseId, folder, starred, archived, isUnread, hasOrder } = req.query;
       
       if (caseId) {
         // Get email threads linked to a specific case
         const relatedItems = await storage.getCaseRelatedItems(caseId as string);
         res.json(relatedItems.emails);
       } else {
-        // Get all email threads
-        const threads = await storage.getEmailThreads();
+        // Get all email threads and apply filters
+        let threads = await storage.getEmailThreads();
+        
+        // Apply folder filter
+        if (folder) {
+          threads = threads.filter(t => t.folder === folder);
+        }
+        
+        // Apply starred filter
+        if (starred === 'true') {
+          threads = threads.filter(t => t.starred === true);
+        }
+        
+        // Apply archived filter
+        if (archived === 'true') {
+          threads = threads.filter(t => t.archived === true);
+        } else if (archived === 'false') {
+          threads = threads.filter(t => t.archived === false);
+        }
+        
+        // Apply unread filter
+        if (isUnread === 'true') {
+          threads = threads.filter(t => t.isUnread === true);
+        }
+        
+        // Apply order filter
+        if (hasOrder === 'true') {
+          threads = threads.filter(t => t.orderId !== null);
+        } else if (hasOrder === 'false') {
+          threads = threads.filter(t => t.orderId === null);
+        }
+        
         res.json(threads);
       }
     } catch (error) {
@@ -1807,6 +1837,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating email thread:", error);
       res.status(500).json({ message: "Failed to update email thread" });
+    }
+  });
+
+  // Bulk actions for email threads
+  app.post("/api/email-threads/bulk/mark-read", async (req, res) => {
+    try {
+      const { threadIds } = req.body;
+      if (!Array.isArray(threadIds) || threadIds.length === 0) {
+        return res.status(400).json({ message: "threadIds array is required" });
+      }
+      
+      const updates = await Promise.all(
+        threadIds.map(id => storage.updateEmailThread(id, { isUnread: false }))
+      );
+      
+      res.json({ updated: updates.length, threads: updates });
+    } catch (error) {
+      console.error("Error marking threads as read:", error);
+      res.status(500).json({ message: "Failed to mark threads as read" });
+    }
+  });
+
+  app.post("/api/email-threads/bulk/mark-unread", async (req, res) => {
+    try {
+      const { threadIds } = req.body;
+      if (!Array.isArray(threadIds) || threadIds.length === 0) {
+        return res.status(400).json({ message: "threadIds array is required" });
+      }
+      
+      const updates = await Promise.all(
+        threadIds.map(id => storage.updateEmailThread(id, { isUnread: true }))
+      );
+      
+      res.json({ updated: updates.length, threads: updates });
+    } catch (error) {
+      console.error("Error marking threads as unread:", error);
+      res.status(500).json({ message: "Failed to mark threads as unread" });
+    }
+  });
+
+  app.post("/api/email-threads/bulk/star", async (req, res) => {
+    try {
+      const { threadIds } = req.body;
+      if (!Array.isArray(threadIds) || threadIds.length === 0) {
+        return res.status(400).json({ message: "threadIds array is required" });
+      }
+      
+      const updates = await Promise.all(
+        threadIds.map(id => storage.updateEmailThread(id, { starred: true }))
+      );
+      
+      res.json({ updated: updates.length, threads: updates });
+    } catch (error) {
+      console.error("Error starring threads:", error);
+      res.status(500).json({ message: "Failed to star threads" });
+    }
+  });
+
+  app.post("/api/email-threads/bulk/unstar", async (req, res) => {
+    try {
+      const { threadIds } = req.body;
+      if (!Array.isArray(threadIds) || threadIds.length === 0) {
+        return res.status(400).json({ message: "threadIds array is required" });
+      }
+      
+      const updates = await Promise.all(
+        threadIds.map(id => storage.updateEmailThread(id, { starred: false }))
+      );
+      
+      res.json({ updated: updates.length, threads: updates });
+    } catch (error) {
+      console.error("Error unstarring threads:", error);
+      res.status(500).json({ message: "Failed to unstar threads" });
+    }
+  });
+
+  app.post("/api/email-threads/bulk/archive", async (req, res) => {
+    try {
+      const { threadIds } = req.body;
+      if (!Array.isArray(threadIds) || threadIds.length === 0) {
+        return res.status(400).json({ message: "threadIds array is required" });
+      }
+      
+      const updates = await Promise.all(
+        threadIds.map(id => storage.updateEmailThread(id, { archived: true }))
+      );
+      
+      res.json({ updated: updates.length, threads: updates });
+    } catch (error) {
+      console.error("Error archiving threads:", error);
+      res.status(500).json({ message: "Failed to archive threads" });
+    }
+  });
+
+  app.post("/api/email-threads/bulk/unarchive", async (req, res) => {
+    try {
+      const { threadIds } = req.body;
+      if (!Array.isArray(threadIds) || threadIds.length === 0) {
+        return res.status(400).json({ message: "threadIds array is required" });
+      }
+      
+      const updates = await Promise.all(
+        threadIds.map(id => storage.updateEmailThread(id, { archived: false }))
+      );
+      
+      res.json({ updated: updates.length, threads: updates });
+    } catch (error) {
+      console.error("Error unarchiving threads:", error);
+      res.status(500).json({ message: "Failed to unarchive threads" });
+    }
+  });
+
+  app.delete("/api/email-threads/bulk", async (req, res) => {
+    try {
+      const { threadIds } = req.body;
+      if (!Array.isArray(threadIds) || threadIds.length === 0) {
+        return res.status(400).json({ message: "threadIds array is required" });
+      }
+      
+      await Promise.all(
+        threadIds.map(id => storage.deleteEmailThread(id))
+      );
+      
+      res.json({ deleted: threadIds.length, message: `Deleted ${threadIds.length} threads` });
+    } catch (error) {
+      console.error("Error deleting threads:", error);
+      res.status(500).json({ message: "Failed to delete threads" });
     }
   });
 

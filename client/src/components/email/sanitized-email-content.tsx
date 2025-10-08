@@ -6,9 +6,10 @@ import { decode as decodeBase64 } from 'js-base64';
 interface SanitizedEmailContentProps {
   body: string;
   isHtml: boolean;
+  encoding?: string;
 }
 
-export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentProps) {
+export function SanitizedEmailContent({ body, isHtml, encoding }: SanitizedEmailContentProps) {
   if (!body) {
     return (
       <div className="text-muted-foreground italic">
@@ -17,12 +18,18 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     );
   }
 
-  const decodeEmailBody = (rawContent: string): string => {
-    let decoded = rawContent;
+  const decodeEmailBody = (rawData: string, transferEncoding?: string): string => {
+    let decoded = rawData;
 
-    // Step 1: Check for and decode base64 content
-    // Base64 content is typically clean alphanumeric with no special chars
-    if (!decoded.includes('=') && !decoded.includes('<') && decoded.length > 50) {
+    // Step 1: Base64 decode if needed
+    if (transferEncoding === 'base64') {
+      try {
+        decoded = decodeBase64(decoded);
+      } catch (e) {
+        console.error('Error decoding base64:', e);
+      }
+    } else if (!decoded.includes('=') && !decoded.includes('<') && decoded.length > 50) {
+      // Auto-detect base64 content
       const base64Pattern = /^[A-Za-z0-9+/=\s]+$/;
       if (base64Pattern.test(decoded.replace(/\s/g, ''))) {
         try {
@@ -34,9 +41,10 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
       }
     }
 
-    // Step 2: Check for and decode quoted-printable content
-    // Quoted-printable has =XX patterns or =\r\n soft line breaks
-    if (decoded.includes('=0A') || decoded.includes('=C2') || decoded.includes('=3D') || /=\r?\n/.test(decoded)) {
+    // Step 2: Quoted-printable decode if detected
+    // Look for patterns like =0A, =C2, =3D, or soft line breaks (=\r\n)
+    if (decoded.includes('=0A') || decoded.includes('=C2') || decoded.includes('=3D') || 
+        decoded.includes('=20') || decoded.includes('=E2') || /=\r?\n/.test(decoded)) {
       try {
         decoded = decodeQuotedPrintable(decoded);
       } catch (e) {
@@ -44,18 +52,27 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
       }
     }
 
-    // Step 3: Clean any remaining MIME headers that might be in the content
+    // Step 3: Ensure UTF-8 decoding
+    try {
+      if (typeof TextDecoder !== 'undefined' && decoded.includes('\ufffd')) {
+        const encoder = new TextEncoder();
+        const uint8Array = encoder.encode(decoded);
+        const decoder = new TextDecoder('utf-8');
+        decoded = decoder.decode(uint8Array);
+      }
+    } catch (e) {
+      // UTF-8 decoding not needed or failed
+    }
+
+    // Step 4: Clean MIME headers at the beginning
     const lines = decoded.split('\n');
     let contentStartIndex = 0;
     
-    // Skip MIME headers at the beginning
     for (let i = 0; i < Math.min(lines.length, 20); i++) {
       const line = lines[i].trim();
-      // Check if this looks like a MIME header
       if (line.match(/^[A-Za-z-]+:\s*.+/) || line.startsWith('--') || line === '') {
         contentStartIndex = i + 1;
       } else {
-        // We've hit actual content
         break;
       }
     }
@@ -64,7 +81,7 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
       decoded = lines.slice(contentStartIndex).join('\n');
     }
 
-    // Step 4: Remove common MIME artifacts
+    // Step 5: Remove common MIME artifacts
     decoded = decoded.replace(/Content-Type:[^\n]*\n?/gi, '');
     decoded = decoded.replace(/Content-Transfer-Encoding:[^\n]*\n?/gi, '');
     decoded = decoded.replace(/Content-Disposition:[^\n]*\n?/gi, '');
@@ -75,8 +92,8 @@ export function SanitizedEmailContent({ body, isHtml }: SanitizedEmailContentPro
     return decoded.trim();
   };
 
-  // Decode the email body
-  const decodedBody = decodeEmailBody(body);
+  // Decode the email body with encoding hint
+  const decodedBody = decodeEmailBody(body, encoding);
 
   // Check if this is HTML content
   const isActuallyHtml = isHtml || 
