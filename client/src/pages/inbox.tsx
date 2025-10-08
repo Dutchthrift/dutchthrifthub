@@ -86,7 +86,7 @@ export default function Inbox() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/email-threads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/email-threads"], exact: false });
       toast({
         title: "Emails synced",
         description: `Synced ${data.synced} new emails`,
@@ -109,7 +109,7 @@ export default function Inbox() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/email-threads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/email-threads"], exact: false });
     },
   });
 
@@ -121,7 +121,7 @@ export default function Inbox() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/email-threads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/email-threads"], exact: false });
       setSelectedThreadIds(new Set());
       toast({ title: "Action completed successfully" });
     },

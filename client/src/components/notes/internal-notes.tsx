@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
@@ -58,10 +58,11 @@ export function InternalNotes({ entityType, entityId, entityTitle }: InternalNot
   });
 
   const handleSubmitNote = () => {
-    if (!newNote.trim()) return;
+    const noteText = newNote.replace(/<[^>]*>/g, '').trim();
+    if (!noteText) return;
 
     const noteData: InsertInternalNote = {
-      content: newNote.trim(),
+      content: newNote,
       authorId: "default-user", // TODO: Replace with actual session user when auth is implemented
       ...(entityType === 'customer' && { customerId: entityId }),
       ...(entityType === 'order' && { orderId: entityId }),

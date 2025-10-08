@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -13,9 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import { 
   Send, 
-  Paperclip, 
-  Type, 
-  Smile,
   Save
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -61,7 +58,9 @@ export function EmailCompose({ open, onOpenChange, to = "", subject = "" }: Emai
   });
 
   const handleSend = () => {
-    if (!toEmail.trim() || !emailSubject.trim() || !emailBody.trim()) {
+    const bodyText = emailBody.replace(/<[^>]*>/g, '').trim();
+    
+    if (!toEmail.trim() || !emailSubject.trim() || !bodyText) {
       toast({
         title: "Missing fields",
         description: "Please fill in all required fields",
@@ -120,36 +119,12 @@ export function EmailCompose({ open, onOpenChange, to = "", subject = "" }: Emai
 
           <div className="space-y-2">
             <Label htmlFor="body">Message *</Label>
-            <Textarea
-              id="body"
+            <RichTextEditor
+              content={emailBody}
+              onChange={setEmailBody}
               placeholder="Type your message..."
-              value={emailBody}
-              onChange={(e) => setEmailBody(e.target.value)}
               className="min-h-[200px]"
-              data-testid="compose-body-textarea"
             />
-          </div>
-
-          {/* Toolbar */}
-          <div className="flex items-center justify-between pt-2 border-t">
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" data-testid="attach-file-button">
-                <Paperclip className="h-4 w-4 mr-1" />
-                Attach
-              </Button>
-              <Button variant="outline" size="sm" data-testid="format-text-button">
-                <Type className="h-4 w-4 mr-1" />
-                Format
-              </Button>
-              <Button variant="outline" size="sm" data-testid="add-emoji-button">
-                <Smile className="h-4 w-4 mr-1" />
-                Emoji
-              </Button>
-            </div>
-            
-            <div className="text-xs text-muted-foreground">
-              {emailBody.length} characters
-            </div>
           </div>
         </div>
 
