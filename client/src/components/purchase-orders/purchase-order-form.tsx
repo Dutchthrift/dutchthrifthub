@@ -314,31 +314,37 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                 )}
               />
 
-              <FormItem>
-                <FormLabel>Bedrag (€)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={lineItems.length > 0 ? totalAmount.toFixed(2) : ""}
-                    onChange={(e) => {
-                      // If user manually enters amount, clear line items
-                      if (lineItems.length === 0) {
-                        const amount = parseFloat(e.target.value) || 0;
-                        form.setValue('totalAmount', Math.round(amount * 100));
-                      }
-                    }}
-                    disabled={lineItems.length > 0}
-                    data-testid="input-amount"
-                  />
-                </FormControl>
-                {lineItems.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Berekend uit regel items
-                  </p>
+              <FormField
+                control={form.control}
+                name="totalAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bedrag (€)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={lineItems.length > 0 ? totalAmount.toFixed(2) : (field.value ? (field.value / 100).toFixed(2) : "")}
+                        onChange={(e) => {
+                          if (lineItems.length === 0) {
+                            const amount = parseFloat(e.target.value) || 0;
+                            field.onChange(Math.round(amount * 100));
+                          }
+                        }}
+                        disabled={lineItems.length > 0}
+                        data-testid="input-amount"
+                      />
+                    </FormControl>
+                    {lineItems.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Berekend uit regel items
+                      </p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </FormItem>
+              />
             </div>
 
             <div className="space-y-3">
