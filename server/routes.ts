@@ -20,7 +20,6 @@ import { OrderMatchingService } from "./services/orderMatchingService";
 import { ObjectStorageService } from "./objectStorage";
 import multer from "multer";
 import Papa from "papaparse";
-import { askGPT } from "./services/openaiClient";
 
 // Extend Request type to include session
 interface AuthenticatedRequest extends Request {
@@ -103,22 +102,6 @@ const auditLog = async (
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize order matching service
   const orderMatchingService = new OrderMatchingService(storage);
-
-  // 🔮 AI endpoint
-  app.post("/api/ask", async (req, res) => {
-    try {
-      const { prompt } = req.body;
-      if (!prompt) {
-        return res.status(400).json({ error: "Missing prompt" });
-      }
-
-      const answer = await askGPT(prompt);
-      res.json({ reply: answer });
-    } catch (error: any) {
-      console.error("AI route error:", error);
-      res.status(500).json({ error: error.message || "Server error" });
-    }
-  });
 
   // Configure multer for file uploads (memory storage for CSV)
   const upload = multer({ storage: multer.memoryStorage() });
@@ -641,10 +624,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!validationResult.success) {
-        return res.status(400).json({
-          message: "Invalid filter parameters",
-          errors: validationResult.error.errors,
-        });
+        return res
+          .status(400)
+          .json({
+            message: "Invalid filter parameters",
+            errors: validationResult.error.errors,
+          });
       }
 
       const validatedFilters = validationResult.data;
@@ -1419,10 +1404,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error syncing customers from Shopify:", error);
-      res.status(500).json({
-        message: "Failed to sync customers from Shopify",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      res
+        .status(500)
+        .json({
+          message: "Failed to sync customers from Shopify",
+          error: error instanceof Error ? error.message : String(error),
+        });
     }
   });
 
@@ -1547,10 +1534,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error syncing orders:", error);
-      res.status(500).json({
-        message: "Failed to sync orders",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      res
+        .status(500)
+        .json({
+          message: "Failed to sync orders",
+          error: error instanceof Error ? error.message : String(error),
+        });
     }
   });
 
@@ -2797,9 +2786,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(201).json(item);
       } catch (error: any) {
         console.error("Error creating purchase order item:", error);
-        res.status(400).json({
-          message: error.message || "Failed to create purchase order item",
-        });
+        res
+          .status(400)
+          .json({
+            message: error.message || "Failed to create purchase order item",
+          });
       }
     },
   );
@@ -2814,9 +2805,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(item);
       } catch (error: any) {
         console.error("Error updating purchase order item:", error);
-        res.status(400).json({
-          message: error.message || "Failed to update purchase order item",
-        });
+        res
+          .status(400)
+          .json({
+            message: error.message || "Failed to update purchase order item",
+          });
       }
     },
   );
@@ -2831,9 +2824,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ message: "Purchase order item deleted successfully" });
       } catch (error: any) {
         console.error("Error deleting purchase order item:", error);
-        res.status(400).json({
-          message: error.message || "Failed to delete purchase order item",
-        });
+        res
+          .status(400)
+          .json({
+            message: error.message || "Failed to delete purchase order item",
+          });
       }
     },
   );
@@ -3193,12 +3188,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newCase);
     } catch (error) {
       console.error("Error creating case from email thread:", error);
-      res.status(400).json({
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to create case from email thread",
-      });
+      res
+        .status(400)
+        .json({
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to create case from email thread",
+        });
     }
   });
 
@@ -3240,10 +3237,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(link);
     } catch (error) {
       console.error("Error creating case link:", error);
-      res.status(400).json({
-        message:
-          error instanceof Error ? error.message : "Failed to create case link",
-      });
+      res
+        .status(400)
+        .json({
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to create case link",
+        });
     }
   });
 
@@ -3304,10 +3305,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(note);
     } catch (error) {
       console.error("Error creating case note:", error);
-      res.status(400).json({
-        message:
-          error instanceof Error ? error.message : "Failed to create case note",
-      });
+      res
+        .status(400)
+        .json({
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to create case note",
+        });
     }
   });
 
