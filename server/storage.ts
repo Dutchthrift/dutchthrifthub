@@ -673,7 +673,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCase(id: string): Promise<void> {
-    // First unlink all related entities to avoid foreign key constraint violations
+    // First delete all related records that have foreign key constraints
+    
+    // Delete case events
+    await db.delete(caseEvents).where(eq(caseEvents.caseId, id));
+    
+    // Delete case notes
+    await db.delete(caseNotes).where(eq(caseNotes.caseId, id));
+    
+    // Delete case links
+    await db.delete(caseLinks).where(eq(caseLinks.caseId, id));
     
     // Unlink email threads
     await db.update(emailThreads).set({ caseId: null }).where(eq(emailThreads.caseId, id));
