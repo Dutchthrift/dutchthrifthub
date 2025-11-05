@@ -2740,16 +2740,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/purchase-orders/:id", async (req, res) => {
+  app.delete("/api/purchase-orders/:id", requireAuth, async (req: any, res: any) => {
     try {
       const { id } = req.params;
+      
+      // Get purchase order details before deletion for audit log
+      const purchaseOrder = await storage.getPurchaseOrder(id);
+      if (!purchaseOrder) {
+        return res.status(404).json({ message: "Purchase order not found" });
+      }
+
       await storage.deletePurchaseOrder(id);
 
       await storage.createActivity({
         type: "purchase_order_deleted",
-        description: `Deleted purchase order`,
-        userId: null, // TODO: Get from session
-        metadata: { purchaseOrderId: id },
+        description: `Deleted purchase order: ${purchaseOrder.title || purchaseOrder.poNumber}`,
+        userId: req.user.id,
+        metadata: { purchaseOrderId: id, poNumber: purchaseOrder.poNumber },
+      });
+
+      await auditLog(req, "DELETE", "purchase_orders", id, {
+        poNumber: purchaseOrder.poNumber,
+        title: purchaseOrder.title,
       });
 
       res.status(204).send();

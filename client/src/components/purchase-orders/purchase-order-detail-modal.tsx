@@ -5,6 +5,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,6 +60,7 @@ export function PurchaseOrderDetailModal({
 }: PurchaseOrderDetailModalProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("details");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const supplier = suppliers.find(s => s.id === purchaseOrder.supplierId);
 
@@ -79,6 +90,27 @@ export function PurchaseOrderDetailModal({
     },
     onError: () => {
       toast({ title: "Fout bij bijwerken", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/purchase-orders/${purchaseOrder.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      toast({ 
+        title: "Inkoop order verwijderd", 
+        description: "De inkoop order is succesvol verwijderd." 
+      });
+      onClose();
+    },
+    onError: () => {
+      toast({ 
+        title: "Verwijderen mislukt", 
+        description: "Er is een fout opgetreden bij het verwijderen van de inkoop order.",
+        variant: "destructive" 
+      });
     },
   });
 
@@ -203,34 +235,45 @@ export function PurchaseOrderDetailModal({
               </CardContent>
             </Card>
 
-            <div className="flex gap-2">
-              {purchaseOrder.status === 'draft' && (
-                <Button 
-                  onClick={() => updateStatusMutation.mutate('sent')}
-                  disabled={updateStatusMutation.isPending}
-                  data-testid="button-mark-sent"
-                >
-                  Markeer als Verzonden
-                </Button>
-              )}
-              {purchaseOrder.status === 'sent' && (
-                <Button 
-                  onClick={() => updateStatusMutation.mutate('awaiting_delivery')}
-                  disabled={updateStatusMutation.isPending}
-                  data-testid="button-mark-awaiting"
-                >
-                  Markeer als Onderweg
-                </Button>
-              )}
-              {purchaseOrder.status === 'awaiting_delivery' && (
-                <Button 
-                  onClick={() => updateStatusMutation.mutate('fully_received')}
-                  disabled={updateStatusMutation.isPending}
-                  data-testid="button-mark-received"
-                >
-                  Markeer als Ontvangen
-                </Button>
-              )}
+            <div className="flex gap-2 justify-between">
+              <div className="flex gap-2">
+                {purchaseOrder.status === 'draft' && (
+                  <Button 
+                    onClick={() => updateStatusMutation.mutate('sent')}
+                    disabled={updateStatusMutation.isPending}
+                    data-testid="button-mark-sent"
+                  >
+                    Markeer als Verzonden
+                  </Button>
+                )}
+                {purchaseOrder.status === 'sent' && (
+                  <Button 
+                    onClick={() => updateStatusMutation.mutate('awaiting_delivery')}
+                    disabled={updateStatusMutation.isPending}
+                    data-testid="button-mark-awaiting"
+                  >
+                    Markeer als Onderweg
+                  </Button>
+                )}
+                {purchaseOrder.status === 'awaiting_delivery' && (
+                  <Button 
+                    onClick={() => updateStatusMutation.mutate('fully_received')}
+                    disabled={updateStatusMutation.isPending}
+                    data-testid="button-mark-received"
+                  >
+                    Markeer als Ontvangen
+                  </Button>
+                )}
+              </div>
+              <Button 
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                disabled={deleteMutation.isPending}
+                data-testid="button-delete-po"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Verwijderen
+              </Button>
             </div>
           </TabsContent>
 
@@ -329,6 +372,36 @@ export function PurchaseOrderDetailModal({
           </TabsContent>
         </Tabs>
       </DialogContent>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deze actie kan niet ongedaan worden gemaakt. Dit zal de inkoop order permanent verwijderen.
+              <br /><br />
+              <strong>PO Nummer:</strong> {purchaseOrder.poNumber}
+              <br />
+              <strong>Titel:</strong> {purchaseOrder.title}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Annuleren
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                deleteMutation.mutate();
+                setShowDeleteDialog(false);
+              }}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Verwijderen..." : "Verwijderen"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
