@@ -322,13 +322,15 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                     <FormLabel>Bedrag (€)</FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
-                        step="1"
-                        placeholder="250"
-                        value={lineItems.length > 0 ? totalAmount.toFixed(2) : (field.value ? (field.value / 100).toFixed(2) : "")}
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="250,00"
+                        value={lineItems.length > 0 ? totalAmount.toFixed(2).replace('.', ',') : (field.value ? (field.value / 100).toFixed(2).replace('.', ',') : "")}
                         onChange={(e) => {
                           if (lineItems.length === 0) {
-                            const amount = parseFloat(e.target.value) || 0;
+                            // Allow typing, convert comma to dot for parsing
+                            const inputValue = e.target.value.replace(',', '.');
+                            const amount = parseFloat(inputValue) || 0;
                             field.onChange(Math.round(amount * 100));
                           }
                         }}
