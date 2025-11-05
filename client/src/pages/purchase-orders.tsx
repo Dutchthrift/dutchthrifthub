@@ -61,20 +61,13 @@ export default function PurchaseOrders() {
 
   const filteredPOs = purchaseOrders?.filter(po => {
     if (statusFilter !== "all" && po.status !== statusFilter) return false;
-    
-    if (supplierFilter.trim()) {
+    if (supplierFilter) {
       const supplier = suppliers?.find(s => s.id === po.supplierId);
-      if (!supplier) return false;
-      
-      const supplierName = supplier.name?.toLowerCase() || "";
-      const supplierCode = supplier.supplierCode?.toLowerCase() || "";
-      const query = supplierFilter.toLowerCase().trim();
-      
-      if (!supplierName.includes(query) && !supplierCode.includes(query)) {
-        return false;
-      }
+      const supplierName = supplier?.name?.toLowerCase() || "";
+      const supplierCode = supplier?.supplierCode?.toLowerCase() || "";
+      const query = supplierFilter.toLowerCase();
+      if (!supplierName.includes(query) && !supplierCode.includes(query)) return false;
     }
-    
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
