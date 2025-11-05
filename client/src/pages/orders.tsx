@@ -60,13 +60,13 @@ import {
 import { InternalNotes } from "@/components/notes/internal-notes";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-type SortField = 'orderNumber' | 'customer' | 'totalAmount' | 'status' | 'paymentStatus' | 'createdAt';
+type SortField = 'orderNumber' | 'customer' | 'totalAmount' | 'status' | 'paymentStatus' | 'createdAt' | 'orderDate';
 type SortDirection = 'asc' | 'desc';
 
 export default function Orders() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sortField, setSortField] = useState<SortField>('orderNumber');
+  const [sortField, setSortField] = useState<SortField>('orderDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -340,6 +340,10 @@ export default function Orders() {
       case 'createdAt':
         aVal = new Date(a.createdAt || '').getTime();
         bVal = new Date(b.createdAt || '').getTime();
+        break;
+      case 'orderDate':
+        aVal = new Date(a.orderDate || a.createdAt || '').getTime();
+        bVal = new Date(b.orderDate || b.createdAt || '').getTime();
         break;
       default:
         return 0;
