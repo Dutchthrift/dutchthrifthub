@@ -159,6 +159,59 @@ class ShopifyClient {
     return allOrders;
   }
 
+  async getOrdersSinceDate(sinceDate: Date, onProgress?: (processed: number) => void) {
+    const allOrders: ShopifyOrder[] = [];
+    const batchSize = 250;
+    let hasMore = true;
+    let batchCount = 0;
+    let sinceId: string | undefined = undefined;
+    
+    const createdAtMin = sinceDate.toISOString();
+    console.log(`📅 Starting to fetch orders created since: ${createdAtMin}`);
+
+    while (hasMore) {
+      batchCount++;
+      console.log(`Fetching batch ${batchCount} (limit: ${batchSize}, created_at_min: ${createdAtMin}${sinceId ? `, since_id: ${sinceId}` : ''})`);
+
+      const params: any = {
+        limit: batchSize,
+        status: 'any',
+        created_at_min: createdAtMin
+      };
+
+      // Use since_id for pagination within the date range
+      if (sinceId) {
+        params.since_id = sinceId;
+      }
+
+      const batchOrders = await this.getOrders(params);
+      
+      if (batchOrders.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allOrders.push(...batchOrders);
+      
+      if (onProgress) {
+        onProgress(allOrders.length);
+      }
+
+      console.log(`Batch ${batchCount}: Retrieved ${batchOrders.length} orders (total: ${allOrders.length})`);
+
+      if (batchOrders.length < batchSize) {
+        hasMore = false;
+      } else {
+        sinceId = batchOrders[batchOrders.length - 1].id.toString();
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+
+    console.log(`✅ Completed date-based sync: ${allOrders.length} orders retrieved since ${createdAtMin}`);
+    return allOrders;
+  }
+
   async getAllCustomers(onProgress?: (processed: number, total?: number) => void) {
     const allCustomers: any[] = [];
     let sinceId: string | undefined = undefined;
