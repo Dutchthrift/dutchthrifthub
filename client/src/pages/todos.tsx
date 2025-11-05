@@ -597,25 +597,6 @@ export default function Todos() {
           queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
         }}
       />
-
-      {/* Floating Action Button */}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              onClick={() => setShowNewTodo(true)}
-              size="lg"
-              className="fixed bottom-8 right-8 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 z-50"
-              data-testid="floating-new-task-button"
-            >
-              <Plus className="h-6 w-6" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="text-sm">
-            <p>New Task (Press N)</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
     </div>
   );
 }
