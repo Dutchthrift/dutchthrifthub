@@ -56,6 +56,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
   const [supplierSearch, setSupplierSearch] = useState("");
   const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [amountInput, setAmountInput] = useState("");
   const { user } = useAuth();
 
   // Get 10 most recent suppliers
@@ -115,6 +116,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
       onClose();
       form.reset();
       setLineItems([]);
+      setAmountInput("");
     },
     onError: (error: any) => {
       toast({ 
@@ -327,14 +329,18 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                         placeholder="250,00"
                         value={lineItems.length > 0 
                           ? totalAmount.toFixed(2).replace('.', ',') 
-                          : field.value 
-                            ? (field.value / 100).toFixed(2).replace('.', ',') 
-                            : ""}
+                          : amountInput}
                         onChange={(e) => {
                           if (lineItems.length === 0) {
-                            const inputValue = e.target.value.replace(',', '.');
-                            const amount = parseFloat(inputValue) || 0;
+                            setAmountInput(e.target.value);
+                          }
+                        }}
+                        onBlur={(e) => {
+                          if (lineItems.length === 0) {
+                            const normalized = e.target.value.replace(',', '.');
+                            const amount = parseFloat(normalized) || 0;
                             field.onChange(Math.round(amount * 100));
+                            setAmountInput(amount.toFixed(2).replace('.', ','));
                           }
                         }}
                         disabled={lineItems.length > 0}
