@@ -1,6 +1,7 @@
 export interface ShopifyOrder {
   id: number;
   order_number: string;
+  name: string;
   email: string;
   total_price: string;
   currency: string;
