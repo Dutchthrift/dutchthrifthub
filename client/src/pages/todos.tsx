@@ -512,16 +512,22 @@ export default function Todos() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => setEditingTodo(todo)}>
+                                  <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingTodo(todo);
+                                  }}>
                                     Edit
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                                     <ExternalLink className="mr-2 h-4 w-4" />
                                     View Links
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
                                     className="text-destructive"
-                                    onClick={() => deleteTodoMutation.mutate(todo.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteTodoMutation.mutate(todo.id);
+                                    }}
                                     disabled={deleteTodoMutation.isPending}
                                   >
                                     Delete
