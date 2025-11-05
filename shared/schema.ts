@@ -55,6 +55,7 @@ export const orders = pgTable("orders", {
   fulfillmentStatus: text("fulfillment_status"),
   paymentStatus: text("payment_status"),
   orderData: jsonb("order_data"), // raw Shopify order data
+  orderDate: timestamp("order_date"), // Actual order date from Shopify
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

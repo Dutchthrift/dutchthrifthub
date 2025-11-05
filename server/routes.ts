@@ -1244,6 +1244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   fulfillmentStatus: shopifyOrder.fulfillment_status,
                   paymentStatus: shopifyOrder.financial_status,
                   orderData: shopifyOrder,
+                  orderDate: new Date(shopifyOrder.created_at),
                 });
                 orderStats.created++;
               } catch (createError) {
@@ -1455,6 +1456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   fulfillmentStatus: shopifyOrder.fulfillment_status,
                   paymentStatus: shopifyOrder.financial_status,
                   orderData: shopifyOrder,
+                  orderDate: new Date(shopifyOrder.created_at),
                 });
                 orderStats.created++;
               } catch (createError) {
