@@ -1329,6 +1329,228 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Incremental sync endpoint - Uses date-based syncing to avoid gaps
+  app.post("/api/shopify/sync-incremental", async (req, res) => {
+    try {
+      console.log("🔄 Starting incremental Shopify sync (date-based)...");
+
+      const LAST_SYNC_KEY = "shopify_last_order_sync_timestamp";
+      
+      // Get the last sync timestamp from system settings
+      const lastSyncStr = await storage.getSystemSetting(LAST_SYNC_KEY);
+      let lastSyncDate: Date;
+      
+      if (lastSyncStr) {
+        lastSyncDate = new Date(lastSyncStr);
+        console.log(`📅 Last sync was at: ${lastSyncDate.toISOString()}`);
+      } else {
+        // If no previous sync, default to 90 days ago to avoid overwhelming initial sync
+        lastSyncDate = new Date();
+        lastSyncDate.setDate(lastSyncDate.getDate() - 90);
+        console.log(`📅 No previous sync found, syncing from: ${lastSyncDate.toISOString()}`);
+      }
+
+      const syncStartTime = new Date(); // Record when this sync started
+      
+      let orderStats = {
+        synced: 0,
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        total: 0,
+      };
+      let errors: string[] = [];
+
+      try {
+        console.log("🛒 Fetching orders from Shopify...");
+        const shopifyOrders = await shopifyClient.getOrdersSinceDate(
+          lastSyncDate,
+          (processed) => {
+            console.log(`📊 Order sync progress: ${processed} orders processed`);
+          }
+        );
+
+        console.log(`Processing ${shopifyOrders.length} orders...`);
+
+        // Map Shopify financial status to our enum values
+        const mapShopifyStatus = (
+          financialStatus: string,
+          fulfillmentStatus: string | null,
+        ) => {
+          if (fulfillmentStatus === "fulfilled") return "delivered";
+          if (fulfillmentStatus === "partial") return "shipped";
+          if (financialStatus === "paid" || financialStatus === "authorized") {
+            return fulfillmentStatus === null ? "processing" : "shipped";
+          }
+          if (financialStatus === "pending") return "pending";
+          if (financialStatus === "refunded") return "refunded";
+          if (financialStatus === "voided") return "cancelled";
+          return "pending";
+        };
+
+        for (const shopifyOrder of shopifyOrders) {
+          try {
+            const existingOrder = await storage.getOrderByShopifyId(
+              shopifyOrder.id.toString(),
+            );
+
+            // Handle customer creation/updating first
+            let customer = null;
+            if (shopifyOrder.customer && shopifyOrder.customer.email) {
+              customer = await storage.getCustomerByEmail(
+                shopifyOrder.customer.email,
+              );
+              if (!customer) {
+                try {
+                  customer = await storage.createCustomer({
+                    email: shopifyOrder.customer.email,
+                    firstName: shopifyOrder.customer.first_name,
+                    lastName: shopifyOrder.customer.last_name,
+                    shopifyCustomerId: shopifyOrder.customer.id.toString(),
+                  });
+                } catch (customerError) {
+                  console.log(
+                    `Customer creation failed, attempting to get existing customer: ${shopifyOrder.customer.email}`,
+                  );
+                  customer = await storage.getCustomerByEmail(
+                    shopifyOrder.customer.email,
+                  );
+                }
+              } else if (
+                !customer.shopifyCustomerId ||
+                customer.shopifyCustomerId !==
+                  shopifyOrder.customer.id.toString()
+              ) {
+                try {
+                  await storage.updateCustomer(customer.id, {
+                    shopifyCustomerId: shopifyOrder.customer.id.toString(),
+                    firstName:
+                      shopifyOrder.customer.first_name || customer.firstName,
+                    lastName:
+                      shopifyOrder.customer.last_name || customer.lastName,
+                  });
+                } catch (updateError) {
+                  console.log(
+                    `Customer update failed: ${updateError instanceof Error ? updateError.message : updateError}`,
+                  );
+                }
+              }
+            }
+
+            if (!existingOrder) {
+              try {
+                await storage.createOrder({
+                  shopifyOrderId: shopifyOrder.id.toString(),
+                  orderNumber: shopifyOrder.order_number,
+                  customerId: customer?.id,
+                  customerEmail: shopifyOrder.email,
+                  totalAmount: Math.round(
+                    parseFloat(shopifyOrder.total_price) * 100,
+                  ),
+                  currency: shopifyOrder.currency,
+                  status: mapShopifyStatus(
+                    shopifyOrder.financial_status,
+                    shopifyOrder.fulfillment_status,
+                  ),
+                  fulfillmentStatus: shopifyOrder.fulfillment_status,
+                  paymentStatus: shopifyOrder.financial_status,
+                  orderData: shopifyOrder,
+                });
+                orderStats.created++;
+              } catch (createError) {
+                console.error(
+                  `Failed to create order ${shopifyOrder.id}: ${createError instanceof Error ? createError.message : createError}`,
+                );
+                orderStats.skipped++;
+                errors.push(
+                  `Order ${shopifyOrder.id}: Failed to create - ${createError instanceof Error ? createError.message : String(createError)}`,
+                );
+                continue;
+              }
+            } else {
+              try {
+                await storage.updateOrder(existingOrder.id, {
+                  status: mapShopifyStatus(
+                    shopifyOrder.financial_status,
+                    shopifyOrder.fulfillment_status,
+                  ),
+                  fulfillmentStatus: shopifyOrder.fulfillment_status,
+                  paymentStatus: shopifyOrder.financial_status,
+                  orderData: shopifyOrder,
+                  totalAmount: Math.round(
+                    parseFloat(shopifyOrder.total_price) * 100,
+                  ),
+                });
+                orderStats.updated++;
+              } catch (updateError) {
+                console.error(
+                  `Failed to update order ${shopifyOrder.id}: ${updateError instanceof Error ? updateError.message : updateError}`,
+                );
+                orderStats.skipped++;
+                errors.push(
+                  `Order ${shopifyOrder.id}: Failed to update - ${updateError instanceof Error ? updateError.message : String(updateError)}`,
+                );
+                continue;
+              }
+            }
+            orderStats.synced++;
+          } catch (orderError) {
+            console.error(
+              `Error processing order ${shopifyOrder.id}:`,
+              orderError,
+            );
+            orderStats.skipped++;
+            errors.push(
+              `Order ${shopifyOrder.id}: ${orderError instanceof Error ? orderError.message : String(orderError)}`,
+            );
+          }
+        }
+
+        orderStats.total = shopifyOrders.length;
+        
+        // Only update the last sync timestamp if the sync completed successfully
+        await storage.setSystemSetting(LAST_SYNC_KEY, syncStartTime.toISOString());
+        
+        console.log(
+          `✅ Incremental order sync completed: ${orderStats.created} created, ${orderStats.updated} updated, ${orderStats.skipped} skipped from ${orderStats.total} orders`,
+        );
+        console.log(`📅 Updated last sync timestamp to: ${syncStartTime.toISOString()}`);
+      } catch (orderSyncError) {
+        console.error("Failed to sync orders:", orderSyncError);
+        errors.push(
+          `Order sync failed: ${orderSyncError instanceof Error ? orderSyncError.message : String(orderSyncError)}`,
+        );
+        
+        // Don't update the timestamp if sync failed - this ensures we retry from the same point
+        return res.status(500).json({
+          success: false,
+          error: "Incremental sync failed",
+          message: orderSyncError instanceof Error ? orderSyncError.message : String(orderSyncError),
+          orders: orderStats,
+          errors: errors.length > 0 ? errors.slice(0, 10) : [],
+        });
+      }
+
+      console.log("🎉 Incremental Shopify sync completed!");
+
+      res.json({
+        success: true,
+        orders: orderStats,
+        errors: errors.length > 0 ? errors.slice(0, 10) : [],
+        totalErrors: errors.length,
+        lastSyncTimestamp: syncStartTime.toISOString(),
+        message: `Incremental sync completed: ${orderStats.total} orders processed from Shopify since ${lastSyncDate.toISOString()}`,
+      });
+    } catch (error) {
+      console.error("Incremental Shopify sync failed:", error);
+      res.status(500).json({
+        success: false,
+        error: "Incremental sync failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   // Sync customers from Shopify - Enhanced with bulk import
   app.post("/api/customers/sync", async (req, res) => {
     try {
