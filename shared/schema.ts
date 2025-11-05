@@ -265,6 +265,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   poNumber: text("po_number").notNull().unique(), // Auto-generated PO number
   title: text("title").notNull(),
+  supplierNumber: text("supplier_number").notNull(), // Supplier's reference number
   supplierId: varchar("supplier_id").references(() => suppliers.id).notNull(),
   orderDate: timestamp("order_date").notNull(),
   expectedDeliveryDate: timestamp("expected_delivery_date"),

@@ -74,6 +74,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
     resolver: zodResolver(insertPurchaseOrderSchema.omit({ poNumber: true })),
     defaultValues: {
       title: "",
+      supplierNumber: "",
       supplierId: "",
       orderDate: new Date(),
       expectedDeliveryDate: undefined,
@@ -255,6 +256,20 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                         </div>
                       )}
                     </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplierNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Leverancier Referentie</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Bijv. LT-2024-001" data-testid="input-supplier-number" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
