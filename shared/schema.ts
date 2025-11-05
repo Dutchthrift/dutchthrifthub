@@ -391,7 +391,7 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   expectedDeliveryDate: z.union([z.string(), z.date()]).optional().transform(val => 
     val && typeof val === 'string' ? new Date(val) : val
   ),
-  totalAmount: z.number().int().positive(),
+  totalAmount: z.number().int().nonnegative(),
 });
 
 export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({
