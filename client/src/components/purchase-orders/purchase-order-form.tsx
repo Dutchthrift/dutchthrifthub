@@ -330,6 +330,11 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                         value={lineItems.length > 0 
                           ? totalAmount.toFixed(2).replace('.', ',') 
                           : amountInput}
+                        onFocus={(e) => {
+                          if (lineItems.length === 0 && (amountInput === "0,00" || amountInput === "")) {
+                            setAmountInput("");
+                          }
+                        }}
                         onChange={(e) => {
                           if (lineItems.length === 0) {
                             setAmountInput(e.target.value);
