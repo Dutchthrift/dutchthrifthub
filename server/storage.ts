@@ -17,7 +17,7 @@ import {
   type CaseEvent, type InsertCaseEvent,
   type Activity, type InsertActivity,
   type AuditLog, type InsertAuditLog,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql } from "drizzle-orm";
@@ -163,6 +163,10 @@ export interface IStorage {
   // Audit Logs
   createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(limit?: number): Promise<AuditLog[]>;
+
+  // System Settings
+  getSystemSetting(key: string): Promise<string | undefined>;
+  setSystemSetting(key: string, value: string): Promise<void>;
 
   // Dashboard stats
   getDashboardStats(): Promise<{
@@ -850,6 +854,21 @@ export class DatabaseStorage implements IStorage {
 
   async getAuditLogs(limit: number = 50): Promise<AuditLog[]> {
     return await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(limit);
+  }
+
+  // System Settings
+  async getSystemSetting(key: string): Promise<string | undefined> {
+    const result = await db.select().from(systemSettings).where(eq(systemSettings.key, key)).limit(1);
+    return result[0]?.value;
+  }
+
+  async setSystemSetting(key: string, value: string): Promise<void> {
+    const existing = await this.getSystemSetting(key);
+    if (existing) {
+      await db.update(systemSettings).set({ value, updatedAt: new Date() }).where(eq(systemSettings.key, key));
+    } else {
+      await db.insert(systemSettings).values({ key, value });
+    }
   }
 
   // Dashboard stats

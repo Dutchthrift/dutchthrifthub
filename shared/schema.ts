@@ -231,6 +231,13 @@ export const caseEvents = pgTable("case_events", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// System Settings table - for tracking system-wide configurations like last sync times
+export const systemSettings = pgTable("system_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Suppliers table
 export const suppliers = pgTable("suppliers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
