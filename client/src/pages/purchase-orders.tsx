@@ -19,7 +19,8 @@ import {
   CheckCircle,
   Truck,
   List,
-  LayoutGrid
+  LayoutGrid,
+  X
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { PurchaseOrder, Supplier } from "@shared/schema";
@@ -40,7 +41,7 @@ import {
 export default function PurchaseOrders() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [supplierFilter, setSupplierFilter] = useState("all");
+  const [supplierFilter, setSupplierFilter] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [showNewPO, setShowNewPO] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -60,7 +61,13 @@ export default function PurchaseOrders() {
 
   const filteredPOs = purchaseOrders?.filter(po => {
     if (statusFilter !== "all" && po.status !== statusFilter) return false;
-    if (supplierFilter !== "all" && po.supplierId !== supplierFilter) return false;
+    if (supplierFilter) {
+      const supplier = suppliers?.find(s => s.id === po.supplierId);
+      const supplierName = supplier?.name?.toLowerCase() || "";
+      const supplierCode = supplier?.supplierCode?.toLowerCase() || "";
+      const query = supplierFilter.toLowerCase();
+      if (!supplierName.includes(query) && !supplierCode.includes(query)) return false;
+    }
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -255,19 +262,25 @@ export default function PurchaseOrders() {
             </SelectContent>
           </Select>
 
-          <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-            <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-supplier-filter">
-              <SelectValue placeholder="Leverancier" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle leveranciers</SelectItem>
-              {suppliers?.map(supplier => (
-                <SelectItem key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="relative w-full sm:w-[200px]">
+            <Input
+              placeholder="Filter leverancier..."
+              value={supplierFilter}
+              onChange={(e) => setSupplierFilter(e.target.value)}
+              className="w-full"
+              data-testid="input-supplier-filter"
+            />
+            {supplierFilter && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                onClick={() => setSupplierFilter("")}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
 
           <div className="flex gap-1 border rounded-md p-1">
             <Button
