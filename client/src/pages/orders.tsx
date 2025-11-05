@@ -637,9 +637,9 @@ export default function Orders() {
                           >
                             {order.orderNumber}
                           </button>
-                          {(order.orderData as any)?.line_items?.length > 1 && (
+                          {(order.orderData as any)?.line_items?.length > 0 && (
                             <Badge variant="outline" className="text-xs">
-                              +{(order.orderData as any).line_items.length - 1}
+                              {(order.orderData as any).line_items.length} {(order.orderData as any).line_items.length === 1 ? 'item' : 'items'}
                             </Badge>
                           )}
                         </div>
