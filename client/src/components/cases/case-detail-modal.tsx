@@ -466,7 +466,7 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-start justify-between">
-              <div>
+              <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <DialogTitle className="text-2xl">Case #{caseData.caseNumber}</DialogTitle>
                   <Badge variant={getStatusVariant(caseData.status)} data-testid="case-status-badge">
@@ -480,23 +480,30 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
                   Created {formatDateTime(caseData.createdAt)}
                 </p>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" data-testid="actions-menu">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleStartEdit} data-testid="action-edit">
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} data-testid="action-delete">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                  data-testid="delete-case-button"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" data-testid="actions-menu">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleStartEdit} data-testid="action-edit">
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </DialogHeader>
 
