@@ -274,8 +274,8 @@ export class DatabaseStorage implements IStorage {
 
   // Orders
   async getOrders(limit: number = 50): Promise<Order[]> {
-    // Sort by order number descending (newest order number first)
-    return await db.select().from(orders).orderBy(desc(orders.orderNumber)).limit(limit);
+    // Sort by order date descending (newest orders first)
+    return await db.select().from(orders).orderBy(desc(orders.orderDate)).limit(limit);
   }
 
   async getOrdersPaginated(page: number = 1, limit: number = 20, searchQuery?: string): Promise<{ orders: Order[], total: number }> {
@@ -299,11 +299,11 @@ export class DatabaseStorage implements IStorage {
     const [countResult] = await countQuery;
     const total = Number(countResult.count);
     
-    // Get paginated orders with search filter
+    // Get paginated orders with search filter, sorted by date (newest first)
     const ordersQuery = db
       .select()
       .from(orders)
-      .orderBy(desc(orders.orderNumber))
+      .orderBy(desc(orders.orderDate))
       .limit(limit)
       .offset(offset);
     
