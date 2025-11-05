@@ -627,16 +627,20 @@ export default function Orders() {
                 </TableHeader>
                 <TableBody>
                   {filteredAndSortedOrders.map((order) => (
-                    <TableRow key={order.id} data-testid={`order-row-${order.id}`}>
+                    <TableRow 
+                      key={order.id} 
+                      data-testid={`order-row-${order.id}`}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleViewDetails(order)}
+                    >
                       <TableCell className="font-medium">
                         <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleViewDetails(order)}
-                            className="text-primary hover:underline font-medium transition-colors"
+                          <span
+                            className="text-primary font-medium"
                             data-testid={`order-number-${order.id}`}
                           >
                             {order.orderNumber}
-                          </button>
+                          </span>
                           {(order.orderData as any)?.line_items?.length > 0 && (
                             <Badge variant="outline" className="text-xs">
                               {(order.orderData as any).line_items.length} {(order.orderData as any).line_items.length === 1 ? 'item' : 'items'}
@@ -678,7 +682,7 @@ export default function Orders() {
                           {new Date(order.orderDate || order.createdAt || '').toLocaleDateString()}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" data-testid={`order-actions-${order.id}`}>
