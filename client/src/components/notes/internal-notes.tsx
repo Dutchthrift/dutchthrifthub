@@ -6,7 +6,17 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { MessageSquarePlus, Send, User, Clock } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { MessageSquarePlus, Send, User, Clock, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +33,7 @@ interface InternalNotesProps {
 export function InternalNotes({ entityType, entityId, entityTitle }: InternalNotesProps) {
   const [newNote, setNewNote] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: notes, isLoading } = useQuery<InternalNote[]>({
@@ -57,13 +68,37 @@ export function InternalNotes({ entityType, entityId, entityTitle }: InternalNot
     }
   });
 
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (noteId: string) => {
+      const response = await fetch(`/api/notes/${noteId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error('Failed to delete note');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notes', entityType, entityId] });
+      setNoteToDelete(null);
+      toast({
+        title: "Note deleted",
+        description: "The note has been deleted successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete note. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleSubmitNote = () => {
     const noteText = newNote.replace(/<[^>]*>/g, '').trim();
     if (!noteText) return;
 
     const noteData: InsertInternalNote = {
       content: newNote,
-      authorId: "default-user", // TODO: Replace with actual session user when auth is implemented
+      authorId: "", // Will be set by the backend using the authenticated user
       ...(entityType === 'customer' && { customerId: entityId }),
       ...(entityType === 'order' && { orderId: entityId }),
       ...(entityType === 'repair' && { repairId: entityId }),
@@ -193,6 +228,14 @@ export function InternalNotes({ entityType, entityId, entityTitle }: InternalNot
                       </div>
                     )}
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setNoteToDelete(note.id)}
+                    data-testid={`delete-note-${note.id}`}
+                  >
+                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                  </Button>
                 </div>
                 {index < notes.length - 1 && <Separator className="mt-4" />}
               </div>
@@ -206,6 +249,29 @@ export function InternalNotes({ entityType, entityId, entityTitle }: InternalNot
           </div>
         )}
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!noteToDelete} onOpenChange={() => setNoteToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Note</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this note? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="cancel-delete-note">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => noteToDelete && deleteNoteMutation.mutate(noteToDelete)}
+              disabled={deleteNoteMutation.isPending}
+              data-testid="confirm-delete-note"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteNoteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

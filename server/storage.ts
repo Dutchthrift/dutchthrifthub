@@ -125,6 +125,7 @@ export interface IStorage {
   // Internal Notes
   getInternalNotes(entityId: string, entityType: string): Promise<InternalNote[]>;
   createInternalNote(note: InsertInternalNote): Promise<InternalNote>;
+  deleteInternalNote(noteId: string): Promise<void>;
 
   // Cases
   getCases(status?: string, search?: string): Promise<Case[]>;
@@ -576,6 +577,10 @@ export class DatabaseStorage implements IStorage {
   async createInternalNote(note: InsertInternalNote): Promise<InternalNote> {
     const result = await db.insert(internalNotes).values(note).returning();
     return result[0];
+  }
+
+  async deleteInternalNote(noteId: string): Promise<void> {
+    await db.delete(internalNotes).where(eq(internalNotes.id, noteId));
   }
 
   // Cases

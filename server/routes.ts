@@ -2673,14 +2673,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/notes", async (req, res) => {
+  app.post("/api/notes", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertInternalNoteSchema.parse(req.body);
-      const note = await storage.createInternalNote(validatedData);
+      // Override authorId with the authenticated user's ID
+      const note = await storage.createInternalNote({
+        ...validatedData,
+        authorId: req.user.id,
+      });
       res.status(201).json(note);
     } catch (error) {
       console.error("Error creating note:", error);
       res.status(400).json({ message: "Failed to create note" });
+    }
+  });
+
+  app.delete("/api/notes/:noteId", requireAuth, async (req: any, res) => {
+    try {
+      const { noteId } = req.params;
+      await storage.deleteInternalNote(noteId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      res.status(400).json({ message: "Failed to delete note" });
     }
   });
 
