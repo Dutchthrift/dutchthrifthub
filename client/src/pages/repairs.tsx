@@ -240,16 +240,6 @@ export default function Repairs() {
         onOpenChange={(open) => !open && setSelectedRepair(null)}
         users={users}
       />
-
-      {/* Floating Action Button */}
-      <Button
-        className="fixed bottom-8 right-8 h-14 w-14 rounded-full shadow-lg"
-        size="icon"
-        onClick={() => setShowNewRepair(true)}
-        data-testid="fab-new-repair"
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
     </div>
   );
 }
