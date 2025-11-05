@@ -60,7 +60,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
 
   // Get 10 most recent suppliers
   const recentSuppliers = suppliers.slice(0, 10);
-  
+
   // Filter suppliers based on search
   const filteredSuppliers = supplierSearch.trim() === ""
     ? recentSuppliers
@@ -89,7 +89,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
       // First create the PO
       const poResponse = await apiRequest("POST", "/api/purchase-orders", data);
       const purchaseOrder = await poResponse.json();
-      
+
       // Then create line items if any
       if (data.lineItems && data.lineItems.length > 0) {
         for (const item of data.lineItems) {
@@ -103,7 +103,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
           });
         }
       }
-      
+
       return purchaseOrder;
     },
     onSuccess: () => {
@@ -325,10 +325,13 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                         type="text"
                         inputMode="decimal"
                         placeholder="250,00"
-                        value={lineItems.length > 0 ? totalAmount.toFixed(2).replace('.', ',') : (field.value ? (field.value / 100).toFixed(2).replace('.', ',') : "")}
+                        value={lineItems.length > 0 
+                          ? totalAmount.toFixed(2).replace('.', ',') 
+                          : field.value 
+                            ? (field.value / 100).toFixed(2).replace('.', ',') 
+                            : ""}
                         onChange={(e) => {
                           if (lineItems.length === 0) {
-                            // Allow typing, convert comma to dot for parsing
                             const inputValue = e.target.value.replace(',', '.');
                             const amount = parseFloat(inputValue) || 0;
                             field.onChange(Math.round(amount * 100));
