@@ -585,7 +585,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                       {/* Order Header */}
                       <div className="flex items-center gap-2 pb-2 border-b">
                         <ShoppingCart className="h-4 w-4 text-primary" />
-                        <span className="font-semibold text-sm">Order #{linkedOrder.orderNumber}</span>
+                        <span className="font-semibold text-sm">Order {linkedOrder.orderNumber}</span>
                         <Badge variant="outline" className="text-xs">
                           {linkedOrder.status}
                         </Badge>

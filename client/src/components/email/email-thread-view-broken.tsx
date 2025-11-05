@@ -611,7 +611,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                               <>
                                 {filteredOrders.map((order) => (
                                   <SelectItem key={order.id} value={order.id} data-testid={`order-option-${order.id}`}>
-                                    #{order.orderNumber} - €{((order.totalAmount || 0) / 100).toFixed(2)}
+                                    {order.orderNumber} - €{((order.totalAmount || 0) / 100).toFixed(2)}
                                   </SelectItem>
                                 ))}
                                 {!showAllOrders && allOrders && allOrders.length > 20 && filteredOrders.length >= 20 && (

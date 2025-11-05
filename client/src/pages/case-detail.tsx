@@ -731,7 +731,7 @@ export default function CaseDetail() {
                       relatedOrders.map(order => (
                         <div key={order.id} className="border rounded p-4">
                           <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium">Order #{order.orderNumber}</h4>
+                            <h4 className="font-medium">Order {order.orderNumber}</h4>
                             <Badge>{order.status}</Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">

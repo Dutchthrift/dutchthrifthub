@@ -344,7 +344,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
               <Input
                 type="text"
                 placeholder={selectedOrder && selectedOrderCustomer 
-                  ? `Order #${selectedOrder.orderNumber} - ${selectedOrderCustomer.firstName} ${selectedOrderCustomer.lastName}`
+                  ? `Order ${selectedOrder.orderNumber} - ${selectedOrderCustomer.firstName} ${selectedOrderCustomer.lastName}`
                   : "Zoek order of klant..."}
                 className="pl-10"
                 value={orderSearchQuery}
