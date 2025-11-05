@@ -635,7 +635,7 @@ export default function Orders() {
                             className="text-primary hover:underline font-medium transition-colors"
                             data-testid={`order-number-${order.id}`}
                           >
-                            #{order.orderNumber}
+                            {order.orderNumber}
                           </button>
                           {(order.orderData as any)?.line_items?.length > 1 && (
                             <Badge variant="outline" className="text-xs">
@@ -779,7 +779,7 @@ export default function Orders() {
         <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Order Details #{selectedOrder?.orderNumber}</DialogTitle>
+              <DialogTitle>Order Details {selectedOrder?.orderNumber}</DialogTitle>
               <DialogDescription>
                 Complete order information and history
               </DialogDescription>
@@ -796,7 +796,7 @@ export default function Orders() {
                     <CardContent className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Order Number:</span>
-                        <span className="font-medium">#{selectedOrder.orderNumber}</span>
+                        <span className="font-medium">{selectedOrder.orderNumber}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Total Amount:</span>
