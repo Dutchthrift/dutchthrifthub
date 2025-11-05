@@ -614,12 +614,12 @@ export default function Orders() {
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('createdAt')}
+                      onClick={() => handleSort('orderDate')}
                       data-testid="sort-date-header"
                     >
                       <div className="flex items-center">
                         Date
-                        {getSortIcon('createdAt')}
+                        {getSortIcon('orderDate')}
                       </div>
                     </TableHead>
                     <TableHead className="w-[50px]"></TableHead>
@@ -675,7 +675,7 @@ export default function Orders() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
-                          {new Date(order.createdAt || '').toLocaleDateString()}
+                          {new Date(order.orderDate || order.createdAt || '').toLocaleDateString()}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -817,7 +817,7 @@ export default function Orders() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Order Date:</span>
                         <span className="font-medium">
-                          {new Date(selectedOrder.createdAt || '').toLocaleDateString()}
+                          {new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleDateString()}
                         </span>
                       </div>
                     </CardContent>
