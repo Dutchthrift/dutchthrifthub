@@ -1230,7 +1230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               try {
                 await storage.createOrder({
                   shopifyOrderId: shopifyOrder.id.toString(),
-                  orderNumber: shopifyOrder.order_number,
+                  orderNumber: shopifyOrder.name,
                   customerId: customer?.id,
                   customerEmail: shopifyOrder.email,
                   totalAmount: Math.round(
@@ -1442,7 +1442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               try {
                 await storage.createOrder({
                   shopifyOrderId: shopifyOrder.id.toString(),
-                  orderNumber: shopifyOrder.order_number,
+                  orderNumber: shopifyOrder.name,
                   customerId: customer?.id,
                   customerEmail: shopifyOrder.email,
                   totalAmount: Math.round(
