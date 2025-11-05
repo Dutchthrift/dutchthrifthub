@@ -323,8 +323,8 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                     <FormControl>
                       <Input
                         type="number"
-                        step="0.01"
-                        placeholder="0.00"
+                        step="1"
+                        placeholder="250"
                         value={lineItems.length > 0 ? totalAmount.toFixed(2) : (field.value ? (field.value / 100).toFixed(2) : "")}
                         onChange={(e) => {
                           if (lineItems.length === 0) {
