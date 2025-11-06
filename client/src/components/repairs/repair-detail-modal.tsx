@@ -869,6 +869,23 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                       const downloadUrl = `/api/attachments/${attachmentPath}`;
                       const filename = decodeURIComponent(attachment.split('/').pop() || 'download');
                       
+                      const handleDownload = async () => {
+                        try {
+                          const response = await fetch(downloadUrl);
+                          const blob = await response.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = filename;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          window.URL.revokeObjectURL(url);
+                        } catch (error) {
+                          console.error('Download failed:', error);
+                        }
+                      };
+                      
                       return (
                         <div key={index} className="flex items-center justify-between border p-2 rounded">
                           <div className="flex items-center gap-2">
@@ -878,7 +895,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(downloadUrl, '_blank')}
+                            onClick={handleDownload}
                             data-testid={`button-download-${index}`}
                           >
                             <Download className="h-4 w-4" />
