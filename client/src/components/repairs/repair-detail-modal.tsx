@@ -44,6 +44,7 @@ import {
   Edit,
   Save,
   X,
+  Maximize2,
 } from "lucide-react";
 import { format, isPast } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -71,6 +72,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const [editForm, setEditForm] = useState<any>({});
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Update local state when repair prop changes
@@ -306,6 +308,34 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     return user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username : 'Onbekend';
   };
 
+  const deleteFileMutation = useMutation({
+    mutationFn: async ({ fileType, fileUrl }: { fileType: 'photos' | 'attachments'; fileUrl: string }) => {
+      if (!repair || !currentRepair) return;
+      
+      // Get current files array
+      const currentFiles = fileType === 'photos' ? (currentRepair.photos || []) : (currentRepair.attachments || []);
+      
+      // Filter out the file to delete
+      const updatedFiles = currentFiles.filter(f => f !== fileUrl);
+      
+      // Update repair
+      const res = await apiRequest('PATCH', `/api/repairs/${currentRepair.id}`, {
+        [fileType]: updatedFiles
+      });
+      return await res.json();
+    },
+    onSuccess: (updatedRepair) => {
+      if (updatedRepair) {
+        setCurrentRepair(updatedRepair);
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/repairs'] });
+      toast({
+        title: "Bestand verwijderd",
+        description: "Het bestand is succesvol verwijderd.",
+      });
+    },
+  });
+
   const handleFileUpload = () => {
     if (selectedFiles) {
       if (selectedFiles.length > 10) {
@@ -320,6 +350,12 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     }
   };
 
+  const handleDeleteFile = (fileType: 'photos' | 'attachments', fileUrl: string) => {
+    if (confirm('Weet je zeker dat je dit bestand wilt verwijderen?')) {
+      deleteFileMutation.mutate({ fileType, fileUrl });
+    }
+  };
+
   const handleAddNote = () => {
     if (note.trim()) {
       addNoteMutation.mutate(note);
@@ -327,8 +363,13 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   };
 
   const partsUsed = Array.isArray(currentRepair.partsUsed) ? currentRepair.partsUsed : [];
-  const attachments = Array.isArray(currentRepair.attachments) ? currentRepair.attachments : [];
-  const photos = Array.isArray(currentRepair.photos) ? currentRepair.photos : [];
+  // Filter out broken/old files (those with 'undefined' in path or ending with '-')
+  const attachments = Array.isArray(currentRepair.attachments) 
+    ? currentRepair.attachments.filter(a => !a.includes('undefined') && !a.endsWith('-'))
+    : [];
+  const photos = Array.isArray(currentRepair.photos) 
+    ? currentRepair.photos.filter(p => !p.includes('undefined') && !p.endsWith('-'))
+    : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -832,12 +873,39 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                       const photoUrl = `/api/attachments/${photoPath}`;
                       
                       return (
-                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
+                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden border group">
                           <img
                             src={photoUrl}
                             alt={`Foto ${index + 1}`}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => setFullScreenImage(photoUrl)}
                           />
+                          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFullScreenImage(photoUrl);
+                              }}
+                              data-testid={`button-view-photo-${index}`}
+                            >
+                              <Maximize2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteFile('photos', photo);
+                              }}
+                              data-testid={`button-delete-photo-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
@@ -871,24 +939,34 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                       
                       return (
                         <div key={index} className="flex items-center justify-between border p-2 rounded">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            <span className="text-sm" title={filename}>{filename}</span>
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <FileText className="h-4 w-4 flex-shrink-0" />
+                            <span className="text-sm truncate" title={filename}>{filename}</span>
                           </div>
-                          <a 
-                            href={downloadUrl} 
-                            download={filename}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
+                          <div className="flex items-center gap-1">
+                            <a 
+                              href={downloadUrl} 
+                              download={filename}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                data-testid={`button-download-${index}`}
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            </a>
                             <Button
                               variant="ghost"
                               size="sm"
-                              data-testid={`button-download-${index}`}
+                              onClick={() => handleDeleteFile('attachments', attachment)}
+                              data-testid={`button-delete-attachment-${index}`}
                             >
-                              <Download className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
-                          </a>
+                          </div>
                         </div>
                       );
                     })}
@@ -1001,6 +1079,30 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Full-screen image viewer */}
+      <Dialog open={!!fullScreenImage} onOpenChange={() => setFullScreenImage(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0">
+          <div className="relative w-full h-full flex items-center justify-center bg-black">
+            {fullScreenImage && (
+              <img
+                src={fullScreenImage}
+                alt="Full screen view"
+                className="max-w-full max-h-[95vh] object-contain"
+                onClick={() => setFullScreenImage(null)}
+              />
+            )}
+            <Button
+              variant="secondary"
+              size="icon"
+              className="absolute top-4 right-4"
+              onClick={() => setFullScreenImage(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
