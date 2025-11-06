@@ -1,6 +1,7 @@
 import { useAuth } from "@/lib/auth";
 import { LoginForm } from "./login-form";
-import { ComponentType } from "react";
+import { ComponentType, useEffect } from "react";
+import { useLocation } from "wouter";
 
 interface ProtectedRouteProps {
   component: ComponentType<any>;
@@ -10,6 +11,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ component: Component, roles = [], ...props }: ProtectedRouteProps) {
   const { user, loading: isLoading } = useAuth();
+  const [, setLocation] = useLocation();
 
   // Show loading spinner while checking authentication
   if (isLoading) {
@@ -36,18 +38,37 @@ export default function ProtectedRoute({ component: Component, roles = [], ...pr
   }
 
   // Check role authorization if roles are specified
+  useEffect(() => {
+    if (roles.length > 0 && user && !roles.includes(user.role)) {
+      // Redirect TECHNICUS users to /repairs instead of showing access denied
+      if (user.role === "TECHNICUS") {
+        setLocation("/repairs");
+      }
+    }
+  }, [user, roles, setLocation]);
+
+  // Show access denied for non-TECHNICUS users without proper roles
   if (roles.length > 0 && !roles.includes(user.role)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-foreground mb-4">Access Denied</h2>
-          <p className="text-muted-foreground mb-4">
-            You don't have permission to access this page.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Required roles: {roles.join(", ")}
-          </p>
+    // TECHNICUS users get redirected above, so this only affects other unauthorized users
+    if (user.role !== "TECHNICUS") {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-foreground mb-4">Access Denied</h2>
+            <p className="text-muted-foreground mb-4">
+              You don't have permission to access this page.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Required roles: {roles.join(", ")}
+            </p>
+          </div>
         </div>
+      );
+    }
+    // For TECHNICUS, show loading while redirect happens
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
