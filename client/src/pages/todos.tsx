@@ -257,26 +257,28 @@ export default function Todos() {
       <Navigation />
       
       <main className="container mx-auto px-4 py-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6" data-testid="todos-header">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">To-do's</h1>
-            <p className="text-muted-foreground">Manage personal and team tasks</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button 
-              variant="outline"
-              onClick={() => setViewMode(viewMode === "list" ? "kanban" : viewMode === "kanban" ? "calendar" : "list")}
-              data-testid="toggle-view-mode"
-            >
-              {viewMode === "list" && <CheckSquare className="mr-2 h-4 w-4" />}
-              {viewMode === "kanban" && <Calendar className="mr-2 h-4 w-4" />}
-              {viewMode === "calendar" && <CheckSquare className="mr-2 h-4 w-4" />}
-              {viewMode === "list" ? "Kanban View" : viewMode === "kanban" ? "Calendar View" : "List View"}
-            </Button>
-            <Button onClick={() => setShowNewTodo(true)} data-testid="new-todo-button">
-              <Plus className="mr-2 h-4 w-4" />
-              New To-do
-            </Button>
+        <div className="bg-card rounded-lg p-6 mb-6 border" data-testid="todos-header">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">To-do's</h1>
+              <p className="text-muted-foreground">Manage personal and team tasks</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button 
+                variant="outline"
+                onClick={() => setViewMode(viewMode === "list" ? "kanban" : viewMode === "kanban" ? "calendar" : "list")}
+                data-testid="toggle-view-mode"
+              >
+                {viewMode === "list" && <CheckSquare className="mr-2 h-4 w-4" />}
+                {viewMode === "kanban" && <Calendar className="mr-2 h-4 w-4" />}
+                {viewMode === "calendar" && <CheckSquare className="mr-2 h-4 w-4" />}
+                {viewMode === "list" ? "Kanban View" : viewMode === "kanban" ? "Calendar View" : "List View"}
+              </Button>
+              <Button onClick={() => setShowNewTodo(true)} data-testid="new-todo-button">
+                <Plus className="mr-2 h-4 w-4" />
+                New To-do
+              </Button>
+            </div>
           </div>
         </div>
 

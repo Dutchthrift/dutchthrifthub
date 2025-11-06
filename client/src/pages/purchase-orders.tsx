@@ -146,24 +146,26 @@ export default function PurchaseOrders() {
       
       <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="text-page-title">
-              <Package2 className="h-8 w-8" />
-              Inkoop Orders
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Beheer inkoop orders en leveranciers
-            </p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {canCreate && <SupplierImportDialog />}
-            {canCreate && (
-              <Button onClick={() => setShowNewPO(true)} data-testid="button-new-po">
-                <Plus className="h-4 w-4 mr-2" />
-                Nieuwe Order
-              </Button>
-            )}
+        <div className="bg-card rounded-lg p-6 border">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="text-page-title">
+                <Package2 className="h-8 w-8" />
+                Inkoop Orders
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Beheer inkoop orders en leveranciers
+              </p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {canCreate && <SupplierImportDialog />}
+              {canCreate && (
+                <Button onClick={() => setShowNewPO(true)} data-testid="button-new-po">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nieuwe Order
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
