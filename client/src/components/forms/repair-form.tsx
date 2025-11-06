@@ -78,6 +78,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
   const [showOrderResults, setShowOrderResults] = useState(false);
   const [selectedOrderDisplay, setSelectedOrderDisplay] = useState<string>("");
+  const [selectedOrderData, setSelectedOrderData] = useState<any>(null);
   const [otherCategoryDetails, setOtherCategoryDetails] = useState("");
   const { toast } = useToast();
 
@@ -189,8 +190,9 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
       return;
     }
 
-    const selectedOrder = orders.find(o => o.id === data.orderId);
-    const selectedCustomer = selectedOrder ? customers.find(c => c.id === selectedOrder.customerId) : null;
+    // Use stored order data if available (from search), otherwise try to find in orders array
+    const selectedOrder = selectedOrderData?.order || orders.find(o => o.id === data.orderId);
+    const selectedCustomer = selectedOrderData?.customer || (selectedOrder ? customers.find(c => c.id === selectedOrder.customerId) : null);
     
     const repairData = {
       title: data.title,
@@ -222,6 +224,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
     setOrderSearchQuery("");
     setShowOrderResults(false);
     setSelectedOrderDisplay("");
+    setSelectedOrderData(null);
     setOtherCategoryDetails("");
     onOpenChange(false);
   };
@@ -360,6 +363,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                   if (selectedOrderDisplay) {
                     // Clear selection when user starts typing again
                     setSelectedOrderDisplay("");
+                    setSelectedOrderData(null);
                     setValue("orderId", "none");
                     setValue("customerId", "none");
                   }
@@ -377,6 +381,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                   onClick={() => {
                     setSelectedOrderDisplay("");
                     setOrderSearchQuery("");
+                    setSelectedOrderData(null);
                     setValue("orderId", "none");
                     setValue("customerId", "none");
                   }}
@@ -402,6 +407,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                               setValue("orderId", order.id);
                               setValue("customerId", order.customerId || "none");
                               setSelectedOrderDisplay(`Order #${order.orderNumber} - ${customerName}`);
+                              setSelectedOrderData({ order, customer });
                               setOrderSearchQuery("");
                               setShowOrderResults(false);
                             }}
