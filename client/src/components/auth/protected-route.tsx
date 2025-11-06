@@ -13,6 +13,15 @@ export default function ProtectedRoute({ component: Component, roles = [], ...pr
   const { user, loading: isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
+  // Auto-redirect TECHNICUS users if they try to access unauthorized pages
+  useEffect(() => {
+    if (!isLoading && user && roles.length > 0 && !roles.includes(user.role)) {
+      if (user.role === "TECHNICUS") {
+        setLocation("/repairs");
+      }
+    }
+  }, [user, roles, setLocation, isLoading]);
+
   // Show loading spinner while checking authentication
   if (isLoading) {
     return (
@@ -36,16 +45,6 @@ export default function ProtectedRoute({ component: Component, roles = [], ...pr
       </div>
     );
   }
-
-  // Check role authorization if roles are specified
-  useEffect(() => {
-    if (roles.length > 0 && user && !roles.includes(user.role)) {
-      // Redirect TECHNICUS users to /repairs instead of showing access denied
-      if (user.role === "TECHNICUS") {
-        setLocation("/repairs");
-      }
-    }
-  }, [user, roles, setLocation]);
 
   // Show access denied for non-TECHNICUS users without proper roles
   if (roles.length > 0 && !roles.includes(user.role)) {
