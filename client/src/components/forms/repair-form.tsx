@@ -350,6 +350,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                 value={selectedOrderDisplay || orderSearchQuery}
                 onChange={(e) => {
                   setOrderSearchQuery(e.target.value);
+                  setShowOrderResults(true);
                   if (selectedOrderDisplay) {
                     // Clear selection when user starts typing again
                     setSelectedOrderDisplay("");
@@ -358,9 +359,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                   }
                 }}
                 onFocus={() => {
-                  if (!selectedOrderDisplay) {
-                    setShowOrderResults(true);
-                  }
+                  setShowOrderResults(true);
                 }}
                 onBlur={() => setTimeout(() => setShowOrderResults(false), 200)}
                 data-testid="input-order-search"
@@ -410,7 +409,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                     </div>
                   ) : (
                     <div className="p-4 text-sm text-muted-foreground">
-                      {orderSearchQuery.length > 2 ? 'Geen order gevonden' : 'Type om te zoeken...'}
+                      {orderSearchQuery.length > 0 ? 'Geen order gevonden' : 'Geen recente orders'}
                     </div>
                   )}
                 </div>
