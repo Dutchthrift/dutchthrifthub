@@ -714,20 +714,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
 
-      // Get existing repair to check permissions
+      // Get existing repair to check it exists
       const existingRepair = await storage.getRepair(id);
       if (!existingRepair) {
         return res.status(404).json({ message: "Repair not found" });
-      }
-
-      // TECHNICUS can only edit own repairs
-      if (
-        req.user.role === "TECHNICUS" &&
-        existingRepair.assignedUserId !== req.user.id
-      ) {
-        return res
-          .status(403)
-          .json({ message: "Not authorized to edit this repair" });
       }
 
       const repair = await storage.updateRepair(id, req.body);
