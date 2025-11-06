@@ -54,8 +54,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         description: `Signed in as ${user.firstName || user.email}`,
       });
       
-      // Redirect to dashboard after successful login
-      setLocation("/");
+      // Redirect based on role
+      if (user.role === "TECHNICUS") {
+        setLocation("/repairs");
+      } else {
+        setLocation("/");
+      }
     }
 
     return {};

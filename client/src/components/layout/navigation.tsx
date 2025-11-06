@@ -26,13 +26,13 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 
 const navigationItems = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/inbox", label: "Inbox", icon: Inbox, badge: 3 },
-  { href: "/cases", label: "Cases", icon: Briefcase },
-  { href: "/orders", label: "Orders", icon: ShoppingCart },
-  { href: "/purchase-orders", label: "Inkoop Orders", icon: Package2 },
-  { href: "/repairs", label: "Repairs", icon: Wrench },
-  { href: "/todos", label: "To-do's", icon: CheckSquare },
+  { href: "/", label: "Home", icon: Home, roles: ["ADMIN", "SUPPORT"] },
+  { href: "/inbox", label: "Inbox", icon: Inbox, badge: 3, roles: ["ADMIN", "SUPPORT"] },
+  { href: "/cases", label: "Cases", icon: Briefcase, roles: ["ADMIN", "SUPPORT"] },
+  { href: "/orders", label: "Orders", icon: ShoppingCart, roles: ["ADMIN", "SUPPORT"] },
+  { href: "/purchase-orders", label: "Inkoop Orders", icon: Package2, roles: ["ADMIN", "SUPPORT"] },
+  { href: "/repairs", label: "Repairs", icon: Wrench, roles: ["ADMIN", "SUPPORT", "TECHNICUS"] },
+  { href: "/todos", label: "To-do's", icon: CheckSquare, roles: ["ADMIN", "SUPPORT"] },
 ];
 
 export function Navigation() {
@@ -81,28 +81,30 @@ export function Navigation() {
                 <SheetTitle>Menu</SheetTitle>
               </SheetHeader>
               <div className="mt-6 flex flex-col space-y-1">
-                {navigationItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center space-x-3 text-sm font-medium px-4 py-3 rounded-md transition-colors",
-                      location === item.href
-                        ? "text-primary bg-primary/10"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                    data-testid={`mobile-nav-link-${item.label.toLowerCase().replace(/[''\s]/g, '-')}`}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                    {item.badge && (
-                      <Badge variant="default" className="ml-auto h-5 w-5 justify-center p-0 text-xs">
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </Link>
-                ))}
+                {navigationItems
+                  .filter((item) => !user?.role || item.roles.includes(user.role))
+                  .map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={cn(
+                        "flex items-center space-x-3 text-sm font-medium px-4 py-3 rounded-md transition-colors",
+                        location === item.href
+                          ? "text-primary bg-primary/10"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                      )}
+                      data-testid={`mobile-nav-link-${item.label.toLowerCase().replace(/[''\s]/g, '-')}`}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.label}</span>
+                      {item.badge && (
+                        <Badge variant="default" className="ml-auto h-5 w-5 justify-center p-0 text-xs">
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </Link>
+                  ))}
                 
                 {/* Admin Links in Mobile Menu */}
                 {user?.role === "ADMIN" && (
@@ -193,27 +195,29 @@ export function Navigation() {
 
           {/* Desktop Navigation Items - Hidden on mobile */}
           <div className="ml-8 hidden lg:flex items-center space-x-6">
-            {navigationItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center space-x-2 text-sm font-medium px-3 py-2 rounded-md transition-colors",
-                  location === item.href
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                )}
-                data-testid={`nav-link-${item.label.toLowerCase().replace(/[''\s]/g, '-')}`}
-              >
-                <item.icon className="h-4 w-4" />
-                <span>{item.label}</span>
-                {item.badge && (
-                  <Badge variant="default" className="ml-1 h-5 w-5 justify-center p-0 text-xs">
-                    {item.badge}
-                  </Badge>
-                )}
-              </Link>
-            ))}
+            {navigationItems
+              .filter((item) => !user?.role || item.roles.includes(user.role))
+              .map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center space-x-2 text-sm font-medium px-3 py-2 rounded-md transition-colors",
+                    location === item.href
+                      ? "text-primary bg-primary/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                  data-testid={`nav-link-${item.label.toLowerCase().replace(/[''\s]/g, '-')}`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                  {item.badge && (
+                    <Badge variant="default" className="ml-1 h-5 w-5 justify-center p-0 text-xs">
+                      {item.badge}
+                    </Badge>
+                  )}
+                </Link>
+              ))}
           </div>
 
           {/* Right Side */}

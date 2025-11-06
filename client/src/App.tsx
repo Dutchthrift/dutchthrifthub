@@ -22,13 +22,13 @@ import Settings from "@/pages/settings";
 function Router() {
   return (
     <Switch>
-      {/* Dashboard - accessible by all authenticated users */}
+      {/* Dashboard - accessible by ADMIN and SUPPORT only */}
       <Route 
         path="/" 
         component={(props: any) => (
           <ProtectedRoute 
             component={Dashboard}
-            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
+            roles={["ADMIN", "SUPPORT"]}
             {...props} 
           />
         )} 
@@ -111,7 +111,7 @@ function Router() {
         component={(props: any) => (
           <ProtectedRoute 
             component={Orders}
-            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
+            roles={["ADMIN", "SUPPORT"]}
             {...props} 
           />
         )} 
@@ -122,7 +122,7 @@ function Router() {
         component={(props: any) => (
           <ProtectedRoute 
             component={PurchaseOrders}
-            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
+            roles={["ADMIN", "SUPPORT"]}
             {...props} 
           />
         )} 
@@ -133,7 +133,7 @@ function Router() {
         component={(props: any) => (
           <ProtectedRoute 
             component={Todos}
-            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
+            roles={["ADMIN", "SUPPORT"]}
             {...props} 
           />
         )} 
@@ -144,7 +144,7 @@ function Router() {
         component={(props: any) => (
           <ProtectedRoute 
             component={CustomerDetail}
-            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
+            roles={["ADMIN", "SUPPORT"]}
             {...props} 
           />
         )} 
