@@ -938,12 +938,12 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                       const filename = decodeURIComponent(attachment.split('/').pop() || 'download');
                       
                       return (
-                        <div key={index} className="flex items-center justify-between border p-2 rounded">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div key={index} className="flex items-center justify-between gap-2 border p-2 rounded">
+                          <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                             <FileText className="h-4 w-4 flex-shrink-0" />
                             <span className="text-sm truncate" title={filename}>{filename}</span>
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-shrink-0">
                             <a 
                               href={downloadUrl} 
                               download={filename}
