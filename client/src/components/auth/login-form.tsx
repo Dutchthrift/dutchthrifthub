@@ -130,13 +130,6 @@ export function LoginForm() {
               </Button>
             </form>
           </Form>
-          
-          <div className="mt-6 pt-4 border-t text-center text-sm text-muted-foreground">
-            <p>Test accounts:</p>
-            <p><strong>Admin:</strong> admin@dutchthrift.com / admin123</p>
-            <p><strong>Support:</strong> support@dutchthrift.com / support123</p>
-            <p><strong>Technicus:</strong> tech@dutchthrift.com / tech123</p>
-          </div>
         </CardContent>
       </Card>
     </div>
