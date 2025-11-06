@@ -37,7 +37,7 @@ export function RepairsTable({ repairs, users, onRepairClick, onAddNote }: Repai
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest(`/api/repairs/${id}`, 'DELETE');
+      await apiRequest('DELETE', `/api/repairs/${id}`);
     },
     onMutate: async (deletedId) => {
       // Cancel outgoing refetches
