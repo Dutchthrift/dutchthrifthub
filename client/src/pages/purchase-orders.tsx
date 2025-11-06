@@ -60,7 +60,12 @@ export default function PurchaseOrders() {
   });
 
   const filteredPOs = purchaseOrders?.filter(po => {
-    if (statusFilter !== "all" && po.status !== statusFilter) return false;
+    // Map status filter to actual database statuses
+    if (statusFilter !== "all") {
+      if (statusFilter === "aangekocht" && po.status !== "sent" && po.status !== "awaiting_delivery") return false;
+      if (statusFilter === "ontvangen" && po.status !== "partially_received" && po.status !== "fully_received") return false;
+      if (statusFilter === "verwerkt" && po.status !== "cancelled") return false;
+    }
     if (supplierFilter) {
       const supplier = suppliers?.find(s => s.id === po.supplierId);
       const supplierName = supplier?.name?.toLowerCase() || "";
@@ -82,10 +87,9 @@ export default function PurchaseOrders() {
   // Analytics calculations
   const statusCounts = {
     all: purchaseOrders?.length || 0,
-    draft: purchaseOrders?.filter(po => po.status === 'draft').length || 0,
-    sent: purchaseOrders?.filter(po => po.status === 'sent').length || 0,
-    awaiting_delivery: purchaseOrders?.filter(po => po.status === 'awaiting_delivery').length || 0,
-    received: purchaseOrders?.filter(po => po.status === 'fully_received').length || 0,
+    aangekocht: purchaseOrders?.filter(po => po.status === 'sent' || po.status === 'awaiting_delivery').length || 0,
+    ontvangen: purchaseOrders?.filter(po => po.status === 'partially_received' || po.status === 'fully_received').length || 0,
+    verwerkt: purchaseOrders?.filter(po => po.status === 'cancelled').length || 0,
   };
 
   const totalAmount = purchaseOrders?.reduce((sum, po) => sum + ((po.totalAmount || 0) / 100), 0) || 0;
@@ -257,10 +261,9 @@ export default function PurchaseOrders() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle statussen</SelectItem>
-              <SelectItem value="draft">Concept</SelectItem>
-              <SelectItem value="sent">Verzonden</SelectItem>
-              <SelectItem value="awaiting_delivery">Onderweg</SelectItem>
-              <SelectItem value="received">Ontvangen</SelectItem>
+              <SelectItem value="aangekocht">Aangekocht</SelectItem>
+              <SelectItem value="ontvangen">Ontvangen</SelectItem>
+              <SelectItem value="verwerkt">Verwerkt</SelectItem>
             </SelectContent>
           </Select>
 
@@ -310,17 +313,14 @@ export default function PurchaseOrders() {
             <TabsTrigger value="all" data-testid="tab-all-pos">
               Alle ({statusCounts.all})
             </TabsTrigger>
-            <TabsTrigger value="draft" data-testid="tab-draft">
-              Concept ({statusCounts.draft})
+            <TabsTrigger value="aangekocht" data-testid="tab-aangekocht">
+              Aangekocht ({statusCounts.aangekocht})
             </TabsTrigger>
-            <TabsTrigger value="sent" data-testid="tab-sent">
-              Verzonden ({statusCounts.sent})
+            <TabsTrigger value="ontvangen" data-testid="tab-ontvangen">
+              Ontvangen ({statusCounts.ontvangen})
             </TabsTrigger>
-            <TabsTrigger value="awaiting_delivery" data-testid="tab-awaiting-delivery">
-              Onderweg ({statusCounts.awaiting_delivery})
-            </TabsTrigger>
-            <TabsTrigger value="received" data-testid="tab-received">
-              Ontvangen ({statusCounts.received})
+            <TabsTrigger value="verwerkt" data-testid="tab-verwerkt">
+              Verwerkt ({statusCounts.verwerkt})
             </TabsTrigger>
           </TabsList>
 
