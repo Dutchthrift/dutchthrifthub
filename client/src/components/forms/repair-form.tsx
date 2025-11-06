@@ -362,7 +362,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                     setShowOrderResults(true);
                   }
                 }}
-                onBlur={() => setTimeout(() => setShowOrderResults(false), 200)}
+                onBlur={() => setTimeout(() => setShowOrderResults(false), 300)}
                 data-testid="input-order-search"
               />
               {selectedOrderDisplay && (
@@ -393,6 +393,10 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                           <div
                             key={order.id}
                             className="p-2 hover:bg-accent rounded cursor-pointer"
+                            onMouseDown={(e) => {
+                              // Prevent blur from firing before click
+                              e.preventDefault();
+                            }}
                             onClick={() => {
                               setValue("orderId", order.id);
                               setValue("customerId", order.customerId || "none");
