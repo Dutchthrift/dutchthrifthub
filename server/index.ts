@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { startScheduledSync } from "./scheduledSync";
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -81,5 +82,8 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Start the scheduled Shopify sync
+    startScheduledSync();
   });
 })();
