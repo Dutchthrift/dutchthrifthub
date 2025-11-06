@@ -82,22 +82,15 @@ export function Navigation() {
               <div className="flex flex-col h-full">
                 {/* Header */}
                 <div className="p-4 border-b border-border/50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="h-8 w-8 rounded-lg overflow-hidden">
-                        <img 
-                          src={smallLogoUrl} 
-                          alt="DutchThrift" 
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <span className="text-lg font-semibold">DutchThrift</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="h-8 w-8 rounded-lg overflow-hidden">
+                      <img 
+                        src={smallLogoUrl} 
+                        alt="DutchThrift" 
+                        className="h-full w-full object-cover"
+                      />
                     </div>
-                    <SheetClose asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </SheetClose>
+                    <span className="text-lg font-semibold">DutchThrift</span>
                   </div>
                 </div>
 
