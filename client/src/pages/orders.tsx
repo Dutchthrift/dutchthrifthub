@@ -539,8 +539,8 @@ export default function Orders() {
           </CardContent>
         </Card>
 
-        {/* Orders Table */}
-        <Card data-testid="orders-table">
+        {/* Orders Table - Desktop */}
+        <Card data-testid="orders-table" className="hidden md:block">
           <CardContent className="p-0">
             {isLoading ? (
               <div className="p-8 space-y-4">
@@ -559,8 +559,7 @@ export default function Orders() {
                 No orders found
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
+              <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead 
@@ -721,10 +720,77 @@ export default function Orders() {
                   ))}
                 </TableBody>
               </Table>
-              </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Orders Cards - Mobile */}
+        <div className="md:hidden space-y-3">
+          {isLoading ? (
+            [...Array(5)].map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4 space-y-3 animate-pulse">
+                  <div className="h-4 bg-muted rounded w-24"></div>
+                  <div className="h-3 bg-muted rounded w-32"></div>
+                  <div className="h-3 bg-muted rounded w-20"></div>
+                </CardContent>
+              </Card>
+            ))
+          ) : filteredAndSortedOrders.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                No orders found
+              </CardContent>
+            </Card>
+          ) : (
+            filteredAndSortedOrders.map((order) => (
+              <Card 
+                key={order.id} 
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => handleViewDetails(order)}
+                data-testid={`order-card-${order.id}`}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="font-semibold text-primary mb-1" data-testid={`order-number-${order.id}`}>
+                        {order.orderNumber}
+                      </div>
+                      <div className="text-sm font-medium">
+                        {(order.orderData as any)?.customer ? 
+                          `${(order.orderData as any).customer.first_name} ${(order.orderData as any).customer.last_name}` :
+                          'Guest'
+                        }
+                      </div>
+                      <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold">€{((order.totalAmount || 0) / 100).toFixed(2)}</div>
+                      {(order.orderData as any)?.line_items?.length > 0 && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {(order.orderData as any).line_items.length} {(order.orderData as any).line_items.length === 1 ? 'item' : 'items'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant={getStatusVariant(order.status)}>
+                        {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {order.paymentStatus ? order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1) : 'Pending'}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(order.orderDate || order.createdAt || '').toLocaleDateString('nl-NL')}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
