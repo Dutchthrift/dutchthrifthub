@@ -773,6 +773,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/repairs/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
+      // Get existing repair to check permissions
+      const existingRepair = await storage.getRepair(id);
+      if (!existingRepair) {
+        return res.status(404).json({ message: "Repair not found" });
+      }
+
+      // Only ADMIN and AGENT can delete repairs
+      if (!["ADMIN", "AGENT"].includes(req.user.role)) {
+        return res
+          .status(403)
+          .json({ message: "Not authorized to delete repairs" });
+      }
+
+      await storage.deleteRepair(id);
+
+      await storage.createActivity({
+        type: "repair_deleted",
+        description: `Deleted repair: ${existingRepair.title}`,
+        userId: req.user.id,
+        metadata: { repairId: id, title: existingRepair.title },
+      });
+
+      await auditLog(req, "DELETE", "repairs", id, { title: existingRepair.title });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting repair:", error);
+      res.status(400).json({ message: "Failed to delete repair" });
+    }
+  });
+
   // Upload files (photos/attachments) to a repair
   app.post(
     "/api/repairs/:id/upload",

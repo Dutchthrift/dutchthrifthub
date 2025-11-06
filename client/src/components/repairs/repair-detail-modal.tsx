@@ -6,6 +6,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +63,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [note, setNote] = useState("");
   const [currentRepair, setCurrentRepair] = useState<Repair | null>(repair);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { toast } = useToast();
 
   // Update local state when repair prop changes
@@ -129,6 +140,28 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     },
   });
 
+  const deleteRepairMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentRepair) return;
+      await apiRequest('DELETE', `/api/repairs/${currentRepair.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/repairs'] });
+      toast({
+        title: "Reparatie verwijderd",
+        description: "De reparatie is succesvol verwijderd.",
+      });
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({
+        title: "Fout",
+        description: "Kon de reparatie niet verwijderen.",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (!currentRepair) return null;
 
   const getStatusColor = (status: string) => {
@@ -194,7 +227,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between">
-            <div>
+            <div className="flex-1">
               <DialogTitle>Reparatie #{currentRepair.id.slice(0, 8)}</DialogTitle>
               <p className="text-sm text-muted-foreground mt-1">{currentRepair.title}</p>
             </div>
@@ -210,6 +243,15 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                   <span className="text-xs font-medium">Te laat</span>
                 </div>
               )}
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteDialog(true)}
+                data-testid="delete-repair-button"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Verwijderen
+              </Button>
             </div>
           </div>
         </DialogHeader>
@@ -554,6 +596,29 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
           </TabsContent>
         </Tabs>
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reparatie verwijderen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je deze reparatie wilt verwijderen? Deze actie kan niet ongedaan gemaakt worden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="cancel-delete-repair">Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteRepairMutation.mutate()}
+              disabled={deleteRepairMutation.isPending}
+              data-testid="confirm-delete-repair"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteRepairMutation.isPending ? "Verwijderen..." : "Verwijderen"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

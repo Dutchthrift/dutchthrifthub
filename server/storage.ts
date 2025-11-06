@@ -81,6 +81,7 @@ export interface IStorage {
   getRepair(id: string): Promise<Repair | undefined>;
   createRepair(repair: InsertRepair): Promise<Repair>;
   updateRepair(id: string, repair: Partial<InsertRepair>): Promise<Repair>;
+  deleteRepair(id: string): Promise<void>;
   getRepairsByStatus(status: string): Promise<Repair[]>;
   getRepairsByTechnician(technicianId: string): Promise<Repair[]>;
   getRepairsByDateRange(startDate: Date, endDate: Date): Promise<Repair[]>;
@@ -471,6 +472,10 @@ export class DatabaseStorage implements IStorage {
   async updateRepair(id: string, repair: Partial<InsertRepair>): Promise<Repair> {
     const result = await db.update(repairs).set(repair).where(eq(repairs.id, id)).returning();
     return result[0];
+  }
+
+  async deleteRepair(id: string): Promise<void> {
+    await db.delete(repairs).where(eq(repairs.id, id));
   }
 
   async getRepairsByStatus(status: string): Promise<Repair[]> {
