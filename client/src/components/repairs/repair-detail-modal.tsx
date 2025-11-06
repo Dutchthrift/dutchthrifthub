@@ -824,15 +824,23 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               <CardContent>
                 {photos.length > 0 ? (
                   <div className="grid grid-cols-3 gap-4">
-                    {photos.map((photo, index) => (
-                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
-                        <img
-                          src={photo}
-                          alt={`Foto ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
+                    {photos.map((photo, index) => {
+                      // Extract the path after /attachments/ to construct the API URL
+                      const photoPath = photo.startsWith('/attachments/') 
+                        ? photo.substring('/attachments/'.length)
+                        : photo;
+                      const photoUrl = `/api/attachments/${photoPath}`;
+                      
+                      return (
+                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
+                          <img
+                            src={photoUrl}
+                            alt={`Foto ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-8">
@@ -853,22 +861,31 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               <CardContent>
                 {attachments.length > 0 ? (
                   <div className="space-y-2">
-                    {attachments.map((attachment, index) => (
-                      <div key={index} className="flex items-center justify-between border p-2 rounded">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          <span className="text-sm">{attachment.split('/').pop()}</span>
+                    {attachments.map((attachment, index) => {
+                      // Extract the path after /attachments/ to construct the API URL
+                      const attachmentPath = attachment.startsWith('/attachments/') 
+                        ? attachment.substring('/attachments/'.length)
+                        : attachment;
+                      const downloadUrl = `/api/attachments/${attachmentPath}`;
+                      const filename = decodeURIComponent(attachment.split('/').pop() || 'download');
+                      
+                      return (
+                        <div key={index} className="flex items-center justify-between border p-2 rounded">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            <span className="text-sm" title={filename}>{filename}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(downloadUrl, '_blank')}
+                            data-testid={`button-download-${index}`}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.open(attachment, '_blank')}
-                          data-testid={`button-download-${index}`}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-8">

@@ -810,11 +810,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         for (const file of files) {
           const filename = `repair-${id}-${type}-${Date.now()}-${file.originalname}`;
+          console.log(`Uploading repair file: ${filename} (${file.size} bytes, ${file.mimetype})`);
           const url = await objectStorage.saveAttachment(
             filename,
             file.buffer,
             file.mimetype,
           );
+          console.log(`Uploaded to: ${url}`);
           uploadedUrls.push(url);
         }
 
@@ -827,6 +829,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           [type === "photo" ? "photos" : "attachments"]: updatedFiles,
         });
 
+        console.log(`Successfully uploaded ${uploadedUrls.length} files to repair ${id}`);
         res.json({ urls: uploadedUrls });
       } catch (error) {
         console.error("Error uploading files to repair:", error);
@@ -2602,7 +2605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Attachment endpoints
+  // Attachment endpoints - handles both email and repair attachments
   app.get("/api/attachments/*", async (req, res) => {
     try {
       // Extract the path after /api/attachments/
@@ -2618,22 +2621,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const attachmentPath = `/attachments/${pathAfterAttachments}`;
       console.log("Looking for attachment with storageUrl:", attachmentPath);
 
-      const attachment = await storage.getEmailAttachment(attachmentPath);
-      if (!attachment) {
+      // Try to find it as an email attachment first
+      const emailAttachment = await storage.getEmailAttachment(attachmentPath);
+      if (emailAttachment) {
         console.log(
-          "Attachment not found in database with path:",
-          attachmentPath,
+          "Found email attachment:",
+          emailAttachment.filename,
+          "contentType:",
+          emailAttachment.contentType,
         );
-        return res.status(404).json({ error: "Attachment not found" });
+        await storage.downloadAttachment(attachmentPath, res);
+        return;
       }
 
-      console.log(
-        "Found attachment:",
-        attachment.filename,
-        "contentType:",
-        attachment.contentType,
-      );
-      await storage.downloadAttachment(attachmentPath, res);
+      // If not found as email attachment, serve directly from object storage
+      // This handles repair attachments and other files
+      console.log("Attempting to serve file directly from object storage");
+      const objectStorageService = new ObjectStorageService();
+      try {
+        const file = await objectStorageService.getAttachmentFile(attachmentPath);
+        await objectStorageService.downloadObject(file, res);
+      } catch (storageError) {
+        console.log("File not found in object storage:", attachmentPath);
+        return res.status(404).json({ error: "Attachment not found" });
+      }
     } catch (error) {
       console.error("Error downloading attachment:", error);
       res.status(500).json({ error: "Failed to download attachment" });
