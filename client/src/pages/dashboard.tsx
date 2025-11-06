@@ -67,12 +67,12 @@ export default function Dashboard() {
       <Navigation />
       
       <main className="container mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6" data-testid="dashboard-header">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6" data-testid="dashboard-header">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
             <p className="text-muted-foreground">Analytics and team performance insights</p>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" data-testid="filter-dashboard">
               <Filter className="mr-2 h-4 w-4" />
               Filters

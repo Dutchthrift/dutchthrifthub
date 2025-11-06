@@ -414,14 +414,14 @@ export default function Cases() {
       
       <main className="container mx-auto px-4 py-6">
         <div className="bg-cases rounded-lg p-6 mb-6" data-testid="cases-header">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-cases">Cases</h1>
               <p className="text-foreground/80">Manage customer cases and track progress</p>
             </div>
             <Dialog open={showNewCase} onOpenChange={setShowNewCase}>
               <DialogTrigger asChild>
-                <Button data-testid="new-case-button">
+                <Button data-testid="new-case-button" className="sm:flex-shrink-0">
                   <Plus className="mr-2 h-4 w-4" />
                   New Case
                 </Button>

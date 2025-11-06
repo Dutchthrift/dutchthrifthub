@@ -257,12 +257,12 @@ export default function Todos() {
       <Navigation />
       
       <main className="container mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6" data-testid="todos-header">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6" data-testid="todos-header">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">To-do's</h1>
             <p className="text-muted-foreground">Manage personal and team tasks</p>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button 
               variant="outline"
               onClick={() => setViewMode(viewMode === "list" ? "kanban" : viewMode === "kanban" ? "calendar" : "list")}
