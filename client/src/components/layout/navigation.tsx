@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Camera, Home, Inbox, ShoppingCart, Package2, Wrench, CheckSquare, BarChart3, Briefcase, Search, Bell, ChevronDown, Settings, Users, Menu, X } from "lucide-react";
+import { Camera, Home, Inbox, ShoppingCart, Package2, Wrench, CheckSquare, BarChart3, Briefcase, Search, Bell, ChevronDown, Settings, Users, Menu, X, Sun, Moon, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  SheetClose,
 } from "@/components/ui/sheet";
 import { useTheme } from "@/hooks/use-theme";
 import { GlobalSearch } from "@/components/search/global-search";
@@ -37,7 +38,7 @@ const navigationItems = [
 
 export function Navigation() {
   const [location] = useLocation();
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { signOut, user } = useAuth();
@@ -63,129 +64,161 @@ export function Navigation() {
 
   return (
     <>
-      <nav className="border-b-2 border-border bg-card shadow-sm" data-testid="main-navigation">
-        <div className="flex h-16 items-center px-4">
+      <nav className="border-b border-border bg-card shadow-soft" data-testid="main-navigation">
+        <div className="flex h-16 items-center px-4 gap-4">
           {/* Mobile Menu Button */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden mr-2"
+                className="lg:hidden"
                 data-testid="mobile-menu-button"
               >
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[300px] sm:w-[400px]">
-              <SheetHeader>
-                <SheetTitle>Menu</SheetTitle>
-              </SheetHeader>
-              <div className="mt-6 flex flex-col space-y-1">
-                {navigationItems
-                  .filter((item) => !user?.role || item.roles.includes(user.role))
-                  .map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={cn(
-                        "flex items-center space-x-3 text-sm font-semibold px-4 py-3 rounded-lg transition-all duration-200",
-                        location === item.href
-                          ? "text-white bg-primary shadow-md"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                      )}
-                      data-testid={`mobile-nav-link-${item.label.toLowerCase().replace(/[''\s]/g, '-')}`}
-                    >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.label}</span>
-                      {item.badge && (
-                        <Badge variant={location === item.href ? "secondary" : "default"} className="ml-auto h-5 w-5 justify-center p-0 text-xs">
-                          {item.badge}
-                        </Badge>
-                      )}
-                    </Link>
-                  ))}
-                
-                {/* Admin Links in Mobile Menu */}
-                {user?.role === "ADMIN" && (
-                  <>
-                    <div className="my-4 border-t border-border" />
-                    <Link
-                      href="/users"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center space-x-3 text-sm font-medium px-4 py-3 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                      data-testid="mobile-nav-users"
-                    >
-                      <Users className="h-5 w-5" />
-                      <span>User Management</span>
-                    </Link>
-                    <Link
-                      href="/settings"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center space-x-3 text-sm font-medium px-4 py-3 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                      data-testid="mobile-nav-settings"
-                    >
-                      <Settings className="h-5 w-5" />
-                      <span>Settings</span>
-                    </Link>
-                  </>
-                )}
-
-                {/* Theme Options in Mobile Menu */}
-                <div className="my-4 border-t border-border" />
-                <div className="px-4 py-2 text-xs font-semibold text-muted-foreground">
-                  Theme
+            <SheetContent side="left" className="w-72 p-0 sidebar-glass border-r border-border">
+              <div className="flex flex-col h-full">
+                {/* Header */}
+                <div className="p-4 border-b border-border/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="h-8 w-8 rounded-lg overflow-hidden">
+                        <img 
+                          src={smallLogoUrl} 
+                          alt="DutchThrift" 
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <span className="text-lg font-semibold">DutchThrift</span>
+                    </div>
+                    <SheetClose asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </SheetClose>
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setTheme("light");
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center space-x-3 text-sm font-medium px-4 py-3 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors w-full text-left"
-                  data-testid="mobile-theme-light"
-                >
-                  Light Theme
-                </button>
-                <button
-                  onClick={() => {
-                    setTheme("dark");
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center space-x-3 text-sm font-medium px-4 py-3 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors w-full text-left"
-                  data-testid="mobile-theme-dark"
-                >
-                  Dark Theme
-                </button>
-                <button
-                  onClick={() => {
-                    setTheme("system");
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center space-x-3 text-sm font-medium px-4 py-3 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors w-full text-left"
-                  data-testid="mobile-theme-system"
-                >
-                  System Theme
-                </button>
 
-                {/* Logout in Mobile Menu */}
-                <div className="my-4 border-t border-border" />
-                <button
-                  onClick={() => {
-                    handleLogout();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center space-x-3 text-sm font-medium px-4 py-3 rounded-md text-destructive hover:bg-destructive/10 transition-colors w-full text-left"
-                  data-testid="mobile-logout"
-                >
-                  Logout
-                </button>
+                {/* Navigation Items */}
+                <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-thin">
+                  {navigationItems
+                    .filter((item) => !user?.role || item.roles.includes(user.role))
+                    .map((item) => {
+                      const isActive = location === item.href;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={cn(
+                            "flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 font-medium text-sm",
+                            isActive
+                              ? "bg-[#FF6600] text-white shadow-orange"
+                              : "text-gray-700 dark:text-gray-300 hover:bg-accent hover:text-foreground"
+                          )}
+                          data-testid={`mobile-nav-link-${item.label.toLowerCase().replace(/[''\s]/g, '-')}`}
+                        >
+                          <item.icon className="h-5 w-5 flex-shrink-0" />
+                          <span className="flex-1">{item.label}</span>
+                          {item.badge && (
+                            <Badge variant={isActive ? "secondary" : "default"} className="h-5 px-2 text-xs">
+                              {item.badge}
+                            </Badge>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  
+                  {/* Admin Links */}
+                  {user?.role === "ADMIN" && (
+                    <>
+                      <div className="my-3 border-t border-border/50" />
+                      <p className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Admin
+                      </p>
+                      <Link
+                        href="/users"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-accent hover:text-foreground transition-all"
+                        data-testid="mobile-nav-users"
+                      >
+                        <Users className="h-5 w-5" />
+                        <span>User Management</span>
+                      </Link>
+                      <Link
+                        href="/settings"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-accent hover:text-foreground transition-all"
+                        data-testid="mobile-nav-settings"
+                      >
+                        <Settings className="h-5 w-5" />
+                        <span>Settings</span>
+                      </Link>
+                    </>
+                  )}
+                </nav>
+
+                {/* Footer with Theme Selector */}
+                <div className="border-t border-border/50 p-3 space-y-2">
+                  <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Theme
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={theme === "light" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTheme("light")}
+                      className="flex-1"
+                      data-testid="mobile-theme-light"
+                    >
+                      <Sun className="h-4 w-4 mr-2" />
+                      Light
+                    </Button>
+                    <Button
+                      variant={theme === "dark" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTheme("dark")}
+                      className="flex-1"
+                      data-testid="mobile-theme-dark"
+                    >
+                      <Moon className="h-4 w-4 mr-2" />
+                      Dark
+                    </Button>
+                  </div>
+                  <Button
+                    variant={theme === "system" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setTheme("system")}
+                    className="w-full"
+                    data-testid="mobile-theme-system"
+                  >
+                    <Monitor className="h-4 w-4 mr-2" />
+                    System
+                  </Button>
+                  
+                  <div className="pt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        handleLogout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full text-destructive hover:bg-destructive/10"
+                      data-testid="mobile-logout"
+                    >
+                      Logout
+                    </Button>
+                  </div>
+                </div>
               </div>
             </SheetContent>
           </Sheet>
 
           {/* Logo */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2" data-testid="logo-link">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
                 <img 
@@ -198,106 +231,100 @@ export function Navigation() {
             </Link>
           </div>
 
-          {/* Desktop Navigation Items - Hidden on mobile */}
-          <div className="ml-8 hidden lg:flex items-center space-x-2">
+          {/* Desktop Navigation Items */}
+          <div className="ml-4 hidden lg:flex items-center gap-1 flex-1">
             {navigationItems
               .filter((item) => !user?.role || item.roles.includes(user.role))
-              .map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center space-x-2 text-sm font-semibold px-4 py-2 rounded-lg transition-all duration-200",
-                    location === item.href
-                      ? "text-white bg-primary shadow-lg hover:shadow-xl"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                  )}
-                  data-testid={`nav-link-${item.label.toLowerCase().replace(/[''\s]/g, '-')}`}
-                >
-                  <item.icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                  {item.badge && (
-                    <Badge variant={location === item.href ? "secondary" : "default"} className="ml-1 h-5 w-5 justify-center p-0 text-xs">
-                      {item.badge}
-                    </Badge>
-                  )}
-                </Link>
-              ))}
+              .map((item) => {
+                const isActive = location === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200",
+                      isActive
+                        ? "bg-[#FF6600] text-white shadow-orange"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                    data-testid={`nav-link-${item.label.toLowerCase().replace(/[''\s]/g, '-')}`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                    {item.badge && (
+                      <Badge variant={isActive ? "secondary" : "default"} className="h-5 px-2 text-xs">
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
+                );
+              })}
           </div>
 
-          {/* Right Side */}
-          <div className="ml-auto flex items-center space-x-2 sm:space-x-4">
-            {/* Search - Hidden on small mobile */}
-            <div className="hidden sm:block">
-              <GlobalSearch />
-            </div>
-
-            {/* Admin Dropdown - Only visible to ADMIN users on desktop */}
-            {user?.role === "ADMIN" && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild data-testid="admin-menu-trigger">
-                  <Button variant="ghost" size="sm" className="hidden lg:flex items-center space-x-2">
-                    <Settings className="h-4 w-4" />
-                    <span className="text-sm">Admin</span>
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" data-testid="admin-menu-content">
-                  <DropdownMenuItem asChild data-testid="admin-menu-users">
-                    <Link href="/users" className="flex items-center cursor-pointer">
-                      <Users className="h-4 w-4 mr-2" />
-                      User Management
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild data-testid="admin-menu-settings">
-                    <Link href="/settings" className="flex items-center cursor-pointer">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Settings
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+          {/* Right Section */}
+          <div className="ml-auto flex items-center gap-2">
+            {/* Search Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowCommandPalette(true)}
+              className="hidden sm:inline-flex"
+              data-testid="search-button"
+            >
+              <Search className="h-4 w-4" />
+            </Button>
 
             {/* Notifications */}
             <Button
               variant="ghost"
               size="icon"
-              className="relative"
+              className="relative hidden sm:inline-flex"
               data-testid="notifications-button"
             >
-              <Bell className="h-5 w-5" />
-              <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 w-4 justify-center p-0 text-xs">
-                2
-              </Badge>
+              <Bell className="h-4 w-4" />
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#FF6600]" />
             </Button>
 
-            {/* User Menu - Desktop */}
+            {/* User Menu */}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild data-testid="user-menu-trigger">
-                <Button variant="ghost" className="flex items-center space-x-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>{getUserInitials()}</AvatarFallback>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="flex items-center space-x-2 h-10"
+                  data-testid="user-menu-button"
+                >
+                  <Avatar className="h-7 w-7">
+                    <AvatarFallback className="text-xs font-semibold">
+                      {getUserInitials()}
+                    </AvatarFallback>
                   </Avatar>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
+                  <span className="hidden md:inline text-sm font-medium">{user?.firstName || 'User'}</span>
+                  <ChevronDown className="h-4 w-4 hidden md:inline" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" data-testid="user-menu-content">
-                <DropdownMenuItem data-testid="user-menu-profile">
-                  Profile Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTheme("light")} data-testid="user-menu-light-theme">
-                  Light Theme
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("dark")} data-testid="user-menu-dark-theme">
-                  Dark Theme
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("system")} data-testid="user-menu-system-theme">
-                  System Theme
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} data-testid="user-menu-logout">
+              <DropdownMenuContent align="end" className="w-48">
+                {user?.role === "ADMIN" && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/users" className="flex items-center cursor-pointer" data-testid="dropdown-users">
+                        <Users className="mr-2 h-4 w-4" />
+                        <span>User Management</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings" className="flex items-center cursor-pointer" data-testid="dropdown-settings">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Settings</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-destructive cursor-pointer"
+                  data-testid="dropdown-logout"
+                >
                   Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -306,10 +333,8 @@ export function Navigation() {
         </div>
       </nav>
 
-      <CommandPalette 
-        open={showCommandPalette} 
-        onOpenChange={setShowCommandPalette}
-      />
+      {/* Command Palette */}
+      <CommandPalette open={showCommandPalette} onOpenChange={setShowCommandPalette} />
     </>
   );
 }
