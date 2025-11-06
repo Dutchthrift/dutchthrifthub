@@ -2663,6 +2663,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/activities", requireAuth, async (req: any, res) => {
+    try {
+      const activity = await storage.createActivity({
+        ...req.body,
+        userId: req.user.id,
+      });
+      res.status(201).json(activity);
+    } catch (error) {
+      console.error("Error creating activity:", error);
+      res.status(400).json({ message: "Failed to create activity" });
+    }
+  });
+
+  app.patch("/api/activities/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const activity = await storage.updateActivity(id, req.body);
+      res.json(activity);
+    } catch (error) {
+      console.error("Error updating activity:", error);
+      res.status(400).json({ message: "Failed to update activity" });
+    }
+  });
+
+  app.delete("/api/activities/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteActivity(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting activity:", error);
+      res.status(400).json({ message: "Failed to delete activity" });
+    }
+  });
+
   // Internal notes
   app.get("/api/notes/:entityType/:entityId", async (req, res) => {
     try {

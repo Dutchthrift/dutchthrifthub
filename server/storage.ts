@@ -161,6 +161,8 @@ export interface IStorage {
   // Activities
   getActivities(limit?: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
+  updateActivity(id: string, activity: Partial<InsertActivity>): Promise<Activity>;
+  deleteActivity(id: string): Promise<void>;
 
   // Audit Logs
   createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
@@ -854,6 +856,15 @@ export class DatabaseStorage implements IStorage {
   async createActivity(activity: InsertActivity): Promise<Activity> {
     const result = await db.insert(activities).values(activity).returning();
     return result[0];
+  }
+
+  async updateActivity(id: string, activity: Partial<InsertActivity>): Promise<Activity> {
+    const result = await db.update(activities).set(activity).where(eq(activities.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteActivity(id: string): Promise<void> {
+    await db.delete(activities).where(eq(activities.id, id));
   }
 
   // Audit Logs

@@ -69,6 +69,8 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState("");
   const { toast } = useToast();
 
   // Update local state when repair prop changes
@@ -90,8 +92,11 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
   const { data: activities = [] } = useQuery<Activity[]>({
     queryKey: ['/api/activities', 'repair', repair?.id],
-    enabled: !!repair?.id && activeTab === 'activity',
+    enabled: !!repair?.id,
   });
+  
+  // Filter notes from activities
+  const notes = activities.filter(activity => activity.type === 'note_added');
 
   const updateStatusMutation = useMutation({
     mutationFn: async (data: { status: string }) => {
@@ -153,6 +158,35 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
       toast({
         title: "Notitie toegevoegd",
         description: "De notitie is succesvol toegevoegd.",
+      });
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ noteId, description }: { noteId: string; description: string }) => {
+      const res = await apiRequest('PATCH', `/api/activities/${noteId}`, { description });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
+      setEditingNoteId(null);
+      setEditingNoteText("");
+      toast({
+        title: "Notitie bijgewerkt",
+        description: "De notitie is succesvol bijgewerkt.",
+      });
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (noteId: string) => {
+      await apiRequest('DELETE', `/api/activities/${noteId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
+      toast({
+        title: "Notitie verwijderd",
+        description: "De notitie is succesvol verwijderd.",
       });
     },
   });
@@ -566,24 +600,112 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  Notitie toevoegen
+                  Notities ({notes.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <Textarea
-                  placeholder="Voeg een notitie toe over deze reparatie..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="min-h-[100px]"
-                  data-testid="input-note-overview"
-                />
-                <Button
-                  onClick={handleAddNote}
-                  disabled={!note.trim() || addNoteMutation.isPending}
-                  data-testid="button-add-note-overview"
-                >
-                  {addNoteMutation.isPending ? 'Opslaan...' : 'Notitie toevoegen'}
-                </Button>
+              <CardContent className="space-y-4">
+                {/* Existing notes list */}
+                {notes.length > 0 && (
+                  <div className="space-y-3 mb-4">
+                    {notes.map((noteItem) => (
+                      <div key={noteItem.id} className="border rounded-lg p-3 bg-muted/50">
+                        {editingNoteId === noteItem.id ? (
+                          <div className="space-y-2">
+                            <Textarea
+                              value={editingNoteText}
+                              onChange={(e) => setEditingNoteText(e.target.value)}
+                              className="min-h-[80px]"
+                              data-testid={`input-edit-note-${noteItem.id}`}
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  if (editingNoteText.trim()) {
+                                    updateNoteMutation.mutate({ 
+                                      noteId: noteItem.id, 
+                                      description: editingNoteText 
+                                    });
+                                  }
+                                }}
+                                disabled={!editingNoteText.trim() || updateNoteMutation.isPending}
+                                data-testid={`button-save-note-${noteItem.id}`}
+                              >
+                                <Save className="h-3 w-3 mr-1" />
+                                Opslaan
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingNoteId(null);
+                                  setEditingNoteText("");
+                                }}
+                                data-testid={`button-cancel-note-${noteItem.id}`}
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Annuleren
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="text-sm mb-2">{noteItem.description}</div>
+                            <div className="flex items-center justify-between">
+                              <div className="text-xs text-muted-foreground">
+                                {noteItem.createdAt && format(new Date(noteItem.createdAt), "d MMM yyyy HH:mm", { locale: nl })}
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditingNoteId(noteItem.id);
+                                    setEditingNoteText(noteItem.description || "");
+                                  }}
+                                  data-testid={`button-edit-note-${noteItem.id}`}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    if (confirm("Weet je zeker dat je deze notitie wilt verwijderen?")) {
+                                      deleteNoteMutation.mutate(noteItem.id);
+                                    }
+                                  }}
+                                  data-testid={`button-delete-note-${noteItem.id}`}
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new note form */}
+                <div className="space-y-2 pt-3 border-t">
+                  <div className="text-sm font-medium">Nieuwe notitie</div>
+                  <Textarea
+                    placeholder="Voeg een notitie toe over deze reparatie..."
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="min-h-[100px]"
+                    data-testid="input-note-overview"
+                  />
+                  <Button
+                    onClick={handleAddNote}
+                    disabled={!note.trim() || addNoteMutation.isPending}
+                    data-testid="button-add-note-overview"
+                  >
+                    {addNoteMutation.isPending ? 'Opslaan...' : 'Notitie toevoegen'}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
