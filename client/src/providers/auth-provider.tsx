@@ -1,4 +1,5 @@
 import { useState, useEffect, ReactNode } from "react";
+import { useLocation } from "wouter";
 import { AuthContext, AuthUser, authApi } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -9,6 +10,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -51,6 +53,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         title: "Welcome back!",
         description: `Signed in as ${user.firstName || user.email}`,
       });
+      
+      // Redirect to dashboard after successful login
+      setLocation("/");
     }
 
     return {};
