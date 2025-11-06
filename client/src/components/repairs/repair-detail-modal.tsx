@@ -90,9 +90,15 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     }
   }, [repair]);
 
-  const { data: activities = [] } = useQuery<Activity[]>({
-    queryKey: ['/api/activities', 'repair', repair?.id],
+  const { data: allActivities = [] } = useQuery<Activity[]>({
+    queryKey: ['/api/activities'],
     enabled: !!repair?.id,
+  });
+  
+  // Filter activities for this specific repair
+  const activities = allActivities.filter(activity => {
+    const metadata = activity.metadata as any;
+    return metadata?.entityType === 'repair' && metadata?.entityId === repair?.id;
   });
   
   // Filter notes from activities
@@ -596,6 +602,38 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               </CardContent>
             </Card>
 
+            {(currentRepair.customerName || currentRepair.customerEmail || currentRepair.orderNumber) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <UserIcon className="h-4 w-4" />
+                    Klant & Order Informatie
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    {(currentRepair.customerName || currentRepair.customerEmail) && (
+                      <div>
+                        <div className="text-sm font-medium">Klant</div>
+                        <div className="text-sm text-muted-foreground">
+                          {currentRepair.customerName || currentRepair.customerEmail || 'Geen klant'}
+                        </div>
+                        {currentRepair.customerEmail && currentRepair.customerName && (
+                          <div className="text-xs text-muted-foreground">{currentRepair.customerEmail}</div>
+                        )}
+                      </div>
+                    )}
+                    {currentRepair.orderNumber && (
+                      <div>
+                        <div className="text-sm font-medium">Order Nummer</div>
+                        <div className="text-sm text-muted-foreground font-mono">{currentRepair.orderNumber}</div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -720,31 +758,6 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                 <RepairStatusTimeline currentStatus={currentRepair.status} />
               </CardContent>
             </Card>
-
-            {(currentRepair.customerId || currentRepair.orderId) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <UserIcon className="h-4 w-4" />
-                    Klant & Order Informatie
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {currentRepair.customerId && (
-                    <div>
-                      <div className="text-sm font-medium">Klant ID</div>
-                      <div className="text-sm text-muted-foreground font-mono">#{currentRepair.customerId.slice(0, 8)}</div>
-                    </div>
-                  )}
-                  {currentRepair.orderId && (
-                    <div>
-                      <div className="text-sm font-medium">Order ID</div>
-                      <div className="text-sm text-muted-foreground font-mono">#{currentRepair.orderId.slice(0, 8)}</div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           <TabsContent value="parts" className="space-y-4 min-h-[400px]">
