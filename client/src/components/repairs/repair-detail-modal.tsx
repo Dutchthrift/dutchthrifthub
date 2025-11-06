@@ -378,7 +378,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <DialogTitle>Reparatie #{currentRepair.id.slice(0, 8)}</DialogTitle>
-              <p className="text-sm text-muted-foreground mt-1">{currentRepair.title}</p>
+              <p className="text-sm text-foreground mt-1">{currentRepair.title}</p>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className={getStatusColor(currentRepair.status)}>
