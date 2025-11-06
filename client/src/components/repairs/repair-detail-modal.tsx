@@ -41,6 +41,9 @@ import {
   Trash2,
   FileText,
   AlertTriangle,
+  Edit,
+  Save,
+  X,
 } from "lucide-react";
 import { format, isPast } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -64,11 +67,25 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const [note, setNote] = useState("");
   const [currentRepair, setCurrentRepair] = useState<Repair | null>(repair);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editForm, setEditForm] = useState<any>({});
   const { toast } = useToast();
 
   // Update local state when repair prop changes
   useEffect(() => {
     setCurrentRepair(repair);
+    if (repair) {
+      setEditForm({
+        title: repair.title || "",
+        description: repair.description || "",
+        productSku: repair.productSku || "",
+        productName: repair.productName || "",
+        issueCategory: repair.issueCategory || "",
+        estimatedCost: repair.estimatedCost ? repair.estimatedCost / 100 : 0,
+        assignedUserId: repair.assignedUserId || "none",
+        priority: repair.priority || "medium",
+      });
+    }
   }, [repair]);
 
   const { data: activities = [] } = useQuery<Activity[]>({
@@ -78,7 +95,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
   const updateStatusMutation = useMutation({
     mutationFn: async (data: { status: string }) => {
-      if (!repair) return;
+      if (!repair || !currentRepair) return;
       const res = await apiRequest('PATCH', `/api/repairs/${currentRepair.id}`, data);
       return await res.json();
     },
@@ -96,7 +113,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
   const uploadFilesMutation = useMutation({
     mutationFn: async (files: FileList) => {
-      if (!repair) return;
+      if (!repair || !currentRepair) return;
       const formData = new FormData();
       Array.from(files).forEach((file) => {
         formData.append('files', file);
@@ -122,7 +139,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
   const addNoteMutation = useMutation({
     mutationFn: async (noteText: string) => {
-      if (!repair) return;
+      if (!repair || !currentRepair) return;
       const res = await apiRequest('POST', '/api/activities', {
         type: 'note_added',
         description: noteText,
@@ -161,6 +178,57 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
       });
     },
   });
+
+  const updateRepairMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!currentRepair) return;
+      const res = await apiRequest('PATCH', `/api/repairs/${currentRepair.id}`, data);
+      return await res.json();
+    },
+    onSuccess: (updatedRepair) => {
+      if (updatedRepair) {
+        setCurrentRepair(updatedRepair);
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/repairs'] });
+      setIsEditMode(false);
+      toast({
+        title: "Reparatie bijgewerkt",
+        description: "De reparatiegegevens zijn succesvol bijgewerkt.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Fout",
+        description: "Kon de reparatie niet bijwerken.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveEdit = () => {
+    const updateData = {
+      ...editForm,
+      estimatedCost: editForm.estimatedCost ? Math.round(editForm.estimatedCost * 100) : undefined,
+      assignedUserId: editForm.assignedUserId === "none" ? null : editForm.assignedUserId,
+    };
+    updateRepairMutation.mutate(updateData);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    if (repair) {
+      setEditForm({
+        title: repair.title || "",
+        description: repair.description || "",
+        productSku: repair.productSku || "",
+        productName: repair.productName || "",
+        issueCategory: repair.issueCategory || "",
+        estimatedCost: repair.estimatedCost ? repair.estimatedCost / 100 : 0,
+        assignedUserId: repair.assignedUserId || "none",
+        priority: repair.priority || "medium",
+      });
+    }
+  };
 
   if (!currentRepair) return null;
 
@@ -243,6 +311,39 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                   <span className="text-xs font-medium">Te laat</span>
                 </div>
               )}
+              {isEditMode ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelEdit}
+                    data-testid="button-cancel-edit"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Annuleren
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleSaveEdit}
+                    disabled={updateRepairMutation.isPending}
+                    data-testid="button-save-edit"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {updateRepairMutation.isPending ? "Opslaan..." : "Opslaan"}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditMode(true)}
+                  data-testid="button-edit-repair"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Bewerken
+                </Button>
+              )}
               <Button
                 variant="destructive"
                 size="sm"
@@ -279,38 +380,136 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm font-medium">Product</div>
-                    <div className="text-sm text-muted-foreground">{currentRepair.productName || currentRepair.title}</div>
-                    {currentRepair.productSku && (
-                      <div className="text-xs text-muted-foreground">SKU: {currentRepair.productSku}</div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Probleem Categorie</div>
-                    <div className="text-sm text-muted-foreground">{currentRepair.issueCategory || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Technicus</div>
-                    <div className="text-sm text-muted-foreground">{getTechnicianName(currentRepair.assignedUserId)}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Prioriteit</div>
-                    <div className="text-sm">
-                      <Badge variant="outline">
-                        {currentRepair.priority === 'urgent' ? 'Urgent' : 
-                         currentRepair.priority === 'high' ? 'Hoog' : 
-                         currentRepair.priority === 'medium' ? 'Gemiddeld' : 'Laag'}
-                      </Badge>
+                {isEditMode ? (
+                  <>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Titel</div>
+                      <Input
+                        value={editForm.title || ""}
+                        onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                        data-testid="input-edit-title"
+                      />
                     </div>
-                  </div>
-                </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium">Product Naam</div>
+                        <Input
+                          value={editForm.productName || ""}
+                          onChange={(e) => setEditForm({ ...editForm, productName: e.target.value })}
+                          data-testid="input-edit-product-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium">Product SKU</div>
+                        <Input
+                          value={editForm.productSku || ""}
+                          onChange={(e) => setEditForm({ ...editForm, productSku: e.target.value })}
+                          data-testid="input-edit-product-sku"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Probleem Categorie</div>
+                      <Input
+                        value={editForm.issueCategory || ""}
+                        onChange={(e) => setEditForm({ ...editForm, issueCategory: e.target.value })}
+                        data-testid="input-edit-issue-category"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium">Technicus</div>
+                        <Select
+                          value={editForm.assignedUserId || "none"}
+                          onValueChange={(value) => setEditForm({ ...editForm, assignedUserId: value })}
+                        >
+                          <SelectTrigger data-testid="select-edit-technician">
+                            <SelectValue placeholder="Selecteer technicus" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Niet toegewezen</SelectItem>
+                            {users.filter(u => u.role === 'TECHNICUS' || u.role === 'ADMIN').map((tech) => (
+                              <SelectItem key={tech.id} value={tech.id}>
+                                {tech.firstName || ''} {tech.lastName || ''} ({tech.username})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium">Prioriteit</div>
+                        <Select
+                          value={editForm.priority || "medium"}
+                          onValueChange={(value) => setEditForm({ ...editForm, priority: value })}
+                        >
+                          <SelectTrigger data-testid="select-edit-priority">
+                            <SelectValue placeholder="Selecteer prioriteit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Laag</SelectItem>
+                            <SelectItem value="medium">Gemiddeld</SelectItem>
+                            <SelectItem value="high">Hoog</SelectItem>
+                            <SelectItem value="urgent">Urgent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Geschatte Kosten (€)</div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editForm.estimatedCost || 0}
+                        onChange={(e) => setEditForm({ ...editForm, estimatedCost: parseFloat(e.target.value) || 0 })}
+                        data-testid="input-edit-estimated-cost"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Beschrijving</div>
+                      <Textarea
+                        value={editForm.description || ""}
+                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                        rows={3}
+                        data-testid="input-edit-description"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-sm font-medium">Product</div>
+                        <div className="text-sm text-muted-foreground">{currentRepair.productName || currentRepair.title}</div>
+                        {currentRepair.productSku && (
+                          <div className="text-xs text-muted-foreground">SKU: {currentRepair.productSku}</div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">Probleem Categorie</div>
+                        <div className="text-sm text-muted-foreground">{currentRepair.issueCategory || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">Technicus</div>
+                        <div className="text-sm text-muted-foreground">{getTechnicianName(currentRepair.assignedUserId)}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">Prioriteit</div>
+                        <div className="text-sm">
+                          <Badge variant="outline">
+                            {currentRepair.priority === 'urgent' ? 'Urgent' : 
+                             currentRepair.priority === 'high' ? 'Hoog' : 
+                             currentRepair.priority === 'medium' ? 'Gemiddeld' : 'Laag'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
 
-                <div>
-                  <div className="text-sm font-medium">Beschrijving</div>
-                  <div className="text-sm text-muted-foreground mt-1">{currentRepair.description || '-'}</div>
-                </div>
+                    <div>
+                      <div className="text-sm font-medium">Beschrijving</div>
+                      <div className="text-sm text-muted-foreground mt-1">{currentRepair.description || '-'}</div>
+                    </div>
+                  </>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>

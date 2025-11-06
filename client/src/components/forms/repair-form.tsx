@@ -189,6 +189,9 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
       return;
     }
 
+    const selectedOrder = orders.find(o => o.id === data.orderId);
+    const selectedCustomer = selectedOrder ? customers.find(c => c.id === selectedOrder.customerId) : null;
+    
     const repairData = {
       title: data.title,
       description: data.description || undefined,
@@ -203,6 +206,9 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
         : data.issueCategory || undefined,
       customerId: (data.customerId && data.customerId !== "none") ? data.customerId : undefined,
       orderId: (data.orderId && data.orderId !== "none") ? data.orderId : undefined,
+      customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}`.trim() : undefined,
+      customerEmail: selectedCustomer?.email || selectedOrder?.customerEmail || undefined,
+      orderNumber: selectedOrder?.orderNumber || undefined,
       status: "new",
     };
 
