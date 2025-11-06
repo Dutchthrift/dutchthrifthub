@@ -565,6 +565,31 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Notitie toevoegen
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea
+                  placeholder="Voeg een notitie toe over deze reparatie..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="min-h-[100px]"
+                  data-testid="input-note-overview"
+                />
+                <Button
+                  onClick={handleAddNote}
+                  disabled={!note.trim() || addNoteMutation.isPending}
+                  data-testid="button-add-note-overview"
+                >
+                  {addNoteMutation.isPending ? 'Opslaan...' : 'Notitie toevoegen'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
                   <ActivityIcon className="h-4 w-4" />
                   Reparatie Voortgang
                 </CardTitle>
