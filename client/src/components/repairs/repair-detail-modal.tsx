@@ -926,9 +926,9 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                   Bijlagen
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-hidden">
                 {attachments.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 w-full overflow-hidden">
                     {attachments.map((attachment, index) => {
                       // Extract the path after /attachments/ to construct the API URL
                       const attachmentPath = attachment.startsWith('/attachments/') 
@@ -938,10 +938,10 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                       const filename = decodeURIComponent(attachment.split('/').pop() || 'download');
                       
                       return (
-                        <div key={index} className="flex items-center justify-between gap-2 border p-2 rounded overflow-hidden">
-                          <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+                        <div key={index} className="flex items-center gap-2 border p-2 rounded w-full">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
                             <FileText className="h-4 w-4 flex-shrink-0" />
-                            <span className="text-sm truncate max-w-full" title={filename}>{filename}</span>
+                            <span className="text-sm truncate block" title={filename}>{filename}</span>
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <a 
