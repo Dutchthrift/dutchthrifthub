@@ -679,7 +679,14 @@ export default function Orders() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
-                          {new Date(order.orderDate || order.createdAt || '').toLocaleDateString()}
+                          {new Date(order.orderDate || order.createdAt || '').toLocaleString('nl-NL', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          })}
                         </span>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
@@ -821,7 +828,14 @@ export default function Orders() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Order Date:</span>
                         <span className="font-medium">
-                          {new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleDateString()}
+                          {new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleString('nl-NL', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          })}
                         </span>
                       </div>
                     </CardContent>
