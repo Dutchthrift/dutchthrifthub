@@ -397,7 +397,7 @@ export default function Orders() {
     <div className="min-h-screen bg-background" data-testid="orders-page">
       <Navigation />
       
-      <main className="flex-1 p-6">
+      <main className="container mx-auto px-4 py-6">
         <div className="bg-orders rounded-lg p-6 mb-6" data-testid="orders-header">
           <div className="flex items-center justify-between">
             <div>

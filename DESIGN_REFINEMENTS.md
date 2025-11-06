@@ -392,6 +392,30 @@ import { Plus } from "lucide-react";
 
 ## 📐 Spacing & Layout
 
+### Page Width Standard
+
+**All pages use the container layout for consistency:**
+
+```tsx
+<main className="container mx-auto px-4 py-6">
+```
+
+**Benefits:**
+- **Max-width**: Content doesn't stretch too wide on large screens
+- **Centered**: Automatic left/right margins center the content
+- **Responsive**: Adapts to different screen sizes
+- **Compact**: Creates comfortable reading width (not edge-to-edge)
+
+**Pages using this standard:**
+- ✅ Dashboard
+- ✅ Orders
+- ✅ Purchase Orders
+- ✅ Repairs
+- ✅ Cases
+- ✅ Case Detail
+- ✅ Todos
+- ✅ All other pages
+
 ### Consistent Spacing Scale
 
 ```css
@@ -529,10 +553,10 @@ className="text-[#FF6600]"  /* Use for links only */
 ### Common Patterns
 
 ```tsx
-// Page Layout
+// Page Layout (STANDARD - Use on all pages)
 <div className="min-h-screen bg-background">
   <Navigation />
-  <main className="container mx-auto p-4 md:p-6">
+  <main className="container mx-auto px-4 py-6">
     <PageHeader
       title="Page Title"
       subtitle="Description"
@@ -541,6 +565,10 @@ className="text-[#FF6600]"  /* Use for links only */
     {/* Content */}
   </main>
 </div>
+
+// IMPORTANT: Always use `container mx-auto px-4 py-6` for consistent page width
+// This creates a centered layout with max-width and proper spacing
+// ❌ DON'T use: className="flex-1 p-6" (full-width, inconsistent)
 
 // Form Input
 <div className="space-y-2">

@@ -256,7 +256,7 @@ export default function Todos() {
     <div className="min-h-screen bg-background" data-testid="todos-page">
       <Navigation />
       
-      <main className="flex-1 p-6">
+      <main className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6" data-testid="todos-header">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">To-do's</h1>

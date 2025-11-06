@@ -412,7 +412,7 @@ export default function Cases() {
     <div className="min-h-screen bg-background" data-testid="cases-page">
       <Navigation />
       
-      <main className="flex-1 p-6">
+      <main className="container mx-auto px-4 py-6">
         <div className="bg-cases rounded-lg p-6 mb-6" data-testid="cases-header">
           <div className="flex items-center justify-between">
             <div>

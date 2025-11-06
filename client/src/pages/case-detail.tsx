@@ -454,7 +454,7 @@ export default function CaseDetail() {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
-        <main className="flex-1 p-6">
+        <main className="container mx-auto px-4 py-6">
           <div className="animate-pulse">
             <div className="h-8 bg-muted rounded mb-4"></div>
             <div className="grid gap-6">
@@ -471,7 +471,7 @@ export default function CaseDetail() {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
-        <main className="flex-1 p-6">
+        <main className="container mx-auto px-4 py-6">
           <div className="text-center py-8">
             <h2 className="text-2xl font-semibold mb-2">Case not found</h2>
             <p className="text-muted-foreground mb-4">The case you're looking for doesn't exist.</p>
@@ -489,7 +489,7 @@ export default function CaseDetail() {
     <div className="min-h-screen bg-background" data-testid="case-detail-page">
       <Navigation />
       
-      <main className="flex-1 p-6">
+      <main className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6" data-testid="case-header">
           <div className="flex items-center space-x-4">

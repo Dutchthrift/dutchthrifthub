@@ -66,7 +66,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background" data-testid="dashboard-page">
       <Navigation />
       
-      <main className="flex-1 p-6">
+      <main className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6" data-testid="dashboard-header">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
