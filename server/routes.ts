@@ -783,7 +783,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const { type } = req.body; // 'photo' or 'attachment'
         const files = req.files as Express.Multer.File[];
 
         if (!files || files.length === 0) {
@@ -795,21 +794,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Repair not found" });
         }
 
-        // TECHNICUS can only upload to own repairs
-        if (
-          req.user.role === "TECHNICUS" &&
-          repair.assignedUserId !== req.user.id
-        ) {
-          return res
-            .status(403)
-            .json({ message: "Not authorized to upload files to this repair" });
-        }
+        // TECHNICUS can upload to any repair (restriction removed)
+        // if (
+        //   req.user.role === "TECHNICUS" &&
+        //   repair.assignedUserId !== req.user.id
+        // ) {
+        //   return res
+        //     .status(403)
+        //     .json({ message: "Not authorized to upload files to this repair" });
+        // }
 
         const objectStorage = new ObjectStorageService();
-        const uploadedUrls: string[] = [];
+        const photoUrls: string[] = [];
+        const attachmentUrls: string[] = [];
 
         for (const file of files) {
-          const filename = `repair-${id}-${type}-${Date.now()}-${file.originalname}`;
+          // Determine if file is a photo or attachment based on mimetype
+          const isPhoto = file.mimetype.startsWith('image/');
+          const fileType = isPhoto ? 'photo' : 'attachment';
+          
+          // Create a safe filename
+          const timestamp = Date.now();
+          const safeOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const filename = `repair-${id}-${fileType}-${timestamp}-${safeOriginalName}`;
+          
           console.log(`Uploading repair file: ${filename} (${file.size} bytes, ${file.mimetype})`);
           const url = await objectStorage.saveAttachment(
             filename,
@@ -817,20 +825,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
             file.mimetype,
           );
           console.log(`Uploaded to: ${url}`);
-          uploadedUrls.push(url);
+          
+          if (isPhoto) {
+            photoUrls.push(url);
+          } else {
+            attachmentUrls.push(url);
+          }
         }
 
         // Update repair with new file URLs
-        const currentFiles =
-          type === "photo" ? repair.photos || [] : repair.attachments || [];
-        const updatedFiles = [...currentFiles, ...uploadedUrls];
+        const updates: any = {};
+        
+        if (photoUrls.length > 0) {
+          const currentPhotos = repair.photos || [];
+          updates.photos = [...currentPhotos, ...photoUrls];
+        }
+        
+        if (attachmentUrls.length > 0) {
+          const currentAttachments = repair.attachments || [];
+          updates.attachments = [...currentAttachments, ...attachmentUrls];
+        }
 
-        await storage.updateRepair(id, {
-          [type === "photo" ? "photos" : "attachments"]: updatedFiles,
+        if (Object.keys(updates).length > 0) {
+          await storage.updateRepair(id, updates);
+        }
+
+        console.log(`Successfully uploaded ${photoUrls.length} photos and ${attachmentUrls.length} attachments to repair ${id}`);
+        res.json({ 
+          photoUrls, 
+          attachmentUrls,
+          total: photoUrls.length + attachmentUrls.length 
         });
-
-        console.log(`Successfully uploaded ${uploadedUrls.length} files to repair ${id}`);
-        res.json({ urls: uploadedUrls });
       } catch (error) {
         console.error("Error uploading files to repair:", error);
         res.status(500).json({ message: "Failed to upload files" });
