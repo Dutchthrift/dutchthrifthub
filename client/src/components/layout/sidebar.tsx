@@ -40,6 +40,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const [location] = useLocation();
+  const smallLogoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/extra-files/dutchthrift-logo-small.jpg`;
 
   return (
     <div 
@@ -52,8 +53,12 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
       {/* Logo */}
       <div className="p-4">
         <Link href="/" className="flex items-center space-x-2" data-testid="sidebar-logo">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
-            <Camera className="h-5 w-5 text-sidebar-primary-foreground" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
+            <img 
+              src={smallLogoUrl} 
+              alt="DutchThrift" 
+              className="h-full w-full object-cover"
+            />
           </div>
           {!collapsed && (
             <span className="text-lg font-semibold text-sidebar-foreground">DutchThrift</span>
