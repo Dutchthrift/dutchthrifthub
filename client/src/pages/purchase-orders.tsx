@@ -144,9 +144,9 @@ export default function PurchaseOrders() {
     <div className="min-h-screen bg-background">
       <Navigation />
       
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="bg-card rounded-lg p-6 border">
+        <div className="bg-card rounded-lg p-6 mb-6 border">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="text-page-title">
@@ -354,7 +354,7 @@ export default function PurchaseOrders() {
             )}
           </TabsContent>
         </Tabs>
-      </div>
+      </main>
 
       {/* Create/Edit Dialog */}
       {showNewPO && (
