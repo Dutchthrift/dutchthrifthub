@@ -63,7 +63,7 @@ export function Navigation() {
 
   return (
     <>
-      <nav className="border-b border-border bg-card" data-testid="main-navigation">
+      <nav className="border-b-2 border-border bg-card shadow-sm" data-testid="main-navigation">
         <div className="flex h-16 items-center px-4">
           {/* Mobile Menu Button */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -90,17 +90,17 @@ export function Navigation() {
                       href={item.href}
                       onClick={() => setMobileMenuOpen(false)}
                       className={cn(
-                        "flex items-center space-x-3 text-sm font-medium px-4 py-3 rounded-md transition-colors",
+                        "flex items-center space-x-3 text-sm font-semibold px-4 py-3 rounded-lg transition-all duration-200",
                         location === item.href
-                          ? "text-primary bg-primary/10"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                          ? "text-white bg-primary shadow-md"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                       )}
                       data-testid={`mobile-nav-link-${item.label.toLowerCase().replace(/[''\s]/g, '-')}`}
                     >
                       <item.icon className="h-5 w-5" />
                       <span>{item.label}</span>
                       {item.badge && (
-                        <Badge variant="default" className="ml-auto h-5 w-5 justify-center p-0 text-xs">
+                        <Badge variant={location === item.href ? "secondary" : "default"} className="ml-auto h-5 w-5 justify-center p-0 text-xs">
                           {item.badge}
                         </Badge>
                       )}
@@ -199,7 +199,7 @@ export function Navigation() {
           </div>
 
           {/* Desktop Navigation Items - Hidden on mobile */}
-          <div className="ml-8 hidden lg:flex items-center space-x-6">
+          <div className="ml-8 hidden lg:flex items-center space-x-2">
             {navigationItems
               .filter((item) => !user?.role || item.roles.includes(user.role))
               .map((item) => (
@@ -207,17 +207,17 @@ export function Navigation() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center space-x-2 text-sm font-medium px-3 py-2 rounded-md transition-colors",
+                    "flex items-center space-x-2 text-sm font-semibold px-4 py-2 rounded-lg transition-all duration-200",
                     location === item.href
-                      ? "text-primary bg-primary/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                      ? "text-white bg-primary shadow-lg hover:shadow-xl"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                   )}
                   data-testid={`nav-link-${item.label.toLowerCase().replace(/[''\s]/g, '-')}`}
                 >
                   <item.icon className="h-4 w-4" />
                   <span>{item.label}</span>
                   {item.badge && (
-                    <Badge variant="default" className="ml-1 h-5 w-5 justify-center p-0 text-xs">
+                    <Badge variant={location === item.href ? "secondary" : "default"} className="ml-1 h-5 w-5 justify-center p-0 text-xs">
                       {item.badge}
                     </Badge>
                   )}
