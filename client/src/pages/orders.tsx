@@ -559,7 +559,8 @@ export default function Orders() {
                 No orders found
               </div>
             ) : (
-              <Table>
+              <div className="overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead 
@@ -720,6 +721,7 @@ export default function Orders() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
