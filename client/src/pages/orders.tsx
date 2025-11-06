@@ -492,36 +492,37 @@ export default function Orders() {
         {/* Filters and Search */}
         <Card className="mb-6">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between space-x-4">
-              <div className="flex items-center space-x-4 flex-1">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search orders, customers..."
-                    className="pl-10"
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setCurrentPage(1); // Reset to first page when searching
-                    }}
-                    data-testid="orders-search-input"
-                  />
-                </div>
-                
-                <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-                  <TabsList>
-                    <TabsTrigger value="all" data-testid="filter-all-orders">All</TabsTrigger>
-                    <TabsTrigger value="pending" data-testid="filter-pending-orders">Pending</TabsTrigger>
-                    <TabsTrigger value="processing" data-testid="filter-processing-orders">Processing</TabsTrigger>
-                    <TabsTrigger value="shipped" data-testid="filter-shipped-orders">Shipped</TabsTrigger>
-                    <TabsTrigger value="delivered" data-testid="filter-delivered-orders">Delivered</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search orders, customers..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1); // Reset to first page when searching
+                  }}
+                  data-testid="orders-search-input"
+                />
               </div>
+
+              {/* Status Tabs */}
+              <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+                <TabsList className="w-full grid grid-cols-5 h-auto">
+                  <TabsTrigger value="all" data-testid="filter-all-orders" className="text-xs sm:text-sm">All</TabsTrigger>
+                  <TabsTrigger value="pending" data-testid="filter-pending-orders" className="text-xs sm:text-sm">Pending</TabsTrigger>
+                  <TabsTrigger value="processing" data-testid="filter-processing-orders" className="text-xs sm:text-sm">Processing</TabsTrigger>
+                  <TabsTrigger value="shipped" data-testid="filter-shipped-orders" className="text-xs sm:text-sm">Shipped</TabsTrigger>
+                  <TabsTrigger value="delivered" data-testid="filter-delivered-orders" className="text-xs sm:text-sm">Delivered</TabsTrigger>
+                </TabsList>
+              </Tabs>
               
-              <div className="flex items-center space-x-2">
+              {/* Page Size and Filters */}
+              <div className="flex items-center justify-between gap-2">
                 <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
-                  <SelectTrigger className="w-32" data-testid="page-size-selector">
+                  <SelectTrigger className="w-full sm:w-40" data-testid="page-size-selector">
                     <SelectValue placeholder="Page size" />
                   </SelectTrigger>
                   <SelectContent>
