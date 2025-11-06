@@ -38,7 +38,7 @@ export function LoginForm() {
     }
   };
 
-  const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/extra-files/dutchthrift-logo.png`;
+  const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/extra-files/dutchthrift-logo-small.jpg`;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -48,7 +48,7 @@ export function LoginForm() {
             <img 
               src={logoUrl} 
               alt="DutchThrift Logo" 
-              className="h-24 w-auto"
+              className="h-16 w-16 object-cover rounded-lg"
               data-testid="login-logo"
             />
           </div>
