@@ -108,6 +108,9 @@ export const repairs = pgTable("repairs", {
   productSku: text("product_sku"),
   productName: text("product_name"),
   issueCategory: text("issue_category"),
+  customerName: text("customer_name"), // Direct customer name for display
+  customerEmail: text("customer_email"), // Direct customer email for display
+  orderNumber: text("order_number"), // Direct order number for display
   customerId: varchar("customer_id").references(() => customers.id),
   orderId: varchar("order_id").references(() => orders.id),
   emailThreadId: varchar("email_thread_id").references(() => emailThreads.id),

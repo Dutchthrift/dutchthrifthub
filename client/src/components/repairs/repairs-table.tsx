@@ -194,13 +194,15 @@ export function RepairsTable({ repairs, users, onRepairClick, onAddNote }: Repai
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    {repair.customerId ? (
-                      <span className="text-sm">Klant #{repair.customerId.slice(0, 8)}</span>
+                    {repair.customerName ? (
+                      <span className="text-sm">{repair.customerName}</span>
+                    ) : repair.customerEmail ? (
+                      <span className="text-sm">{repair.customerEmail}</span>
                     ) : (
                       <span className="text-sm text-muted-foreground">Geen klant</span>
                     )}
-                    {repair.orderId && (
-                      <span className="text-xs text-muted-foreground">Order #{repair.orderId.slice(0, 8)}</span>
+                    {repair.orderNumber && (
+                      <span className="text-xs text-muted-foreground">{repair.orderNumber}</span>
                     )}
                   </div>
                 </TableCell>
