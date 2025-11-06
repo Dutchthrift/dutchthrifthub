@@ -247,6 +247,34 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     },
   });
 
+  const deleteFileMutation = useMutation({
+    mutationFn: async ({ fileType, fileUrl }: { fileType: 'photos' | 'attachments'; fileUrl: string }) => {
+      if (!repair || !currentRepair) return;
+      
+      // Get current files array
+      const currentFiles = fileType === 'photos' ? (currentRepair.photos || []) : (currentRepair.attachments || []);
+      
+      // Filter out the file to delete
+      const updatedFiles = currentFiles.filter(f => f !== fileUrl);
+      
+      // Update repair
+      const res = await apiRequest('PATCH', `/api/repairs/${currentRepair.id}`, {
+        [fileType]: updatedFiles
+      });
+      return await res.json();
+    },
+    onSuccess: (updatedRepair) => {
+      if (updatedRepair) {
+        setCurrentRepair(updatedRepair);
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/repairs'] });
+      toast({
+        title: "Bestand verwijderd",
+        description: "Het bestand is succesvol verwijderd.",
+      });
+    },
+  });
+
   const handleSaveEdit = () => {
     const updateData = {
       ...editForm,
@@ -307,34 +335,6 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     const user = users.find(u => u.id === userId);
     return user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username : 'Onbekend';
   };
-
-  const deleteFileMutation = useMutation({
-    mutationFn: async ({ fileType, fileUrl }: { fileType: 'photos' | 'attachments'; fileUrl: string }) => {
-      if (!repair || !currentRepair) return;
-      
-      // Get current files array
-      const currentFiles = fileType === 'photos' ? (currentRepair.photos || []) : (currentRepair.attachments || []);
-      
-      // Filter out the file to delete
-      const updatedFiles = currentFiles.filter(f => f !== fileUrl);
-      
-      // Update repair
-      const res = await apiRequest('PATCH', `/api/repairs/${currentRepair.id}`, {
-        [fileType]: updatedFiles
-      });
-      return await res.json();
-    },
-    onSuccess: (updatedRepair) => {
-      if (updatedRepair) {
-        setCurrentRepair(updatedRepair);
-      }
-      queryClient.invalidateQueries({ queryKey: ['/api/repairs'] });
-      toast({
-        title: "Bestand verwijderd",
-        description: "Het bestand is succesvol verwijderd.",
-      });
-    },
-  });
 
   const handleFileUpload = () => {
     if (selectedFiles) {
