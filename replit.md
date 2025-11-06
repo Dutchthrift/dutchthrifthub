@@ -26,6 +26,7 @@ Preferred communication style: Simple, everyday language.
 - **API Design**: RESTful API with JSON communication
 - **Error Handling**: Centralized error handling middleware
 - **Request Logging**: Custom middleware for API request/response logging
+- **Scheduled Jobs**: Node-cron for automated background tasks (hourly Shopify sync)
 
 ### Database Design
 - **Database**: PostgreSQL with Drizzle ORM
@@ -61,6 +62,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Order Management
 - **Shopify Integration**: Real-time synchronization of order data
+- **Automatic Sync**: Scheduled hourly sync running in background (every hour at :00)
+- **Manual Sync**: On-demand sync button for immediate synchronization
+- **Incremental Sync**: Only fetches new/updated orders since last sync for efficiency
 - **Status Tracking**: Order lifecycle management from pending to completion
 - **Customer Linking**: Automatic customer profile creation and linking
 
