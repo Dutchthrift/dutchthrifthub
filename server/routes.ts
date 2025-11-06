@@ -582,15 +582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           caseId as string,
         );
 
-        // TECHNICUS role: only see own repairs
-        const filteredRepairs =
-          req.user.role === "TECHNICUS"
-            ? relatedItems.repairs.filter(
-                (repair: any) => repair.assignedUserId === req.user.id,
-              )
-            : relatedItems.repairs;
-
-        res.json(filteredRepairs);
+        res.json(relatedItems.repairs);
         return;
       }
 
@@ -653,11 +645,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedFilters.endDate)
         filters.endDate = new Date(validatedFilters.endDate);
 
-      // TECHNICUS role: only see own repairs
-      if (req.user.role === "TECHNICUS") {
-        filters.technicianId = req.user.id;
-      }
-
       const hasFilters = Object.keys(filters).length > 0;
 
       if (hasFilters) {
@@ -679,16 +666,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const repair = await storage.getRepair(id);
       if (!repair) {
         return res.status(404).json({ message: "Repair not found" });
-      }
-
-      // TECHNICUS can only view own repairs
-      if (
-        req.user.role === "TECHNICUS" &&
-        repair.assignedUserId !== req.user.id
-      ) {
-        return res
-          .status(403)
-          .json({ message: "Not authorized to view this repair" });
       }
 
       res.json(repair);
