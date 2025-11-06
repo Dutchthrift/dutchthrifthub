@@ -41,6 +41,7 @@ export function Navigation() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { signOut, user } = useAuth();
+  const smallLogoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/extra-files/dutchthrift-logo-small.jpg`;
 
   const handleLogout = async () => {
     await signOut();
@@ -186,8 +187,12 @@ export function Navigation() {
           {/* Logo */}
           <div className="flex items-center space-x-4">
             <Link href="/" className="flex items-center space-x-2" data-testid="logo-link">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <Camera className="h-5 w-5 text-primary-foreground" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
+                <img 
+                  src={smallLogoUrl} 
+                  alt="DutchThrift" 
+                  className="h-full w-full object-cover"
+                />
               </div>
               <span className="text-lg font-semibold text-foreground hidden sm:inline">DutchThrift</span>
             </Link>
