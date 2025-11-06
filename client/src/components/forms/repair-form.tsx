@@ -77,6 +77,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
   const [showOrderResults, setShowOrderResults] = useState(false);
+  const [selectedOrderDisplay, setSelectedOrderDisplay] = useState<string>("");
   const [otherCategoryDetails, setOtherCategoryDetails] = useState("");
   const { toast } = useToast();
 
@@ -214,6 +215,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
     setSelectedFiles([]);
     setOrderSearchQuery("");
     setShowOrderResults(false);
+    setSelectedOrderDisplay("");
     setOtherCategoryDetails("");
     onOpenChange(false);
   };
@@ -343,16 +345,40 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground z-10" />
               <Input
                 type="text"
-                placeholder={selectedOrder && selectedOrderCustomer 
-                  ? `Order #${selectedOrder.orderNumber} - ${selectedOrderCustomer.firstName} ${selectedOrderCustomer.lastName}`
-                  : "Zoek order of klant..."}
-                className="pl-10"
-                value={orderSearchQuery}
-                onChange={(e) => setOrderSearchQuery(e.target.value)}
-                onFocus={() => setShowOrderResults(true)}
+                placeholder="Zoek order of klant..."
+                className="pl-10 pr-8"
+                value={selectedOrderDisplay || orderSearchQuery}
+                onChange={(e) => {
+                  setOrderSearchQuery(e.target.value);
+                  if (selectedOrderDisplay) {
+                    // Clear selection when user starts typing again
+                    setSelectedOrderDisplay("");
+                    setValue("orderId", "none");
+                    setValue("customerId", "none");
+                  }
+                }}
+                onFocus={() => {
+                  if (!selectedOrderDisplay) {
+                    setShowOrderResults(true);
+                  }
+                }}
                 onBlur={() => setTimeout(() => setShowOrderResults(false), 200)}
                 data-testid="input-order-search"
               />
+              {selectedOrderDisplay && (
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setSelectedOrderDisplay("");
+                    setOrderSearchQuery("");
+                    setValue("orderId", "none");
+                    setValue("customerId", "none");
+                  }}
+                >
+                  ×
+                </button>
+              )}
               
               {showOrderResults && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
@@ -370,6 +396,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                             onClick={() => {
                               setValue("orderId", order.id);
                               setValue("customerId", order.customerId || "none");
+                              setSelectedOrderDisplay(`Order #${order.orderNumber} - ${customerName}`);
                               setOrderSearchQuery("");
                               setShowOrderResults(false);
                             }}
