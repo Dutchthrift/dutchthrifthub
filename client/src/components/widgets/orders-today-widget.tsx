@@ -26,21 +26,23 @@ export function OrdersTodayWidget() {
   const todaysCount = stats?.todaysOrders?.count || 12;
 
   return (
-    <Card data-testid="orders-today-widget">
+    <Card className="hover:shadow-card-hover" data-testid="orders-today-widget">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Orders Today</CardTitle>
-        <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+        <CardTitle className="text-sm font-semibold text-muted-foreground">Orders Today</CardTitle>
+        <div className="h-10 w-10 rounded-full bg-gradient-orders flex items-center justify-center">
+          <ShoppingBag className="h-5 w-5 text-white" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-1">
-          <div className="text-2xl font-bold" data-testid="orders-total">
+        <div className="space-y-2">
+          <div className="text-3xl font-bold text-orders" data-testid="orders-total">
             €{(todaysTotal / 100).toLocaleString()}
           </div>
-          <p className="text-xs text-muted-foreground" data-testid="orders-count">
+          <p className="text-sm font-medium text-muted-foreground" data-testid="orders-count">
             {todaysCount} new orders
           </p>
-          <div className="flex items-center text-xs text-muted-foreground">
-            <span className="text-chart-2" data-testid="orders-change">
+          <div className="flex items-center text-sm">
+            <span className="text-success font-semibold" data-testid="orders-change">
               +18% from yesterday
             </span>
           </div>

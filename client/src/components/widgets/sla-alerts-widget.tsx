@@ -23,19 +23,21 @@ export function SlaAlertsWidget() {
   }
 
   return (
-    <Card data-testid="sla-alerts-widget">
+    <Card className="hover:shadow-card-hover border-destructive/20" data-testid="sla-alerts-widget">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">SLA Alerts</CardTitle>
-        <AlertTriangle className="h-4 w-4 text-destructive" />
+        <CardTitle className="text-sm font-semibold text-muted-foreground">SLA Alerts</CardTitle>
+        <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center border-2 border-destructive/20">
+          <AlertTriangle className="h-5 w-5 text-destructive" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-1">
-          <div className="text-2xl font-bold text-destructive" data-testid="sla-alerts-count">
+        <div className="space-y-2">
+          <div className="text-3xl font-bold text-destructive" data-testid="sla-alerts-count">
             {stats?.slaAlerts || 0}
           </div>
-          <p className="text-xs text-muted-foreground">Overdue items</p>
-          <div className="flex items-center text-xs text-muted-foreground">
-            <span className="text-chart-4" data-testid="sla-due-today">
+          <p className="text-sm font-medium text-muted-foreground">Overdue items</p>
+          <div className="flex items-center text-sm">
+            <span className="text-warning font-semibold" data-testid="sla-due-today">
               {(stats?.slaAlerts || 0) * 3} due today
             </span>
           </div>

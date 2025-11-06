@@ -14,20 +14,26 @@ import { TodoForm } from "@/components/forms/todo-form";
 import { RepairForm } from "@/components/forms/repair-form";
 import { Button } from "@/components/ui/button";
 import { Download, Plus } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import type { User } from "@shared/schema";
 
 export default function Home() {
   const [openTodoDialog, setOpenTodoDialog] = useState(false);
   const [openRepairDialog, setOpenRepairDialog] = useState(false);
+  
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
   return (
     <div className="min-h-screen bg-background" data-testid="home-page">
       <Navigation />
       
-      <main className="flex-1 space-y-4 p-8 pt-6">
+      <main className="flex-1 space-y-6 p-8 pt-6">
         {/* Page Header */}
         <div className="flex items-center justify-between" data-testid="page-header">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, John</h2>
-            <p className="text-muted-foreground">Here's what's happening at DutchThrift today.</p>
+            <h2 className="text-4xl font-bold tracking-tight bg-gradient-primary bg-clip-text text-transparent">Welcome back, John</h2>
+            <p className="text-muted-foreground mt-1 text-lg">Here's what's happening at DutchThrift today.</p>
           </div>
           <div className="flex items-center space-x-2">
             <Button variant="outline" data-testid="export-data-button">
@@ -86,6 +92,7 @@ export default function Home() {
       <RepairForm 
         open={openRepairDialog} 
         onOpenChange={setOpenRepairDialog}
+        users={users}
       />
     </div>
   );

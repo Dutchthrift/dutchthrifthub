@@ -23,19 +23,21 @@ export function InboxStatusWidget() {
   }
 
   return (
-    <Card data-testid="inbox-status-widget">
+    <Card className="hover:shadow-card-hover" data-testid="inbox-status-widget">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Inbox Status</CardTitle>
-        <Mail className="h-4 w-4 text-muted-foreground" />
+        <CardTitle className="text-sm font-semibold text-muted-foreground">Inbox Status</CardTitle>
+        <div className="h-10 w-10 rounded-full bg-gradient-inbox flex items-center justify-center">
+          <Mail className="h-5 w-5 text-white" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-1">
-          <div className="text-2xl font-bold" data-testid="unread-emails-count">
+        <div className="space-y-2">
+          <div className="text-3xl font-bold text-inbox" data-testid="unread-emails-count">
             {stats?.unreadEmails || 0}
           </div>
-          <p className="text-xs text-muted-foreground">Unread emails</p>
-          <div className="flex items-center text-xs text-muted-foreground">
-            <span className="text-destructive" data-testid="require-reply-count">
+          <p className="text-sm font-medium text-muted-foreground">Unread emails</p>
+          <div className="flex items-center text-sm">
+            <span className="text-destructive font-semibold" data-testid="require-reply-count">
               {Math.floor((stats?.unreadEmails || 0) / 3)} require reply
             </span>
           </div>
