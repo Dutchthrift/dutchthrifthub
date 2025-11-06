@@ -866,25 +866,8 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                       const attachmentPath = attachment.startsWith('/attachments/') 
                         ? attachment.substring('/attachments/'.length)
                         : attachment;
-                      const downloadUrl = `/api/attachments/${attachmentPath}`;
+                      const downloadUrl = `/api/attachments/${attachmentPath}?download=1`;
                       const filename = decodeURIComponent(attachment.split('/').pop() || 'download');
-                      
-                      const handleDownload = async () => {
-                        try {
-                          const response = await fetch(downloadUrl);
-                          const blob = await response.blob();
-                          const url = window.URL.createObjectURL(blob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = filename;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                          window.URL.revokeObjectURL(url);
-                        } catch (error) {
-                          console.error('Download failed:', error);
-                        }
-                      };
                       
                       return (
                         <div key={index} className="flex items-center justify-between border p-2 rounded">
@@ -892,14 +875,20 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                             <FileText className="h-4 w-4" />
                             <span className="text-sm" title={filename}>{filename}</span>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleDownload}
-                            data-testid={`button-download-${index}`}
+                          <a 
+                            href={downloadUrl} 
+                            download={filename}
+                            target="_blank"
+                            rel="noopener noreferrer"
                           >
-                            <Download className="h-4 w-4" />
-                          </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              data-testid={`button-download-${index}`}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </a>
                         </div>
                       );
                     })}

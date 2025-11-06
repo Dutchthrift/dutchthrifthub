@@ -2610,11 +2610,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Extract the path after /api/attachments/
       const pathAfterAttachments = req.path.replace("/api/attachments/", "");
+      const forceDownload = req.query.download === '1';
       console.log(
         "Attachment request path:",
         req.path,
         "extracted path:",
         pathAfterAttachments,
+        "forceDownload:",
+        forceDownload,
       );
 
       // Construct the storage path with /attachments/ prefix
@@ -2630,7 +2633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "contentType:",
           emailAttachment.contentType,
         );
-        await storage.downloadAttachment(attachmentPath, res);
+        await storage.downloadAttachment(attachmentPath, res, forceDownload);
         return;
       }
 
@@ -2640,7 +2643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const objectStorageService = new ObjectStorageService();
       try {
         const file = await objectStorageService.getAttachmentFile(attachmentPath);
-        await objectStorageService.downloadObject(file, res);
+        await objectStorageService.downloadObject(file, res, 3600, forceDownload);
       } catch (storageError) {
         console.log("File not found in object storage:", attachmentPath);
         return res.status(404).json({ error: "Attachment not found" });

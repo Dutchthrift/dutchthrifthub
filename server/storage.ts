@@ -74,7 +74,7 @@ export interface IStorage {
   getEmailAttachment(attachmentPath: string): Promise<EmailAttachment | undefined>;
   getEmailMessageAttachments(messageId: string): Promise<EmailAttachment[]>;
   createEmailAttachment(attachment: InsertEmailAttachment): Promise<EmailAttachment>;
-  downloadAttachment(attachmentPath: string, res: any): Promise<void>;
+  downloadAttachment(attachmentPath: string, res: any, forceDownload?: boolean): Promise<void>;
 
   // Repairs
   getRepairs(): Promise<Repair[]>;
@@ -1090,10 +1090,10 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async downloadAttachment(attachmentPath: string, res: Response): Promise<void> {
+  async downloadAttachment(attachmentPath: string, res: Response, forceDownload: boolean = false): Promise<void> {
     const objectStorageService = new ObjectStorageService();
     const file = await objectStorageService.getAttachmentFile(attachmentPath);
-    await objectStorageService.downloadObject(file, res);
+    await objectStorageService.downloadObject(file, res, 3600, forceDownload);
   }
 }
 

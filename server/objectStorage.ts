@@ -74,7 +74,7 @@ export class ObjectStorageService {
   }
 
   // Downloads an object to the response.
-  async downloadObject(file: File, res: Response, cacheTtlSec: number = 3600) {
+  async downloadObject(file: File, res: Response, cacheTtlSec: number = 3600, forceDownload: boolean = false) {
     try {
       // Get file metadata
       const [metadata] = await file.getMetadata();
@@ -98,16 +98,16 @@ export class ObjectStorageService {
         "X-Content-Type-Options": "nosniff",
       };
       
-      // Set Content-Disposition based on file type
-      if (isPreviewable) {
+      // Set Content-Disposition based on file type and forceDownload flag
+      if (forceDownload || !isPreviewable) {
+        headers["Content-Disposition"] = `attachment; filename="${filename}"`;
+        headers["X-Frame-Options"] = "DENY";
+      } else {
         headers["Content-Disposition"] = `inline; filename="${filename}"`;
         // Allow framing for PDFs in preview
         if (contentType.includes('pdf')) {
           headers["X-Frame-Options"] = "SAMEORIGIN";
         }
-      } else {
-        headers["Content-Disposition"] = `attachment; filename="${filename}"`;
-        headers["X-Frame-Options"] = "DENY";
       }
       
       res.set(headers);
