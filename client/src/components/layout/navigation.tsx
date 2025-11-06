@@ -64,7 +64,7 @@ export function Navigation() {
 
   return (
     <>
-      <nav className="border-b border-border bg-card shadow-soft" data-testid="main-navigation">
+      <nav className="sticky top-0 z-50 border-b border-border bg-card shadow-soft" data-testid="main-navigation">
         <div className="flex h-16 items-center px-4 gap-4">
           {/* Mobile Menu Button */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
