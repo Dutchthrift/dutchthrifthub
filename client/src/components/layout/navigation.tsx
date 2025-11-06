@@ -302,7 +302,7 @@ export function Navigation() {
                   <ChevronDown className="h-4 w-4 hidden md:inline" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
                 {user?.role === "ADMIN" && (
                   <>
                     <DropdownMenuItem asChild>
@@ -320,6 +320,47 @@ export function Navigation() {
                     <DropdownMenuSeparator />
                   </>
                 )}
+                
+                {/* Theme Selector */}
+                <div className="px-2 py-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                    Theme
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    <Button
+                      variant={theme === "light" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setTheme("light")}
+                      className="w-full justify-start"
+                      data-testid="dropdown-theme-light"
+                    >
+                      <Sun className="h-4 w-4 mr-2" />
+                      Light
+                    </Button>
+                    <Button
+                      variant={theme === "dark" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setTheme("dark")}
+                      className="w-full justify-start"
+                      data-testid="dropdown-theme-dark"
+                    >
+                      <Moon className="h-4 w-4 mr-2" />
+                      Dark
+                    </Button>
+                    <Button
+                      variant={theme === "system" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setTheme("system")}
+                      className="w-full justify-start"
+                      data-testid="dropdown-theme-system"
+                    >
+                      <Monitor className="h-4 w-4 mr-2" />
+                      System
+                    </Button>
+                  </div>
+                </div>
+                
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleLogout}
                   className="text-destructive cursor-pointer"
