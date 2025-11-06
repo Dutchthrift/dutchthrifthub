@@ -68,11 +68,11 @@ export default function Repairs() {
       <Navigation />
       
       <main className="container mx-auto px-4 py-6">
-        <div className="bg-repairs rounded-lg p-6 mb-6" data-testid="repairs-header">
+        <div className="bg-card rounded-lg p-6 mb-6 border" data-testid="repairs-header">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-repairs">Reparaties</h1>
-              <p className="text-foreground/80">Beheer reparatieverzoeken en volg de voortgang</p>
+              <h1 className="text-3xl font-bold tracking-tight">Reparaties</h1>
+              <p className="text-muted-foreground">Beheer reparatieverzoeken en volg de voortgang</p>
             </div>
             <Button onClick={() => setShowNewRepair(true)} data-testid="button-new-repair" className="sm:flex-shrink-0">
               <Plus className="mr-2 h-4 w-4" />

@@ -413,11 +413,11 @@ export default function Cases() {
       <Navigation />
       
       <main className="container mx-auto px-4 py-6">
-        <div className="bg-cases rounded-lg p-6 mb-6" data-testid="cases-header">
+        <div className="bg-card rounded-lg p-6 mb-6 border" data-testid="cases-header">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-cases">Cases</h1>
-              <p className="text-foreground/80">Manage customer cases and track progress</p>
+              <h1 className="text-3xl font-bold tracking-tight">Cases</h1>
+              <p className="text-muted-foreground">Manage customer cases and track progress</p>
             </div>
             <Dialog open={showNewCase} onOpenChange={setShowNewCase}>
               <DialogTrigger asChild>
