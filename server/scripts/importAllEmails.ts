@@ -222,58 +222,11 @@ export async function importAllEmails() {
       }
 
       console.log(`Successfully parsed ${emails.length} emails`);
-      console.log(`Found ${attachmentQueue.length} attachments to download`);
+      console.log(`Found ${attachmentQueue.length} attachments (metadata only, not downloading)`);
 
-      // Download attachments
-      const objectStorage = new ObjectStorageService();
-      const attachmentMap = new Map<string, string>();
-
-      if (attachmentQueue.length > 0) {
-        console.log('Downloading attachments...');
-        let downloadedCount = 0;
-        
-        for (const attachment of attachmentQueue) {
-          try {
-            const timeoutMs = 15000;
-            const timeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error(`Attachment download timeout`)), timeoutMs);
-            });
-            
-            const downloadPromise = async () => {
-              const { content: stream } = await client.download(attachment.uid, attachment.partId);
-              const chunks: Buffer[] = [];
-              for await (const chunk of stream) {
-                chunks.push(chunk);
-              }
-              return Buffer.concat(chunks);
-            };
-            
-            const buffer = await Promise.race([downloadPromise(), timeoutPromise]);
-            const key = `${attachment.uid}-${attachment.partId}`;
-            
-            const storageUrl = await objectStorage.saveAttachment(
-              attachment.filename,
-              buffer,
-              attachment.contentType
-            );
-            
-            attachmentMap.set(key, storageUrl);
-            downloadedCount++;
-            
-            if (downloadedCount % 10 === 0) {
-              console.log(`Downloaded ${downloadedCount}/${attachmentQueue.length} attachments...`);
-            }
-          } catch (error) {
-            console.error(`Error downloading attachment ${attachment.filename}:`, error);
-          }
-        }
-        
-        console.log(`Successfully downloaded ${downloadedCount} attachments`);
-      }
-
-      // Import into database
+      // Import into database (attachments will be downloaded on-demand when viewing emails)
       console.log('Importing emails into database...');
-      await importEmailsToDatabase(emails, attachmentMap);
+      await importEmailsToDatabase(emails);
       
       console.log(`Import complete! Imported ${emails.length} emails`);
       return { success: true, imported: emails.length };
@@ -310,7 +263,7 @@ function decodeContent(buffer: Buffer, encoding: string): string {
   }
 }
 
-async function importEmailsToDatabase(emails: ParsedEmail[], attachmentMap: Map<string, string>) {
+async function importEmailsToDatabase(emails: ParsedEmail[]) {
   // Group emails into threads
   const threadMap = new Map<string, ParsedEmail[]>();
   
@@ -409,18 +362,16 @@ async function importEmailsToDatabase(emails: ParsedEmail[], attachmentMap: Map<
           continue;
         }
         
-        // Map attachments
-        const messageAttachments = email.attachments.map((att: EmailAttachment) => {
-          const key = `${att.uid}-${att.partId}`;
-          const url = attachmentMap.get(key);
-          return {
-            filename: att.filename,
-            contentType: att.contentType,
-            size: att.size,
-            url: url || '',
-            contentId: att.contentId
-          };
-        }).filter((att: any) => att.url);
+        // Store attachment metadata (files will be downloaded on-demand when viewing)
+        const messageAttachments = email.attachments.map((att: EmailAttachment) => ({
+          filename: att.filename,
+          contentType: att.contentType,
+          size: att.size,
+          contentId: att.contentId,
+          // Store IMAP location for future on-demand download
+          uid: att.uid,
+          partId: att.partId
+        }));
         
         await storage.createEmailMessage({
           threadId,
