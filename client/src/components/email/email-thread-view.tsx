@@ -498,7 +498,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                         </Button>
                         <Button 
                           size="sm" 
-                          variant="destructive"
+                          variant="danger"
                           onClick={() => linkToCaseMutation.mutate('')}
                           disabled={linkToCaseMutation.isPending}
                           data-testid={`unlink-case-${caseItem.id}`}
@@ -571,7 +571,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                     <div className="text-sm font-medium">Gekoppelde Order</div>
                     <Button 
                       size="sm" 
-                      variant="destructive"
+                      variant="danger"
                       onClick={() => linkToOrderMutation.mutate('')}
                       disabled={linkToOrderMutation.isPending}
                       data-testid="unlink-order-button"
