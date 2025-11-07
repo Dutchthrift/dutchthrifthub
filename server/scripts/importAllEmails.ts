@@ -70,12 +70,16 @@ export async function importAllEmails() {
 
       const emails: ParsedEmail[] = [];
       const attachmentQueue: EmailAttachment[] = [];
+      let failedCount = 0;
       
       // Fetch emails in batches of 50
       const batchSize = 50;
       for (let i = 0; i < uids.length; i += batchSize) {
         const batchUids = uids.slice(i, i + batchSize);
-        console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(uids.length / batchSize)} (${batchUids.length} emails)...`);
+        const batchNum = Math.floor(i / batchSize) + 1;
+        const totalBatches = Math.ceil(uids.length / batchSize);
+        const progress = Math.round((i / uids.length) * 100);
+        console.log(`\n📦 Processing batch ${batchNum}/${totalBatches} (${progress}% complete, ${batchUids.length} emails in batch)`);
         
         for await (const message of client.fetch(batchUids, {
           envelope: true,
@@ -130,36 +134,45 @@ export async function importAllEmails() {
             const htmlPart = textParts.find(p => p.type === 'text/html');
             const plainPart = textParts.find(p => p.type === 'text/plain');
             
-            // Download body content with timeout
-            const downloadBodyPart = async (partId: string, encoding: string): Promise<string> => {
-              try {
-                const timeoutMs = 10000;
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                  setTimeout(() => reject(new Error(`Download timeout after ${timeoutMs}ms`)), timeoutMs);
-                });
-                
-                const downloadPromise = async () => {
-                  const { content: stream } = await client.download(message.uid, partId);
-                  const chunks: Buffer[] = [];
-                  for await (const chunk of stream) {
-                    chunks.push(chunk);
+            // Download body content with timeout and retry logic
+            const downloadBodyPart = async (partId: string, encoding: string, maxRetries = 3): Promise<string> => {
+              for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                  const timeoutMs = 60000; // 60 second timeout for bulk import
+                  const timeoutPromise = new Promise<never>((_, reject) => {
+                    setTimeout(() => reject(new Error(`Download timeout after ${timeoutMs}ms`)), timeoutMs);
+                  });
+                  
+                  const downloadPromise = async () => {
+                    const { content: stream } = await client.download(message.uid, partId);
+                    const chunks: Buffer[] = [];
+                    for await (const chunk of stream) {
+                      chunks.push(chunk);
+                    }
+                    return Buffer.concat(chunks);
+                  };
+                  
+                  const contentBuffer = await Promise.race([downloadPromise(), timeoutPromise]);
+                  return decodeContent(contentBuffer, encoding);
+                } catch (error) {
+                  if (attempt === maxRetries) {
+                    console.error(`Failed to download part ${partId} for UID ${message.uid} after ${maxRetries} attempts:`, error);
+                    return '';
                   }
-                  return Buffer.concat(chunks);
-                };
-                
-                const contentBuffer = await Promise.race([downloadPromise(), timeoutPromise]);
-                return decodeContent(contentBuffer, encoding);
-              } catch (error) {
-                console.error(`Error downloading part ${partId} for UID ${message.uid}:`, error);
-                return '';
+                  console.log(`Retry ${attempt}/${maxRetries} for part ${partId} UID ${message.uid}...`);
+                  await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                }
               }
+              return '';
             };
 
             if (htmlPart) {
               bodyHtml = await downloadBodyPart(htmlPart.partId, htmlPart.encoding);
+              if (!bodyHtml) failedCount++;
             }
             if (plainPart) {
               bodyText = await downloadBodyPart(plainPart.partId, plainPart.encoding);
+              if (!bodyText && !bodyHtml) failedCount++;
             }
 
             // Find attachments
@@ -197,39 +210,58 @@ export async function importAllEmails() {
             const messageAttachments = findAttachments(message.bodyStructure);
             attachmentQueue.push(...messageAttachments);
 
-            emails.push({
-              messageId,
-              from,
-              to,
-              cc,
-              subject,
-              date,
-              bodyText,
-              bodyHtml,
-              attachments: messageAttachments,
-              inReplyTo,
-              references,
-              isRead
-            });
+            // Only add email if we got at least some body content
+            if (bodyHtml || bodyText) {
+              emails.push({
+                messageId,
+                from,
+                to,
+                cc,
+                subject,
+                date,
+                bodyText,
+                bodyHtml,
+                attachments: messageAttachments,
+                inReplyTo,
+                references,
+                isRead
+              });
+            } else {
+              console.warn(`⚠️  Skipping email UID ${message.uid} - no body content downloaded`);
+              failedCount++;
+            }
             
-            if (emails.length % 10 === 0) {
-              console.log(`Parsed ${emails.length}/${uids.length} emails...`);
+            if (emails.length % 100 === 0) {
+              console.log(`✅ Parsed ${emails.length}/${uids.length} emails (${failedCount} failed)...`);
             }
           } catch (error) {
-            console.error(`Error parsing email UID ${message.uid}:`, error);
+            console.error(`❌ Error parsing email UID ${message.uid}:`, error);
+            failedCount++;
           }
         }
       }
 
-      console.log(`Successfully parsed ${emails.length} emails`);
-      console.log(`Found ${attachmentQueue.length} attachments (metadata only, not downloading)`);
+      console.log(`\n📊 Import Summary:`);
+      console.log(`   ✅ Successfully parsed: ${emails.length} emails`);
+      console.log(`   ❌ Failed to download: ${failedCount} emails`);
+      console.log(`   📎 Attachments found: ${attachmentQueue.length} (metadata only, not downloading)`);
+      console.log(`   📈 Success rate: ${Math.round((emails.length / uids.length) * 100)}%\n`);
 
       // Import into database (attachments will be downloaded on-demand when viewing emails)
-      console.log('Importing emails into database...');
-      await importEmailsToDatabase(emails);
+      console.log('💾 Importing emails into database...');
+      const importStats = await importEmailsToDatabase(emails);
       
-      console.log(`Import complete! Imported ${emails.length} emails`);
-      return { success: true, imported: emails.length };
+      console.log(`\n🎉 Import complete!`);
+      console.log(`   📧 Total emails imported: ${importStats.importedMessages}`);
+      console.log(`   🧵 Conversation threads created: ${importStats.importedThreads}`);
+      console.log(`   ❌ Failed downloads: ${failedCount}`);
+      
+      return { 
+        success: true, 
+        imported: importStats.importedMessages,
+        threads: importStats.importedThreads,
+        failed: failedCount
+      };
       
     } finally {
       lock.release();
@@ -389,8 +421,8 @@ async function importEmailsToDatabase(emails: ParsedEmail[]) {
         importedMessages++;
       }
       
-      if (importedThreads % 10 === 0) {
-        console.log(`Imported ${importedThreads} threads, ${importedMessages} messages...`);
+      if (importedThreads % 50 === 0 && importedThreads > 0) {
+        console.log(`💾 Progress: ${importedThreads} threads, ${importedMessages} messages imported...`);
       }
     } catch (error) {
       console.error(`Error importing thread:`, error);
@@ -398,4 +430,9 @@ async function importEmailsToDatabase(emails: ParsedEmail[]) {
   }
   
   console.log(`Database import complete: ${importedThreads} threads, ${importedMessages} messages`);
+  
+  return {
+    importedThreads,
+    importedMessages
+  };
 }
