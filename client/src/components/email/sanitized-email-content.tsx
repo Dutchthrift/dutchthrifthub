@@ -21,30 +21,69 @@ export function SanitizedEmailContent({ body, isHtml, encoding }: SanitizedEmail
   const decodeEmailBody = (rawData: string, transferEncoding?: string): string => {
     let decoded = rawData;
 
-    // Step 1: Base64 decode if needed
-    if (transferEncoding === 'base64') {
+    // Step 1: Remove multipart boundaries and MIME headers first
+    // This prevents them from interfering with decoding
+    const lines = decoded.split('\n');
+    const cleanedLines: string[] = [];
+    let skipUntilEmpty = false;
+    let inMimeHeaders = true;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
+      
+      // Skip multipart boundaries
+      if (trimmedLine.startsWith('--') && trimmedLine.length > 10) {
+        skipUntilEmpty = true;
+        continue;
+      }
+      
+      // Skip MIME headers at the beginning
+      if (inMimeHeaders) {
+        if (trimmedLine === '') {
+          inMimeHeaders = false;
+          continue;
+        }
+        if (trimmedLine.match(/^[A-Za-z-]+:\s*.+/)) {
+          continue;
+        }
+        inMimeHeaders = false;
+      }
+      
+      // Skip lines after boundary until we hit content
+      if (skipUntilEmpty) {
+        if (trimmedLine === '' || trimmedLine.match(/^[A-Za-z-]+:\s*.+/)) {
+          continue;
+        }
+        skipUntilEmpty = false;
+      }
+      
+      // Skip standalone MIME headers anywhere in content
+      if (trimmedLine.match(/^(Content-Type|Content-Transfer-Encoding|Content-Disposition|Mime-Version|charset):/i)) {
+        continue;
+      }
+      
+      cleanedLines.push(line);
+    }
+    
+    decoded = cleanedLines.join('\n').trim();
+
+    // Step 2: Base64 decode if needed
+    if (transferEncoding?.toLowerCase() === 'base64' || 
+        (!decoded.includes('<') && !decoded.includes('=') && decoded.length > 100 && /^[A-Za-z0-9+/=\s]+$/.test(decoded.substring(0, 200)))) {
       try {
-        decoded = decodeBase64(decoded);
+        const cleanBase64 = decoded.replace(/\s/g, '');
+        if (cleanBase64.length > 0) {
+          decoded = decodeBase64(cleanBase64);
+        }
       } catch (e) {
         console.error('Error decoding base64:', e);
       }
-    } else if (!decoded.includes('=') && !decoded.includes('<') && decoded.length > 50) {
-      // Auto-detect base64 content
-      const base64Pattern = /^[A-Za-z0-9+/=\s]+$/;
-      if (base64Pattern.test(decoded.replace(/\s/g, ''))) {
-        try {
-          const cleanBase64 = decoded.replace(/\s/g, '');
-          decoded = decodeBase64(cleanBase64);
-        } catch (e) {
-          // Not base64, continue
-        }
-      }
     }
 
-    // Step 2: Quoted-printable decode if detected
-    // Look for patterns like =0A, =C2, =3D, or soft line breaks (=\r\n)
-    if (decoded.includes('=0A') || decoded.includes('=C2') || decoded.includes('=3D') || 
-        decoded.includes('=20') || decoded.includes('=E2') || /=\r?\n/.test(decoded)) {
+    // Step 3: Quoted-printable decode if detected
+    if (transferEncoding?.toLowerCase() === 'quoted-printable' ||
+        decoded.includes('=0A') || decoded.includes('=3D') || /=[0-9A-F]{2}/.test(decoded)) {
       try {
         decoded = decodeQuotedPrintable(decoded);
       } catch (e) {
@@ -52,44 +91,16 @@ export function SanitizedEmailContent({ body, isHtml, encoding }: SanitizedEmail
       }
     }
 
-    // Step 3: Ensure UTF-8 decoding
-    try {
-      if (typeof TextDecoder !== 'undefined' && decoded.includes('\ufffd')) {
-        const encoder = new TextEncoder();
-        const uint8Array = encoder.encode(decoded);
-        const decoder = new TextDecoder('utf-8');
-        decoded = decoder.decode(uint8Array);
-      }
-    } catch (e) {
-      // UTF-8 decoding not needed or failed
-    }
-
-    // Step 4: Clean MIME headers at the beginning
-    const lines = decoded.split('\n');
-    let contentStartIndex = 0;
+    // Step 4: Remove any remaining MIME artifacts
+    decoded = decoded.replace(/--[a-zA-Z0-9_-]{10,}(--)?[\r\n]*/g, '');
+    decoded = decoded.replace(/^(Content-Type|Content-Transfer-Encoding|Content-Disposition|Mime-Version):[^\n]*\n?/gim, '');
+    decoded = decoded.replace(/charset="?[^"\n]*"?/gi, '');
     
-    for (let i = 0; i < Math.min(lines.length, 20); i++) {
-      const line = lines[i].trim();
-      if (line.match(/^[A-Za-z-]+:\s*.+/) || line.startsWith('--') || line === '') {
-        contentStartIndex = i + 1;
-      } else {
-        break;
-      }
-    }
+    // Step 5: Clean up excessive whitespace
+    decoded = decoded.replace(/\n{3,}/g, '\n\n');
+    decoded = decoded.trim();
 
-    if (contentStartIndex > 0 && contentStartIndex < lines.length) {
-      decoded = lines.slice(contentStartIndex).join('\n');
-    }
-
-    // Step 5: Remove common MIME artifacts
-    decoded = decoded.replace(/Content-Type:[^\n]*\n?/gi, '');
-    decoded = decoded.replace(/Content-Transfer-Encoding:[^\n]*\n?/gi, '');
-    decoded = decoded.replace(/Content-Disposition:[^\n]*\n?/gi, '');
-    decoded = decoded.replace(/Mime-Version:[^\n]*\n?/gi, '');
-    decoded = decoded.replace(/charset="?[^"\n]*"?\n?/gi, '');
-    decoded = decoded.replace(/--[a-zA-Z0-9_-]{10,}[^\n]*\n?/g, '');
-
-    return decoded.trim();
+    return decoded;
   };
 
   // Decode the email body with encoding hint
@@ -119,27 +130,46 @@ export function SanitizedEmailContent({ body, isHtml, encoding }: SanitizedEmail
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'ul', 'ol', 'li', 'a', 'img', 'div', 'span', 'table', 'thead', 'tbody',
-        'tr', 'td', 'th', 'blockquote', 'code', 'pre', 'hr', 'b', 'i', 'font'
+        'tr', 'td', 'th', 'blockquote', 'code', 'pre', 'hr', 'b', 'i', 'font',
+        'center', 'small', 'big', 'sub', 'sup', 'strike', 's', 'del'
       ],
-      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel', 'width', 'height'],
+      ALLOWED_ATTR: [
+        'href', 'src', 'alt', 'title', 'target', 'rel', 'width', 'height',
+        'align', 'valign', 'bgcolor', 'color', 'size', 'face', 'border',
+        'cellpadding', 'cellspacing', 'style'
+      ],
+      ALLOWED_STYLES: {
+        '*': {
+          'color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/, /^rgba\(/],
+          'background-color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/, /^rgba\(/],
+          'font-size': [/^\d+px$/, /^\d+em$/, /^\d+%$/],
+          'font-family': [/.*/],
+          'font-weight': [/^(normal|bold|\d{3})$/],
+          'text-align': [/^(left|right|center|justify)$/],
+          'padding': [/^\d+px$/],
+          'margin': [/^\d+px$/],
+          'border': [/.*/],
+          'text-decoration': [/^(none|underline|line-through)$/]
+        }
+      },
       ALLOW_DATA_ATTR: false,
-      ADD_ATTR: ['target', 'rel'],
+      ADD_ATTR: ['target'],
       FORCE_BODY: true,
     };
 
     let cleanHtml = html;
 
-    // Remove style tags (but keep the content structure)
+    // Remove style tags but keep inline styles for basic formatting
     cleanHtml = cleanHtml.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
     
-    // Remove inline styles but keep the tags
-    cleanHtml = cleanHtml.replace(/\s*style="[^"]*"/gi, '');
+    // Remove script tags
+    cleanHtml = cleanHtml.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
     
-    // Remove classes
-    cleanHtml = cleanHtml.replace(/\s*class="[^"]*"/gi, '');
-    
-    // Clean up excessive whitespace
+    // Convert common entities
     cleanHtml = cleanHtml.replace(/&nbsp;/g, ' ');
+    
+    // Ensure all links open in new tab
+    cleanHtml = cleanHtml.replace(/<a\s/gi, '<a target="_blank" rel="noopener noreferrer" ');
 
     const sanitized = DOMPurify.sanitize(cleanHtml, config);
     return sanitized;
