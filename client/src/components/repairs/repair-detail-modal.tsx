@@ -876,7 +876,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               </CardHeader>
               <CardContent>
                 {photos.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {photos.map((photo, index) => {
                       // Extract the path after /attachments/ to construct the API URL
                       const photoPath = photo.startsWith('/attachments/') 
@@ -892,30 +892,30 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                             className="w-full h-full object-cover cursor-pointer"
                             onClick={() => setFullScreenImage(photoUrl)}
                           />
-                          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
                               variant="secondary"
                               size="sm"
-                              className="h-8 w-8 p-0"
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setFullScreenImage(photoUrl);
                               }}
                               data-testid={`button-view-photo-${index}`}
                             >
-                              <Maximize2 className="h-4 w-4" />
+                              <Maximize2 className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
-                              className="h-8 w-8 p-0"
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteFile('photos', photo);
                               }}
                               data-testid={`button-delete-photo-${index}`}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                           </div>
                         </div>
@@ -949,13 +949,33 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                       const downloadUrl = `/api/attachments/${attachmentPath}?download=1`;
                       const filename = decodeURIComponent(attachment.split('/').pop() || 'download');
                       
+                      // Create a shorter display name for mobile
+                      const getDisplayName = (name: string) => {
+                        if (name.length <= 30) return name;
+                        const parts = name.split('.');
+                        if (parts.length > 1) {
+                          const ext = parts.pop();
+                          const basename = parts.join('.');
+                          return basename.length > 20 
+                            ? `${basename.substring(0, 20)}...${ext}` 
+                            : `${basename}.${ext}`;
+                        }
+                        return `${name.substring(0, 25)}...`;
+                      };
+                      
                       return (
-                        <div key={index} className="flex items-center gap-2 border p-2 rounded w-full">
+                        <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-2 border p-3 rounded w-full">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <FileText className="h-4 w-4 flex-shrink-0" />
-                            <span className="text-sm truncate block" title={filename}>{filename}</span>
+                            <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                            <span 
+                              className="text-sm break-all sm:truncate block" 
+                              title={filename}
+                            >
+                              <span className="hidden sm:inline">{filename}</span>
+                              <span className="sm:hidden">{getDisplayName(filename)}</span>
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
+                          <div className="flex items-center gap-1 flex-shrink-0 self-end sm:self-center">
                             <a 
                               href={downloadUrl} 
                               download={filename}
@@ -966,8 +986,10 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                                 variant="ghost"
                                 size="sm"
                                 data-testid={`button-download-${index}`}
+                                className="h-8 px-2"
                               >
                                 <Download className="h-4 w-4" />
+                                <span className="ml-1 text-xs hidden sm:inline">Download</span>
                               </Button>
                             </a>
                             <Button
@@ -975,8 +997,10 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                               size="sm"
                               onClick={() => handleDeleteFile('attachments', attachment)}
                               data-testid={`button-delete-attachment-${index}`}
+                              className="h-8 px-2"
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
+                              <span className="ml-1 text-xs hidden sm:inline">Delete</span>
                             </Button>
                           </div>
                         </div>
@@ -996,17 +1020,19 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               <CardHeader>
                 <CardTitle className="text-base">Nieuwe bestanden uploaden</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 <Input
                   type="file"
                   multiple
                   onChange={(e) => setSelectedFiles(e.target.files)}
                   data-testid="input-file-upload"
+                  className="cursor-pointer"
                 />
                 <Button
                   onClick={handleFileUpload}
                   disabled={!selectedFiles || uploadFilesMutation.isPending}
                   data-testid="button-upload-files"
+                  className="w-full sm:w-auto"
                 >
                   <Upload className="h-4 w-4 mr-2" />
                   {uploadFilesMutation.isPending ? 'Uploaden...' : 'Upload bestanden'}
