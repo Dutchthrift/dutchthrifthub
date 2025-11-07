@@ -27,6 +27,10 @@ export class ImapSmtpProvider implements EmailProvider {
   });
 
   async syncEmails(): Promise<RawEmail[]> {
+    return this.syncEmailsWithLimit(10, 0);
+  }
+
+  async syncEmailsWithLimit(limit: number = 10, offset: number = 0): Promise<RawEmail[]> {
     console.log('IMAP Config:', {
       host: this.imapConfig.host,
       port: this.imapConfig.port,
@@ -49,15 +53,21 @@ export class ImapSmtpProvider implements EmailProvider {
       
       try {
         // Get total message count from selected mailbox
-        const totalMessages = client.mailbox && typeof client.mailbox === 'object' ? client.mailbox.exists : 10;
+        const totalMessages = client.mailbox && typeof client.mailbox === 'object' ? client.mailbox.exists : limit;
         
-        // Calculate range for last 10 messages (faster sync)
-        const startSeq = Math.max(1, totalMessages - 9); // Get last 10 messages
-        const endSeq = totalMessages;
+        // Calculate range based on limit and offset (counting from the end)
+        const endSeq = totalMessages - offset;
+        const startSeq = Math.max(1, endSeq - limit + 1);
         
-        console.log(`IMAP total messages: ${totalMessages}, fetching range: ${startSeq}:${endSeq}`);
+        console.log(`IMAP total messages: ${totalMessages}, fetching range: ${startSeq}:${endSeq} (limit: ${limit}, offset: ${offset})`);
         
-        // Get recent emails (last 10)
+        // Return early if range is invalid
+        if (startSeq > endSeq || endSeq < 1) {
+          console.log('No messages in requested range');
+          return [];
+        }
+        
+        // Get emails in the specified range
         const messages = [];
         let attachmentQueue: Array<{
           messageIndex: number;
