@@ -1,6 +1,5 @@
 import { ImapFlow } from 'imapflow';
 import { storage } from '../storage';
-import * as mimeTypes from 'mime-types';
 import { ObjectStorageService } from '../objectStorage';
 
 interface EmailAttachment {
@@ -25,7 +24,7 @@ interface ParsedEmail {
   bodyHtml: string;
   attachments: EmailAttachment[];
   inReplyTo?: string;
-  references?: string[];
+  references: string[];
   isRead: boolean;
 }
 
@@ -59,7 +58,9 @@ export async function importAllEmails() {
       const searchDate = new Date('2025-01-01');
       console.log(`Searching for emails since ${searchDate.toISOString()}...`);
       
-      const uids = await client.search({ since: searchDate });
+      const searchResult = await client.search({ since: searchDate });
+      const uids = Array.isArray(searchResult) ? searchResult : [];
+      
       console.log(`Found ${uids.length} emails to import`);
       
       if (uids.length === 0) {
@@ -85,6 +86,7 @@ export async function importAllEmails() {
         })) {
           try {
             const envelope = message.envelope;
+            if (!envelope) continue;
             
             // Extract basic info
             const messageId = envelope.messageId || `generated-${message.uid}@dutchthrift.com`;
@@ -93,15 +95,11 @@ export async function importAllEmails() {
             const cc = envelope.cc?.map(addr => addr.address || '') || [];
             const subject = envelope.subject || '(No Subject)';
             const date = envelope.date || new Date();
-            const isRead = !message.flags?.has('\\Seen');
+            const isRead = message.flags?.has('\\Seen') || false;
             
             // Extract threading info
             const inReplyTo = envelope.inReplyTo;
-            const references = Array.isArray(message.envelope.references) 
-              ? message.envelope.references 
-              : message.envelope.references 
-                ? [message.envelope.references] 
-                : [];
+            const references: string[] = [];
 
             // Find text parts in body structure
             let bodyText = '';
@@ -253,9 +251,11 @@ export async function importAllEmails() {
             const buffer = await Promise.race([downloadPromise(), timeoutPromise]);
             const key = `${attachment.uid}-${attachment.partId}`;
             
-            const storageUrl = await objectStorage.uploadFile(buffer, attachment.filename, {
-              contentType: attachment.contentType
-            });
+            const storageUrl = await objectStorage.saveAttachment(
+              attachment.filename,
+              buffer,
+              attachment.contentType
+            );
             
             attachmentMap.set(key, storageUrl);
             downloadedCount++;
@@ -343,34 +343,35 @@ async function importEmailsToDatabase(emails: ParsedEmail[], attachmentMap: Map<
   let importedThreads = 0;
   let importedMessages = 0;
   
-  for (const [threadKey, threadEmails] of threadMap.entries()) {
+  for (const [threadKey, threadEmails] of Array.from(threadMap.entries())) {
     try {
       // Sort by date
-      threadEmails.sort((a, b) => a.date.getTime() - b.date.getTime());
+      threadEmails.sort((a: ParsedEmail, b: ParsedEmail) => a.date.getTime() - b.date.getTime());
       
       const firstEmail = threadEmails[0];
       const lastEmail = threadEmails[threadEmails.length - 1];
       
       // Determine participants
       const allParticipants = new Set<string>();
-      threadEmails.forEach(email => {
+      threadEmails.forEach((email: ParsedEmail) => {
         allParticipants.add(email.from);
-        email.to.forEach(addr => allParticipants.add(addr));
-        email.cc.forEach(addr => allParticipants.add(addr));
+        email.to.forEach((addr: string) => allParticipants.add(addr));
+        email.cc.forEach((addr: string) => allParticipants.add(addr));
       });
       
       // Determine status
-      const hasUnread = threadEmails.some(e => e.isRead);
+      const hasUnread = threadEmails.some((e: ParsedEmail) => !e.isRead);
       const status = hasUnread ? 'open' : 'closed';
       
       // Check if thread already exists
-      const existingThreads = await storage.getEmailThreads();
+      const existingThreads = await storage.getEmailThreads({});
       const existingThread = existingThreads.find(t => 
         t.subject === firstEmail.subject && 
-        Math.abs(new Date(t.lastMessageAt).getTime() - lastEmail.date.getTime()) < 60000
+        t.lastActivity && 
+        Math.abs(new Date(t.lastActivity).getTime() - lastEmail.date.getTime()) < 60000
       );
       
-      let threadId: number;
+      let threadId: string;
       
       if (existingThread) {
         threadId = existingThread.id;
@@ -378,16 +379,19 @@ async function importEmailsToDatabase(emails: ParsedEmail[], attachmentMap: Map<
       } else {
         // Create thread
         const thread = await storage.createEmailThread({
+          threadId: threadKey,
           subject: firstEmail.subject,
-          participants: Array.from(allParticipants),
+          customerEmail: firstEmail.from,
           status,
-          lastMessageAt: lastEmail.date,
-          messageCount: threadEmails.length,
-          hasAttachments: threadEmails.some(e => e.attachments.length > 0),
+          lastActivity: lastEmail.date,
+          hasAttachment: threadEmails.some((e: ParsedEmail) => e.attachments.length > 0),
           customerId: null,
-          orderId: null,
-          assignedToId: null,
-          priority: 'normal'
+          assignedUserId: null,
+          priority: 'medium',
+          isUnread: hasUnread,
+          folder: 'inbox',
+          starred: false,
+          archived: false
         });
         
         threadId = thread.id;
@@ -406,7 +410,7 @@ async function importEmailsToDatabase(emails: ParsedEmail[], attachmentMap: Map<
         }
         
         // Map attachments
-        const messageAttachments = email.attachments.map(att => {
+        const messageAttachments = email.attachments.map((att: EmailAttachment) => {
           const key = `${att.uid}-${att.partId}`;
           const url = attachmentMap.get(key);
           return {
@@ -416,22 +420,23 @@ async function importEmailsToDatabase(emails: ParsedEmail[], attachmentMap: Map<
             url: url || '',
             contentId: att.contentId
           };
-        }).filter(att => att.url);
+        }).filter((att: any) => att.url);
         
         await storage.createEmailMessage({
           threadId,
           messageId: email.messageId,
-          from: email.from,
-          to: email.to,
-          cc: email.cc,
+          senderEmail: email.from,
+          senderName: email.from.split('@')[0],
+          recipientEmails: email.to,
+          ccEmails: email.cc,
           subject: email.subject,
           bodyText: email.bodyText,
           bodyHtml: email.bodyHtml,
           sentAt: email.date,
-          isFromCustomer: true,
+          isOutgoing: false,
           attachments: messageAttachments,
           inReplyTo: email.inReplyTo,
-          references: email.references || []
+          references: email.references
         });
         
         importedMessages++;
