@@ -49,15 +49,15 @@ export class ImapSmtpProvider implements EmailProvider {
       
       try {
         // Get total message count from selected mailbox
-        const totalMessages = client.mailbox && typeof client.mailbox === 'object' ? client.mailbox.exists : 50;
+        const totalMessages = client.mailbox && typeof client.mailbox === 'object' ? client.mailbox.exists : 10;
         
-        // Calculate range for last 50 messages
-        const startSeq = Math.max(1, totalMessages - 49); // Get last 50 messages
+        // Calculate range for last 10 messages (faster sync)
+        const startSeq = Math.max(1, totalMessages - 9); // Get last 10 messages
         const endSeq = totalMessages;
         
         console.log(`IMAP total messages: ${totalMessages}, fetching range: ${startSeq}:${endSeq}`);
         
-        // Get recent emails (last 50)
+        // Get recent emails (last 10)
         const messages = [];
         let attachmentQueue: Array<{
           messageIndex: number;
@@ -79,10 +79,7 @@ export class ImapSmtpProvider implements EmailProvider {
         })) {
           
           // Check if message has attachments
-          console.log(`=== DEBUG: Checking message UID ${message.uid} for attachments ===`);
-          console.log('bodyStructure:', JSON.stringify(message.bodyStructure, null, 2));
           const hasAttachment = this.checkForAttachments(message.bodyStructure);
-          console.log(`=== DEBUG: hasAttachment result for UID ${message.uid}: ${hasAttachment} ===`);
           
           // Build conversation ID from subject and participants
           const envelope = message.envelope;
