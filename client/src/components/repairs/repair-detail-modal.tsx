@@ -373,14 +373,17 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
+          <div className="space-y-3">
+            {/* Title and Subtitle */}
+            <div>
               <DialogTitle>Reparatie #{currentRepair.id.slice(0, 8)}</DialogTitle>
               <p className="text-sm text-foreground mt-1">{currentRepair.title}</p>
             </div>
-            <div className="flex items-center gap-2">
+            
+            {/* Status Badge and Warning */}
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="secondary" className={getStatusColor(currentRepair.status)}>
                 {getStatusLabel(currentRepair.status)}
               </Badge>
@@ -392,6 +395,10 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                   <span className="text-xs font-medium">Te laat</span>
                 </div>
               )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
               {isEditMode ? (
                 <>
                   <Button
@@ -400,8 +407,8 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                     onClick={handleCancelEdit}
                     data-testid="button-cancel-edit"
                   >
-                    <X className="h-4 w-4 mr-2" />
-                    Annuleren
+                    <X className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Annuleren</span>
                   </Button>
                   <Button
                     variant="default"
@@ -410,8 +417,8 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                     disabled={updateRepairMutation.isPending}
                     data-testid="button-save-edit"
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    {updateRepairMutation.isPending ? "Opslaan..." : "Opslaan"}
+                    <Save className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">{updateRepairMutation.isPending ? "Opslaan..." : "Opslaan"}</span>
                   </Button>
                 </>
               ) : (
@@ -421,8 +428,8 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                   onClick={() => setIsEditMode(true)}
                   data-testid="button-edit-repair"
                 >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Bewerken
+                  <Edit className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Bewerken</span>
                 </Button>
               )}
               <Button
@@ -431,24 +438,29 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                 onClick={() => setShowDeleteDialog(true)}
                 data-testid="delete-repair-button"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Verwijderen
+                <Trash2 className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Verwijderen</span>
               </Button>
             </div>
           </div>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview" data-testid="tab-overview">Overzicht</TabsTrigger>
-            <TabsTrigger value="parts" data-testid="tab-parts">
-              Onderdelen ({partsUsed.length})
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+            <TabsTrigger value="overview" data-testid="tab-overview" className="text-xs sm:text-sm">
+              Overzicht
             </TabsTrigger>
-            <TabsTrigger value="files" data-testid="tab-files">
-              Bestanden ({photos.length + attachments.length})
+            <TabsTrigger value="parts" data-testid="tab-parts" className="text-xs sm:text-sm">
+              <span className="hidden sm:inline">Onderdelen ({partsUsed.length})</span>
+              <span className="sm:hidden">Delen ({partsUsed.length})</span>
             </TabsTrigger>
-            <TabsTrigger value="activity" data-testid="tab-activity">
-              Activiteit ({activities.length})
+            <TabsTrigger value="files" data-testid="tab-files" className="text-xs sm:text-sm">
+              <span className="hidden sm:inline">Bestanden ({photos.length + attachments.length})</span>
+              <span className="sm:hidden">Files ({photos.length + attachments.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="activity" data-testid="tab-activity" className="text-xs sm:text-sm">
+              <span className="hidden sm:inline">Activiteit ({activities.length})</span>
+              <span className="sm:hidden">Log ({activities.length})</span>
             </TabsTrigger>
           </TabsList>
 
