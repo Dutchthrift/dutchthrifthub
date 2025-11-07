@@ -107,15 +107,26 @@ export class ImapSmtpProvider implements EmailProvider {
             if (partToUse) {
               console.log(`Downloading ${partToUse.type} part ${partToUse.partId} for UID ${message.uid}`);
               
-              // Download the part content as a stream
-              const { content: stream } = await client.download(message.uid, partToUse.partId);
+              // Add timeout to prevent hanging on large emails
+              const downloadWithTimeout = async () => {
+                const timeoutMs = 10000; // 10 second timeout
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                  setTimeout(() => reject(new Error(`Download timeout after ${timeoutMs}ms`)), timeoutMs);
+                });
+                
+                const downloadPromise = async () => {
+                  const { content: stream } = await client.download(message.uid, partToUse.partId);
+                  const chunks: Buffer[] = [];
+                  for await (const chunk of stream) {
+                    chunks.push(chunk);
+                  }
+                  return Buffer.concat(chunks);
+                };
+                
+                return Promise.race([downloadPromise(), timeoutPromise]);
+              };
               
-              // Collect stream into buffer
-              const chunks: Buffer[] = [];
-              for await (const chunk of stream) {
-                chunks.push(chunk);
-              }
-              const contentBuffer = Buffer.concat(chunks);
+              const contentBuffer = await downloadWithTimeout();
               
               // Decode based on encoding
               bodyText = this.decodeContent(contentBuffer, partToUse.encoding);
