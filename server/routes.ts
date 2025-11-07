@@ -18,6 +18,7 @@ import { syncEmails, sendEmail } from "./services/emailService";
 import { shopifyClient } from "./services/shopifyClient";
 import { OrderMatchingService } from "./services/orderMatchingService";
 import { ObjectStorageService } from "./objectStorage";
+import { importAllEmails } from "./scripts/importAllEmails";
 import multer from "multer";
 import Papa from "papaparse";
 
@@ -2445,6 +2446,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error syncing emails:", error);
       res.status(500).json({ message: "Failed to sync emails" });
+    }
+  });
+
+  // Import all emails from 2025-01-01 to now
+  app.post("/api/emails/import-all", requireAuth, async (req, res) => {
+    try {
+      console.log(`🚀 Starting full email import from 2025-01-01...`);
+      const result = await importAllEmails();
+      
+      if (result.success) {
+        // Auto-match orders for newly imported emails
+        console.log(`🔄 Auto-matching orders for imported emails...`);
+        try {
+          const threads = await storage.getEmailThreads({});
+          const threadsWithoutOrders = threads.filter((thread) => !thread.orderId);
+          
+          let matchedCount = 0;
+          for (const thread of threadsWithoutOrders) {
+            const messages = await storage.getEmailMessages(thread.id);
+            if (messages.length > 0) {
+              const firstMessage = messages[0];
+              const matchedOrder = await orderMatchingService.getOrderForAutoLink(
+                firstMessage.body || "",
+                thread.customerEmail || "",
+                thread.subject || "",
+              );
+              
+              if (matchedOrder) {
+                await storage.updateEmailThread(thread.id, {
+                  orderId: matchedOrder.id,
+                });
+                matchedCount++;
+              }
+            }
+          }
+          
+          console.log(`✅ Matched ${matchedCount} threads with orders`);
+        } catch (matchError) {
+          console.error("Error auto-matching orders:", matchError);
+        }
+        
+        res.json({
+          success: true,
+          imported: result.imported,
+          message: `Successfully imported ${result.imported} emails from 2025-01-01 to now`,
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: "Email import failed",
+        });
+      }
+    } catch (error) {
+      console.error("Error importing emails:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to import emails",
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 

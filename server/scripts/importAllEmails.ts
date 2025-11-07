@@ -425,18 +425,14 @@ async function importEmailsToDatabase(emails: ParsedEmail[], attachmentMap: Map<
         await storage.createEmailMessage({
           threadId,
           messageId: email.messageId,
-          senderEmail: email.from,
-          senderName: email.from.split('@')[0],
-          recipientEmails: email.to,
-          ccEmails: email.cc,
+          fromEmail: email.from,
+          toEmail: email.to.join(', '),
           subject: email.subject,
-          bodyText: email.bodyText,
-          bodyHtml: email.bodyHtml,
-          sentAt: email.date,
-          isOutgoing: false,
+          body: email.bodyHtml || email.bodyText,
+          isHtml: !!email.bodyHtml,
+          isOutbound: false,
           attachments: messageAttachments,
-          inReplyTo: email.inReplyTo,
-          references: email.references
+          sentAt: email.date
         });
         
         importedMessages++;

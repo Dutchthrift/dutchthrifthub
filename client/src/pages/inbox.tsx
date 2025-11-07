@@ -13,7 +13,8 @@ import {
   Archive as ArchiveIcon,
   RefreshCw,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { EmailThread } from "@shared/schema";
@@ -96,6 +97,28 @@ export default function Inbox() {
       toast({
         title: "Sync failed",
         description: "Failed to sync emails from server",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const importAllEmailsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/emails/import-all", { method: "POST" });
+      if (!response.ok) throw new Error("Failed to import emails");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-threads"], exact: false });
+      toast({
+        title: "Import complete",
+        description: data.message,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Import failed",
+        description: error.message || "Failed to import emails from server",
         variant: "destructive",
       });
     }
@@ -309,15 +332,27 @@ export default function Inbox() {
                 )}
               </div>
 
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => syncEmailsMutation.mutate()}
-                disabled={syncEmailsMutation.isPending}
-                data-testid="sync-emails-button"
-              >
-                <RefreshCw className={cn("h-4 w-4", syncEmailsMutation.isPending && "animate-spin")} />
-              </Button>
+              <div className="flex gap-1">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => importAllEmailsMutation.mutate()}
+                  disabled={importAllEmailsMutation.isPending}
+                  data-testid="import-all-emails-button"
+                  title="Import all emails from 2025-01-01"
+                >
+                  <Download className={cn("h-4 w-4", importAllEmailsMutation.isPending && "animate-spin")} />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => syncEmailsMutation.mutate()}
+                  disabled={syncEmailsMutation.isPending}
+                  data-testid="sync-emails-button"
+                >
+                  <RefreshCw className={cn("h-4 w-4", syncEmailsMutation.isPending && "animate-spin")} />
+                </Button>
+              </div>
             </div>
 
             {/* Bulk Actions */}
