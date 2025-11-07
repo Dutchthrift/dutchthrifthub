@@ -1,0 +1,86 @@
+Build a modern Gmail-style webmail interface that connects to an IMAP and SMTP server (Strato), using the Strato mail server for all email sending and receiving — no external mail API.
+
+Core requirements:
+
+The system must connect directly to Strato’s:
+
+IMAP server: imap.strato.com
+
+SMTP server: smtp.strato.com
+
+The UI must look and behave like Gmail:
+
+Left sidebar with folders (Inbox, Sent, Drafts, etc.)
+
+Threaded conversations
+
+Search bar at the top
+
+Modern, responsive design (Material-like)
+
+HTML mail rendering with sanitization and attachments
+
+Compose window with reply, reply-all, forward
+
+Multi-select, mark as read/unread, delete, move
+
+Emails are fetched via IMAP and stored in a local database/cache for quick access.
+
+Each incoming email should automatically check if the sender’s email address matches an existing order in the system.
+
+If matched: automatically link the email to that order.
+
+If not matched: leave unlinked but show a “Link to order” dropdown in the UI.
+
+Users can manually link or unlink an email to an order via a simple UI control.
+
+For example, a dropdown or modal to choose an existing order.
+
+The linked order information should be visible in a side panel next to the email content (similar to Gmail’s right-hand add-on pane).
+
+The UI should be built in React (Next.js or similar) with:
+
+A clean, Gmail-like layout
+
+Realtime updates using WebSockets or polling
+
+Smooth transitions (React Motion or Framer Motion)
+
+Backend can be in Node.js with:
+
+imapflow (for IMAP sync)
+
+mailparser (for parsing)
+
+nodemailer (for SMTP)
+
+Prisma (for database schema)
+
+The database should include:
+
+emails(id, from, to, cc, subject, date, snippet, body, thread_id, flags, order_id)
+
+orders(id, email, customer_name, status, created_at)
+
+Include endpoints for:
+
+GET /emails (list inbox)
+
+GET /emails/:id (email detail + linked order)
+
+POST /emails/:id/link (link to order)
+
+DELETE /emails/:id/link (unlink)
+
+GET /orders/search?email= (for manual linking dropdown)
+
+Optional enhancements:
+
+AI summarization of long email threads.
+
+Tagging or categorization (Support, Returns, Shipping, etc.)
+
+Quick templates for common replies.
+
+Goal:
+A Gmail-like email dashboard fully integrated into our custom hub, using Strato mail servers as backend, with the ability to automatically or manually link emails to orders based on the sender’s email address.
