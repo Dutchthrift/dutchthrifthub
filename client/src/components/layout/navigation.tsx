@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Camera, Home, Inbox, ShoppingCart, Package2, Wrench, CheckSquare, BarChart3, Briefcase, Search, Bell, ChevronDown, Settings, Users, Menu, X, Sun, Moon, Monitor } from "lucide-react";
+import { Camera, Home, Inbox, ShoppingCart, Package2, Wrench, CheckSquare, BarChart3, Briefcase, Package, Search, Bell, ChevronDown, Settings, Users, Menu, X, Sun, Moon, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ const navigationItems = [
   { href: "/", label: "Home", icon: Home, roles: ["ADMIN", "SUPPORT"] },
   { href: "/inbox", label: "Inbox", icon: Inbox, badge: 3, roles: ["ADMIN", "SUPPORT"] },
   { href: "/cases", label: "Cases", icon: Briefcase, roles: ["ADMIN", "SUPPORT"] },
+  { href: "/returns", label: "Retouren", icon: Package, roles: ["ADMIN", "SUPPORT"] },
   { href: "/orders", label: "Orders", icon: ShoppingCart, roles: ["ADMIN", "SUPPORT"] },
   { href: "/purchase-orders", label: "Inkoop Orders", icon: Package2, roles: ["ADMIN", "SUPPORT"] },
   { href: "/repairs", label: "Repairs", icon: Wrench, roles: ["ADMIN", "SUPPORT", "TECHNICUS"] },
