@@ -305,8 +305,8 @@ export class DatabaseStorage implements IStorage {
 
   // Orders
   async getOrders(limit: number = 50): Promise<Order[]> {
-    // Sort by order date descending (newest orders first)
-    return await db.select().from(orders).orderBy(desc(orders.orderDate)).limit(limit);
+    // Sort by order date descending (newest orders first), NULL dates go to end
+    return await db.select().from(orders).orderBy(sql`${orders.orderDate} DESC NULLS LAST`).limit(limit);
   }
 
   async getOrdersPaginated(page: number = 1, limit: number = 20, searchQuery?: string): Promise<{ orders: Order[], total: number }> {
@@ -331,10 +331,11 @@ export class DatabaseStorage implements IStorage {
     const total = Number(countResult.count);
     
     // Get paginated orders with search filter, sorted by date (newest first)
+    // Use sql`` to add NULLS LAST to prevent NULL dates from appearing in middle of results
     const ordersQuery = db
       .select()
       .from(orders)
-      .orderBy(desc(orders.orderDate))
+      .orderBy(sql`${orders.orderDate} DESC NULLS LAST`)
       .limit(limit)
       .offset(offset);
     
