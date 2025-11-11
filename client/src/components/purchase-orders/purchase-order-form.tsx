@@ -426,7 +426,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: 
                                 checked={checkField.value}
                                 onCheckedChange={checkField.onChange}
                                 data-testid="checkbox-is-paid"
-                                className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                                className="data-[state=checked]:bg-green-600 data-[state=checked]:text-white data-[state=checked]:border-green-600"
                               />
                             </FormControl>
                           </FormItem>
