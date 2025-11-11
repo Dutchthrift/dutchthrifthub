@@ -600,10 +600,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Internal Notes
-  async getInternalNotes(entityId: string, entityType: string): Promise<InternalNote[]> {
+  async getInternalNotes(entityType: string, entityId: string): Promise<InternalNote[]> {
     const column = entityType === 'customer' ? internalNotes.customerId :
                   entityType === 'order' ? internalNotes.orderId :
                   entityType === 'repair' ? internalNotes.repairId :
+                  entityType === 'case' ? internalNotes.caseId :
+                  entityType === 'return' ? internalNotes.returnId :
                   internalNotes.emailThreadId;
     
     return await db.select().from(internalNotes).where(eq(column, entityId)).orderBy(desc(internalNotes.createdAt));

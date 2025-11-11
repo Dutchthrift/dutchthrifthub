@@ -3505,7 +3505,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!returnData) {
         return res.status(404).json({ message: "Return not found" });
       }
-      res.json(returnData);
+
+      // Fetch associated order with Shopify data
+      let order = null;
+      let customer = null;
+      let orderTracking = null;
+      
+      if (returnData.orderId) {
+        order = await storage.getOrder(returnData.orderId);
+        
+        // Extract tracking from Shopify order data
+        if (order?.orderData) {
+          const fulfillments = (order.orderData as any)?.fulfillments || [];
+          if (fulfillments.length > 0) {
+            const latestFulfillment = fulfillments[fulfillments.length - 1];
+            orderTracking = {
+              trackingNumber: latestFulfillment.tracking_number,
+              trackingUrl: latestFulfillment.tracking_url,
+              trackingCompany: latestFulfillment.tracking_company,
+            };
+          }
+        }
+      }
+      
+      // Fetch customer
+      if (returnData.customerId) {
+        customer = await storage.getCustomer(returnData.customerId);
+      } else if (order?.customerId) {
+        customer = await storage.getCustomer(order.customerId);
+      }
+
+      // Fetch return items
+      const items = await storage.getReturnItems(id);
+
+      // Calculate financial comparison
+      const refundAmount = returnData.refundAmount || 0;
+      const originalAmount = order?.totalAmount || 0;
+      const financialComparison = {
+        refundAmount,
+        originalAmount,
+        difference: originalAmount - refundAmount,
+      };
+
+      // Tracking information
+      const tracking = {
+        returnTracking: {
+          trackingNumber: returnData.trackingNumber,
+          expectedReturnDate: returnData.expectedReturnDate,
+        },
+        orderTracking,
+      };
+
+      // Get photos from object storage (already in return)
+      const photos = returnData.photos || [];
+
+      // Fetch internal notes
+      const notes = await storage.getInternalNotes('return', id);
+
+      // Get assigned user details
+      let assignedUser = null;
+      if (returnData.assignedUserId) {
+        assignedUser = await storage.getUser(returnData.assignedUserId);
+      }
+
+      // Return enriched data
+      res.json({
+        return: returnData,
+        order: order || null,
+        customer: customer || null,
+        returnItems: items,
+        financialComparison,
+        tracking,
+        photos,
+        notes,
+        assignedUser: assignedUser ? {
+          id: assignedUser.id,
+          fullName: `${assignedUser.firstName || ''} ${assignedUser.lastName || ''}`.trim() || assignedUser.username,
+          email: assignedUser.email,
+        } : null,
+      });
     } catch (error) {
       console.error("Error fetching return:", error);
       res.status(500).json({ message: "Failed to fetch return" });
@@ -3645,11 +3723,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.file.mimetype
       );
 
-      // Update the return's photoUrls array
-      const currentPhotos = returnData.photoUrls || [];
+      // Update the return's photos array
+      const currentPhotos = returnData.photos || [];
       const updatedPhotos = [...currentPhotos, photoPath];
       
-      await storage.updateReturn(id, { photoUrls: updatedPhotos });
+      await storage.updateReturn(id, { photos: updatedPhotos });
 
       await auditLog(req, "UPDATE", "returns", id, {
         action: "photo_uploaded",
@@ -3681,10 +3759,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Remove the photo from the array
-      const currentPhotos = returnData.photoUrls || [];
-      const updatedPhotos = currentPhotos.filter(p => p !== photoPath);
+      const currentPhotos = returnData.photos || [];
+      const updatedPhotos = currentPhotos.filter((p: string) => p !== photoPath);
       
-      await storage.updateReturn(id, { photoUrls: updatedPhotos });
+      await storage.updateReturn(id, { photos: updatedPhotos });
 
       await auditLog(req, "UPDATE", "returns", id, {
         action: "photo_deleted",

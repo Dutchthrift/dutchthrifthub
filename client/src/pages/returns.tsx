@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { Navigation } from "@/components/layout/navigation";
-import { Package, Plus, Filter, Search, Calendar } from "lucide-react";
+import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,9 +15,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { CreateReturnModal } from "@/components/forms/create-return-modal";
+import { InternalNotes } from "@/components/notes/internal-notes";
+import { useToast } from "@/hooks/use-toast";
 
 type Return = {
   id: string;
@@ -26,14 +36,69 @@ type Return = {
   customerId: string | null;
   orderId: string | null;
   returnReason: string | null;
+  otherReason: string | null;
   trackingNumber: string | null;
   requestedAt: string;
+  receivedAt: string | null;
+  expectedReturnDate: string | null;
+  completedAt: string | null;
   refundAmount: number | null;
   refundStatus: string | null;
+  refundMethod: string | null;
+  shopifyRefundId: string | null;
+  customerNotes: string | null;
+  internalNotes: string | null;
+  conditionNotes: string | null;
+  photos: string[] | null;
   priority: string | null;
   tags: string[] | null;
+  assignedUserId: string | null;
+  caseId: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+type ReturnItem = {
+  id: string;
+  returnId: string;
+  sku: string | null;
+  productName: string;
+  quantity: number;
+  unitPrice: number | null;
+  condition: string | null;
+  imageUrl: string | null;
+  restockable: boolean | null;
+  restockedAt: string | null;
+};
+
+type EnrichedReturnData = {
+  return: Return;
+  order: any;
+  customer: any;
+  returnItems: ReturnItem[];
+  financialComparison: {
+    refundAmount: number;
+    originalAmount: number;
+    difference: number;
+  };
+  tracking: {
+    returnTracking: {
+      trackingNumber: string | null;
+      expectedReturnDate: string | null;
+    };
+    orderTracking: {
+      trackingNumber: string;
+      trackingUrl: string;
+      trackingCompany: string;
+    } | null;
+  };
+  photos: string[];
+  notes: any[];
+  assignedUser: {
+    id: string;
+    fullName: string;
+    email: string;
+  } | null;
 };
 
 const STATUS_TABS = [
@@ -71,11 +136,57 @@ export default function Returns() {
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showReturnDetails, setShowReturnDetails] = useState(false);
+  const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
+  
+  const [location, setLocation] = useLocation();
+  const { toast } = useToast();
 
   // Fetch all returns (filtering done client-side)
   const { data: allReturns = [], isLoading } = useQuery<Return[]>({
     queryKey: ["/api/returns"],
   });
+
+  // Fetch enriched return details when a return is selected
+  const { data: enrichedReturnData, isLoading: isLoadingDetails } = useQuery<EnrichedReturnData>({
+    queryKey: ["/api/returns", selectedReturn?.id],
+    enabled: !!selectedReturn?.id && showReturnDetails,
+  });
+
+  // Check for returnId in URL and fetch/open return details
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const returnId = params.get('returnId');
+    
+    if (returnId) {
+      const existingReturn = allReturns.find(r => r.id === returnId);
+      if (existingReturn) {
+        setSelectedReturn(existingReturn);
+        setShowReturnDetails(true);
+        setLocation('/returns');
+      } else {
+        fetch(`/api/returns/${returnId}`)
+          .then(response => {
+            if (!response.ok) throw new Error('Return not found');
+            return response.json();
+          })
+          .then(returnData => {
+            setSelectedReturn(returnData.return);
+            setShowReturnDetails(true);
+            setLocation('/returns');
+          })
+          .catch(error => {
+            console.error('Failed to fetch return:', error);
+            toast({
+              title: "Retour niet gevonden",
+              description: "De gevraagde retour kon niet worden gevonden.",
+              variant: "destructive",
+            });
+            setLocation('/returns');
+          });
+      }
+    }
+  }, [location, allReturns, setLocation, toast]);
 
   // Filter by status
   const returns = currentStatus === "all" 
@@ -111,6 +222,11 @@ export default function Returns() {
   const getStatusLabel = (status: string) => {
     const tab = STATUS_TABS.find((t) => t.value === status);
     return tab?.label || status;
+  };
+
+  const handleViewDetails = (returnItem: Return) => {
+    setSelectedReturn(returnItem);
+    setShowReturnDetails(true);
   };
 
   return (
@@ -252,78 +368,76 @@ export default function Returns() {
         ) : (
           <div className="space-y-3">
             {filteredReturns.map((ret) => (
-              <Link
+              <Card 
                 key={ret.id}
-                href={`/returns/${ret.id}`}
-                className="block"
+                className="transition-all hover:border-primary/40 hover:shadow-soft cursor-pointer"
+                onClick={() => handleViewDetails(ret)}
                 data-testid={`card-return-${ret.id}`}
               >
-                <Card className="transition-all hover:border-primary/40 hover:shadow-soft cursor-pointer">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="font-mono text-sm font-semibold">
-                            {ret.returnNumber}
-                          </span>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="font-mono text-sm font-semibold">
+                          {ret.returnNumber}
+                        </span>
+                        <Badge 
+                          variant="outline" 
+                          className={STATUS_COLORS[ret.status] || ""}
+                        >
+                          {getStatusLabel(ret.status)}
+                        </Badge>
+                        {ret.priority && ret.priority !== "medium" && (
                           <Badge 
-                            variant="outline" 
-                            className={STATUS_COLORS[ret.status] || ""}
+                            variant="outline"
+                            className={PRIORITY_COLORS[ret.priority] || ""}
                           >
-                            {getStatusLabel(ret.status)}
+                            {ret.priority === "low"
+                              ? "Laag"
+                              : ret.priority === "high"
+                              ? "Hoog"
+                              : ret.priority === "urgent"
+                              ? "Urgent"
+                              : ret.priority}
                           </Badge>
-                          {ret.priority && ret.priority !== "medium" && (
-                            <Badge 
-                              variant="outline"
-                              className={PRIORITY_COLORS[ret.priority] || ""}
-                            >
-                              {ret.priority === "low"
-                                ? "Laag"
-                                : ret.priority === "high"
-                                ? "Hoog"
-                                : ret.priority === "urgent"
-                                ? "Urgent"
-                                : ret.priority}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          {ret.trackingNumber && (
-                            <div className="flex items-center gap-1">
-                              <Package className="h-4 w-4" />
-                              <span>{ret.trackingNumber}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>{format(new Date(ret.requestedAt), "dd MMM yyyy")}</span>
-                          </div>
-                        </div>
+                        )}
                       </div>
-                      <div className="text-right">
-                        {ret.refundAmount && (
-                          <div className="text-lg font-semibold">
-                            {formatCurrency(ret.refundAmount)}
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        {ret.trackingNumber && (
+                          <div className="flex items-center gap-1">
+                            <Package className="h-4 w-4" />
+                            <span>{ret.trackingNumber}</span>
                           </div>
                         )}
-                        {ret.refundStatus && (
-                          <div className="text-xs text-muted-foreground">
-                            {ret.refundStatus === "pending"
-                              ? "In afwachting"
-                              : ret.refundStatus === "processing"
-                              ? "Verwerken"
-                              : ret.refundStatus === "completed"
-                              ? "Voltooid"
-                              : ret.refundStatus === "failed"
-                              ? "Mislukt"
-                              : ret.refundStatus}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>{format(new Date(ret.requestedAt), "dd MMM yyyy")}</span>
+                        </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                    <div className="text-right">
+                      {ret.refundAmount && (
+                        <div className="text-lg font-semibold">
+                          {formatCurrency(ret.refundAmount)}
+                        </div>
+                      )}
+                      {ret.refundStatus && (
+                        <div className="text-xs text-muted-foreground">
+                          {ret.refundStatus === "pending"
+                            ? "In afwachting"
+                            : ret.refundStatus === "processing"
+                            ? "Verwerken"
+                            : ret.refundStatus === "completed"
+                            ? "Voltooid"
+                            : ret.refundStatus === "failed"
+                            ? "Mislukt"
+                            : ret.refundStatus}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}
@@ -333,6 +447,400 @@ export default function Returns() {
         open={showCreateModal} 
         onOpenChange={setShowCreateModal}
       />
+
+      {/* Return Details Dialog */}
+      <Dialog open={showReturnDetails} onOpenChange={setShowReturnDetails}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Retour Details {selectedReturn?.returnNumber}</DialogTitle>
+            <DialogDescription>
+              Volledige retourinformatie en order details
+            </DialogDescription>
+          </DialogHeader>
+          
+          {isLoadingDetails ? (
+            <div className="space-y-4">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-48 w-full" />
+            </div>
+          ) : enrichedReturnData && (
+            <div className="space-y-6">
+              {/* Return Overview & Customer Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Return Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Retour Informatie</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Retournummer:</span>
+                      <span className="font-medium">{enrichedReturnData.return.returnNumber}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Status:</span>
+                      <Badge variant="outline" className={STATUS_COLORS[enrichedReturnData.return.status] || ""}>
+                        {getStatusLabel(enrichedReturnData.return.status)}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Prioriteit:</span>
+                      <Badge variant="outline" className={PRIORITY_COLORS[enrichedReturnData.return.priority || 'medium'] || ""}>
+                        {enrichedReturnData.return.priority === "low" ? "Laag" : 
+                         enrichedReturnData.return.priority === "high" ? "Hoog" : 
+                         enrichedReturnData.return.priority === "urgent" ? "Urgent" : "Normaal"}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Reden:</span>
+                      <span className="font-medium text-right max-w-[200px]">
+                        {enrichedReturnData.return.returnReason === "defect" ? "Defect" :
+                         enrichedReturnData.return.returnReason === "wrong_item" ? "Verkeerd artikel" :
+                         enrichedReturnData.return.returnReason === "not_as_described" ? "Niet zoals beschreven" :
+                         enrichedReturnData.return.returnReason === "no_longer_needed" ? "Niet meer nodig" :
+                         enrichedReturnData.return.returnReason === "other" ? enrichedReturnData.return.otherReason || "Anders" :
+                         enrichedReturnData.return.returnReason || "-"}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Aangevraagd:</span>
+                      <span className="font-medium">
+                        {format(new Date(enrichedReturnData.return.requestedAt), "dd MMM yyyy HH:mm")}
+                      </span>
+                    </div>
+                    {enrichedReturnData.return.receivedAt && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Ontvangen:</span>
+                        <span className="font-medium">
+                          {format(new Date(enrichedReturnData.return.receivedAt), "dd MMM yyyy HH:mm")}
+                        </span>
+                      </div>
+                    )}
+                    {enrichedReturnData.assignedUser && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Toegewezen aan:</span>
+                        <span className="font-medium">{enrichedReturnData.assignedUser.fullName}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Customer Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Klantinformatie</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {enrichedReturnData.customer ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Naam:</span>
+                          <span className="font-medium">
+                            {enrichedReturnData.customer.firstName} {enrichedReturnData.customer.lastName}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Email:</span>
+                          <span className="font-medium">{enrichedReturnData.customer.email}</span>
+                        </div>
+                        {enrichedReturnData.customer.phone && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Telefoon:</span>
+                            <span className="font-medium">{enrichedReturnData.customer.phone}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : enrichedReturnData.order?.orderData?.customer ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Naam:</span>
+                          <span className="font-medium">
+                            {enrichedReturnData.order.orderData.customer.first_name} {enrichedReturnData.order.orderData.customer.last_name}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Email:</span>
+                          <span className="font-medium">{enrichedReturnData.order.orderData.customer.email}</span>
+                        </div>
+                        {enrichedReturnData.order.orderData.customer.phone && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Telefoon:</span>
+                            <span className="font-medium">{enrichedReturnData.order.orderData.customer.phone}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-muted-foreground">Geen klantinformatie beschikbaar</div>
+                    )}
+                    {enrichedReturnData.return.customerNotes && (
+                      <>
+                        <Separator />
+                        <div>
+                          <span className="text-sm text-muted-foreground block mb-1">Klant notities:</span>
+                          <p className="text-sm">{enrichedReturnData.return.customerNotes}</p>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Order Information from Shopify */}
+              {enrichedReturnData.order && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">Originele Order Informatie</CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/orders?orderId=${enrichedReturnData.order.id}`, '_blank')}
+                        data-testid="button-view-order"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Bekijk Order
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <span className="text-sm text-muted-foreground">Ordernummer:</span>
+                        <p className="font-medium">{enrichedReturnData.order.orderNumber}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm text-muted-foreground">Orderdatum:</span>
+                        <p className="font-medium">
+                          {enrichedReturnData.order.orderDate ? 
+                            format(new Date(enrichedReturnData.order.orderDate), "dd MMM yyyy") : 
+                            "-"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-sm text-muted-foreground">Status:</span>
+                        <p className="font-medium capitalize">{enrichedReturnData.order.status}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm text-muted-foreground">Totaal bedrag:</span>
+                        <p className="font-medium">
+                          {formatCurrency(enrichedReturnData.order.totalAmount)}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Financial Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Financiële Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <span className="text-sm text-muted-foreground block mb-1">Origineel bedrag:</span>
+                      <p className="text-lg font-semibold">
+                        {formatCurrency(enrichedReturnData.financialComparison.originalAmount)}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <span className="text-sm text-muted-foreground block mb-1">Terugbetaling:</span>
+                      <p className="text-lg font-semibold">
+                        {formatCurrency(enrichedReturnData.financialComparison.refundAmount)}
+                      </p>
+                      <span className="text-xs text-muted-foreground">
+                        {enrichedReturnData.return.refundStatus === "pending" ? "In afwachting" :
+                         enrichedReturnData.return.refundStatus === "processing" ? "Verwerken" :
+                         enrichedReturnData.return.refundStatus === "completed" ? "Voltooid" :
+                         enrichedReturnData.return.refundStatus === "failed" ? "Mislukt" :
+                         enrichedReturnData.return.refundStatus || "Pending"}
+                      </span>
+                    </div>
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <span className="text-sm text-muted-foreground block mb-1">Verschil:</span>
+                      <p className="text-lg font-semibold">
+                        {formatCurrency(enrichedReturnData.financialComparison.difference)}
+                      </p>
+                    </div>
+                  </div>
+                  {enrichedReturnData.return.refundMethod && (
+                    <div className="mt-4">
+                      <span className="text-sm text-muted-foreground">Terugbetalingsmethode: </span>
+                      <span className="font-medium capitalize">{enrichedReturnData.return.refundMethod}</span>
+                    </div>
+                  )}
+                  {enrichedReturnData.return.shopifyRefundId && (
+                    <div className="mt-2">
+                      <span className="text-sm text-muted-foreground">Shopify Refund ID: </span>
+                      <span className="font-mono text-sm">{enrichedReturnData.return.shopifyRefundId}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Return Items */}
+              {enrichedReturnData.returnItems.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Geretourneerde Artikelen</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {enrichedReturnData.returnItems.map((item) => (
+                        <div key={item.id} className="flex items-start justify-between p-3 border rounded-lg" data-testid={`return-item-${item.id}`}>
+                          <div className="flex-1">
+                            <div className="font-medium">{item.productName}</div>
+                            {item.sku && (
+                              <div className="text-sm text-muted-foreground">SKU: {item.sku}</div>
+                            )}
+                            <div className="text-sm text-muted-foreground">Aantal: {item.quantity}</div>
+                            {item.condition && (
+                              <Badge variant="outline" className="mt-1">
+                                {item.condition === "unopened" ? "Ongeopend" :
+                                 item.condition === "opened_unused" ? "Geopend, ongebruikt" :
+                                 item.condition === "used" ? "Gebruikt" :
+                                 item.condition === "damaged" ? "Beschadigd" :
+                                 item.condition}
+                              </Badge>
+                            )}
+                            {item.restockable && (
+                              <Badge variant="outline" className="mt-1 ml-2 bg-chart-2/10 text-chart-2 border-chart-2/20">
+                                Kan opnieuw verkocht
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            {item.unitPrice && (
+                              <>
+                                <div className="font-medium">{formatCurrency(item.unitPrice)}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  Totaal: {formatCurrency(item.unitPrice * item.quantity)}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Tracking Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Tracking Informatie</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Return Tracking */}
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">Retour Tracking</span>
+                      </div>
+                      {enrichedReturnData.tracking.returnTracking.trackingNumber ? (
+                        <>
+                          <p className="font-mono text-sm">{enrichedReturnData.tracking.returnTracking.trackingNumber}</p>
+                          {enrichedReturnData.tracking.returnTracking.expectedReturnDate && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Verwacht: {format(new Date(enrichedReturnData.tracking.returnTracking.expectedReturnDate), "dd MMM yyyy")}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Geen tracking beschikbaar</p>
+                      )}
+                    </div>
+
+                    {/* Order Tracking */}
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Truck className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">Originele Order Tracking</span>
+                      </div>
+                      {enrichedReturnData.tracking.orderTracking ? (
+                        <>
+                          <p className="font-mono text-sm">{enrichedReturnData.tracking.orderTracking.trackingNumber}</p>
+                          {enrichedReturnData.tracking.orderTracking.trackingCompany && (
+                            <p className="text-sm text-muted-foreground">{enrichedReturnData.tracking.orderTracking.trackingCompany}</p>
+                          )}
+                          {enrichedReturnData.tracking.orderTracking.trackingUrl && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0 h-auto mt-1"
+                              onClick={() => window.open(enrichedReturnData.tracking.orderTracking!.trackingUrl, '_blank')}
+                              data-testid="button-track-shipment"
+                            >
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              Track verzending
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Geen tracking beschikbaar</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Photos & Evidence */}
+              {enrichedReturnData.photos.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <ImageIcon className="h-5 w-5" />
+                      Foto's & Bewijs
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {enrichedReturnData.photos.map((photo, index) => (
+                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
+                          <img 
+                            src={photo} 
+                            alt={`Return photo ${index + 1}`}
+                            className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => window.open(photo, '_blank')}
+                            data-testid={`return-photo-${index}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {enrichedReturnData.return.conditionNotes && (
+                      <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">Conditie Notities</span>
+                        </div>
+                        <p className="text-sm">{enrichedReturnData.return.conditionNotes}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Internal Notes */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Interne Notities</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <InternalNotes 
+                    entityType="return" 
+                    entityId={enrichedReturnData.return.id}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

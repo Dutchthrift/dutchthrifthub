@@ -25,7 +25,7 @@ import type { InternalNote, InsertInternalNote } from "@/lib/types";
 // InternalNote type is imported from types
 
 interface InternalNotesProps {
-  entityType: 'customer' | 'order' | 'repair' | 'emailThread' | 'case';
+  entityType: 'customer' | 'order' | 'repair' | 'emailThread' | 'case' | 'return';
   entityId: string;
   entityTitle?: string;
 }
@@ -104,6 +104,7 @@ export function InternalNotes({ entityType, entityId, entityTitle }: InternalNot
       ...(entityType === 'repair' && { repairId: entityId }),
       ...(entityType === 'emailThread' && { emailThreadId: entityId }),
       ...(entityType === 'case' && { caseId: entityId }),
+      ...(entityType === 'return' && { returnId: entityId }),
     };
 
     createNoteMutation.mutate(noteData);
