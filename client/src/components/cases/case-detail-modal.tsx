@@ -61,12 +61,10 @@ import { NotesPanel } from "@/components/notes/NotesPanel";
 import { EmailCompose } from "@/components/email/email-compose";
 
 const CASE_STATUS_OPTIONS = [
-  { value: "new", label: "New" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "waiting_customer", label: "Waiting Customer" },
-  { value: "waiting_part", label: "Waiting Part" },
-  { value: "resolved", label: "Resolved" },
-  { value: "closed", label: "Closed" },
+  { value: "new", label: "Nieuw" },
+  { value: "in_progress", label: "In Behandeling" },
+  { value: "waiting_customer", label: "Wachtend op Klant" },
+  { value: "resolved", label: "Opgelost" },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -105,45 +103,53 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
     enabled: !!caseId && open,
   });
 
-  const { data: relatedEmails } = useQuery<EmailThread[]>({
-    queryKey: ["/api/email-threads", "caseId", caseId],
+  // Fetch case links to get related items
+  const { data: caseLinksData = [] } = useQuery<any[]>({
+    queryKey: ["/api/cases", caseId, "links"],
     queryFn: async () => {
-      const response = await fetch(`/api/email-threads?caseId=${caseId}`);
-      if (!response.ok) throw new Error('Failed to fetch related emails');
+      const response = await fetch(`/api/cases/${caseId}/links`);
+      if (!response.ok) throw new Error('Failed to fetch case links');
       return response.json();
     },
     enabled: !!caseId && open,
   });
 
-  const { data: relatedOrders } = useQuery<Order[]>({
-    queryKey: ["/api/orders", "caseId", caseId],
-    queryFn: async () => {
-      const response = await fetch(`/api/orders?caseId=${caseId}`);
-      if (!response.ok) throw new Error('Failed to fetch related orders');
-      return response.json();
-    },
-    enabled: !!caseId && open,
+  // Extract linked entity IDs by type
+  const linkedEmailIds = caseLinksData.filter((link: any) => link.linkType === "email").map((link: any) => link.linkedId);
+  const linkedOrderIds = caseLinksData.filter((link: any) => link.linkType === "order").map((link: any) => link.linkedId);
+  const linkedRepairIds = caseLinksData.filter((link: any) => link.linkType === "repair").map((link: any) => link.linkedId);
+  const linkedTodoIds = caseLinksData.filter((link: any) => link.linkType === "todo").map((link: any) => link.linkedId);
+
+  const { data: allEmailsData = [] } = useQuery<EmailThread[]>({
+    queryKey: ["/api/email-threads"],
+    enabled: !!caseId && open && linkedEmailIds.length > 0,
   });
 
-  const { data: relatedRepairs } = useQuery<Repair[]>({
-    queryKey: ["/api/repairs", "caseId", caseId],
+  const { data: allOrdersData } = useQuery<any>({
+    queryKey: ["/api/orders", { page: 1, limit: 1000 }],
     queryFn: async () => {
-      const response = await fetch(`/api/repairs?caseId=${caseId}`);
-      if (!response.ok) throw new Error('Failed to fetch related repairs');
+      const response = await fetch("/api/orders?page=1&limit=1000");
+      if (!response.ok) throw new Error("Failed to fetch orders");
       return response.json();
     },
-    enabled: !!caseId && open,
+    enabled: !!caseId && open && linkedOrderIds.length > 0,
   });
 
-  const { data: relatedTodos } = useQuery<Todo[]>({
-    queryKey: ["/api/todos", "caseId", caseId],
-    queryFn: async () => {
-      const response = await fetch(`/api/todos?caseId=${caseId}`);
-      if (!response.ok) throw new Error('Failed to fetch related todos');
-      return response.json();
-    },
-    enabled: !!caseId && open,
+  const { data: allRepairsData } = useQuery<Repair[]>({
+    queryKey: ["/api/repairs"],
+    enabled: !!caseId && open && linkedRepairIds.length > 0,
   });
+
+  const { data: allTodosData } = useQuery<Todo[]>({
+    queryKey: ["/api/todos"],
+    enabled: !!caseId && open && linkedTodoIds.length > 0,
+  });
+
+  // Filter to get only linked items
+  const relatedEmails = allEmailsData.filter((email: EmailThread) => linkedEmailIds.includes(email.id));
+  const relatedOrders = (allOrdersData?.orders || []).filter((order: Order) => linkedOrderIds.includes(order.id));
+  const relatedRepairs = (allRepairsData || []).filter((repair: Repair) => linkedRepairIds.includes(repair.id));
+  const relatedTodos = (allTodosData || []).filter((todo: Todo) => linkedTodoIds.includes(todo.id));
 
   const { data: caseNotes = [] } = useQuery<any[]>({
     queryKey: ["/api/cases", caseId, "notes"],
@@ -170,10 +176,6 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
     },
   });
 
-  const { data: caseLinks = [] } = useQuery<any[]>({
-    queryKey: ["/api/cases", caseId, "links"],
-    enabled: !!caseId && showLinkDialog,
-  });
 
   const { data: allEmails = [] } = useQuery<any[]>({
     queryKey: ["/api/email-threads"],
@@ -442,7 +444,7 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
   };
 
   const getAvailableItems = () => {
-    const linkedIds = caseLinks.map((link: any) => link.linkedId);
+    const linkedIds = caseLinksData.map((link: any) => link.linkedId);
     
     switch (linkType) {
       case "email":
@@ -493,10 +495,11 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
               </div>
               <div className="flex items-center gap-2">
                 <Button 
-                  variant="destructive" 
+                  variant="ghost" 
                   size="sm"
                   onClick={() => setShowDeleteDialog(true)}
                   data-testid="delete-case-button"
+                  className="text-destructive hover:text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
@@ -793,7 +796,7 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
 
                 <TabsContent value="orders" className="space-y-3 mt-4">
                   {relatedOrders?.length ? (
-                    relatedOrders.map(order => (
+                    relatedOrders.map((order: Order) => (
                       <Card key={order.id}>
                         <CardContent className="pt-4">
                           <div className="flex items-center justify-between mb-2">
