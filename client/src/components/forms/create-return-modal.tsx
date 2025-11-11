@@ -1,3 +1,4 @@
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -24,13 +25,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertReturnSchema } from "@shared/schema";
 import { z } from "zod";
+import { Check, ChevronsUpDown, Package } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const createReturnFormSchema = insertReturnSchema.extend({
   customerId: z.string().min(1, "Klant is verplicht"),
@@ -53,6 +70,8 @@ interface CreateReturnModalProps {
 export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: CreateReturnModalProps) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [orderSearchOpen, setOrderSearchOpen] = useState(false);
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
 
   const { data: customers } = useQuery<any[]>({
     queryKey: ["/api/customers"],
@@ -87,6 +106,16 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
       completedAt: null,
     },
   });
+
+  // Populate customerId when modal opens with preset orderId
+  useEffect(() => {
+    if (open && orderId && orders) {
+      const order = orders.find(o => o.id === orderId);
+      if (order && order.customerId) {
+        form.setValue("customerId", order.customerId);
+      }
+    }
+  }, [open, orderId, orders, form]);
 
   const createReturnMutation = useMutation({
     mutationFn: async (data: CreateReturnFormValues) => {
@@ -128,8 +157,33 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
     createReturnMutation.mutate(data);
   };
 
-  const selectedCustomer = customers?.find(c => c.id === form.watch("customerId"));
-  const customerOrders = orders?.filter(o => o.customerId === form.watch("customerId")) || [];
+  // Filter orders by search query
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+    if (!orderSearchQuery) return orders;
+    
+    const query = orderSearchQuery.toLowerCase();
+    return orders.filter((order) => 
+      order.orderNumber?.toLowerCase().includes(query) ||
+      order.shopifyOrderId?.toLowerCase().includes(query) ||
+      order.customerEmail?.toLowerCase().includes(query)
+    );
+  }, [orders, orderSearchQuery]);
+
+  // Get selected order and customer info
+  const selectedOrderId = form.watch("orderId");
+  const selectedOrder = orders?.find(o => o.id === selectedOrderId);
+  const selectedCustomer = customers?.find(c => c.id === selectedOrder?.customerId);
+
+  // Handle order selection
+  const handleOrderSelect = (orderId: string) => {
+    const order = orders?.find(o => o.id === orderId);
+    if (order) {
+      form.setValue("orderId", orderId);
+      form.setValue("customerId", order.customerId || "");
+    }
+    setOrderSearchOpen(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -137,70 +191,106 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
         <DialogHeader>
           <DialogTitle>Nieuwe Retour Aanmaken</DialogTitle>
           <DialogDescription>
-            Maak een nieuwe retour aan. U kunt artikelen toevoegen op de detailpagina.
+            Zoek een bestelling om een retour aan te maken. U kunt artikelen toevoegen op de detailpagina.
           </DialogDescription>
         </DialogHeader>
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Order Search */}
             <FormField
               control={form.control}
-              name="customerId"
+              name="orderId"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Klant *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid="return-customer-select">
-                        <SelectValue placeholder="Selecteer klant..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {customers?.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.firstName} {customer.lastName} ({customer.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <FormItem className="flex flex-col">
+                  <FormLabel>Bestelling *</FormLabel>
+                  <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "justify-between",
+                            !field.value && "text-muted-foreground"
+                          )}
+                          data-testid="order-search-button"
+                        >
+                          {field.value && selectedOrder
+                            ? `${selectedOrder.orderNumber} - €${(selectedOrder.totalAmount / 100).toFixed(2)}`
+                            : "Zoek bestelling..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[460px] p-0" data-testid="order-search-popover">
+                      <Command>
+                        <CommandInput 
+                          placeholder="Zoek op bestelnummer of email..." 
+                          value={orderSearchQuery}
+                          onValueChange={setOrderSearchQuery}
+                          data-testid="order-search-input"
+                        />
+                        <CommandList>
+                          <CommandEmpty>Geen bestellingen gevonden.</CommandEmpty>
+                          <CommandGroup>
+                            {filteredOrders.slice(0, 50).map((order) => (
+                              <CommandItem
+                                key={order.id}
+                                value={order.id}
+                                onSelect={() => handleOrderSelect(order.id)}
+                                data-testid={`order-option-${order.id}`}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    field.value === order.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <Package className="h-4 w-4 text-muted-foreground" />
+                                    <span className="font-mono font-medium">
+                                      {order.orderNumber}
+                                    </span>
+                                    <Badge variant="outline" className="ml-auto">
+                                      €{(order.totalAmount / 100).toFixed(2)}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {order.customerEmail}
+                                  </div>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="orderId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Bestelling (Optioneel)</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value || undefined}
-                    disabled={!form.watch("customerId")}
-                  >
-                    <FormControl>
-                      <SelectTrigger data-testid="return-order-select">
-                        <SelectValue placeholder={
-                          form.watch("customerId") 
-                            ? "Selecteer bestelling..." 
-                            : "Selecteer eerst een klant"
-                        } />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Geen bestelling</SelectItem>
-                      {customerOrders.map((order) => (
-                        <SelectItem key={order.id} value={order.id}>
-                          {order.shopifyOrderNumber || order.id} - €{(order.totalPrice / 100).toFixed(2)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Show customer info when order is selected */}
+            {selectedOrder && selectedCustomer && (
+              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                <div className="text-sm font-medium">Klantinformatie</div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Naam:</span>{" "}
+                    <span className="font-medium">
+                      {selectedCustomer.firstName} {selectedCustomer.lastName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Email:</span>{" "}
+                    <span className="font-medium">{selectedCustomer.email}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -306,7 +396,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
               </Button>
               <Button
                 type="submit"
-                disabled={createReturnMutation.isPending}
+                disabled={createReturnMutation.isPending || !selectedOrder}
                 data-testid="button-create-return"
               >
                 {createReturnMutation.isPending ? "Aanmaken..." : "Retour Aanmaken"}
