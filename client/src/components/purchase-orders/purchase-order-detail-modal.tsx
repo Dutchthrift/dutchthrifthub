@@ -54,6 +54,7 @@ interface PurchaseOrderDetailModalProps {
   open: boolean;
   onClose: () => void;
   suppliers: Supplier[];
+  purchaseOrders: PurchaseOrder[];
 }
 
 export function PurchaseOrderDetailModal({
@@ -61,6 +62,7 @@ export function PurchaseOrderDetailModal({
   open,
   onClose,
   suppliers,
+  purchaseOrders,
 }: PurchaseOrderDetailModalProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("details");
@@ -147,6 +149,7 @@ export function PurchaseOrderDetailModal({
   const totalAmount = lineItems?.reduce((sum, item) => sum + ((item.subtotal || 0) / 100), 0) || (purchaseOrder.totalAmount || 0) / 100;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -413,6 +416,15 @@ export function PurchaseOrderDetailModal({
         </AlertDialogContent>
       </AlertDialog>
     </Dialog>
+    
+    <PurchaseOrderForm
+      open={isEditing}
+      onClose={() => setIsEditing(false)}
+      suppliers={suppliers}
+      purchaseOrders={purchaseOrders}
+      editPurchaseOrder={purchaseOrder}
+    />
+    </>
   );
 }
 

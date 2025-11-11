@@ -372,6 +372,7 @@ export default function PurchaseOrders() {
             setSelectedPO(null);
           }}
           suppliers={suppliers || []}
+          purchaseOrders={purchaseOrders || []}
         />
       )}
     </div>

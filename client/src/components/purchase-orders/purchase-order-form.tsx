@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, X, Upload, FileText } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
 
 type PurchaseOrderFormData = z.infer<typeof insertPurchaseOrderSchema>;
 
@@ -42,6 +43,7 @@ interface PurchaseOrderFormProps {
   onClose: () => void;
   suppliers: Supplier[];
   purchaseOrders: any[];
+  editPurchaseOrder?: any;
 }
 
 interface LineItem {
@@ -52,7 +54,7 @@ interface LineItem {
   unitPrice: number;
 }
 
-export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: PurchaseOrderFormProps) {
+export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders, editPurchaseOrder }: PurchaseOrderFormProps) {
   const { toast } = useToast();
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
@@ -101,6 +103,62 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: 
       createdBy: user?.id || "",
     },
   });
+
+  // Fetch line items when editing
+  const { data: existingLineItems } = useQuery<any[]>({
+    queryKey: ["/api/purchase-order-items", editPurchaseOrder?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/purchase-order-items/${editPurchaseOrder.id}`, {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch items");
+      return response.json();
+    },
+    enabled: !!editPurchaseOrder?.id,
+  });
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editPurchaseOrder && open) {
+      form.reset({
+        title: editPurchaseOrder.title || "",
+        supplierNumber: editPurchaseOrder.supplierNumber || "",
+        supplierId: editPurchaseOrder.supplierId || "",
+        orderDate: editPurchaseOrder.orderDate ? new Date(editPurchaseOrder.orderDate) : new Date(),
+        expectedDeliveryDate: editPurchaseOrder.expectedDeliveryDate ? new Date(editPurchaseOrder.expectedDeliveryDate) : undefined,
+        totalAmount: editPurchaseOrder.totalAmount || 0,
+        currency: editPurchaseOrder.currency || "EUR",
+        status: editPurchaseOrder.status || "aangekocht",
+        isPaid: editPurchaseOrder.isPaid || false,
+        notes: editPurchaseOrder.notes || "",
+        createdBy: editPurchaseOrder.createdBy || user?.id || "",
+      });
+      
+      // Set supplier search text
+      const supplier = suppliers.find(s => s.id === editPurchaseOrder.supplierId);
+      if (supplier) {
+        setSupplierSearch(`${supplier.supplierCode} - ${supplier.name}`);
+      }
+      
+      // Set amount input
+      if (editPurchaseOrder.totalAmount) {
+        setAmountInput((editPurchaseOrder.totalAmount / 100).toString());
+      }
+    }
+  }, [editPurchaseOrder, open, form, suppliers, user?.id]);
+
+  // Populate line items when editing
+  useEffect(() => {
+    if (existingLineItems && existingLineItems.length > 0) {
+      setLineItems(existingLineItems.map(item => ({
+        id: item.id,
+        sku: item.sku || "",
+        productName: item.productName || "",
+        quantity: item.quantity || 0,
+        unitPrice: (item.unitPrice || 0) / 100,
+      })));
+    }
+  }, [existingLineItems]);
 
   const createSupplierMutation = useMutation({
     mutationFn: async (data: { supplierCode: string; name: string }) => {
@@ -205,10 +263,66 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: 
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      // Update the PO
+      const poResponse = await apiRequest("PATCH", `/api/purchase-orders/${editPurchaseOrder.id}`, data);
+      const purchaseOrder = await poResponse.json();
+
+      // Delete existing line items and recreate them
+      if (existingLineItems) {
+        for (const item of existingLineItems) {
+          await apiRequest("DELETE", `/api/purchase-order-items/${item.id}`);
+        }
+      }
+
+      // Create new line items
+      if (data.lineItems && data.lineItems.length > 0) {
+        for (const item of data.lineItems) {
+          await apiRequest("POST", "/api/purchase-order-items", {
+            purchaseOrderId: purchaseOrder.id,
+            sku: item.sku,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: Math.round(item.unitPrice * 100),
+            subtotal: Math.round(item.quantity * item.unitPrice * 100),
+          });
+        }
+      }
+
+      return purchaseOrder;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-order-items", editPurchaseOrder.id] });
+      toast({ 
+        title: "Inkoop order bijgewerkt", 
+        description: "De inkoop order is succesvol bijgewerkt." 
+      });
+      onClose();
+      form.reset();
+      setLineItems([]);
+      setAmountInput("");
+      setUploadedFiles([]);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Fout bij bijwerken", 
+        description: error.message || "Er is een fout opgetreden.",
+        variant: "destructive"
+      });
+    },
+  });
+
   const handleSubmit = (data: any) => {
     // Calculate total amount from line items in cents
     const total = Math.round(lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0) * 100);
-    createMutation.mutate({ ...data, totalAmount: total, createdBy: user?.id, lineItems });
+    
+    if (editPurchaseOrder) {
+      updateMutation.mutate({ ...data, totalAmount: total, lineItems });
+    } else {
+      createMutation.mutate({ ...data, totalAmount: total, createdBy: user?.id, lineItems });
+    }
   };
 
   const addLineItem = () => {
@@ -238,7 +352,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: 
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nieuwe Inkoop Order</DialogTitle>
+          <DialogTitle>{editPurchaseOrder ? "Bewerk Inkoop Order" : "Nieuwe Inkoop Order"}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
