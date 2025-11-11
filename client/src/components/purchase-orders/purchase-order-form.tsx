@@ -265,32 +265,9 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders, ed
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Update the PO
+      // Update the PO with line items - backend handles atomically
       const poResponse = await apiRequest("PATCH", `/api/purchase-orders/${editPurchaseOrder.id}`, data);
-      const purchaseOrder = await poResponse.json();
-
-      // Delete existing line items and recreate them
-      if (existingLineItems) {
-        for (const item of existingLineItems) {
-          await apiRequest("DELETE", `/api/purchase-order-items/${item.id}`);
-        }
-      }
-
-      // Create new line items
-      if (data.lineItems && data.lineItems.length > 0) {
-        for (const item of data.lineItems) {
-          await apiRequest("POST", "/api/purchase-order-items", {
-            purchaseOrderId: purchaseOrder.id,
-            sku: item.sku,
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: Math.round(item.unitPrice * 100),
-            subtotal: Math.round(item.quantity * item.unitPrice * 100),
-          });
-        }
-      }
-
-      return purchaseOrder;
+      return await poResponse.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });

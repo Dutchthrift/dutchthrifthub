@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { storage } from "./storage";
+import { db } from "./services/supabaseClient";
 import {
   insertTodoSchema,
   insertRepairSchema,
@@ -15,7 +16,9 @@ import {
   insertCaseNoteSchema,
   insertUserSchema,
   insertAuditLogSchema,
+  purchaseOrderItems,
 } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { syncEmails, sendEmail } from "./services/emailService";
 import { shopifyClient } from "./services/shopifyClient";
 import { OrderMatchingService } from "./services/orderMatchingService";
@@ -3084,9 +3087,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/purchase-orders/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      const { lineItems, ...updateFields } = req.body;
 
       // Always validate with partial schema for data integrity
-      const updateData = insertPurchaseOrderSchema.partial().parse(req.body);
+      const updateData = insertPurchaseOrderSchema.partial().parse(updateFields);
 
       // Convert orderDate string to Date object for database if present
       const purchaseOrderUpdateData = updateData.orderDate
@@ -3103,6 +3107,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id,
         purchaseOrderUpdateData as any,
       );
+
+      // Handle line items update atomically if provided
+      if (lineItems !== undefined) {
+        // Validate line items array
+        if (!Array.isArray(lineItems)) {
+          return res.status(400).json({ message: "lineItems must be an array" });
+        }
+
+        await db.transaction(async (tx) => {
+          // Delete all existing line items for this purchase order within transaction
+          await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, id));
+
+          // Create new line items within transaction
+          if (lineItems.length > 0) {
+            for (const item of lineItems) {
+              // Validate each item
+              if (!item.productName || item.quantity == null || item.unitPrice == null) {
+                throw new Error("Invalid line item: missing required fields");
+              }
+
+              await tx.insert(purchaseOrderItems).values({
+                purchaseOrderId: id,
+                sku: item.sku || "",
+                productName: item.productName,
+                quantity: item.quantity,
+                unitPrice: Math.round(item.unitPrice * 100),
+                subtotal: Math.round(item.quantity * item.unitPrice * 100),
+              });
+            }
+          }
+        });
+      }
 
       if (req.body.status) {
         await storage.createActivity({
