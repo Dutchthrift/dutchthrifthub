@@ -58,6 +58,9 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
   const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [amountInput, setAmountInput] = useState("");
+  const [showNewSupplierDialog, setShowNewSupplierDialog] = useState(false);
+  const [newSupplierCode, setNewSupplierCode] = useState("");
+  const [newSupplierName, setNewSupplierName] = useState("");
   const { user } = useAuth();
 
   // Get 10 most recent suppliers
@@ -85,6 +88,34 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
       isPaid: false,
       notes: "",
       createdBy: user?.id || "",
+    },
+  });
+
+  const createSupplierMutation = useMutation({
+    mutationFn: async (data: { supplierCode: string; name: string }) => {
+      const response = await apiRequest("POST", "/api/suppliers", data);
+      return await response.json();
+    },
+    onSuccess: (newSupplier) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      toast({ 
+        title: "Leverancier aangemaakt", 
+        description: "De leverancier is succesvol aangemaakt." 
+      });
+      // Select the newly created supplier
+      form.setValue("supplierId", newSupplier.id);
+      setSupplierSearch(`${newSupplier.supplierCode} - ${newSupplier.name}`);
+      // Close dialog and reset
+      setShowNewSupplierDialog(false);
+      setNewSupplierCode("");
+      setNewSupplierName("");
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Fout bij aanmaken leverancier", 
+        description: error.message || "Er is een fout opgetreden.",
+        variant: "destructive"
+      });
     },
   });
 
@@ -159,6 +190,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
   const totalAmount = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -187,7 +219,20 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                 name="supplierId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Leverancier</FormLabel>
+                    <div className="flex items-center justify-between mb-2">
+                      <FormLabel>Leverancier</FormLabel>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowNewSupplierDialog(true)}
+                        className="h-7 text-xs"
+                        data-testid="button-new-supplier"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Nieuwe Leverancier
+                      </Button>
+                    </div>
                     <div className="relative">
                       <FormControl>
                         <Input
@@ -263,19 +308,6 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="supplierNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Leverancier Referentie</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Bijv. LT-2024-001" data-testid="input-supplier-number" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -339,36 +371,56 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Bedrag (€)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="250,00"
-                        value={lineItems.length > 0 
-                          ? totalAmount.toFixed(2).replace('.', ',') 
-                          : amountInput}
-                        onFocus={(e) => {
-                          if (lineItems.length === 0 && (amountInput === "0,00" || amountInput === "")) {
-                            setAmountInput("");
-                          }
-                        }}
-                        onChange={(e) => {
-                          if (lineItems.length === 0) {
-                            setAmountInput(e.target.value);
-                          }
-                        }}
-                        onBlur={(e) => {
-                          if (lineItems.length === 0) {
-                            const normalized = e.target.value.replace(',', '.');
-                            const amount = parseFloat(normalized) || 0;
-                            field.onChange(Math.round(amount * 100));
-                            setAmountInput(amount.toFixed(2).replace('.', ','));
-                          }
-                        }}
-                        disabled={lineItems.length > 0}
-                        data-testid="input-amount"
+                    <div className="flex items-center gap-3">
+                      <FormControl>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="250,00"
+                          value={lineItems.length > 0 
+                            ? totalAmount.toFixed(2).replace('.', ',') 
+                            : amountInput}
+                          onFocus={(e) => {
+                            if (lineItems.length === 0 && (amountInput === "0,00" || amountInput === "")) {
+                              setAmountInput("");
+                            }
+                          }}
+                          onChange={(e) => {
+                            if (lineItems.length === 0) {
+                              setAmountInput(e.target.value);
+                            }
+                          }}
+                          onBlur={(e) => {
+                            if (lineItems.length === 0) {
+                              const normalized = e.target.value.replace(',', '.');
+                              const amount = parseFloat(normalized) || 0;
+                              field.onChange(Math.round(amount * 100));
+                              setAmountInput(amount.toFixed(2).replace('.', ','));
+                            }
+                          }}
+                          disabled={lineItems.length > 0}
+                          data-testid="input-amount"
+                          className="flex-1"
+                        />
+                      </FormControl>
+                      <FormField
+                        control={form.control}
+                        name="isPaid"
+                        render={({ field: checkField }) => (
+                          <FormItem className="flex items-center gap-2 space-y-0">
+                            <FormLabel className="text-sm font-normal whitespace-nowrap">Betaald:</FormLabel>
+                            <FormControl>
+                              <Checkbox
+                                checked={checkField.value}
+                                onCheckedChange={checkField.onChange}
+                                data-testid="checkbox-is-paid"
+                                className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
+                    </div>
                     {lineItems.length > 0 && (
                       <p className="text-xs text-muted-foreground mt-1">
                         Berekend uit regel items
@@ -379,30 +431,6 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="isPaid"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="checkbox-is-paid"
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      Betaald
-                    </FormLabel>
-                    <p className="text-sm text-muted-foreground">
-                      Vink dit aan als de order al betaald is
-                    </p>
-                  </div>
-                </FormItem>
-              )}
-            />
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -569,5 +597,62 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
         </Form>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={showNewSupplierDialog} onOpenChange={setShowNewSupplierDialog}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nieuwe Leverancier</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">Leverancier Code</label>
+            <Input
+              placeholder="Bijv. SUP001"
+              value={newSupplierCode}
+              onChange={(e) => setNewSupplierCode(e.target.value)}
+              data-testid="input-new-supplier-code"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Naam</label>
+            <Input
+              placeholder="Bijv. Acme Supplies B.V."
+              value={newSupplierName}
+              onChange={(e) => setNewSupplierName(e.target.value)}
+              data-testid="input-new-supplier-name"
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowNewSupplierDialog(false);
+                setNewSupplierCode("");
+                setNewSupplierName("");
+              }}
+              data-testid="button-cancel-supplier"
+            >
+              Annuleer
+            </Button>
+            <Button
+              onClick={() => {
+                if (newSupplierCode && newSupplierName) {
+                  createSupplierMutation.mutate({
+                    supplierCode: newSupplierCode,
+                    name: newSupplierName,
+                  });
+                }
+              }}
+              disabled={!newSupplierCode || !newSupplierName || createSupplierMutation.isPending}
+              data-testid="button-create-supplier"
+            >
+              {createSupplierMutation.isPending ? "Aanmaken..." : "Aanmaken"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
