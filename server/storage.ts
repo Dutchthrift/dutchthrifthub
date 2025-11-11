@@ -1040,6 +1040,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePurchaseOrder(id: string): Promise<void> {
+    // Delete all associated items and files first (foreign key constraints)
+    await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, id));
+    await db.delete(purchaseOrderFiles).where(eq(purchaseOrderFiles.purchaseOrderId, id));
+    // Then delete the purchase order
     await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
   }
 
