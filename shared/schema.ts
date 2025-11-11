@@ -292,6 +292,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   currency: text("currency").default("EUR"),
   status: purchaseOrderStatusEnum("status").notNull().default("aangekocht"),
   isPaid: boolean("is_paid").notNull().default(false), // Payment status
+  archived: boolean("archived").notNull().default(false), // Archive status
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   assignedBuyer: varchar("assigned_buyer").references(() => users.id),
   receivedBy: varchar("received_by").references(() => users.id),

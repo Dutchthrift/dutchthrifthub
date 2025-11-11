@@ -97,7 +97,7 @@ export function PurchaseOrdersCards({
                 <div className="flex items-center gap-2 text-sm">
                   <Truck className="h-4 w-4 text-muted-foreground" />
                   <span className={
-                    new Date(po.expectedDeliveryDate) < new Date() && po.status !== 'fully_received'
+                    new Date(po.expectedDeliveryDate) < new Date() && po.status !== 'verwerkt'
                       ? "text-red-600 font-medium"
                       : ""
                   }>

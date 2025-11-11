@@ -144,10 +144,7 @@ export default function PurchaseOrders() {
   // Archive mutation
   const archiveMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/purchase-orders/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ archived: true }),
-      });
+      return apiRequest("PATCH", `/api/purchase-orders/${id}`, { archived: true });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
@@ -168,10 +165,7 @@ export default function PurchaseOrders() {
   // Unarchive mutation
   const unarchiveMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/purchase-orders/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ archived: false }),
-      });
+      return apiRequest("PATCH", `/api/purchase-orders/${id}`, { archived: false });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
@@ -192,9 +186,7 @@ export default function PurchaseOrders() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/purchase-orders/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/purchase-orders/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });

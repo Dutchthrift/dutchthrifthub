@@ -95,7 +95,7 @@ export function PurchaseOrdersTable({
                 <TableCell>
                   {po.expectedDeliveryDate ? (
                     <span className={
-                      new Date(po.expectedDeliveryDate) < new Date() && po.status !== 'fully_received'
+                      new Date(po.expectedDeliveryDate) < new Date() && po.status !== 'verwerkt'
                         ? "text-red-600 font-medium"
                         : ""
                     }>
