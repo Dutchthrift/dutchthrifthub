@@ -15,6 +15,7 @@ import PurchaseOrders from "@/pages/purchase-orders";
 import Repairs from "@/pages/repairs";
 import Todos from "@/pages/todos";
 import Returns from "@/pages/returns";
+import ReturnDetail from "@/pages/return-detail";
 import CustomerDetail from "@/pages/customer-detail";
 import CaseDetail from "@/pages/case-detail";
 import UserManagement from "@/pages/user-management";
@@ -146,6 +147,17 @@ function Router() {
         component={(props: any) => (
           <ProtectedRoute 
             component={Returns}
+            roles={["ADMIN", "SUPPORT"]}
+            {...props} 
+          />
+        )} 
+      />
+
+      <Route 
+        path="/returns/:id" 
+        component={(props: any) => (
+          <ProtectedRoute 
+            component={ReturnDetail}
             roles={["ADMIN", "SUPPORT"]}
             {...props} 
           />
