@@ -511,7 +511,7 @@ export default function ReturnDetail() {
                       </div>
                     )}
 
-                    {returnData.refundAmount !== null && (
+                    {returnData.refundAmount != null && (
                       <div className="border-t border-border pt-6">
                         <h3 className="text-lg font-semibold mb-4">Refund Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
