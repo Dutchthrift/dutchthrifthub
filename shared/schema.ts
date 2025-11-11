@@ -392,6 +392,156 @@ export const returnItems = pgTable("return_items", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ============================================
+// NOTES DOMAIN - Advanced Notes System
+// ============================================
+
+export const noteVisibilityEnum = pgEnum("note_visibility", ["internal", "customer_visible", "system"]);
+export const noteEntityTypeEnum = pgEnum("note_entity_type", ["customer", "order", "repair", "emailThread", "case", "return"]);
+export const noteLinkTypeEnum = pgEnum("note_link_type", ["order", "tracking", "sku", "email", "url"]);
+export const followupStatusEnum = pgEnum("followup_status", ["pending", "in_progress", "completed", "cancelled"]);
+
+// Main polymorphic Notes table
+export const notes = pgTable("notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Polymorphic entity linking
+  entityType: noteEntityTypeEnum("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  
+  // Note visibility (who can see it)
+  visibility: noteVisibilityEnum("visibility").notNull().default("internal"),
+  
+  // Content
+  content: text("content").notNull(), // Rich text HTML
+  renderedHtml: text("rendered_html"), // Sanitized HTML
+  plainText: text("plain_text"), // For search
+  
+  // Threading (enforced max depth via application logic)
+  parentNoteId: varchar("parent_note_id").references((): any => notes.id),
+  threadDepth: integer("thread_depth").default(0).$type<number>(),
+  
+  // Author & timestamps
+  authorId: varchar("author_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at"),
+  editedAt: timestamp("edited_at"),
+  
+  // Pinning (max 3 enforced via application logic)
+  isPinned: boolean("is_pinned").default(false),
+  pinnedAt: timestamp("pinned_at"),
+  pinnedBy: varchar("pinned_by").references(() => users.id),
+  
+  // Soft delete
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by").references(() => users.id),
+  deleteReason: text("delete_reason"),
+  
+  // Status context
+  statusPromptId: varchar("status_prompt_id"),
+  
+  // Source tracking
+  source: text("source").default("manual"), // manual, email, system
+});
+
+// Note Tags catalog
+export const noteTags = pgTable("note_tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  color: text("color"), // hex color for display
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Note-Tag assignments (many-to-many)
+export const noteTagAssignments = pgTable("note_tag_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  noteId: varchar("note_id").references(() => notes.id, { onDelete: "cascade" }).notNull(),
+  tagId: varchar("tag_id").references(() => noteTags.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Note Mentions
+export const noteMentions = pgTable("note_mentions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  noteId: varchar("note_id").references(() => notes.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  notified: boolean("notified").default(false),
+  notifiedAt: timestamp("notified_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Note Reactions
+export const noteReactions = pgTable("note_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  noteId: varchar("note_id").references(() => notes.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  emoji: text("emoji").notNull(), // 👍 👀 ✅
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Note Attachments
+export const noteAttachments = pgTable("note_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  noteId: varchar("note_id").references(() => notes.id, { onDelete: "cascade" }).notNull(),
+  fileName: text("file_name").notNull(),
+  filePath: text("file_path").notNull(), // Object storage path
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  previewUrl: text("preview_url"), // For images
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+// Note Follow-ups (integrates with Todos)
+export const noteFollowups = pgTable("note_followups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  noteId: varchar("note_id").references(() => notes.id, { onDelete: "cascade" }).notNull(),
+  todoId: varchar("todo_id").references(() => todos.id), // Optional link to unified tasks
+  dueAt: timestamp("due_at").notNull(),
+  assigneeId: varchar("assignee_id").references(() => users.id).notNull(),
+  status: followupStatusEnum("status").default("pending"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Note Revisions (audit trail for edits)
+export const noteRevisions = pgTable("note_revisions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  noteId: varchar("note_id").references(() => notes.id, { onDelete: "cascade" }).notNull(),
+  editorId: varchar("editor_id").references(() => users.id).notNull(),
+  previousContent: text("previous_content").notNull(),
+  newContent: text("new_content").notNull(),
+  delta: jsonb("delta"), // Change diff
+  editedAt: timestamp("edited_at").defaultNow(),
+});
+
+// Note Templates
+export const noteTemplates = pgTable("note_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  content: text("content").notNull(), // Template with {{variables}}
+  description: text("description"),
+  scope: text("scope").default("global"), // global, status-specific, entityType
+  entityType: noteEntityTypeEnum("entity_type"),
+  statusContext: text("status_context"), // e.g., waiting_customer, missing_package
+  variables: text("variables").array(), // e.g., [orderId, customerFirstName]
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Note Links (smart links to other entities)
+export const noteLinks = pgTable("note_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  noteId: varchar("note_id").references(() => notes.id, { onDelete: "cascade" }).notNull(),
+  linkType: noteLinkTypeEnum("link_type").notNull(),
+  targetId: text("target_id"), // Order ID, tracking number, SKU, etc.
+  displayText: text("display_text"),
+  url: text("url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Activity feed table
 export const activities = pgTable("activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -568,6 +718,68 @@ export const insertReturnItemSchema = createInsertSchema(returnItems).omit({
   updatedAt: true,
 });
 
+// Notes Domain Insert Schemas
+export const insertNoteSchema = createInsertSchema(notes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  editedAt: true,
+  pinnedAt: true,
+  deletedAt: true,
+});
+
+export const insertNoteTagSchema = createInsertSchema(noteTags).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNoteTagAssignmentSchema = createInsertSchema(noteTagAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNoteMentionSchema = createInsertSchema(noteMentions).omit({
+  id: true,
+  createdAt: true,
+  notifiedAt: true,
+});
+
+export const insertNoteReactionSchema = createInsertSchema(noteReactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNoteAttachmentSchema = createInsertSchema(noteAttachments).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export const insertNoteFollowupSchema = createInsertSchema(noteFollowups).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+}).extend({
+  dueAt: z.union([z.string(), z.date()]).transform(val => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
+});
+
+export const insertNoteRevisionSchema = createInsertSchema(noteRevisions).omit({
+  id: true,
+  editedAt: true,
+});
+
+export const insertNoteTemplateSchema = createInsertSchema(noteTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertNoteLinkSchema = createInsertSchema(noteLinks).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -631,3 +843,34 @@ export type InsertReturn = z.infer<typeof insertReturnSchema>;
 
 export type ReturnItem = typeof returnItems.$inferSelect;
 export type InsertReturnItem = z.infer<typeof insertReturnItemSchema>;
+
+// Notes Domain Types
+export type Note = typeof notes.$inferSelect;
+export type InsertNote = z.infer<typeof insertNoteSchema>;
+
+export type NoteTag = typeof noteTags.$inferSelect;
+export type InsertNoteTag = z.infer<typeof insertNoteTagSchema>;
+
+export type NoteTagAssignment = typeof noteTagAssignments.$inferSelect;
+export type InsertNoteTagAssignment = z.infer<typeof insertNoteTagAssignmentSchema>;
+
+export type NoteMention = typeof noteMentions.$inferSelect;
+export type InsertNoteMention = z.infer<typeof insertNoteMentionSchema>;
+
+export type NoteReaction = typeof noteReactions.$inferSelect;
+export type InsertNoteReaction = z.infer<typeof insertNoteReactionSchema>;
+
+export type NoteAttachment = typeof noteAttachments.$inferSelect;
+export type InsertNoteAttachment = z.infer<typeof insertNoteAttachmentSchema>;
+
+export type NoteFollowup = typeof noteFollowups.$inferSelect;
+export type InsertNoteFollowup = z.infer<typeof insertNoteFollowupSchema>;
+
+export type NoteRevision = typeof noteRevisions.$inferSelect;
+export type InsertNoteRevision = z.infer<typeof insertNoteRevisionSchema>;
+
+export type NoteTemplate = typeof noteTemplates.$inferSelect;
+export type InsertNoteTemplate = z.infer<typeof insertNoteTemplateSchema>;
+
+export type NoteLink = typeof noteLinks.$inferSelect;
+export type InsertNoteLink = z.infer<typeof insertNoteLinkSchema>;

@@ -15,6 +15,11 @@
   --primary: 24 100% 50%;                  /* #FF6600 */
   --primary-foreground: hsl(0 0% 100%);
   
+  /* ========== BRAND ORANGE (Shopify-style) ========== */
+  --brand-orange-100: #FEF3C7;             /* Light background */
+  --brand-orange-600: #F59E0B;             /* Primary accent */
+  --brand-orange-700: #D97706;             /* Hover/active */
+  
   /* ========== NEUTRALS - CLEAN GRAYS ========== */
   --secondary: hsl(0 0% 94%);
   --secondary-foreground: hsl(0 0% 11%);
@@ -64,6 +69,11 @@
   /* ========== PRIMARY - VIBRANT ORANGE ========== */
   --primary: 24 100% 55%;                  /* Slightly brighter for dark */
   --primary-foreground: hsl(0 0% 100%);
+  
+  /* ========== BRAND ORANGE (Shopify-style) ========== */
+  --brand-orange-100: #451A03;             /* Dark background */
+  --brand-orange-600: #F59E0B;             /* Primary accent */
+  --brand-orange-700: #FBBF24;             /* Hover/active (lighter for dark mode) */
   
   /* ========== NEUTRALS - DARK GRAYS ========== */
   --secondary: hsl(0 0% 14%);
