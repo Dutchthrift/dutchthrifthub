@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import { CreateReturnModal } from "@/components/forms/create-return-modal";
 
 type Return = {
   id: string;
@@ -67,6 +68,7 @@ export default function Returns() {
   const [currentStatus, setCurrentStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Fetch returns with filters
   const { data: returns = [], isLoading } = useQuery<Return[]>({
@@ -121,12 +123,14 @@ export default function Returns() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/returns/new">
-              <Button className="bg-orange-600 hover:bg-orange-700" data-testid="button-create-return">
-                <Plus className="h-4 w-4 mr-2" />
-                Nieuw Retour
-              </Button>
-            </Link>
+            <Button 
+              className="bg-orange-600 hover:bg-orange-700" 
+              onClick={() => setShowCreateModal(true)}
+              data-testid="button-create-return"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nieuw Retour
+            </Button>
           </div>
         </div>
 
@@ -305,6 +309,11 @@ export default function Returns() {
           </div>
         )}
       </div>
+
+      <CreateReturnModal 
+        open={showCreateModal} 
+        onOpenChange={setShowCreateModal}
+      />
     </div>
   );
 }
