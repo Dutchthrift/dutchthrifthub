@@ -103,32 +103,34 @@ export default function PurchaseOrders() {
     return true;
   }) || [];
 
-  // Analytics calculations
+  // Analytics calculations (exclude archived orders)
+  const activePOs = purchaseOrders?.filter(po => !po.archived) || [];
+  
   const statusCounts = {
-    all: purchaseOrders?.length || 0,
-    aangekocht: purchaseOrders?.filter(po => po.status === 'aangekocht').length || 0,
-    ontvangen: purchaseOrders?.filter(po => po.status === 'ontvangen').length || 0,
-    verwerkt: purchaseOrders?.filter(po => po.status === 'verwerkt').length || 0,
+    all: activePOs.length,
+    aangekocht: activePOs.filter(po => po.status === 'aangekocht').length,
+    ontvangen: activePOs.filter(po => po.status === 'ontvangen').length,
+    verwerkt: activePOs.filter(po => po.status === 'verwerkt').length,
   };
 
-  const totalAmount = purchaseOrders?.reduce((sum, po) => sum + ((po.totalAmount || 0) / 100), 0) || 0;
+  const totalAmount = activePOs.reduce((sum, po) => sum + ((po.totalAmount || 0) / 100), 0);
   
-  const pendingDeliveries = purchaseOrders?.filter(po => 
+  const pendingDeliveries = activePOs.filter(po => 
     po.status === 'aangekocht' && po.expectedDeliveryDate
-  ).length || 0;
+  ).length;
 
-  const overdueDeliveries = purchaseOrders?.filter(po => {
+  const overdueDeliveries = activePOs.filter(po => {
     if (po.status !== 'aangekocht' || !po.expectedDeliveryDate) return false;
     return new Date(po.expectedDeliveryDate) < new Date();
-  }).length || 0;
+  }).length;
 
-  // Top supplier by spending
-  const supplierSpending = purchaseOrders?.reduce((acc, po) => {
+  // Top supplier by spending (exclude archived orders)
+  const supplierSpending = activePOs.reduce((acc, po) => {
     if (po.supplierId) {
       acc[po.supplierId] = (acc[po.supplierId] || 0) + ((po.totalAmount || 0) / 100);
     }
     return acc;
-  }, {} as Record<string, number>) || {};
+  }, {} as Record<string, number>);
 
   const topSupplier = Object.entries(supplierSpending).sort((a, b) => b[1] - a[1])[0];
   const topSupplierName = topSupplier 
