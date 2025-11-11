@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { Navigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,7 +88,9 @@ export default function CaseDetail() {
   const [slaDeadline, setSlaDeadline] = useState("");
   const [linkType, setLinkType] = useState<"email" | "order" | "repair" | "todo" | "">("");
   const [linkedId, setLinkedId] = useState("");
+  const [showConvertDialog, setShowConvertDialog] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const { data: caseData, isLoading } = useQuery<CaseWithDetails>({
     queryKey: ["/api/cases", caseId],
@@ -354,6 +356,36 @@ export default function CaseDetail() {
     }
   });
 
+  const convertToReturnMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/returns/from-case/${caseId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Failed to convert case to return");
+      return response.json();
+    },
+    onSuccess: (returnData) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+      setShowConvertDialog(false);
+      toast({
+        title: "Return created",
+        description: `Return ${returnData.returnNumber} created successfully from this case`,
+      });
+      // Navigate to the new return
+      setLocation(`/returns/${returnData.id}`);
+    },
+    onError: () => {
+      toast({
+        title: "Failed to convert",
+        description: "Could not convert case to return",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleStartEdit = () => {
     if (caseData) {
       setEditTitle(caseData.title);
@@ -542,6 +574,11 @@ export default function CaseDetail() {
             <Button onClick={() => setShowEmailDialog(true)} data-testid="send-email-button">
               <Mail className="mr-2 h-4 w-4" />
               Send Email
+            </Button>
+
+            <Button variant="outline" onClick={() => setShowConvertDialog(true)} data-testid="convert-to-return-button">
+              <Package className="mr-2 h-4 w-4" />
+              Convert to Return
             </Button>
           </div>
         </div>
@@ -1097,6 +1134,39 @@ export default function CaseDetail() {
         to={caseData?.customerEmail || ""}
         subject={`Re: Case #${caseData?.caseNumber || caseId}`}
       />
+
+      {/* Convert to Return Dialog */}
+      <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
+        <DialogContent data-testid="convert-to-return-dialog">
+          <DialogHeader>
+            <DialogTitle>Convert Case to Return</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This will create a new return linked to this case. The return will inherit the case's customer and priority.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              You can add return items and details on the return page after creation.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowConvertDialog(false)}
+                data-testid="cancel-convert-button"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => convertToReturnMutation.mutate()}
+                disabled={convertToReturnMutation.isPending}
+                data-testid="confirm-convert-button"
+              >
+                {convertToReturnMutation.isPending ? "Converting..." : "Convert to Return"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

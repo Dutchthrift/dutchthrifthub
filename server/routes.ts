@@ -3351,6 +3351,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload photo for return
+  const photoUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+      const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'));
+      }
+    }
+  });
+
+  app.post("/api/returns/:id/photos", requireAuth, photoUpload.single('photo'), async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Get the return
+      const returnData = await storage.getReturn(id);
+      if (!returnData) {
+        return res.status(404).json({ message: "Return not found" });
+      }
+
+      // Save the photo to object storage
+      const objectStorageService = new ObjectStorageService();
+      const photoPath = await objectStorageService.saveAttachment(
+        req.file.originalname,
+        req.file.buffer,
+        req.file.mimetype
+      );
+
+      // Update the return's photoUrls array
+      const currentPhotos = returnData.photoUrls || [];
+      const updatedPhotos = [...currentPhotos, photoPath];
+      
+      await storage.updateReturn(id, { photoUrls: updatedPhotos });
+
+      await auditLog(req, "UPDATE", "returns", id, {
+        action: "photo_uploaded",
+        photoPath,
+      });
+
+      res.status(201).json({ photoPath, message: "Photo uploaded successfully" });
+    } catch (error: any) {
+      console.error("Error uploading photo:", error);
+      res.status(400).json({
+        message: error.message || "Failed to upload photo",
+      });
+    }
+  });
+
+  // Delete photo from return
+  app.delete("/api/returns/:id/photos", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const { photoPath } = req.body;
+
+      if (!photoPath) {
+        return res.status(400).json({ message: "Photo path is required" });
+      }
+
+      const returnData = await storage.getReturn(id);
+      if (!returnData) {
+        return res.status(404).json({ message: "Return not found" });
+      }
+
+      // Remove the photo from the array
+      const currentPhotos = returnData.photoUrls || [];
+      const updatedPhotos = currentPhotos.filter(p => p !== photoPath);
+      
+      await storage.updateReturn(id, { photoUrls: updatedPhotos });
+
+      await auditLog(req, "UPDATE", "returns", id, {
+        action: "photo_deleted",
+        photoPath,
+      });
+
+      res.json({ message: "Photo deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting photo:", error);
+      res.status(400).json({
+        message: error.message || "Failed to delete photo",
+      });
+    }
+  });
+
   // Return Items
   app.get("/api/return-items/:returnId", requireAuth, async (req: any, res: any) => {
     try {

@@ -28,7 +28,10 @@ import {
   Activity,
   DollarSign,
   Mail,
-  ShoppingCart
+  ShoppingCart,
+  Image,
+  Trash2,
+  Upload
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -138,6 +141,7 @@ export default function ReturnDetail() {
   const [, setLocation] = useLocation();
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const { toast } = useToast();
 
   const { data: returnData, isLoading } = useQuery<Return>({
@@ -197,6 +201,53 @@ export default function ReturnDetail() {
     onError: () => {
       toast({ 
         title: "Failed to assign user",
+        variant: "destructive"
+      });
+    },
+  });
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+
+      const response = await fetch(`/api/returns/${returnId}/photos`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Upload failed');
+
+      queryClient.invalidateQueries({ queryKey: ["/api/returns", returnId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+      toast({ title: "Photo uploaded successfully" });
+    } catch (error) {
+      toast({ 
+        title: "Failed to upload photo",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploadingPhoto(false);
+      event.target.value = '';
+    }
+  };
+
+  const deletePhotoMutation = useMutation({
+    mutationFn: async (photoPath: string) => {
+      return apiRequest("DELETE", `/api/returns/${returnId}/photos`, { photoPath });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/returns", returnId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+      toast({ title: "Photo deleted successfully" });
+    },
+    onError: () => {
+      toast({ 
+        title: "Failed to delete photo",
         variant: "destructive"
       });
     },
@@ -367,6 +418,7 @@ export default function ReturnDetail() {
               <TabsList>
                 <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
                 <TabsTrigger value="items" data-testid="tab-items">Items</TabsTrigger>
+                <TabsTrigger value="photos" data-testid="tab-photos">Photos</TabsTrigger>
                 <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
               </TabsList>
 
@@ -548,6 +600,72 @@ export default function ReturnDetail() {
                       </div>
                     ) : (
                       <p className="text-muted-foreground text-center py-8">No items found</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="photos" className="mt-6">
+                <Card>
+                  <CardHeader className="bg-card-header border-b border-border">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <Camera className="h-5 w-5" />
+                        Return Photos
+                      </CardTitle>
+                      <div>
+                        <input
+                          type="file"
+                          id="photo-upload"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handlePhotoUpload}
+                          disabled={isUploadingPhoto}
+                        />
+                        <Button
+                          onClick={() => document.getElementById('photo-upload')?.click()}
+                          disabled={isUploadingPhoto}
+                          size="sm"
+                          data-testid="button-upload-photo"
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          {isUploadingPhoto ? "Uploading..." : "Upload Photo"}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    {!returnData.photoUrls || returnData.photoUrls.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">No photos uploaded yet</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Upload photos to document the condition of returned items
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {returnData.photoUrls.map((photoPath, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={`/api/attachments${photoPath}`}
+                              alt={`Return photo ${index + 1}`}
+                              className="w-full h-48 object-cover rounded-lg border border-border"
+                              data-testid={`image-photo-${index}`}
+                            />
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => deletePhotoMutation.mutate(photoPath)}
+                              disabled={deletePhotoMutation.isPending}
+                              data-testid={`button-delete-photo-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </CardContent>
                 </Card>
