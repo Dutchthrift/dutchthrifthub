@@ -22,7 +22,7 @@ import {
   LayoutGrid,
   X
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import type { PurchaseOrder, Supplier } from "@shared/schema";
 import { PurchaseOrderForm } from "@/components/purchase-orders/purchase-order-form";
 import { PurchaseOrderDetailModal } from "@/components/purchase-orders/purchase-order-detail-modal";
@@ -30,6 +30,8 @@ import { PurchaseOrdersTable } from "@/components/purchase-orders/purchase-order
 import { PurchaseOrdersCards } from "@/components/purchase-orders/purchase-orders-cards";
 import { SupplierImportDialog } from "@/components/purchase-orders/supplier-import-dialog";
 import { useAuth } from "@/lib/auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -48,6 +50,7 @@ export default function PurchaseOrders() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const canCreate = user?.role === "ADMIN" || user?.role === "SUPPORT";
 
@@ -136,6 +139,102 @@ export default function PurchaseOrders() {
   const handlePOClick = (po: PurchaseOrder) => {
     setSelectedPO(po);
     setShowDetailModal(true);
+  };
+
+  // Archive mutation
+  const archiveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/purchase-orders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ archived: true }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      toast({
+        title: "Gearchiveerd",
+        description: "Inkoop order is gearchiveerd",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Fout",
+        description: "Kon order niet archiveren",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Unarchive mutation
+  const unarchiveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/purchase-orders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ archived: false }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      toast({
+        title: "Hersteld",
+        description: "Inkoop order is hersteld uit archief",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Fout",
+        description: "Kon order niet herstellen",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/purchase-orders/${id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      toast({
+        title: "Verwijderd",
+        description: "Inkoop order is verwijderd",
+      });
+      if (selectedPO?.id === deleteMutation.variables) {
+        setShowDetailModal(false);
+        setSelectedPO(null);
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Fout",
+        description: "Kon order niet verwijderen",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handlePOOpen = (id: string) => {
+    const po = purchaseOrders?.find(p => p.id === id);
+    if (po) {
+      handlePOClick(po);
+    }
+  };
+
+  const handlePOArchive = (id: string) => {
+    archiveMutation.mutate(id);
+  };
+
+  const handlePOUnarchive = (id: string) => {
+    unarchiveMutation.mutate(id);
+  };
+
+  const handlePODelete = (id: string) => {
+    if (confirm("Weet je zeker dat je deze inkoop order wilt verwijderen?")) {
+      deleteMutation.mutate(id);
+    }
   };
 
   const isLoading = isLoadingPOs || isLoadingSuppliers;
@@ -339,6 +438,10 @@ export default function PurchaseOrders() {
                 suppliers={suppliers || []}
                 onPOClick={handlePOClick}
                 getStatusColor={getStatusColor}
+                onPOOpen={handlePOOpen}
+                onPOArchive={handlePOArchive}
+                onPOUnarchive={handlePOUnarchive}
+                onPODelete={handlePODelete}
               />
             ) : (
               <PurchaseOrdersCards
@@ -346,6 +449,10 @@ export default function PurchaseOrders() {
                 suppliers={suppliers || []}
                 onPOClick={handlePOClick}
                 getStatusColor={getStatusColor}
+                onPOOpen={handlePOOpen}
+                onPOArchive={handlePOArchive}
+                onPOUnarchive={handlePOUnarchive}
+                onPODelete={handlePODelete}
               />
             )}
           </TabsContent>
