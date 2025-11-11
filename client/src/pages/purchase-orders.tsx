@@ -20,7 +20,8 @@ import {
   Truck,
   List,
   LayoutGrid,
-  X
+  X,
+  Archive
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { PurchaseOrder, Supplier } from "@shared/schema";
@@ -48,6 +49,7 @@ export default function PurchaseOrders() {
   const [showNewPO, setShowNewPO] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -63,6 +65,10 @@ export default function PurchaseOrders() {
   });
 
   const filteredPOs = purchaseOrders?.filter(po => {
+    // Filter by archived status
+    if (showArchived && !po.archived) return false;
+    if (!showArchived && po.archived) return false;
+    
     // Filter by status
     if (statusFilter !== "all" && po.status !== statusFilter) {
       return false;
@@ -415,6 +421,16 @@ export default function PurchaseOrders() {
               data-testid="button-view-cards"
             >
               <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={showArchived ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setShowArchived(!showArchived)}
+              data-testid="button-toggle-archived"
+              className="ml-2"
+            >
+              <Archive className="h-4 w-4 mr-2" />
+              {showArchived ? "Toon Actief" : "Toon Archief"}
             </Button>
           </div>
         </div>
