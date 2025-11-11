@@ -97,6 +97,7 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
   const [linkType, setLinkType] = useState<"email" | "order" | "repair" | "todo" | "">("");
   const [linkedId, setLinkedId] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data: caseData, isLoading } = useQuery<CaseWithDetails>({
     queryKey: ["/api/cases", caseId],
@@ -1001,6 +1002,7 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
               <Select value={linkType} onValueChange={(value: any) => {
                 setLinkType(value);
                 setLinkedId("");
+                setSearchTerm("");
               }}>
                 <SelectTrigger data-testid="link-type-select">
                   <SelectValue placeholder="Select item type..." />
@@ -1016,42 +1018,141 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
 
             {linkType && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Select Item</label>
-                <Select value={linkedId} onValueChange={setLinkedId}>
-                  <SelectTrigger data-testid="linked-item-select">
-                    <SelectValue placeholder={`Select ${linkType}...`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAvailableItems().length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground">
-                        No available {linkType}s to link
-                      </div>
-                    ) : (
-                      <>
-                        {linkType === "email" && getAvailableItems().map((email: any) => (
-                          <SelectItem key={email.id} value={email.id}>
-                            {email.subject}
-                          </SelectItem>
-                        ))}
-                        {linkType === "order" && getAvailableItems().map((order: any) => (
-                          <SelectItem key={order.id} value={order.id}>
-                            Order #{order.orderNumber}
-                          </SelectItem>
-                        ))}
-                        {linkType === "repair" && getAvailableItems().map((repair: any) => (
-                          <SelectItem key={repair.id} value={repair.id}>
-                            {repair.title}
-                          </SelectItem>
-                        ))}
-                        {linkType === "todo" && getAvailableItems().map((todo: any) => (
-                          <SelectItem key={todo.id} value={todo.id}>
-                            {todo.title}
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">
+                  {linkType === "order" ? "Search by order number or customer" : 
+                   linkType === "email" ? "Search by subject or customer email" :
+                   linkType === "repair" ? "Search by repair title" :
+                   "Search by title"}
+                </label>
+                <Input
+                  placeholder={
+                    linkType === "order" ? "Type order number or customer name..." :
+                    linkType === "email" ? "Type subject or email..." :
+                    linkType === "repair" ? "Type repair title..." :
+                    "Type to search..."
+                  }
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  data-testid="link-search-input"
+                />
+                
+                {searchTerm.trim() && (
+                  <div className="border rounded-md max-h-60 overflow-y-auto">
+                    {(() => {
+                      const availableItems = getAvailableItems();
+                      const filteredItems = availableItems.filter((item: any) => {
+                        const search = searchTerm.toLowerCase();
+                        
+                        if (linkType === "email") {
+                          return (
+                            item.subject?.toLowerCase().includes(search) ||
+                            item.customerEmail?.toLowerCase().includes(search)
+                          );
+                        } else if (linkType === "order") {
+                          return (
+                            item.orderNumber?.toString().includes(search) ||
+                            item.customerEmail?.toLowerCase().includes(search) ||
+                            item.customerName?.toLowerCase().includes(search)
+                          );
+                        } else if (linkType === "repair") {
+                          return (
+                            item.title?.toLowerCase().includes(search) ||
+                            item.description?.toLowerCase().includes(search)
+                          );
+                        } else if (linkType === "todo") {
+                          return (
+                            item.title?.toLowerCase().includes(search) ||
+                            item.description?.toLowerCase().includes(search)
+                          );
+                        }
+                        return false;
+                      });
+
+                      if (filteredItems.length === 0) {
+                        return (
+                          <div className="p-3 text-sm text-muted-foreground text-center">
+                            No matching {linkType}s found
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="divide-y">
+                          {linkType === "email" && filteredItems.map((email: any) => (
+                            <button
+                              key={email.id}
+                              onClick={() => {
+                                setLinkedId(email.id);
+                                setSearchTerm("");
+                              }}
+                              className="w-full p-3 text-left hover:bg-muted transition-colors"
+                              data-testid={`link-option-${email.id}`}
+                            >
+                              <div className="font-medium text-sm">{email.subject}</div>
+                              <div className="text-xs text-muted-foreground">{email.customerEmail}</div>
+                            </button>
+                          ))}
+                          {linkType === "order" && filteredItems.map((order: any) => (
+                            <button
+                              key={order.id}
+                              onClick={() => {
+                                setLinkedId(order.id);
+                                setSearchTerm("");
+                              }}
+                              className="w-full p-3 text-left hover:bg-muted transition-colors"
+                              data-testid={`link-option-${order.id}`}
+                            >
+                              <div className="font-medium text-sm">Order #{order.orderNumber}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {order.customerEmail || order.customerName} • €{((order.totalAmount || 0) / 100).toFixed(2)}
+                              </div>
+                            </button>
+                          ))}
+                          {linkType === "repair" && filteredItems.map((repair: any) => (
+                            <button
+                              key={repair.id}
+                              onClick={() => {
+                                setLinkedId(repair.id);
+                                setSearchTerm("");
+                              }}
+                              className="w-full p-3 text-left hover:bg-muted transition-colors"
+                              data-testid={`link-option-${repair.id}`}
+                            >
+                              <div className="font-medium text-sm">{repair.title}</div>
+                              <div className="text-xs text-muted-foreground">{repair.description}</div>
+                            </button>
+                          ))}
+                          {linkType === "todo" && filteredItems.map((todo: any) => (
+                            <button
+                              key={todo.id}
+                              onClick={() => {
+                                setLinkedId(todo.id);
+                                setSearchTerm("");
+                              }}
+                              className="w-full p-3 text-left hover:bg-muted transition-colors"
+                              data-testid={`link-option-${todo.id}`}
+                            >
+                              <div className="font-medium text-sm">{todo.title}</div>
+                              <div className="text-xs text-muted-foreground">{todo.description}</div>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+                
+                {linkedId && !searchTerm && (
+                  <div className="p-2 bg-muted rounded-md">
+                    <div className="text-sm font-medium">Selected:</div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {linkType === "email" && allEmails.find((e: any) => e.id === linkedId)?.subject}
+                      {linkType === "order" && `Order #${allOrders.find((o: any) => o.id === linkedId)?.orderNumber}`}
+                      {linkType === "repair" && allRepairs.find((r: any) => r.id === linkedId)?.title}
+                      {linkType === "todo" && allTodos.find((t: any) => t.id === linkedId)?.title}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1062,6 +1163,7 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
                   setShowLinkDialog(false);
                   setLinkType("");
                   setLinkedId("");
+                  setSearchTerm("");
                 }}
                 data-testid="cancel-link-button"
               >
