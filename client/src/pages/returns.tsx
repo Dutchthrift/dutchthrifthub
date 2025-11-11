@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { Navigation } from "@/components/layout/navigation";
 import { Package, Plus, Filter, Search, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -112,147 +113,151 @@ export default function Returns() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-white dark:bg-gray-950">
-      {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900">
-              <Package className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+    <div className="flex flex-col h-screen bg-background">
+      <Navigation />
+      
+      <main className="flex-1 overflow-hidden">
+        <div className="h-full flex flex-col bg-white dark:bg-gray-950">
+          {/* Header */}
+          <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+            <div className="flex items-center justify-between px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900">
+                  <Package className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Retouren</h1>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Beheer alle productretouren
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  className="bg-orange-600 hover:bg-orange-700" 
+                  onClick={() => setShowCreateModal(true)}
+                  data-testid="button-create-return"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nieuw Retour
+                </Button>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Retouren</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Beheer alle productretouren
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              className="bg-orange-600 hover:bg-orange-700" 
-              onClick={() => setShowCreateModal(true)}
-              data-testid="button-create-return"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nieuw Retour
-            </Button>
-          </div>
-        </div>
 
-        {/* Stats Bar */}
-        <div className="flex items-center gap-6 px-6 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-          <div className="flex items-center gap-2">
+            {/* Stats Bar */}
+            <div className="flex items-center gap-6 px-6 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+              <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 dark:text-gray-400">Totaal:</span>
             <span className="text-sm font-semibold text-gray-900 dark:text-white">
               {returns.length}
             </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Nieuw:</span>
+                <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                  {statusCounts.nieuw_onderweg || 0}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Wachten op klant:</span>
+                <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
+                  {statusCounts.wachten_klant || 0}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Klaar:</span>
+                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                  {statusCounts.klaar || 0}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Nieuw:</span>
-            <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-              {statusCounts.nieuw_onderweg || 0}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Wachten op klant:</span>
-            <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
-              {statusCounts.wachten_klant || 0}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Klaar:</span>
-            <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
-              {statusCounts.klaar || 0}
-            </span>
-          </div>
-        </div>
-      </div>
 
-      {/* Tabs and Filters */}
-      <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <Tabs value={currentStatus} onValueChange={setCurrentStatus} className="w-full">
-          <div className="px-6">
-            <TabsList className="h-12 w-full justify-start gap-1 bg-transparent p-0">
-              {STATUS_TABS.map((tab) => (
-                <TabsTrigger
-                  key={tab.value}
-                  value={tab.value}
-                  className="relative h-full rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-orange-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-orange-600"
-                  data-testid={`tab-${tab.value}`}
-                >
-                  {tab.label}
-                  {tab.value !== "all" && statusCounts[tab.value] > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-2 h-5 min-w-[20px] rounded-full px-1.5 text-xs"
+          {/* Tabs and Filters */}
+          <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+            <Tabs value={currentStatus} onValueChange={setCurrentStatus} className="w-full">
+              <div className="px-6">
+                <TabsList className="h-12 w-full justify-start gap-1 bg-transparent p-0">
+                  {STATUS_TABS.map((tab) => (
+                    <TabsTrigger
+                      key={tab.value}
+                      value={tab.value}
+                      className="relative h-full rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-orange-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-orange-600"
+                      data-testid={`tab-${tab.value}`}
                     >
-                      {statusCounts[tab.value]}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-        </Tabs>
+                      {tab.label}
+                      {tab.value !== "all" && statusCounts[tab.value] > 0 && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-2 h-5 min-w-[20px] rounded-full px-1.5 text-xs"
+                        >
+                          {statusCounts[tab.value]}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+            </Tabs>
 
-        {/* Filters */}
-        <div className="flex items-center gap-3 px-6 py-3 border-t border-gray-200 dark:border-gray-800">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Zoek op retoournummer of tracking..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-              data-testid="input-search-returns"
-            />
+            {/* Filters */}
+            <div className="flex items-center gap-3 px-6 py-3 border-t border-gray-200 dark:border-gray-800">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Zoek op retoournummer of tracking..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-returns"
+                />
+              </div>
+              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-priority-filter">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Prioriteit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle prioriteiten</SelectItem>
+                  <SelectItem value="low">Laag</SelectItem>
+                  <SelectItem value="medium">Normaal</SelectItem>
+                  <SelectItem value="high">Hoog</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-[180px]" data-testid="select-priority-filter">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Prioriteit" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle prioriteiten</SelectItem>
-              <SelectItem value="low">Laag</SelectItem>
-              <SelectItem value="medium">Normaal</SelectItem>
-              <SelectItem value="high">Hoog</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
-        {isLoading ? (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-24 w-full" />
-            ))}
-          </div>
-        ) : filteredReturns.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <Package className="h-12 w-12 text-gray-400 mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
-              Geen retouren gevonden
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              {searchQuery || priorityFilter !== "all"
-                ? "Probeer een andere zoekopdracht of filter"
-                : "Er zijn nog geen retouren in dit overzicht"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredReturns.map((ret) => (
-              <Link
-                key={ret.id}
-                href={`/returns/${ret.id}`}
-                className="block"
-                data-testid={`card-return-${ret.id}`}
-              >
-                <div className="group rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 transition-all hover:border-orange-300 hover:shadow-sm dark:hover:border-orange-700">
+          {/* Content */}
+          <div className="flex-1 overflow-auto p-6">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-24 w-full" />
+                ))}
+              </div>
+            ) : filteredReturns.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Package className="h-12 w-12 text-gray-400 mb-3" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+                  Geen retouren gevonden
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  {searchQuery || priorityFilter !== "all"
+                    ? "Probeer een andere zoekopdracht of filter"
+                    : "Er zijn nog geen retouren in dit overzicht"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredReturns.map((ret) => (
+                  <Link
+                    key={ret.id}
+                    href={`/returns/${ret.id}`}
+                    className="block"
+                    data-testid={`card-return-${ret.id}`}
+                  >
+                    <div className="group rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 transition-all hover:border-orange-300 hover:shadow-sm dark:hover:border-orange-700">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
@@ -306,14 +311,16 @@ export default function Returns() {
                             : ret.refundStatus}
                         </div>
                       )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      </main>
 
       <CreateReturnModal 
         open={showCreateModal} 
