@@ -10,6 +10,7 @@ import {
 import type { PurchaseOrder, Supplier } from "@shared/schema";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
+import { CheckCircle } from "lucide-react";
 
 interface PurchaseOrdersTableProps {
   purchaseOrders: PurchaseOrder[];
@@ -86,7 +87,14 @@ export function PurchaseOrdersTable({
                 ) : "-"}
               </TableCell>
               <TableCell>
-                €{((po.totalAmount || 0) / 100).toLocaleString('nl-NL', { minimumFractionDigits: 2 })}
+                <div className="flex items-center gap-2">
+                  €{((po.totalAmount || 0) / 100).toLocaleString('nl-NL', { minimumFractionDigits: 2 })}
+                  {po.isPaid && (
+                    <svg className="h-4 w-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 <Badge 

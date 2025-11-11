@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PurchaseOrder, Supplier } from "@shared/schema";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
-import { Building2, Calendar, Euro, Truck } from "lucide-react";
+import { Building2, Calendar, Euro, Truck, CheckCircle } from "lucide-react";
 
 interface PurchaseOrdersCardsProps {
   purchaseOrders: PurchaseOrder[];
@@ -52,8 +52,8 @@ export function PurchaseOrdersCards({
                   {po.poNumber || "Geen PO nummer"}
                 </p>
               </div>
-              <Badge 
-                variant="secondary" 
+              <Badge
+                variant="secondary"
                 className={getStatusColor(po.status)}
               >
                 {getStatusLabel(po.status)}
@@ -65,11 +65,11 @@ export function PurchaseOrdersCards({
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <span className="truncate">{getSupplierName(po.supplierId)}</span>
             </div>
-            
+
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span>
-                {po.orderDate 
+                {po.orderDate
                   ? format(new Date(po.orderDate), "d MMM yyyy", { locale: nl })
                   : "-"
                 }
@@ -89,11 +89,13 @@ export function PurchaseOrdersCards({
               </div>
             )}
 
-            <div className="flex items-center gap-2 text-sm pt-2 border-t">
-              <Euro className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">
+            <div className="flex items-center justify-between mt-3 pt-3 border-t">
+              <div className="text-sm font-medium">
                 €{((po.totalAmount || 0) / 100).toLocaleString('nl-NL', { minimumFractionDigits: 2 })}
-              </span>
+              </div>
+              {po.isPaid && (
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              )}
             </div>
           </CardContent>
         </Card>
