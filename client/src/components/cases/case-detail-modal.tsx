@@ -290,15 +290,15 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
       case "new": return "default";
       case "in_progress": return "secondary";
       case "waiting_customer": return "outline";
-      case "resolved": return "primary";
+      case "resolved": return "success";
       default: return "default";
     }
   };
 
-  const getPriorityVariant = (priority: string) => {
+  const getPriorityVariant = (priority: string | null) => {
     switch (priority) {
-      case "urgent": return "danger";
-      case "high": return "danger";
+      case "urgent": return "destructive";
+      case "high": return "destructive";
       case "medium": return "default";
       case "low": return "secondary";
       default: return "default";
@@ -491,7 +491,7 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
                           <div>
                             <label className="text-sm font-medium text-muted-foreground">Priority</label>
                             <Select
-                              value={caseData.priority}
+                              value={caseData.priority || "medium"}
                               onValueChange={(value) => updateCaseMutation.mutate({ id: caseId, data: { priority: value as any } })}
                             >
                               <SelectTrigger className="mt-1" data-testid="priority-select">
@@ -802,6 +802,7 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
                       <NotesPanel
                         entityType="case"
                         entityId={caseId}
+                        currentUser={currentUser}
                       />
                     </div>
                   </CardContent>
