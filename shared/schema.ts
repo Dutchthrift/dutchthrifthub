@@ -476,7 +476,6 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
   id: true,
   poNumber: true, // Auto-generated
-  archived: true, // Has default value
   createdAt: true,
   updatedAt: true,
 }).extend({
@@ -487,6 +486,7 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
     val && typeof val === 'string' ? new Date(val) : val
   ),
   totalAmount: z.number().int().nonnegative(),
+  archived: z.boolean().optional(), // Allow archiving via updates
 });
 
 export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({
