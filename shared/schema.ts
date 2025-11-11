@@ -476,6 +476,7 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
   id: true,
   poNumber: true, // Auto-generated
+  archived: true, // Has default value
   createdAt: true,
   updatedAt: true,
 }).extend({
