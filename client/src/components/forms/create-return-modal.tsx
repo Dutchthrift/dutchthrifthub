@@ -95,7 +95,23 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
 
   // Fetch orders with search query (or recent orders if no search)
   const { data: ordersData } = useQuery<{ orders: any[], total: number }>({
-    queryKey: ["/api/orders", { page: 1, limit: 50, search: orderSearchQuery || undefined }],
+    queryKey: ["/api/orders", "paginated", orderSearchQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "50",
+      });
+      
+      if (orderSearchQuery) {
+        params.append("search", orderSearchQuery);
+      }
+      
+      const response = await fetch(`/api/orders?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch orders");
+      }
+      return response.json();
+    },
   });
 
   // Combine preset order with search results
