@@ -1,0 +1,134 @@
+Build a Cases Management Page in React + Supabase, following the style and component structure of the DutchThrift Hub app.
+The goal is to create a stable and clean drag-and-drop board for managing customer cases linked to orders or returns.
+
+🧩 Core requirements
+
+Page name: Cases
+Purpose: Manage all cases related to orders, claims, or issues in progress.
+
+🧱 Structure
+
+The page should contain 4 main columns:
+
+Nieuw (New)
+
+In Behandeling (In Progress)
+
+Wachtend op Klant (Waiting on Customer)
+
+Opgelost (Resolved)
+
+Each column displays the cases that belong to that status.
+Cases can be dragged and dropped between columns — updating their status in Supabase immediately.
+Use a smooth and reliable drag-and-drop library such as @dnd-kit or react-beautiful-dnd.
+
+🧾 Case Data Model
+
+Use this database structure in Supabase:
+
+{
+  id: string,
+  title: string,
+  description: string,
+  priority: 'low' | 'medium' | 'high' | 'urgent',
+  status: 'new' | 'in_progress' | 'waiting_customer' | 'resolved',
+  linked_order_id?: string,
+  linked_return_id?: string,
+  customer_email?: string,
+  sla_deadline?: Date,
+  created_at: Date,
+  updated_at: Date
+}
+
+🧠 Integrations
+
+Universal Notes System
+
+Integrate the existing universal notes system already used in the project.
+
+Each case can display its related notes via the shared notes component (linked_type: 'case' and linked_id: case.id).
+
+Linked Orders & Returns
+
+Each case can be linked to an order or a return.
+
+Display a clickable reference (like “View Order #1234”) on the case card.
+
+Realtime Updates
+
+Use Supabase on('INSERT'), on('UPDATE'), and on('DELETE') to keep the board live-updating.
+
+🎨 UI / UX Requirements
+
+Main layout:
+
+Top summary widgets (Total Active, New Today, Resolved, Overdue SLA)
+
+Search and filter bar
+
+Four columns with draggable cards
+
+Case card design:
+
+Title
+
+Description (shortened)
+
+Priority badge (color-coded)
+
+Linked order/return info
+
+Notes count (📝)
+
+SLA deadline (with red highlight if overdue)
+
+Hover effect showing extra details (email, timestamps)
+
+Modal: Create New Case
+Fields:
+
+Title
+
+Description
+
+Priority (dropdown)
+
+Customer Email
+
+SLA Deadline (optional)
+
+Create button → saves to Supabase and adds to the “Nieuw” column.
+
+🔧 Functional Logic
+
+When a card is dropped into a new column → update its status in Supabase.
+
+Use optimistic updates so the card moves instantly.
+
+Allow case deletion and editing through context menu or modal.
+
+Use consistent UI (buttons, modals, typography) with the rest of the DutchThrift Hub design.
+
+Fully responsive layout (desktop + mobile).
+
+🚀 Optional Enhancements
+
+Add filters by priority or linked_order_id.
+
+Add a “Show Archived” toggle to display resolved/closed cases.
+
+Allow file uploads (attachments like images or PDFs) linked to a case.
+
+Add notifications for SLA deadlines approaching.
+
+✅ Goal
+
+Deliver a clean, stable, and interactive Cases Management Page that:
+
+Uses Supabase for data and realtime sync
+
+Integrates seamlessly with the universal notes system
+
+Allows easy linking with orders/returns
+
+Has smooth drag-and-drop and a consistent UI across the Hub

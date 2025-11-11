@@ -35,12 +35,10 @@ import { CaseContextMenu } from "../components/cases/case-context-menu";
 import { CaseDetailModal } from "../components/cases/case-detail-modal";
 
 const CASE_STATUS_CONFIG = {
-  new: { label: "New", color: "bg-chart-4", icon: FileText },
-  in_progress: { label: "In Progress", color: "bg-primary", icon: Clock },
-  waiting_customer: { label: "Waiting Customer", color: "bg-chart-1", icon: Users },
-  waiting_part: { label: "Waiting Part", color: "bg-chart-3", icon: AlertTriangle },
-  resolved: { label: "Resolved", color: "bg-chart-2", icon: CheckCircle },
-  closed: { label: "Closed", color: "bg-muted-foreground", icon: Archive },
+  new: { label: "Nieuw", color: "bg-chart-4", icon: FileText },
+  in_progress: { label: "In Behandeling", color: "bg-primary", icon: Clock },
+  waiting_customer: { label: "Wachtend op Klant", color: "bg-chart-1", icon: Users },
+  resolved: { label: "Opgelost", color: "bg-chart-2", icon: CheckCircle },
 };
 
 export default function Cases() {
@@ -125,9 +123,7 @@ export default function Cases() {
       new: 0,
       in_progress: 0,
       waiting_customer: 0,
-      waiting_part: 0,
       resolved: 0,
-      closed: 0,
     };
 
     filteredCases.forEach(c => {
@@ -139,8 +135,47 @@ export default function Cases() {
     return counts;
   }, [filteredCases]);
 
-  const totalWaiting = caseStatusCount.waiting_customer + caseStatusCount.waiting_part;
-  const totalActive = caseStatusCount.new + caseStatusCount.in_progress + totalWaiting + caseStatusCount.resolved;
+  const totalActive = caseStatusCount.new + caseStatusCount.in_progress + caseStatusCount.waiting_customer;
+  
+  // Calculate "New Today" - cases created today
+  const newToday = useMemo(() => {
+    if (!cases) return 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return cases.filter(c => {
+      if (!c.createdAt) return false;
+      const createdDate = new Date(c.createdAt);
+      createdDate.setHours(0, 0, 0, 0);
+      return createdDate.getTime() === today.getTime() && c.status === 'new';
+    }).length;
+  }, [cases]);
+
+  // Calculate "Resolved Today" - cases resolved today
+  const resolvedToday = useMemo(() => {
+    if (!cases) return 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return cases.filter(c => {
+      if (!c.updatedAt || c.status !== 'resolved') return false;
+      const updatedDate = new Date(c.updatedAt);
+      updatedDate.setHours(0, 0, 0, 0);
+      return updatedDate.getTime() === today.getTime();
+    }).length;
+  }, [cases]);
+
+  // Calculate "Overdue SLA" - cases past their SLA deadline
+  const overdueSLA = useMemo(() => {
+    if (!cases) return 0;
+    const now = new Date();
+    
+    return cases.filter(c => {
+      if (!c.slaDeadline || c.status === 'resolved') return false;
+      const deadline = new Date(c.slaDeadline);
+      return deadline < now;
+    }).length;
+  }, [cases]);
 
   const onDragEnd = useCallback((result: any) => {
     if (!result.destination) return;
@@ -437,7 +472,7 @@ export default function Cases() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6 mb-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
           <Card data-testid="cases-stats-total">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Active</CardTitle>
@@ -445,56 +480,48 @@ export default function Cases() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalActive}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Open cases
+              </p>
             </CardContent>
           </Card>
           
-          <Card data-testid="cases-stats-new">
+          <Card data-testid="cases-stats-new-today">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">New</CardTitle>
-              <div className="h-3 w-3 rounded-full bg-chart-4"></div>
+              <CardTitle className="text-sm font-medium">New Today</CardTitle>
+              <Plus className="h-4 w-4 text-chart-4" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{caseStatusCount.new}</div>
+              <div className="text-2xl font-bold">{newToday}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Created today
+              </p>
             </CardContent>
           </Card>
 
-          <Card data-testid="cases-stats-progress">
+          <Card data-testid="cases-stats-resolved-today">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-              <div className="h-3 w-3 rounded-full bg-primary"></div>
+              <CardTitle className="text-sm font-medium">Resolved Today</CardTitle>
+              <CheckCircle className="h-4 w-4 text-chart-2" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{caseStatusCount.in_progress}</div>
+              <div className="text-2xl font-bold">{resolvedToday}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Closed today
+              </p>
             </CardContent>
           </Card>
 
-          <Card data-testid="cases-stats-waiting">
+          <Card data-testid="cases-stats-overdue">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Waiting</CardTitle>
-              <div className="h-3 w-3 rounded-full bg-chart-1"></div>
+              <CardTitle className="text-sm font-medium">Overdue SLA</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalWaiting}</div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="cases-stats-resolved">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Resolved</CardTitle>
-              <div className="h-3 w-3 rounded-full bg-chart-2"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{caseStatusCount.resolved}</div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="cases-stats-closed">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Closed</CardTitle>
-              <div className="h-3 w-3 rounded-full bg-muted-foreground"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{caseStatusCount.closed}</div>
+              <div className="text-2xl font-bold text-destructive">{overdueSLA}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Past deadline
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -549,8 +576,8 @@ export default function Cases() {
         {/* Kanban Board */}
         <div className="min-h-[600px]" data-testid="cases-kanban-board">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
                 <Card key={i} className="h-[400px] animate-pulse">
                   <CardHeader>
                     <div className="h-4 bg-muted rounded"></div>
@@ -567,7 +594,7 @@ export default function Cases() {
             </div>
           ) : (
             <DragDropContext onDragEnd={onDragEnd}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {columns.map(status => {
                   const columnCases = filteredCases.filter(caseItem => caseItem.status === status);
                   return (
