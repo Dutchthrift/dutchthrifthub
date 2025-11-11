@@ -98,6 +98,7 @@ export const emailMessages = pgTable("email_messages", {
   body: text("body"),
   isHtml: boolean("is_html").default(false),
   isOutbound: boolean("is_outbound").default(false),
+  folder: emailFolderEnum("folder").notNull().default("inbox"),
   attachments: jsonb("attachments"), // array of attachment metadata
   rawData: jsonb("raw_data"), // raw email data
   sentAt: timestamp("sent_at"),
@@ -290,6 +291,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   totalAmount: integer("total_amount").notNull(), // in cents
   currency: text("currency").default("EUR"),
   status: purchaseOrderStatusEnum("status").notNull().default("draft"),
+  isPaid: boolean("is_paid").notNull().default(false), // Payment status
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   assignedBuyer: varchar("assigned_buyer").references(() => users.id),
   receivedBy: varchar("received_by").references(() => users.id),

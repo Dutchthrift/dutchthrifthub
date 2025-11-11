@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertPurchaseOrderSchema, type Supplier } from "@shared/schema";
@@ -80,7 +81,8 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
       expectedDeliveryDate: undefined,
       totalAmount: 0,
       currency: "EUR",
-      status: "draft" as const,
+      status: "sent" as const,
+      isPaid: false,
       notes: "",
       createdBy: user?.id || "",
     },
@@ -320,10 +322,10 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="draft">Concept</SelectItem>
-                        <SelectItem value="sent">Verzonden</SelectItem>
+                        <SelectItem value="sent">Aangekocht</SelectItem>
                         <SelectItem value="awaiting_delivery">Onderweg</SelectItem>
-                        <SelectItem value="fully_received">Ontvangen</SelectItem>
+                        <SelectItem value="partially_received">Gedeeltelijk Ontvangen</SelectItem>
+                        <SelectItem value="fully_received">Volledig Ontvangen</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -377,6 +379,30 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="isPaid"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      data-testid="checkbox-is-paid"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Betaald
+                    </FormLabel>
+                    <p className="text-sm text-muted-foreground">
+                      Vink dit aan als de order al betaald is
+                    </p>
+                  </div>
+                </FormItem>
+              )}
+            />
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">

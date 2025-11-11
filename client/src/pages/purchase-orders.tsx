@@ -185,7 +185,7 @@ export default function PurchaseOrders() {
             <CardContent>
               <div className="text-2xl font-bold" data-testid="stat-total-orders">{statusCounts.all}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {statusCounts.draft} concept, {statusCounts.sent} verzonden
+                {statusCounts.aangekocht} aangekocht, {statusCounts.ontvangen} ontvangen
               </p>
             </CardContent>
           </Card>
