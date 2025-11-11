@@ -40,6 +40,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function PurchaseOrders() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,6 +60,8 @@ export default function PurchaseOrders() {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [poToDelete, setPoToDelete] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -230,8 +242,15 @@ export default function PurchaseOrders() {
   };
 
   const handlePODelete = (id: string) => {
-    if (confirm("Weet je zeker dat je deze inkoop order wilt verwijderen?")) {
-      deleteMutation.mutate(id);
+    setPoToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (poToDelete) {
+      deleteMutation.mutate(poToDelete);
+      setDeleteConfirmOpen(false);
+      setPoToDelete(null);
     }
   };
 
@@ -517,6 +536,28 @@ export default function PurchaseOrders() {
           purchaseOrders={purchaseOrders || []}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent data-testid="dialog-delete-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Inkoop order verwijderen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je deze inkoop order wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Annuleren</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
