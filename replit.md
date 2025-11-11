@@ -148,9 +148,9 @@ The platform features a comprehensive Shopify-quality Notes system for centraliz
 
 **Integration Status:**
 - ✅ Orders page (client/src/pages/orders.tsx)
-- ✅ Returns page (client/src/pages/returns.tsx)
+- ✅ Returns list page (client/src/pages/returns.tsx)
 - ✅ Return detail page (client/src/pages/return-detail.tsx)
-- ✅ Cases page (client/src/pages/case-detail.tsx)
+- ✅ Case detail page (client/src/pages/case-detail.tsx)
 - ✅ Case detail modal (client/src/components/cases/case-detail-modal.tsx)
 - ✅ Customer detail page (client/src/pages/customer-detail.tsx)
 - ✅ Task detail modal (client/src/components/todos/task-detail-modal.tsx)
