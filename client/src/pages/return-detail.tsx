@@ -682,18 +682,20 @@ export default function ReturnDetail() {
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="space-y-4">
-                      <div className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="w-2 h-2 rounded-full bg-primary" />
-                          <div className="w-0.5 h-full bg-border" />
+                      {returnData.createdAt && (
+                        <div className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="w-2 h-2 rounded-full bg-primary" />
+                            <div className="w-0.5 h-full bg-border" />
+                          </div>
+                          <div className="flex-1 pb-8">
+                            <p className="text-sm font-medium">Return Created</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(returnData.createdAt), "PPP 'at' p")}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex-1 pb-8">
-                          <p className="text-sm font-medium">Return Created</p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(returnData.createdAt), "PPP 'at' p")}
-                          </p>
-                        </div>
-                      </div>
+                      )}
                       {returnData.receivedDate && (
                         <div className="flex gap-4">
                           <div className="flex flex-col items-center">
