@@ -99,4 +99,5 @@ export interface ActivityWithUser extends Activity {
 export interface CaseWithDetails extends Case {
   customer?: Customer;
   assignedUser?: User;
+  notesCount?: number;
 }

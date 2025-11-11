@@ -33,7 +33,7 @@ import {
   users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
-import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql } from "drizzle-orm";
+import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns } from "drizzle-orm";
 import { ObjectStorageService } from "./objectStorage";
 import type { Response } from "express";
 
@@ -680,7 +680,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Cases
-  async getCases(status?: string, search?: string, emailThreadId?: string): Promise<Case[]> {
+  async getCases(status?: string, search?: string, emailThreadId?: string): Promise<any[]> {
     const conditions = [];
     
     if (status) {
@@ -718,11 +718,25 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    if (conditions.length > 0) {
-      return await db.select().from(cases).where(and(...conditions)).orderBy(desc(cases.createdAt));
-    } else {
-      return await db.select().from(cases).orderBy(desc(cases.createdAt));
-    }
+    // Get cases with notes count and related data
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const casesData = await db
+      .select({
+        ...getTableColumns(cases),
+        notesCount: sql<number>`COALESCE((
+          SELECT COUNT(*)::int 
+          FROM ${notes} 
+          WHERE ${notes.entityType} = 'case' 
+          AND ${notes.entityId} = ${cases.id}
+          AND ${notes.deletedAt} IS NULL
+        ), 0)`,
+      })
+      .from(cases)
+      .where(whereClause)
+      .orderBy(desc(cases.createdAt));
+    
+    return casesData;
   }
 
   async getCase(id: string): Promise<Case | undefined> {

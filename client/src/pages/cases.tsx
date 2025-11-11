@@ -302,6 +302,15 @@ export default function Cases() {
     deleteCaseMutation.mutate(caseId);
   };
 
+  const handleCaseStatusChange = (caseId: string, newStatus: string) => {
+    const previousData = cases;
+    updateCaseMutation.mutate({ 
+      id: caseId, 
+      data: { status: newStatus as any }, 
+      previousData 
+    });
+  };
+
   const getPriorityVariant = (priority: string | null) => {
     switch (priority) {
       case "urgent": return "destructive";
@@ -329,11 +338,13 @@ export default function Cases() {
       {(provided, snapshot) => (
         <CaseContextMenu
           caseId={caseItem.id}
+          currentStatus={caseItem.status}
           isArchived={caseItem.archived || false}
           onOpen={handleCaseOpen}
           onArchive={handleCaseArchive}
           onUnarchive={handleCaseUnarchive}
           onDelete={handleCaseDelete}
+          onStatusChange={handleCaseStatusChange}
         >
           <Card
             ref={provided.innerRef}
@@ -387,13 +398,20 @@ export default function Cases() {
                     )}
                   </div>
                   
-                  {caseItem.assignedUser && (
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="text-xs" data-testid={`case-assignee-${caseItem.id}`}>
-                        {(caseItem.assignedUser.firstName?.[0] || '') + (caseItem.assignedUser.lastName?.[0] || '')}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {caseItem.notesCount !== undefined && caseItem.notesCount > 0 && (
+                      <Badge variant="outline" className="text-xs" data-testid={`case-notes-count-${caseItem.id}`}>
+                        📝 {caseItem.notesCount}
+                      </Badge>
+                    )}
+                    {caseItem.assignedUser && (
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs" data-testid={`case-assignee-${caseItem.id}`}>
+                          {(caseItem.assignedUser.firstName?.[0] || '') + (caseItem.assignedUser.lastName?.[0] || '')}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
