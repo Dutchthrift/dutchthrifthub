@@ -60,11 +60,9 @@ export default function PurchaseOrders() {
   });
 
   const filteredPOs = purchaseOrders?.filter(po => {
-    // Map status filter to actual database statuses
-    if (statusFilter !== "all") {
-      if (statusFilter === "aangekocht" && po.status !== "sent" && po.status !== "awaiting_delivery") return false;
-      if (statusFilter === "ontvangen" && po.status !== "partially_received" && po.status !== "fully_received") return false;
-      if (statusFilter === "verwerkt" && po.status !== "cancelled") return false;
+    // Filter by status
+    if (statusFilter !== "all" && po.status !== statusFilter) {
+      return false;
     }
     if (supplierFilter) {
       const supplier = suppliers?.find(s => s.id === po.supplierId);
@@ -87,19 +85,19 @@ export default function PurchaseOrders() {
   // Analytics calculations
   const statusCounts = {
     all: purchaseOrders?.length || 0,
-    aangekocht: purchaseOrders?.filter(po => po.status === 'sent' || po.status === 'awaiting_delivery').length || 0,
-    ontvangen: purchaseOrders?.filter(po => po.status === 'partially_received' || po.status === 'fully_received').length || 0,
-    verwerkt: purchaseOrders?.filter(po => po.status === 'cancelled').length || 0,
+    aangekocht: purchaseOrders?.filter(po => po.status === 'aangekocht').length || 0,
+    ontvangen: purchaseOrders?.filter(po => po.status === 'ontvangen').length || 0,
+    verwerkt: purchaseOrders?.filter(po => po.status === 'verwerkt').length || 0,
   };
 
   const totalAmount = purchaseOrders?.reduce((sum, po) => sum + ((po.totalAmount || 0) / 100), 0) || 0;
   
   const pendingDeliveries = purchaseOrders?.filter(po => 
-    po.status === 'awaiting_delivery' && po.expectedDeliveryDate
+    po.status === 'aangekocht' && po.expectedDeliveryDate
   ).length || 0;
 
   const overdueDeliveries = purchaseOrders?.filter(po => {
-    if (po.status !== 'awaiting_delivery' || !po.expectedDeliveryDate) return false;
+    if (po.status !== 'aangekocht' || !po.expectedDeliveryDate) return false;
     return new Date(po.expectedDeliveryDate) < new Date();
   }).length || 0;
 
@@ -119,20 +117,18 @@ export default function PurchaseOrders() {
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case "draft": return "secondary";
-      case "sent": return "default";
-      case "awaiting_delivery": return "outline";
-      case "received": return "default";
+      case "aangekocht": return "default";
+      case "ontvangen": return "default";
+      case "verwerkt": return "secondary";
       default: return "secondary";
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "draft": return "text-gray-600 bg-gray-100 dark:bg-gray-800";
-      case "sent": return "text-blue-600 bg-blue-100 dark:bg-blue-900";
-      case "awaiting_delivery": return "text-orange-600 bg-orange-100 dark:bg-orange-900";
-      case "received": return "text-green-600 bg-green-100 dark:bg-green-900";
+      case "aangekocht": return "text-blue-600 bg-blue-100 dark:bg-blue-900";
+      case "ontvangen": return "text-green-600 bg-green-100 dark:bg-green-900";
+      case "verwerkt": return "text-gray-600 bg-gray-100 dark:bg-gray-800";
       default: return "text-gray-600 bg-gray-100";
     }
   };

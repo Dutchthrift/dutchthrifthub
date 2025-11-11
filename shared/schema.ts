@@ -12,7 +12,7 @@ export const todoCategoryEnum = pgEnum("todo_category", ["orders", "purchasing",
 export const emailStatusEnum = pgEnum("email_status", ["open", "closed"]);
 export const emailFolderEnum = pgEnum("email_folder", ["inbox", "sent"]);
 export const orderStatusEnum = pgEnum("order_status", ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]);
-export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["draft", "sent", "awaiting_delivery", "partially_received", "fully_received", "cancelled"]);
+export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["aangekocht", "ontvangen", "verwerkt"]);
 export const caseStatusEnum = pgEnum("case_status", ["new", "in_progress", "waiting_customer", "waiting_part", "resolved", "closed"]);
 export const caseEventTypeEnum = pgEnum("case_event_type", ["created", "status_change", "note_added", "link_added", "link_removed", "sla_set", "assigned", "email_sent", "email_received"]);
 export const caseLinkTypeEnum = pgEnum("case_link_type", ["order", "email", "repair", "todo", "return"]);
@@ -290,7 +290,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   receivedDate: timestamp("received_date"),
   totalAmount: integer("total_amount").notNull(), // in cents
   currency: text("currency").default("EUR"),
-  status: purchaseOrderStatusEnum("status").notNull().default("draft"),
+  status: purchaseOrderStatusEnum("status").notNull().default("aangekocht"),
   isPaid: boolean("is_paid").notNull().default(false), // Payment status
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   assignedBuyer: varchar("assigned_buyer").references(() => users.id),

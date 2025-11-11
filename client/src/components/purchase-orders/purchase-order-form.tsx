@@ -66,9 +66,9 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: 
 
   // Calculate status counts
   const statusCounts = {
-    aangekocht: purchaseOrders.filter(po => po.status === 'sent' || po.status === 'awaiting_delivery').length,
-    ontvangen: purchaseOrders.filter(po => po.status === 'partially_received' || po.status === 'fully_received').length,
-    verwerkt: purchaseOrders.filter(po => po.status === 'cancelled').length,
+    aangekocht: purchaseOrders.filter(po => po.status === 'aangekocht').length,
+    ontvangen: purchaseOrders.filter(po => po.status === 'ontvangen').length,
+    verwerkt: purchaseOrders.filter(po => po.status === 'verwerkt').length,
   };
 
   // Sort all suppliers by supplier code descending (highest number first)
@@ -95,7 +95,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: 
       expectedDeliveryDate: undefined,
       totalAmount: 0,
       currency: "EUR",
-      status: "sent" as const,
+      status: "aangekocht" as const,
       isPaid: false,
       notes: "",
       createdBy: user?.id || "",
@@ -365,11 +365,9 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: 
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="sent">Aangekocht ({statusCounts.aangekocht})</SelectItem>
-                        <SelectItem value="awaiting_delivery">Onderweg</SelectItem>
-                        <SelectItem value="partially_received">Ontvangen ({statusCounts.ontvangen})</SelectItem>
-                        <SelectItem value="fully_received">Volledig Ontvangen</SelectItem>
-                        <SelectItem value="cancelled">Verwerkt ({statusCounts.verwerkt})</SelectItem>
+                        <SelectItem value="aangekocht">Aangekocht ({statusCounts.aangekocht})</SelectItem>
+                        <SelectItem value="ontvangen">Ontvangen ({statusCounts.ontvangen})</SelectItem>
+                        <SelectItem value="verwerkt">Verwerkt ({statusCounts.verwerkt})</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
