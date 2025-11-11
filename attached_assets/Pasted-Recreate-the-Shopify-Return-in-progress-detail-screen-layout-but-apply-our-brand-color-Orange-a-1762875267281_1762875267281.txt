@@ -1,0 +1,308 @@
+Recreate the Shopify “Return in progress” detail screen layout, but apply our brand color = Orange as the primary accent. Keep information architecture and UX patterns—plus a robust Notes system (see below).
+
+Brand & Theming
+
+Add theme tokens (CSS variables or TS constants):
+
+--brand-orange-600: #F59E0B (primary)
+
+--brand-orange-700: #D97706
+
+--brand-orange-100: #FEF3C7
+Use neutrals from Tailwind slate/gray.
+Orange is used for primary buttons, focus rings, active status chip, banners.
+
+Page Structure
+
+Header bar
+
+Left: #8915 (return reference).
+
+Status chips: Paid, Fulfilled, Return in progress.
+
+Subtext: “10 November 2025 at 12:16 from Online Store”.
+
+Right button group: Refund, Edit, Print, More actions ▾.
+
+Main content grid (desktop: 2 columns)
+
+Left column
+
+Card: Return in progress
+
+Header: icon + title; small reference (e.g., #8915-R1) on the right.
+
+Tracking row with lock icon + carrier link.
+
+Returned items list (thumbnail, title, SKU, reason, qty, price).
+
+“Unreleased exchange items” section.
+
+Right-aligned primary button Process return (orange).
+
+Card: Payment / Balance
+
+“Paid” chip.
+
+Light brand banner: “A return is in progress and the order balance may change once processed.”
+
+Totals table (Subtotal, Items, Total).
+
+Right column (~360px)
+
+Notes (Advanced) ← see next section.
+
+Customer
+
+Name (link), orders count, email (link), phone.
+
+Shipping address + “View map”.
+
+Billing address (or “Same as shipping address”).
+
+Status System (chips + banner)
+
+Badge variants:
+
+return_in_progress → brand orange (solid for banner, soft for chip).
+
+paid, fulfilled → gray.
+
+Keep variants for future: received_control (orange-soft), approved_refund (green), missing_package (red), waiting_customer (yellow), reship (purple), closed_not_received (gray).
+
+Advanced Notes (replace the simple Notes card)
+
+Purpose: Centralize communication, decisions, and evidence for each return. Notes must be fast, structured, and auditable.
+
+Features
+
+Note types: internal (visible only to staff), customer_visible (can be shared), system (auto-generated).
+
+Threading & replies: each note supports reply threads with indentation.
+
+Mentions & notify: @teammate autocomplete; optional email/push notify toggle.
+
+Pins: pin critical notes to top; max 3 pins; show pin count.
+
+Tags: freeform chips (e.g., refund, verification, photo, gls).
+
+Attachments: image/PDF upload preview; drag-and-drop; file size limit feedback.
+
+Quick templates: dropdown with canned snippets (e.g., “RMA instructions”, “Refund approved”); insert variables like {orderId}, {customerFirstName}.
+
+Smart links: auto-link order IDs, tracking codes, SKUs.
+
+Status-linked prompts: when status = waiting_customer or missing_package, show contextual templates on composer.
+
+Timeline & audit: each note shows author, timestamp, edited badge; hover reveals change log.
+
+Edit & delete (with reasons): editing preserves history; deleting requires a reason (kept in audit).
+
+Reactions: 👍 👀 ✅ (lightweight acknowledgment).
+
+Follow-ups: add due date + assignee; shows in a small “Tasks” sublist; overdue turns orange.
+
+Filters & search: by type, tag, author, has:attachment, date range; full-text search.
+
+Visibility switch: composer toggle “Internal / Share with customer”.
+
+Export: export filtered notes to Markdown; exclude internal by default.
+
+Email sync (stub): surface a “Linked emails” area (list inbound/outbound message subjects) and allow creating a note from an email (for later integration).
+
+Keyboard shortcuts: Ctrl+Enter to post, / to open templates, @ to mention, # to add tag.
+
+Notes UI
+
+Header: “Notes” + counts: All, Internal, Customer + filter button + search field.
+
+Pinned notes section (if any).
+
+Composer:
+
+Rich text (bold/italic/links, bullet list).
+
+Visibility toggle pill.
+
+Tag adder (#tag chips).
+
+Attachment zone with previews.
+
+Template button.
+
+Primary submit (orange), secondary cancel.
+
+Note card:
+
+Avatar, name, timestamp (relative + tooltip absolute).
+
+Type badge (Internal, Customer, System) with color:
+
+Internal: slate/neutral
+
+Customer: orange outline
+
+System: indigo soft
+
+Body with linkified entities + attachments grid.
+
+Footer actions: Reply, Pin/Unpin, Edit, Delete, Add follow-up, reactions.
+
+Thread replies collapsed after 2; “Show more replies”.
+
+Notes Accessibility & Feedback
+
+Focus rings in orange.
+
+ARIA labels for composer controls.
+
+Announce posting, edit, delete via status region.
+
+Upload progress bars for attachments.
+
+Components
+
+Create reusable components under src/components:
+
+PageHeader.tsx
+
+StatusChip.tsx
+
+Card.tsx (with CardHeader, CardBody, CardFooter)
+
+InfoBanner.tsx
+
+ItemRow.tsx
+
+KeyValue.tsx
+
+Notes/
+
+NotesPanel.tsx (container with filters/search)
+
+NoteComposer.tsx
+
+NoteItem.tsx
+
+NoteThread.tsx
+
+NoteFilters.tsx
+
+AttachmentPreview.tsx
+
+NoteExportButton.tsx
+
+Types (no mock data; types only)
+
+Create src/types/notes.ts:
+
+export type NoteVisibility = "internal" | "customer_visible" | "system";
+
+export interface NoteAttachment {
+  id: string;
+  name: string;
+  mime: string;
+  sizeBytes: number;
+  url?: string;         // optional until uploaded
+  previewUrl?: string;  // image thumbs
+  createdAt: string;
+}
+
+export interface NoteReaction {
+  emoji: "👍" | "👀" | "✅";
+  userId: string;
+}
+
+export interface NoteFollowUp {
+  id: string;
+  dueAt: string;
+  assigneeId: string;
+  completedAt?: string;
+}
+
+export interface Note {
+  id: string;
+  authorId: string;
+  authorName: string;
+  visibility: NoteVisibility;
+  tags: string[];
+  contentHtml: string;     // sanitized
+  attachments?: NoteAttachment[];
+  reactions?: NoteReaction[];
+  followUps?: NoteFollowUp[];
+  pinned?: boolean;
+  parentId?: string;       // for threading
+  createdAt: string;
+  updatedAt?: string;
+  deletedAt?: string;
+  deleteReason?: string;
+  source?: "manual" | "email" | "system";
+}
+
+
+Create src/types/return.ts with minimal contracts needed by the page (ids, strings, totals), but do not include any concrete mock objects.
+
+Interactions (stub handlers only)
+
+onProcessReturn(returnId)
+
+Notes:
+
+onCreateNote(noteDraft)
+
+onUpdateNote(noteId, patch)
+
+onDeleteNote(noteId, reason)
+
+onTogglePin(noteId)
+
+onAddReaction(noteId, emoji)
+
+onAddFollowUp(noteId, followUp)
+
+onUploadAttachment(file) → returns {id, previewUrl}
+
+onExportNotes(filter) → downloads .md
+All handlers may console.log for now.
+
+Layout & Styling
+
+Background: bg-slate-50.
+
+Cards: bg-white border border-slate-200 rounded-lg shadow-sm.
+
+Spacing: 12–16px; radii 8px.
+
+Chips: text-xs rounded-full px-2 py-0.5.
+
+Orange soft: bg-orange-100 text-orange-800
+
+Gray soft: bg-slate-100 text-slate-700
+
+Primary button: bg-orange-600 hover:bg-orange-700 text-white focus:ring-2 focus:ring-orange-600/30.
+
+Info banner (brand): bg-orange-50 text-orange-900 border border-orange-100.
+
+Files to Generate
+
+src/pages/ReturnDetail.tsx
+
+src/components/... (as listed)
+
+src/types/notes.ts, src/types/return.ts
+
+src/styles/theme.css or constants file for brand tokens
+
+Tailwind config & base CSS
+
+Acceptance Criteria
+
+Visual hierarchy matches Shopify’s layout; orange is the primary accent.
+
+Desktop two-column; mobile stacks.
+
+Notes panel supports: types, replies, pins, tags, attachments, templates, search, filters, reactions, follow-ups, export, and audit badges (edited/deleted).
+
+Keyboard accessible (composer + actions); orange focus states.
+
+No mock data included; components accept props and render without runtime TS errors.
