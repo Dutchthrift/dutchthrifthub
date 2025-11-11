@@ -70,10 +70,15 @@ export default function Returns() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Fetch returns with filters
-  const { data: returns = [], isLoading } = useQuery<Return[]>({
-    queryKey: ["/api/returns", currentStatus !== "all" ? { status: currentStatus } : {}],
+  // Fetch all returns (filtering done client-side)
+  const { data: allReturns = [], isLoading } = useQuery<Return[]>({
+    queryKey: ["/api/returns"],
   });
+
+  // Filter by status
+  const returns = currentStatus === "all" 
+    ? allReturns 
+    : allReturns.filter(ret => ret.status === currentStatus);
 
   // Filter returns by search query and priority
   const filteredReturns = returns.filter((ret) => {
