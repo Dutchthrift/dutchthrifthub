@@ -17,6 +17,15 @@ import {
   insertUserSchema,
   insertAuditLogSchema,
   purchaseOrderItems,
+  insertNoteSchema,
+  insertNoteTagSchema,
+  insertNoteMentionSchema,
+  insertNoteReactionSchema,
+  insertNoteAttachmentSchema,
+  insertNoteFollowupSchema,
+  insertNoteRevisionSchema,
+  insertNoteTemplateSchema,
+  insertNoteLinkSchema,
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { syncEmails, sendEmail } from "./services/emailService";
@@ -4321,6 +4330,591 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching case events:", error);
       res.status(500).json({ message: "Failed to fetch case events" });
+    }
+  });
+
+  // ==========================================
+  // NOTES SYSTEM API ROUTES
+  // ==========================================
+
+  // Core Notes Routes
+  // GET /api/notes/:entityType/:entityId - Get all notes for an entity
+  app.get("/api/notes/:entityType/:entityId", requireAuth, async (req: any, res: any) => {
+    try {
+      const { entityType, entityId } = req.params;
+      const { visibility, tagIds, authorId } = req.query;
+
+      const filters: any = {};
+      if (visibility) filters.visibility = visibility;
+      if (authorId) filters.authorId = authorId;
+      if (tagIds) {
+        filters.tagIds = Array.isArray(tagIds) ? tagIds : [tagIds];
+      }
+
+      const notes = await storage.getNotes(entityType, entityId, filters);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+      res.status(500).json({ error: "Failed to fetch notes" });
+    }
+  });
+
+  // POST /api/notes - Create a new note
+  app.post("/api/notes", requireAuth, async (req: any, res: any) => {
+    try {
+      const validatedData = insertNoteSchema.parse({
+        ...req.body,
+        authorId: req.user.id,
+      });
+
+      const note = await storage.createNote(validatedData);
+
+      await auditLog(req, "CREATE", "notes", note.id, {
+        entityType: note.entityType,
+        entityId: note.entityId,
+      });
+
+      res.status(201).json(note);
+    } catch (error) {
+      console.error("Error creating note:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid note data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Failed to create note" });
+      }
+    }
+  });
+
+  // GET /api/notes/:id - Get a single note
+  app.get("/api/notes/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const note = await storage.getNote(id);
+
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+
+      res.json(note);
+    } catch (error) {
+      console.error("Error fetching note:", error);
+      res.status(500).json({ error: "Failed to fetch note" });
+    }
+  });
+
+  // PATCH /api/notes/:id - Update a note (creates revision)
+  app.patch("/api/notes/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const existingNote = await storage.getNote(id);
+
+      if (!existingNote) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+
+      // Create revision before updating
+      if (req.body.content && req.body.content !== existingNote.content) {
+        await storage.createNoteRevision({
+          noteId: id,
+          editorId: req.user.id,
+          previousContent: existingNote.content,
+          newContent: req.body.content,
+        });
+      }
+
+      const updatedNote = await storage.updateNote(id, {
+        ...req.body,
+        editedAt: new Date(),
+      });
+
+      await auditLog(req, "UPDATE", "notes", id, req.body);
+
+      res.json(updatedNote);
+    } catch (error) {
+      console.error("Error updating note:", error);
+      res.status(400).json({ error: "Failed to update note" });
+    }
+  });
+
+  // DELETE /api/notes/:id - Soft delete a note
+  app.delete("/api/notes/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const { deleteReason } = req.body;
+
+      if (!deleteReason) {
+        return res.status(400).json({ error: "Delete reason is required" });
+      }
+
+      await storage.deleteNote(id, deleteReason, req.user.id);
+
+      await auditLog(req, "DELETE", "notes", id, { deleteReason });
+
+      res.json({ message: "Note deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      res.status(400).json({ error: "Failed to delete note" });
+    }
+  });
+
+  // POST /api/notes/:id/pin - Pin a note
+  app.post("/api/notes/:id/pin", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      await storage.pinNote(id);
+
+      await auditLog(req, "PIN", "notes", id);
+
+      res.json({ message: "Note pinned successfully" });
+    } catch (error) {
+      console.error("Error pinning note:", error);
+      res.status(400).json({ error: "Failed to pin note" });
+    }
+  });
+
+  // DELETE /api/notes/:id/pin - Unpin a note
+  app.delete("/api/notes/:id/pin", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      await storage.unpinNote(id);
+
+      await auditLog(req, "UNPIN", "notes", id);
+
+      res.json({ message: "Note unpinned successfully" });
+    } catch (error) {
+      console.error("Error unpinning note:", error);
+      res.status(400).json({ error: "Failed to unpin note" });
+    }
+  });
+
+  // GET /api/notes/search - Search notes across all entities
+  app.get("/api/notes/search", requireAuth, async (req: any, res: any) => {
+    try {
+      const { query, entityType, visibility } = req.query;
+
+      if (!query) {
+        return res.status(400).json({ error: "Search query is required" });
+      }
+
+      const filters: any = {};
+      if (entityType) filters.entityType = entityType;
+      if (visibility) filters.visibility = visibility;
+
+      const notes = await storage.searchNotes(query as string, filters);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error searching notes:", error);
+      res.status(500).json({ error: "Failed to search notes" });
+    }
+  });
+
+  // Note Tags Routes
+  // GET /api/note-tags - Get all tags
+  app.get("/api/note-tags", requireAuth, async (req: any, res: any) => {
+    try {
+      const tags = await storage.getNoteTags();
+      res.json(tags);
+    } catch (error) {
+      console.error("Error fetching note tags:", error);
+      res.status(500).json({ error: "Failed to fetch note tags" });
+    }
+  });
+
+  // POST /api/note-tags - Create a new tag
+  app.post("/api/note-tags", requireAuth, async (req: any, res: any) => {
+    try {
+      const validatedData = insertNoteTagSchema.parse(req.body);
+      const tag = await storage.createNoteTag(validatedData);
+
+      await auditLog(req, "CREATE", "note-tags", tag.id, { name: tag.name });
+
+      res.status(201).json(tag);
+    } catch (error) {
+      console.error("Error creating note tag:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid tag data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Failed to create note tag" });
+      }
+    }
+  });
+
+  // POST /api/notes/:noteId/tags/:tagId - Assign tag to note
+  app.post("/api/notes/:noteId/tags/:tagId", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId, tagId } = req.params;
+      await storage.assignTagToNote(noteId, tagId);
+
+      await auditLog(req, "ASSIGN_TAG", "notes", noteId, { tagId });
+
+      res.status(201).json({ message: "Tag assigned successfully" });
+    } catch (error) {
+      console.error("Error assigning tag to note:", error);
+      res.status(400).json({ error: "Failed to assign tag to note" });
+    }
+  });
+
+  // DELETE /api/notes/:noteId/tags/:tagId - Remove tag from note
+  app.delete("/api/notes/:noteId/tags/:tagId", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId, tagId } = req.params;
+      await storage.removeTagFromNote(noteId, tagId);
+
+      await auditLog(req, "REMOVE_TAG", "notes", noteId, { tagId });
+
+      res.json({ message: "Tag removed successfully" });
+    } catch (error) {
+      console.error("Error removing tag from note:", error);
+      res.status(400).json({ error: "Failed to remove tag from note" });
+    }
+  });
+
+  // Note Mentions Routes
+  // POST /api/notes/:noteId/mentions - Create a mention
+  app.post("/api/notes/:noteId/mentions", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const validatedData = insertNoteMentionSchema.parse({
+        noteId,
+        ...req.body,
+      });
+
+      const mention = await storage.createNoteMention(validatedData);
+
+      await auditLog(req, "CREATE", "note-mentions", mention.id, {
+        noteId,
+        userId: mention.userId,
+      });
+
+      res.status(201).json(mention);
+    } catch (error) {
+      console.error("Error creating note mention:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid mention data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Failed to create note mention" });
+      }
+    }
+  });
+
+  // GET /api/notes/:noteId/mentions - Get note mentions
+  app.get("/api/notes/:noteId/mentions", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const mentions = await storage.getNoteMentions(noteId);
+      res.json(mentions);
+    } catch (error) {
+      console.error("Error fetching note mentions:", error);
+      res.status(500).json({ error: "Failed to fetch note mentions" });
+    }
+  });
+
+  // PATCH /api/note-mentions/:id/read - Mark mention as read
+  app.patch("/api/note-mentions/:id/read", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      await storage.markMentionRead(id);
+
+      await auditLog(req, "MARK_READ", "note-mentions", id);
+
+      res.json({ message: "Mention marked as read" });
+    } catch (error) {
+      console.error("Error marking mention as read:", error);
+      res.status(400).json({ error: "Failed to mark mention as read" });
+    }
+  });
+
+  // Note Reactions Routes
+  // POST /api/notes/:noteId/reactions - Add a reaction
+  app.post("/api/notes/:noteId/reactions", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const validatedData = insertNoteReactionSchema.parse({
+        noteId,
+        userId: req.user.id,
+        emoji: req.body.emoji,
+      });
+
+      const reaction = await storage.addReaction(validatedData);
+
+      await auditLog(req, "CREATE", "note-reactions", reaction.id, {
+        noteId,
+        emoji: reaction.emoji,
+      });
+
+      res.status(201).json(reaction);
+    } catch (error) {
+      console.error("Error adding note reaction:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid reaction data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Failed to add note reaction" });
+      }
+    }
+  });
+
+  // DELETE /api/notes/:noteId/reactions - Remove a reaction
+  app.delete("/api/notes/:noteId/reactions", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const { userId, emoji } = req.body;
+
+      if (!userId || !emoji) {
+        return res.status(400).json({ error: "userId and emoji are required" });
+      }
+
+      await storage.removeReaction(noteId, userId, emoji);
+
+      await auditLog(req, "DELETE", "note-reactions", noteId, { userId, emoji });
+
+      res.json({ message: "Reaction removed successfully" });
+    } catch (error) {
+      console.error("Error removing note reaction:", error);
+      res.status(400).json({ error: "Failed to remove note reaction" });
+    }
+  });
+
+  // GET /api/notes/:noteId/reactions - Get note reactions
+  app.get("/api/notes/:noteId/reactions", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const reactions = await storage.getNoteReactions(noteId);
+      res.json(reactions);
+    } catch (error) {
+      console.error("Error fetching note reactions:", error);
+      res.status(500).json({ error: "Failed to fetch note reactions" });
+    }
+  });
+
+  // Note Attachments Routes
+  // POST /api/notes/:noteId/attachments - Upload an attachment
+  app.post("/api/notes/:noteId/attachments", requireAuth, upload.array('files', 10), async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const files = req.files as Express.Multer.File[];
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No files uploaded" });
+      }
+
+      const objectStorage = new ObjectStorageService();
+      const attachments = [];
+
+      for (const file of files) {
+        const storagePath = await objectStorage.saveAttachment(
+          file.originalname,
+          file.buffer,
+          file.mimetype
+        );
+
+        const attachment = await storage.createNoteAttachment({
+          noteId,
+          fileName: file.originalname,
+          filePath: storagePath,
+          mimeType: file.mimetype,
+          sizeBytes: file.size,
+          uploadedBy: req.user.id,
+        });
+
+        attachments.push(attachment);
+      }
+
+      await auditLog(req, "UPLOAD", "note-attachments", noteId, {
+        count: attachments.length,
+      });
+
+      res.status(201).json(attachments);
+    } catch (error) {
+      console.error("Error uploading note attachments:", error);
+      res.status(400).json({ error: "Failed to upload note attachments" });
+    }
+  });
+
+  // GET /api/notes/:noteId/attachments - Get note attachments
+  app.get("/api/notes/:noteId/attachments", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const attachments = await storage.getNoteAttachments(noteId);
+      res.json(attachments);
+    } catch (error) {
+      console.error("Error fetching note attachments:", error);
+      res.status(500).json({ error: "Failed to fetch note attachments" });
+    }
+  });
+
+  // DELETE /api/note-attachments/:id - Delete an attachment
+  app.delete("/api/note-attachments/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteNoteAttachment(id);
+
+      await auditLog(req, "DELETE", "note-attachments", id);
+
+      res.json({ message: "Attachment deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting note attachment:", error);
+      res.status(400).json({ error: "Failed to delete note attachment" });
+    }
+  });
+
+  // Note Follow-ups Routes
+  // POST /api/notes/:noteId/followups - Create a follow-up (also creates a Todo)
+  app.post("/api/notes/:noteId/followups", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const note = await storage.getNote(noteId);
+
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+
+      const validatedData = insertNoteFollowupSchema.parse({
+        noteId,
+        ...req.body,
+      });
+
+      // Convert dueAt to Date if it's a string
+      if (typeof validatedData.dueAt === 'string') {
+        validatedData.dueAt = new Date(validatedData.dueAt);
+      }
+
+      // Create the Todo first
+      const todo = await storage.createTodo({
+        title: req.body.todoTitle || `Follow-up: ${note.content.substring(0, 50)}...`,
+        description: req.body.todoDescription || note.content,
+        category: "other",
+        assignedUserId: validatedData.assigneeId,
+        createdBy: req.user.id,
+        status: "todo",
+        priority: "medium",
+        dueDate: validatedData.dueAt,
+      });
+
+      // Create the NoteFollowup with the Todo link
+      const followup = await storage.createNoteFollowup({
+        ...validatedData,
+        todoId: todo.id,
+      });
+
+      await auditLog(req, "CREATE", "note-followups", followup.id, {
+        noteId,
+        todoId: todo.id,
+      });
+
+      res.status(201).json({ followup, todo });
+    } catch (error) {
+      console.error("Error creating note followup:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid followup data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Failed to create note followup" });
+      }
+    }
+  });
+
+  // GET /api/notes/:noteId/followups - Get note follow-ups
+  app.get("/api/notes/:noteId/followups", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const followups = await storage.getNoteFollowups(noteId);
+      res.json(followups);
+    } catch (error) {
+      console.error("Error fetching note followups:", error);
+      res.status(500).json({ error: "Failed to fetch note followups" });
+    }
+  });
+
+  // Note Revisions Routes
+  // GET /api/notes/:noteId/revisions - Get note edit history
+  app.get("/api/notes/:noteId/revisions", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const revisions = await storage.getNoteRevisions(noteId);
+      res.json(revisions);
+    } catch (error) {
+      console.error("Error fetching note revisions:", error);
+      res.status(500).json({ error: "Failed to fetch note revisions" });
+    }
+  });
+
+  // Note Templates Routes
+  // GET /api/note-templates - Get all templates
+  app.get("/api/note-templates", requireAuth, async (req: any, res: any) => {
+    try {
+      const { entityType } = req.query;
+      const templates = await storage.getNoteTemplates(entityType as string);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching note templates:", error);
+      res.status(500).json({ error: "Failed to fetch note templates" });
+    }
+  });
+
+  // POST /api/note-templates - Create a template
+  app.post("/api/note-templates", requireAuth, async (req: any, res: any) => {
+    try {
+      const validatedData = insertNoteTemplateSchema.parse({
+        ...req.body,
+        createdBy: req.user.id,
+      });
+
+      const template = await storage.createNoteTemplate(validatedData);
+
+      await auditLog(req, "CREATE", "note-templates", template.id, {
+        name: template.name,
+      });
+
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating note template:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid template data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Failed to create note template" });
+      }
+    }
+  });
+
+  // PATCH /api/note-templates/:id - Update a template
+  app.patch("/api/note-templates/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.updateNoteTemplate(id, req.body);
+
+      await auditLog(req, "UPDATE", "note-templates", id, req.body);
+
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating note template:", error);
+      res.status(400).json({ error: "Failed to update note template" });
+    }
+  });
+
+  // DELETE /api/note-templates/:id - Delete a template
+  app.delete("/api/note-templates/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteNoteTemplate(id);
+
+      await auditLog(req, "DELETE", "note-templates", id);
+
+      res.json({ message: "Template deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting note template:", error);
+      res.status(400).json({ error: "Failed to delete note template" });
+    }
+  });
+
+  // Note Links Routes
+  // GET /api/notes/:noteId/links - Get note smart links
+  app.get("/api/notes/:noteId/links", requireAuth, async (req: any, res: any) => {
+    try {
+      const { noteId } = req.params;
+      const links = await storage.getNoteLinks(noteId);
+      res.json(links);
+    } catch (error) {
+      console.error("Error fetching note links:", error);
+      res.status(500).json({ error: "Failed to fetch note links" });
     }
   });
 

@@ -20,7 +20,17 @@ import {
   type CaseEvent, type InsertCaseEvent,
   type Activity, type InsertActivity,
   type AuditLog, type InsertAuditLog,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings
+  type Note, type InsertNote,
+  type NoteTag, type InsertNoteTag,
+  type NoteTagAssignment, type InsertNoteTagAssignment,
+  type NoteMention, type InsertNoteMention,
+  type NoteReaction, type InsertNoteReaction,
+  type NoteAttachment, type InsertNoteAttachment,
+  type NoteFollowup, type InsertNoteFollowup,
+  type NoteRevision, type InsertNoteRevision,
+  type NoteTemplate, type InsertNoteTemplate,
+  type NoteLink, type InsertNoteLink,
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql } from "drizzle-orm";
@@ -220,6 +230,55 @@ export interface IStorage {
   getCustomerOrders(customerId: string): Promise<Order[]>;
   getCustomerEmailThreads(customerId: string): Promise<EmailThread[]>;
   getCustomerRepairs(customerId: string): Promise<Repair[]>;
+
+  // Notes (Universal)
+  getNotes(entityType: string, entityId: string, filters?: { visibility?: string; tagIds?: string[]; authorId?: string; }): Promise<Note[]>;
+  getNote(id: string): Promise<Note | undefined>;
+  createNote(note: InsertNote): Promise<Note>;
+  updateNote(id: string, updates: Partial<InsertNote>): Promise<Note>;
+  deleteNote(id: string, reason: string, userId: string): Promise<void>;
+  pinNote(noteId: string): Promise<void>;
+  unpinNote(noteId: string): Promise<void>;
+  searchNotes(query: string, filters?: { entityType?: string; visibility?: string; }): Promise<Note[]>;
+
+  // Note Tags
+  getNoteTags(): Promise<NoteTag[]>;
+  createNoteTag(tag: InsertNoteTag): Promise<NoteTag>;
+  assignTagToNote(noteId: string, tagId: string): Promise<void>;
+  removeTagFromNote(noteId: string, tagId: string): Promise<void>;
+
+  // Note Mentions
+  createNoteMention(mention: InsertNoteMention): Promise<NoteMention>;
+  getNoteMentions(noteId: string): Promise<NoteMention[]>;
+  markMentionRead(mentionId: string): Promise<void>;
+
+  // Note Reactions
+  addReaction(reaction: InsertNoteReaction): Promise<NoteReaction>;
+  removeReaction(noteId: string, userId: string, emoji: string): Promise<void>;
+  getNoteReactions(noteId: string): Promise<NoteReaction[]>;
+
+  // Note Attachments
+  createNoteAttachment(attachment: InsertNoteAttachment): Promise<NoteAttachment>;
+  getNoteAttachments(noteId: string): Promise<NoteAttachment[]>;
+  deleteNoteAttachment(id: string): Promise<void>;
+
+  // Note Follow-ups
+  createNoteFollowup(followup: InsertNoteFollowup): Promise<NoteFollowup>;
+  getNoteFollowups(noteId: string): Promise<NoteFollowup[]>;
+
+  // Note Revisions
+  createNoteRevision(revision: InsertNoteRevision): Promise<NoteRevision>;
+  getNoteRevisions(noteId: string): Promise<NoteRevision[]>;
+
+  // Note Templates
+  getNoteTemplates(entityType?: string): Promise<NoteTemplate[]>;
+  createNoteTemplate(template: InsertNoteTemplate): Promise<NoteTemplate>;
+  updateNoteTemplate(id: string, updates: Partial<InsertNoteTemplate>): Promise<NoteTemplate>;
+  deleteNoteTemplate(id: string): Promise<void>;
+
+  // Note Links
+  createNoteLink(link: InsertNoteLink): Promise<NoteLink>;
+  getNoteLinks(noteId: string): Promise<NoteLink[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1292,6 +1351,279 @@ export class DatabaseStorage implements IStorage {
     const objectStorageService = new ObjectStorageService();
     const file = await objectStorageService.getAttachmentFile(attachmentPath);
     await objectStorageService.downloadObject(file, res, 3600, forceDownload);
+  }
+
+  // Notes (Universal)
+  async getNotes(entityType: string, entityId: string, filters?: { visibility?: string; tagIds?: string[]; authorId?: string; }): Promise<Note[]> {
+    const conditions = [
+      eq(notes.entityType, entityType as any),
+      eq(notes.entityId, entityId),
+      sql`${notes.deletedAt} IS NULL`
+    ];
+
+    if (filters?.visibility) {
+      conditions.push(eq(notes.visibility, filters.visibility as any));
+    }
+
+    if (filters?.authorId) {
+      conditions.push(eq(notes.authorId, filters.authorId));
+    }
+
+    let query = db.select().from(notes).where(and(...conditions));
+
+    if (filters?.tagIds && filters.tagIds.length > 0) {
+      const notesWithTags = await db
+        .select({ noteId: noteTagAssignments.noteId })
+        .from(noteTagAssignments)
+        .where(inArray(noteTagAssignments.tagId, filters.tagIds));
+      
+      const noteIds = notesWithTags.map(nt => nt.noteId);
+      if (noteIds.length > 0) {
+        conditions.push(inArray(notes.id, noteIds));
+      } else {
+        return [];
+      }
+    }
+
+    return await query.orderBy(desc(notes.isPinned), desc(notes.createdAt));
+  }
+
+  async getNote(id: string): Promise<Note | undefined> {
+    const result = await db.select().from(notes).where(
+      and(
+        eq(notes.id, id),
+        sql`${notes.deletedAt} IS NULL`
+      )
+    ).limit(1);
+    return result[0];
+  }
+
+  async createNote(note: InsertNote): Promise<Note> {
+    const result = await db.insert(notes).values(note as any).returning();
+    return result[0];
+  }
+
+  async updateNote(id: string, updates: Partial<InsertNote>): Promise<Note> {
+    const result = await db.update(notes).set({
+      ...updates,
+      updatedAt: new Date(),
+      editedAt: new Date()
+    } as any).where(eq(notes.id, id)).returning();
+    if (result.length === 0) {
+      throw new Error("Note not found");
+    }
+    return result[0];
+  }
+
+  async deleteNote(id: string, reason: string, userId: string): Promise<void> {
+    const result = await db.update(notes).set({
+      deletedAt: new Date(),
+      deletedBy: userId,
+      deleteReason: reason
+    } as any).where(eq(notes.id, id)).returning();
+    if (result.length === 0) {
+      throw new Error("Note not found");
+    }
+  }
+
+  async pinNote(noteId: string): Promise<void> {
+    const note = await this.getNote(noteId);
+    if (!note) {
+      throw new Error("Note not found");
+    }
+
+    const pinnedNotes = await db.select().from(notes).where(
+      and(
+        eq(notes.entityType, note.entityType),
+        eq(notes.entityId, note.entityId),
+        eq(notes.isPinned, true),
+        sql`${notes.deletedAt} IS NULL`
+      )
+    );
+
+    if (pinnedNotes.length >= 3) {
+      throw new Error("Maximum 3 pinned notes per entity reached");
+    }
+
+    await db.update(notes).set({
+      isPinned: true,
+      pinnedAt: new Date()
+    } as any).where(eq(notes.id, noteId));
+  }
+
+  async unpinNote(noteId: string): Promise<void> {
+    await db.update(notes).set({
+      isPinned: false,
+      pinnedAt: null,
+      pinnedBy: null
+    } as any).where(eq(notes.id, noteId));
+  }
+
+  async searchNotes(query: string, filters?: { entityType?: string; visibility?: string; }): Promise<Note[]> {
+    const searchTerm = `%${query}%`;
+    const conditions = [
+      sql`${notes.deletedAt} IS NULL`,
+      or(
+        ilike(notes.content, searchTerm),
+        ilike(notes.plainText, searchTerm)
+      )
+    ];
+
+    if (filters?.entityType) {
+      conditions.push(eq(notes.entityType, filters.entityType as any));
+    }
+
+    if (filters?.visibility) {
+      conditions.push(eq(notes.visibility, filters.visibility as any));
+    }
+
+    return await db.select().from(notes).where(and(...conditions)).orderBy(desc(notes.createdAt)).limit(50);
+  }
+
+  // Note Tags
+  async getNoteTags(): Promise<NoteTag[]> {
+    return await db.select().from(noteTags).orderBy(noteTags.name);
+  }
+
+  async createNoteTag(tag: InsertNoteTag): Promise<NoteTag> {
+    const result = await db.insert(noteTags).values(tag as any).returning();
+    return result[0];
+  }
+
+  async assignTagToNote(noteId: string, tagId: string): Promise<void> {
+    await db.insert(noteTagAssignments).values({
+      noteId,
+      tagId
+    } as any);
+  }
+
+  async removeTagFromNote(noteId: string, tagId: string): Promise<void> {
+    await db.delete(noteTagAssignments).where(
+      and(
+        eq(noteTagAssignments.noteId, noteId),
+        eq(noteTagAssignments.tagId, tagId)
+      )
+    );
+  }
+
+  // Note Mentions
+  async createNoteMention(mention: InsertNoteMention): Promise<NoteMention> {
+    const result = await db.insert(noteMentions).values(mention as any).returning();
+    return result[0];
+  }
+
+  async getNoteMentions(noteId: string): Promise<NoteMention[]> {
+    return await db.select().from(noteMentions).where(eq(noteMentions.noteId, noteId));
+  }
+
+  async markMentionRead(mentionId: string): Promise<void> {
+    await db.update(noteMentions).set({
+      notified: true,
+      notifiedAt: new Date()
+    } as any).where(eq(noteMentions.id, mentionId));
+  }
+
+  // Note Reactions
+  async addReaction(reaction: InsertNoteReaction): Promise<NoteReaction> {
+    const result = await db.insert(noteReactions).values(reaction as any).returning();
+    return result[0];
+  }
+
+  async removeReaction(noteId: string, userId: string, emoji: string): Promise<void> {
+    await db.delete(noteReactions).where(
+      and(
+        eq(noteReactions.noteId, noteId),
+        eq(noteReactions.userId, userId),
+        eq(noteReactions.emoji, emoji)
+      )
+    );
+  }
+
+  async getNoteReactions(noteId: string): Promise<NoteReaction[]> {
+    return await db.select().from(noteReactions).where(eq(noteReactions.noteId, noteId));
+  }
+
+  // Note Attachments
+  async createNoteAttachment(attachment: InsertNoteAttachment): Promise<NoteAttachment> {
+    const result = await db.insert(noteAttachments).values(attachment as any).returning();
+    return result[0];
+  }
+
+  async getNoteAttachments(noteId: string): Promise<NoteAttachment[]> {
+    return await db.select().from(noteAttachments).where(eq(noteAttachments.noteId, noteId));
+  }
+
+  async deleteNoteAttachment(id: string): Promise<void> {
+    await db.delete(noteAttachments).where(eq(noteAttachments.id, id));
+  }
+
+  // Note Follow-ups
+  async createNoteFollowup(followup: InsertNoteFollowup): Promise<NoteFollowup> {
+    const result = await db.insert(noteFollowups).values(followup as any).returning();
+    return result[0];
+  }
+
+  async getNoteFollowups(noteId: string): Promise<NoteFollowup[]> {
+    return await db.select().from(noteFollowups).where(eq(noteFollowups.noteId, noteId));
+  }
+
+  // Note Revisions
+  async createNoteRevision(revision: InsertNoteRevision): Promise<NoteRevision> {
+    const result = await db.insert(noteRevisions).values(revision as any).returning();
+    return result[0];
+  }
+
+  async getNoteRevisions(noteId: string): Promise<NoteRevision[]> {
+    return await db.select().from(noteRevisions).where(eq(noteRevisions.noteId, noteId)).orderBy(desc(noteRevisions.editedAt));
+  }
+
+  // Note Templates
+  async getNoteTemplates(entityType?: string): Promise<NoteTemplate[]> {
+    if (entityType) {
+      return await db.select().from(noteTemplates).where(
+        and(
+          eq(noteTemplates.isActive, true),
+          or(
+            eq(noteTemplates.entityType, entityType as any),
+            eq(noteTemplates.scope, 'global')
+          )
+        )
+      ).orderBy(noteTemplates.name);
+    }
+    return await db.select().from(noteTemplates).where(eq(noteTemplates.isActive, true)).orderBy(noteTemplates.name);
+  }
+
+  async createNoteTemplate(template: InsertNoteTemplate): Promise<NoteTemplate> {
+    const result = await db.insert(noteTemplates).values(template as any).returning();
+    return result[0];
+  }
+
+  async updateNoteTemplate(id: string, updates: Partial<InsertNoteTemplate>): Promise<NoteTemplate> {
+    const result = await db.update(noteTemplates).set({
+      ...updates,
+      updatedAt: new Date()
+    } as any).where(eq(noteTemplates.id, id)).returning();
+    if (result.length === 0) {
+      throw new Error("Note template not found");
+    }
+    return result[0];
+  }
+
+  async deleteNoteTemplate(id: string): Promise<void> {
+    await db.update(noteTemplates).set({
+      isActive: false,
+      updatedAt: new Date()
+    } as any).where(eq(noteTemplates.id, id));
+  }
+
+  // Note Links
+  async createNoteLink(link: InsertNoteLink): Promise<NoteLink> {
+    const result = await db.insert(noteLinks).values(link as any).returning();
+    return result[0];
+  }
+
+  async getNoteLinks(noteId: string): Promise<NoteLink[]> {
+    return await db.select().from(noteLinks).where(eq(noteLinks.noteId, noteId));
   }
 }
 
