@@ -43,6 +43,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertReturnSchema } from "@shared/schema";
@@ -89,7 +91,6 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
   const [, setLocation] = useLocation();
   const [orderSearchOpen, setOrderSearchOpen] = useState(false);
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
-  const [wizardStep, setWizardStep] = useState(1);
   const [selectedItems, setSelectedItems] = useState<Map<string, SelectedItemData>>(new Map());
 
   const { data: customers } = useQuery<any[]>({
@@ -169,10 +170,9 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
     }
   }, [open, presetOrder, form]);
 
-  // Reset wizard when modal closes
+  // Reset form and selections when modal closes
   useEffect(() => {
     if (!open) {
-      setWizardStep(1);
       setSelectedItems(new Map());
       form.reset();
     }
@@ -209,7 +209,6 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
       if (currentOrderId && currentOrderId !== orderId && selectedItems.size > 0) {
         if (confirm("Bestelling wijzigen zal geselecteerde artikelen wissen. Doorgaan?")) {
           setSelectedItems(new Map());
-          setWizardStep(1);
         } else {
           return;
         }
@@ -250,7 +249,6 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
       onOpenChange(false);
       form.reset();
       setSelectedItems(new Map());
-      setWizardStep(1);
       
       // Instead of navigating, call the callback or open modal
       if (onReturnCreated) {
@@ -266,33 +264,6 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
     },
   });
 
-  const handleStep1Next = () => {
-    // Validate step 1 fields
-    const values = form.getValues();
-    if (!values.customerId || !values.orderId) {
-      toast({
-        title: "Validatiefout",
-        description: "Selecteer een bestelling om door te gaan",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (values.returnReason === "other" && !values.otherReason) {
-      toast({
-        title: "Validatiefout",
-        description: "Specificeer de reden wanneer 'Anders' is geselecteerd",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setWizardStep(2);
-  };
-
-  const handleStep2Back = () => {
-    setWizardStep(1);
-  };
 
   const handleFinalSubmit = (data: CreateReturnFormValues) => {
     // Convert selectedItems map to array format
@@ -313,16 +284,8 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
   };
 
   const onSubmit = (data: CreateReturnFormValues) => {
-    if (wizardStep === 1) {
-      // If no order selected or user wants to skip item selection
-      if (!selectedOrderId || orderLineItems.length === 0) {
-        createReturnMutation.mutate({ ...data, items: [] });
-      } else {
-        handleStep1Next();
-      }
-    } else {
-      handleFinalSubmit(data);
-    }
+    // Always submit with current item selection (empty array if no items selected)
+    handleFinalSubmit(data);
   };
 
   const toggleItemSelection = (itemId: string) => {
@@ -365,21 +328,21 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" data-testid="create-return-modal">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col" data-testid="create-return-modal">
         <DialogHeader>
-          <DialogTitle>
-            Nieuwe Retour Aanmaken {wizardStep === 2 && "- Artikelen Selecteren"}
-          </DialogTitle>
+          <DialogTitle>Nieuwe Retour Aanmaken</DialogTitle>
           <DialogDescription>
-            {wizardStep === 1 ? "Stap 1 van 2: Basisinformatie" : "Stap 2 van 2: Selecteer artikelen om te retourneren"}
+            Selecteer een bestelling en vul de retourinformatie in. Kies optioneel specifieke artikelen om te retourneren.
           </DialogDescription>
         </DialogHeader>
         
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {wizardStep === 1 ? (
-              <>
-                {/* Step 1: Basic Information */}
+        <ScrollArea className="flex-1 pr-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Section 1: Order & Return Details */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground">Bestelling & Retour Details</h3>
+                
                 <FormField
                   control={form.control}
                   name="orderId"
@@ -586,177 +549,170 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                   )}
                 />
 
-                <div className="flex justify-between gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => onOpenChange(false)}
-                    disabled={createReturnMutation.isPending}
-                    data-testid="button-cancel-return"
-                  >
-                    Annuleren
-                  </Button>
-                  <div className="flex gap-2">
-                    {!selectedOrderId || orderLineItems.length === 0 ? (
-                      <Button
-                        type="submit"
-                        disabled={createReturnMutation.isPending}
-                        data-testid="button-create-return-no-items"
-                      >
-                        {createReturnMutation.isPending ? "Aanmaken..." : "Retour Aanmaken"}
-                      </Button>
-                    ) : (
-                      <>
-                        <Button
-                          type="submit"
-                          variant="outline"
-                          disabled={createReturnMutation.isPending}
-                          data-testid="button-skip-items"
-                        >
-                          Zonder Artikelen
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={handleStep1Next}
-                          disabled={!selectedOrderId}
-                          data-testid="button-next-step"
-                        >
-                          Volgende: Artikelen <ChevronRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      </>
+              </div>
+
+              {/* Separator */}
+              <Separator className="my-6" />
+
+              {/* Section 2: Item Selection */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-muted-foreground">Artikelen uit Bestelling</h3>
+                    {!selectedOrderId && (
+                      <p className="text-xs text-muted-foreground mt-1">Selecteer eerst een bestelling om artikelen te zien</p>
                     )}
                   </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Step 2: Item Selection */}
-                <div className="space-y-4">
-                  {orderLineItems.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      Geen artikelen gevonden in deze bestelling
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                          {selectedItems.size} van {orderLineItems.length} artikel(en) geselecteerd
-                        </p>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={selectAllItems}
-                            data-testid="button-select-all"
-                          >
-                            Alles Selecteren
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={deselectAllItems}
-                            data-testid="button-deselect-all"
-                          >
-                            Alles Deselecteren
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                        {orderLineItems.map((lineItem) => {
-                          const isSelected = selectedItems.has(lineItem.id);
-                          const itemData = selectedItems.get(lineItem.id);
-
-                          return (
-                            <div
-                              key={lineItem.id}
-                              className={cn(
-                                "border rounded-lg p-4 space-y-3 transition-colors",
-                                isSelected ? "border-primary bg-primary/5" : "border-border"
-                              )}
-                            >
-                              <div className="flex items-start gap-3">
-                                <Checkbox
-                                  checked={isSelected}
-                                  onCheckedChange={() => toggleItemSelection(lineItem.id)}
-                                  data-testid={`checkbox-item-${lineItem.id}`}
-                                />
-                                <div className="flex-1">
-                                  <div className="font-medium">{lineItem.title}</div>
-                                  {lineItem.variantTitle && (
-                                    <div className="text-sm text-muted-foreground">{lineItem.variantTitle}</div>
-                                  )}
-                                  <div className="text-sm text-muted-foreground">
-                                    SKU: {lineItem.sku || "N/A"} • Besteld: {lineItem.quantity} • €{parseFloat(lineItem.price).toFixed(2)}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {isSelected && itemData && (
-                                <div className="grid grid-cols-2 gap-3 pl-8">
-                                  <div>
-                                    <label className="text-sm font-medium">Aantal Retour</label>
-                                    <Input
-                                      type="number"
-                                      min={1}
-                                      max={lineItem.quantity}
-                                      value={itemData.quantity}
-                                      onChange={(e) => updateItemData(lineItem.id, "quantity", parseInt(e.target.value) || 1)}
-                                      className="mt-1"
-                                      data-testid={`input-quantity-${lineItem.id}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-sm font-medium">Conditie *</label>
-                                    <Select
-                                      value={itemData.condition}
-                                      onValueChange={(value) => updateItemData(lineItem.id, "condition", value)}
-                                    >
-                                      <SelectTrigger className="mt-1" data-testid={`select-condition-${lineItem.id}`}>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="unopened">Ongeopend</SelectItem>
-                                        <SelectItem value="opened_unused">Geopend, Ongebruikt</SelectItem>
-                                        <SelectItem value="used">Gebruikt</SelectItem>
-                                        <SelectItem value="damaged">Beschadigd</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
+                  {selectedOrderId && orderLineItems.length > 0 && (
+                    <Badge variant="outline">
+                      {selectedItems.size} van {orderLineItems.length} geselecteerd
+                    </Badge>
                   )}
                 </div>
 
-                <div className="flex justify-between gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleStep2Back}
-                    disabled={createReturnMutation.isPending}
-                    data-testid="button-back-step"
-                  >
-                    <ChevronLeft className="mr-2 h-4 w-4" /> Vorige
-                  </Button>
+                {!selectedOrderId ? (
+                  <div className="border rounded-lg p-8 text-center text-muted-foreground bg-muted/30">
+                    <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p>Selecteer een bestelling om artikelen te selecteren</p>
+                  </div>
+                ) : orderLineItems.length === 0 ? (
+                  <div className="border rounded-lg p-8 text-center text-muted-foreground">
+                    <p>Geen artikelen gevonden in deze bestelling</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={selectAllItems}
+                        disabled={!selectedOrderId}
+                        data-testid="button-select-all"
+                      >
+                        Alles Selecteren
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={deselectAllItems}
+                        disabled={!selectedOrderId || selectedItems.size === 0}
+                        data-testid="button-deselect-all"
+                      >
+                        Alles Deselecteren
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+                      {orderLineItems.map((lineItem) => {
+                        const isSelected = selectedItems.has(lineItem.id);
+                        const itemData = selectedItems.get(lineItem.id);
+
+                        return (
+                          <div
+                            key={lineItem.id}
+                            className={cn(
+                              "border rounded-lg p-4 space-y-3 transition-colors",
+                              isSelected ? "border-primary bg-primary/5" : "border-border"
+                            )}
+                          >
+                            <div className="flex items-start gap-3">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleItemSelection(lineItem.id)}
+                                data-testid={`checkbox-item-${lineItem.id}`}
+                              />
+                              <div className="flex-1">
+                                <div className="font-medium">{lineItem.title}</div>
+                                {lineItem.variantTitle && (
+                                  <div className="text-sm text-muted-foreground">{lineItem.variantTitle}</div>
+                                )}
+                                <div className="text-sm text-muted-foreground">
+                                  SKU: {lineItem.sku || "N/A"} • Besteld: {lineItem.quantity} • €{parseFloat(lineItem.price).toFixed(2)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {isSelected && itemData && (
+                              <div className="grid grid-cols-2 gap-3 pl-8">
+                                <div>
+                                  <label className="text-sm font-medium">Aantal Retour</label>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={lineItem.quantity}
+                                    value={itemData.quantity}
+                                    onChange={(e) => updateItemData(lineItem.id, "quantity", parseInt(e.target.value) || 1)}
+                                    className="mt-1"
+                                    data-testid={`input-quantity-${lineItem.id}`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium">Conditie *</label>
+                                  <Select
+                                    value={itemData.condition}
+                                    onValueChange={(value) => updateItemData(lineItem.id, "condition", value)}
+                                  >
+                                    <SelectTrigger className="mt-1" data-testid={`select-condition-${lineItem.id}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="unopened">Ongeopend</SelectItem>
+                                      <SelectItem value="opened_unused">Geopend, Ongebruikt</SelectItem>
+                                      <SelectItem value="used">Gebruikt</SelectItem>
+                                      <SelectItem value="damaged">Beschadigd</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex justify-between gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={createReturnMutation.isPending}
+                  data-testid="button-cancel-return"
+                >
+                  Annuleren
+                </Button>
+                <div className="flex gap-2">
+                  {selectedOrderId && orderLineItems.length > 0 && selectedItems.size === 0 && (
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      disabled={createReturnMutation.isPending}
+                      data-testid="button-skip-items"
+                    >
+                      Zonder Artikelen
+                    </Button>
+                  )}
                   <Button
                     type="submit"
-                    disabled={createReturnMutation.isPending || selectedItems.size === 0}
-                    data-testid="button-create-return-with-items"
+                    disabled={createReturnMutation.isPending || !selectedOrderId}
+                    data-testid="button-create-return"
                   >
-                    {createReturnMutation.isPending ? "Aanmaken..." : `Retour Aanmaken (${selectedItems.size} artikelen)`}
+                    {createReturnMutation.isPending 
+                      ? "Aanmaken..." 
+                      : selectedItems.size > 0 
+                        ? `Retour Aanmaken (${selectedItems.size} ${selectedItems.size === 1 ? 'artikel' : 'artikelen'})`
+                        : "Retour Aanmaken"}
                   </Button>
                 </div>
-              </>
-            )}
-          </form>
-        </Form>
+              </div>
+            </form>
+          </Form>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
