@@ -47,6 +47,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PurchaseOrderForm } from "./purchase-order-form";
 
 interface PurchaseOrderDetailModalProps {
   purchaseOrder: PurchaseOrder;
@@ -64,6 +65,7 @@ export function PurchaseOrderDetailModal({
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("details");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const supplier = suppliers.find(s => s.id === purchaseOrder.supplierId);
 
@@ -155,9 +157,20 @@ export function PurchaseOrderDetailModal({
                 {purchaseOrder.poNumber || "Geen PO nummer"}
               </p>
             </div>
-            <Badge variant="secondary" className={getStatusColor(purchaseOrder.status)}>
-              {getStatusLabel(purchaseOrder.status)}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsEditing(true)}
+                data-testid="button-edit-purchase-order"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Bewerken
+              </Button>
+              <Badge variant="secondary" className={getStatusColor(purchaseOrder.status)}>
+                {getStatusLabel(purchaseOrder.status)}
+              </Badge>
+            </div>
           </div>
         </DialogHeader>
 
