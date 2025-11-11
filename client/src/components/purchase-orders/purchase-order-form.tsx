@@ -63,8 +63,10 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
   const [newSupplierName, setNewSupplierName] = useState("");
   const { user } = useAuth();
 
-  // Get 10 most recent suppliers
-  const recentSuppliers = suppliers.slice(0, 10);
+  // Get 10 most recent suppliers (sorted by supplier code descending - highest number first)
+  const recentSuppliers = [...suppliers]
+    .sort((a, b) => b.supplierCode.localeCompare(a.supplierCode, undefined, { numeric: true }))
+    .slice(0, 10);
 
   // Filter suppliers based on search
   const filteredSuppliers = supplierSearch.trim() === ""
@@ -281,7 +283,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                           ) : (
                             <>
                               <div className="px-3 py-2 text-xs text-muted-foreground border-b">
-                                10 meest recente leveranciers
+                                10 nieuwste leveranciers (hoogste nummer eerst)
                               </div>
                               {recentSuppliers.map((supplier) => (
                                 <div
