@@ -11,13 +11,15 @@ import {
   type PurchaseOrder, type InsertPurchaseOrder,
   type Supplier, type InsertSupplier,
   type PurchaseOrderItem, type InsertPurchaseOrderItem,
+  type Return, type InsertReturn,
+  type ReturnItem, type InsertReturnItem,
   type Case, type InsertCase,
   type CaseLink, type InsertCaseLink,
   type CaseNote, type InsertCaseNote,
   type CaseEvent, type InsertCaseEvent,
   type Activity, type InsertActivity,
   type AuditLog, type InsertAuditLog,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, returns, returnItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql } from "drizzle-orm";
@@ -115,6 +117,24 @@ export interface IStorage {
   createPurchaseOrderItem(item: InsertPurchaseOrderItem): Promise<PurchaseOrderItem>;
   updatePurchaseOrderItem(id: string, item: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem>;
   deletePurchaseOrderItem(id: string): Promise<void>;
+
+  // Returns
+  getReturns(filters?: { status?: string; customerId?: string; orderId?: string; assignedUserId?: string }): Promise<Return[]>;
+  getReturn(id: string): Promise<Return | undefined>;
+  getReturnByReturnNumber(returnNumber: string): Promise<Return | undefined>;
+  createReturn(returnData: InsertReturn): Promise<Return>;
+  updateReturn(id: string, returnData: Partial<InsertReturn>): Promise<Return>;
+  deleteReturn(id: string): Promise<void>;
+  generateReturnNumber(): Promise<string>;
+  getReturnsByStatus(status: string): Promise<Return[]>;
+  getReturnsByCustomer(customerId: string): Promise<Return[]>;
+  createReturnFromCase(caseId: string): Promise<Return>;
+
+  // Return Items
+  getReturnItems(returnId: string): Promise<ReturnItem[]>;
+  createReturnItem(item: InsertReturnItem): Promise<ReturnItem>;
+  updateReturnItem(id: string, item: Partial<InsertReturnItem>): Promise<ReturnItem>;
+  deleteReturnItem(id: string): Promise<void>;
 
   // Todos
   getTodos(userId?: string): Promise<Todo[]>;
@@ -1032,6 +1052,151 @@ export class DatabaseStorage implements IStorage {
 
   async deletePurchaseOrderItem(id: string): Promise<void> {
     await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.id, id));
+  }
+
+  // Returns
+  async getReturns(filters?: { status?: string; customerId?: string; orderId?: string; assignedUserId?: string }): Promise<Return[]> {
+    let query = db.select().from(returns);
+    
+    if (filters) {
+      const conditions = [];
+      if (filters.status) conditions.push(eq(returns.status, filters.status as any));
+      if (filters.customerId) conditions.push(eq(returns.customerId, filters.customerId));
+      if (filters.orderId) conditions.push(eq(returns.orderId, filters.orderId));
+      if (filters.assignedUserId) conditions.push(eq(returns.assignedUserId, filters.assignedUserId));
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+    }
+    
+    return await query.orderBy(desc(returns.createdAt));
+  }
+
+  async getReturn(id: string): Promise<Return | undefined> {
+    const result = await db.select().from(returns).where(eq(returns.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getReturnByReturnNumber(returnNumber: string): Promise<Return | undefined> {
+    const result = await db.select().from(returns).where(eq(returns.returnNumber, returnNumber)).limit(1);
+    return result[0];
+  }
+
+  async generateReturnNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const result = await db.select({ returnNumber: returns.returnNumber })
+      .from(returns)
+      .where(sql`${returns.returnNumber} LIKE ${`RET-${year}-%`}`)
+      .orderBy(desc(returns.returnNumber))
+      .limit(1);
+    
+    if (result.length === 0) {
+      return `RET-${year}-001`;
+    }
+    
+    const lastNumber = parseInt(result[0].returnNumber!.split('-')[2]) || 0;
+    const nextNumber = (lastNumber + 1).toString().padStart(3, '0');
+    return `RET-${year}-${nextNumber}`;
+  }
+
+  async createReturn(returnData: InsertReturn): Promise<Return> {
+    const returnNumber = await this.generateReturnNumber();
+    const result = await db.insert(returns).values({ 
+      ...returnData, 
+      returnNumber 
+    } as any).returning();
+    
+    // Create activity log
+    await this.createActivity({
+      type: 'return_created',
+      description: `Return ${returnNumber} created`,
+      metadata: { returnId: result[0].id },
+    });
+    
+    return result[0];
+  }
+
+  async updateReturn(id: string, returnData: Partial<InsertReturn>): Promise<Return> {
+    const result = await db.update(returns)
+      .set({ ...returnData, updatedAt: new Date() } as any)
+      .where(eq(returns.id, id))
+      .returning();
+    
+    return result[0];
+  }
+
+  async deleteReturn(id: string): Promise<void> {
+    // Delete return items first
+    await db.delete(returnItems).where(eq(returnItems.returnId, id));
+    // Delete return
+    await db.delete(returns).where(eq(returns.id, id));
+  }
+
+  async getReturnsByStatus(status: string): Promise<Return[]> {
+    return await db.select().from(returns).where(eq(returns.status, status as any)).orderBy(desc(returns.createdAt));
+  }
+
+  async getReturnsByCustomer(customerId: string): Promise<Return[]> {
+    return await db.select().from(returns).where(eq(returns.customerId, customerId)).orderBy(desc(returns.createdAt));
+  }
+
+  async createReturnFromCase(caseId: string): Promise<Return> {
+    // Get case details
+    const caseData = await this.getCase(caseId);
+    if (!caseData) {
+      throw new Error('Case not found');
+    }
+
+    // Create return with case information
+    const returnNumber = await this.generateReturnNumber();
+    const result = await db.insert(returns).values({
+      returnNumber,
+      caseId,
+      customerId: caseData.customerId || undefined,
+      status: 'nieuw_onderweg',
+      priority: caseData.priority || 'medium',
+      requestedAt: new Date(),
+    } as any).returning();
+
+    // Create case link
+    await this.createCaseLink({
+      caseId,
+      linkType: 'return',
+      linkedId: result[0].id,
+    });
+
+    // Create case event
+    await this.createCaseEvent({
+      caseId,
+      eventType: 'link_added',
+      message: `Return ${returnNumber} created from case`,
+      metadata: { returnId: result[0].id },
+    });
+
+    return result[0];
+  }
+
+  // Return Items
+  async getReturnItems(returnId: string): Promise<ReturnItem[]> {
+    return await db.select().from(returnItems).where(eq(returnItems.returnId, returnId)).orderBy(returnItems.createdAt);
+  }
+
+  async createReturnItem(item: InsertReturnItem): Promise<ReturnItem> {
+    const result = await db.insert(returnItems).values(item as any).returning();
+    return result[0];
+  }
+
+  async updateReturnItem(id: string, item: Partial<InsertReturnItem>): Promise<ReturnItem> {
+    const result = await db.update(returnItems)
+      .set({ ...item, updatedAt: new Date() } as any)
+      .where(eq(returnItems.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteReturnItem(id: string): Promise<void> {
+    await db.delete(returnItems).where(eq(returnItems.id, id));
   }
 
   // Search

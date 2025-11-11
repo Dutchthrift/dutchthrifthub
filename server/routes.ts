@@ -8,6 +8,8 @@ import {
   insertRepairSchema,
   insertInternalNoteSchema,
   insertPurchaseOrderSchema,
+  insertReturnSchema,
+  insertReturnItemSchema,
   insertCaseSchema,
   insertCaseLinkSchema,
   insertCaseNoteSchema,
@@ -3219,6 +3221,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
+
+  // Returns
+  app.get("/api/returns", requireAuth, async (req: any, res: any) => {
+    try {
+      const { status, customerId, orderId, assignedUserId } = req.query;
+      const filters: any = {};
+      if (status) filters.status = status;
+      if (customerId) filters.customerId = customerId;
+      if (orderId) filters.orderId = orderId;
+      if (assignedUserId) filters.assignedUserId = assignedUserId;
+      
+      const returns = await storage.getReturns(filters);
+      res.json(returns);
+    } catch (error) {
+      console.error("Error fetching returns:", error);
+      res.status(500).json({ message: "Failed to fetch returns" });
+    }
+  });
+
+  app.get("/api/returns/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const returnData = await storage.getReturn(id);
+      if (!returnData) {
+        return res.status(404).json({ message: "Return not found" });
+      }
+      res.json(returnData);
+    } catch (error) {
+      console.error("Error fetching return:", error);
+      res.status(500).json({ message: "Failed to fetch return" });
+    }
+  });
+
+  app.post("/api/returns", requireAuth, async (req: any, res: any) => {
+    try {
+      const validatedData = insertReturnSchema.parse(req.body);
+      const returnData = await storage.createReturn(validatedData as any);
+
+      await auditLog(req, "CREATE", "returns", returnData.id, {
+        returnNumber: returnData.returnNumber,
+        status: returnData.status,
+      });
+
+      res.status(201).json(returnData);
+    } catch (error: any) {
+      console.error("Error creating return:", error);
+      res.status(400).json({
+        message: error.message || "Failed to create return",
+      });
+    }
+  });
+
+  app.patch("/api/returns/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const returnData = await storage.updateReturn(id, req.body);
+
+      // Create activity if status changed
+      if (req.body.status) {
+        await storage.createActivity({
+          type: "return_status_changed",
+          description: `Return ${returnData.returnNumber} status changed to ${req.body.status}`,
+          userId: req.user.id,
+          metadata: { returnId: id, newStatus: req.body.status },
+        });
+      }
+
+      await auditLog(req, "UPDATE", "returns", id, {
+        returnNumber: returnData.returnNumber,
+        changes: req.body,
+      });
+
+      res.json(returnData);
+    } catch (error: any) {
+      console.error("Error updating return:", error);
+      res.status(400).json({
+        message: error.message || "Failed to update return",
+      });
+    }
+  });
+
+  app.delete("/api/returns/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const returnData = await storage.getReturn(id);
+      if (!returnData) {
+        return res.status(404).json({ message: "Return not found" });
+      }
+
+      await storage.deleteReturn(id);
+
+      await storage.createActivity({
+        type: "return_deleted",
+        description: `Deleted return ${returnData.returnNumber}`,
+        userId: req.user.id,
+        metadata: { returnId: id, returnNumber: returnData.returnNumber },
+      });
+
+      await auditLog(req, "DELETE", "returns", id, {
+        returnNumber: returnData.returnNumber,
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting return:", error);
+      res.status(400).json({ message: "Failed to delete return" });
+    }
+  });
+
+  // Convert case to return
+  app.post("/api/returns/from-case/:caseId", requireAuth, async (req: any, res: any) => {
+    try {
+      const { caseId } = req.params;
+      const returnData = await storage.createReturnFromCase(caseId);
+
+      await auditLog(req, "CREATE", "returns", returnData.id, {
+        returnNumber: returnData.returnNumber,
+        source: "case_conversion",
+        caseId,
+      });
+
+      res.status(201).json(returnData);
+    } catch (error: any) {
+      console.error("Error creating return from case:", error);
+      res.status(400).json({
+        message: error.message || "Failed to create return from case",
+      });
+    }
+  });
+
+  // Return Items
+  app.get("/api/return-items/:returnId", requireAuth, async (req: any, res: any) => {
+    try {
+      const { returnId } = req.params;
+      const items = await storage.getReturnItems(returnId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching return items:", error);
+      res.status(500).json({ message: "Failed to fetch return items" });
+    }
+  });
+
+  app.post("/api/return-items", requireAuth, async (req: any, res: any) => {
+    try {
+      const validatedData = insertReturnItemSchema.parse(req.body);
+      const item = await storage.createReturnItem(validatedData as any);
+      res.status(201).json(item);
+    } catch (error: any) {
+      console.error("Error creating return item:", error);
+      res.status(400).json({
+        message: error.message || "Failed to create return item",
+      });
+    }
+  });
+
+  app.patch("/api/return-items/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const item = await storage.updateReturnItem(id, req.body);
+      res.json(item);
+    } catch (error: any) {
+      console.error("Error updating return item:", error);
+      res.status(400).json({
+        message: error.message || "Failed to update return item",
+      });
+    }
+  });
+
+  app.delete("/api/return-items/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteReturnItem(id);
+      res.json({ message: "Return item deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting return item:", error);
+      res.status(400).json({
+        message: error.message || "Failed to delete return item",
+      });
+    }
+  });
 
   // Search
   app.get("/api/search", async (req, res) => {

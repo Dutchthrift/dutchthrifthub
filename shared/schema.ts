@@ -15,7 +15,11 @@ export const orderStatusEnum = pgEnum("order_status", ["pending", "processing", 
 export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["draft", "sent", "awaiting_delivery", "partially_received", "fully_received", "cancelled"]);
 export const caseStatusEnum = pgEnum("case_status", ["new", "in_progress", "waiting_customer", "waiting_part", "resolved", "closed"]);
 export const caseEventTypeEnum = pgEnum("case_event_type", ["created", "status_change", "note_added", "link_added", "link_removed", "sla_set", "assigned", "email_sent", "email_received"]);
-export const caseLinkTypeEnum = pgEnum("case_link_type", ["order", "email", "repair", "todo"]);
+export const caseLinkTypeEnum = pgEnum("case_link_type", ["order", "email", "repair", "todo", "return"]);
+export const returnStatusEnum = pgEnum("return_status", ["nieuw_onderweg", "ontvangen_controle", "akkoord_terugbetaling", "vermiste_pakketten", "wachten_klant", "opnieuw_versturen", "klaar", "niet_ontvangen"]);
+export const returnReasonEnum = pgEnum("return_reason", ["wrong_item", "damaged", "defective", "size_issue", "changed_mind", "other"]);
+export const refundStatusEnum = pgEnum("refund_status", ["pending", "processing", "completed", "failed"]);
+export const refundMethodEnum = pgEnum("refund_method", ["original_payment", "store_credit", "exchange"]);
 
 // Users table
 export const users = pgTable("users", {
@@ -149,6 +153,7 @@ export const todos = pgTable("todos", {
   repairId: varchar("repair_id").references(() => repairs.id),
   emailThreadId: varchar("email_thread_id").references(() => emailThreads.id),
   caseId: varchar("case_id").references(() => cases.id), // Link todos to cases
+  returnId: varchar("return_id").references(() => returns.id), // Link todos to returns
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -165,6 +170,7 @@ export const internalNotes = pgTable("internal_notes", {
   repairId: varchar("repair_id").references(() => repairs.id),
   emailThreadId: varchar("email_thread_id").references(() => emailThreads.id),
   caseId: varchar("case_id").references(() => cases.id), // Link notes to cases
+  returnId: varchar("return_id").references(() => returns.id), // Link notes to returns
   mentions: text("mentions").array(), // user IDs mentioned in the note
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -306,6 +312,66 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   unitPrice: integer("unit_price").notNull(), // in cents
   subtotal: integer("subtotal").notNull(), // in cents (quantity * unitPrice)
   receivedQuantity: integer("received_quantity").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Returns table - Product returns management
+export const returns = pgTable("returns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  returnNumber: text("return_number").notNull().unique(), // Auto-generated (e.g., RET-2025-001)
+  
+  // Relationships
+  customerId: varchar("customer_id").references(() => customers.id),
+  orderId: varchar("order_id").references(() => orders.id),
+  caseId: varchar("case_id").references(() => cases.id),
+  assignedUserId: varchar("assigned_user_id").references(() => users.id),
+  
+  // Return details
+  status: returnStatusEnum("status").notNull().default("nieuw_onderweg"),
+  returnReason: returnReasonEnum("return_reason"),
+  trackingNumber: text("tracking_number"),
+  
+  // Dates
+  requestedAt: timestamp("requested_at").defaultNow(),
+  receivedAt: timestamp("received_at"),
+  expectedReturnDate: timestamp("expected_return_date"),
+  completedAt: timestamp("completed_at"),
+  
+  // Financial (amounts in cents)
+  refundAmount: integer("refund_amount"),
+  refundStatus: refundStatusEnum("refund_status").default("pending"),
+  refundMethod: refundMethodEnum("refund_method"),
+  shopifyRefundId: text("shopify_refund_id"),
+  
+  // Notes & evidence
+  customerNotes: text("customer_notes"),
+  internalNotes: text("internal_notes"),
+  conditionNotes: text("condition_notes"), // Notes after inspection
+  photos: text("photos").array(), // Array of object storage URLs
+  
+  // Metadata
+  priority: priorityEnum("priority").default("medium"),
+  tags: text("tags").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Return Items table - Individual products in a return
+export const returnItems = pgTable("return_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  returnId: varchar("return_id").references(() => returns.id).notNull(),
+  
+  sku: text("sku"),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: integer("unit_price"), // in cents
+  condition: text("condition"), // unopened, opened_unused, used, damaged
+  imageUrl: text("image_url"), // from Shopify or object storage
+  
+  restockable: boolean("restockable").default(false),
+  restockedAt: timestamp("restocked_at"),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -454,6 +520,32 @@ export const insertEmailAttachmentSchema = createInsertSchema(emailAttachments).
   createdAt: true,
 });
 
+export const insertReturnSchema = createInsertSchema(returns).omit({
+  id: true,
+  returnNumber: true, // Auto-generated
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  requestedAt: z.union([z.string(), z.date()]).optional().transform(val => 
+    val && typeof val === 'string' ? new Date(val) : val
+  ),
+  receivedAt: z.union([z.string(), z.date()]).optional().nullable().transform(val => 
+    val && typeof val === 'string' ? new Date(val) : val
+  ),
+  expectedReturnDate: z.union([z.string(), z.date()]).optional().nullable().transform(val => 
+    val && typeof val === 'string' ? new Date(val) : val
+  ),
+  completedAt: z.union([z.string(), z.date()]).optional().nullable().transform(val => 
+    val && typeof val === 'string' ? new Date(val) : val
+  ),
+});
+
+export const insertReturnItemSchema = createInsertSchema(returnItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -508,3 +600,9 @@ export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 
 export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
 export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
+
+export type Return = typeof returns.$inferSelect;
+export type InsertReturn = z.infer<typeof insertReturnSchema>;
+
+export type ReturnItem = typeof returnItems.$inferSelect;
+export type InsertReturnItem = z.infer<typeof insertReturnItemSchema>;

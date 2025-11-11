@@ -1,0 +1,146 @@
+Create a new page called “Retouren” (Returns) inside the DutchThrift Hub app.
+This page manages and tracks all product returns, including different stages of the return process.
+It should integrate with the existing case system so a case can be converted into a return.
+
+🔧 Functional requirements
+
+1. Main Page Layout
+
+Page name: Retouren
+
+Tabs (or segmented view) for each return status.
+
+Each tab shows all returns belonging to that status.
+
+Use a dashboard layout with cards or table view per return.
+
+Each return card should include:
+
+Return ID / SKU
+
+Customer name
+
+Case reference (if converted)
+
+Status chip (colored)
+
+Last update date
+
+Quick action buttons (View, Edit, Move to next stage)
+
+Tabs (keep names in Dutch):
+
+Nieuw / Onderweg — new or in transit
+
+Ontvangen (controle nodig) — received but not yet checked
+
+Akkoord / Terugbetaling — approved, pending refund
+
+Vermiste pakketten — missing packages
+
+Wachten op klant — waiting for customer response
+
+Opnieuw versturen — resend required
+
+Klaar — completed returns
+
+Niet ontvangen — not returned
+
+🔁 Integration with Cases
+
+On the Case detail page, add a button:
+→ “Omzetten naar retour” (Convert to return)
+
+Clicking it creates a new return record in the database and redirects to the Retouren page (default status = Nieuw / Onderweg).
+
+Prefill the return form with case data:
+
+Customer name & email
+
+SKU(s) or product info
+
+Case reference
+
+Original order number
+
+🧱 Data model (example in TypeScript / Prisma or Drizzle ORM)
+model Return {
+  id              String   @id @default(uuid())
+  sku             String
+  customerName    String
+  customerEmail   String?
+  caseId          String?
+  orderNumber     String?
+  status          String   // one of the 8 Dutch statuses
+  reason          String?
+  trackingCode    String?
+  refundAmount    Float?
+  internalNotes   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+💻 Frontend behavior (React / shadcn-ui + Tailwind)
+
+Use a Tabs or SegmentedControl component for switching between statuses.
+
+Display a DataTable or CardGrid inside each tab.
+
+Add a “Nieuw retour aanmaken” button at the top to create returns manually.
+
+Implement a status update dropdown to quickly move returns between phases.
+
+Use soft color-coded chips for status:
+
+Nieuw / Onderweg → Blue
+
+Ontvangen (controle nodig) → Orange
+
+Akkoord / Terugbetaling → Green
+
+Vermiste pakketten → Red
+
+Wachten op klant → Yellow
+
+Opnieuw versturen → Purple
+
+Klaar → Gray
+
+Niet ontvangen → Black / Neutral
+
+⚙️ Backend endpoints (Express example)
+// GET all returns grouped by status
+GET /api/returns
+
+// POST create new return
+POST /api/returns
+
+// PUT update return status or fields
+PUT /api/returns/:id
+
+// GET returns by caseId
+GET /api/returns/case/:caseId
+
+🧭 Extra improvements
+
+Add filters: by date, SKU, or customer.
+
+Add a small summary at the top:
+
+“3 onderweg · 2 wachten op klant · 5 klaar”
+
+Make sure return creation is confirmed with a toast (“Retour succesvol aangemaakt”).
+
+Optional: Add activity timeline in return details view (status changes, messages, etc.).
+
+✅ Deliverables
+
+A complete Retouren page (React + TypeScript + shadcn/ui)
+
+Backend endpoints for CRUD operations
+
+Integration with the Case detail page to create returns
+
+Database migration for returns table
+
+Responsive layout for mobile and desktop
