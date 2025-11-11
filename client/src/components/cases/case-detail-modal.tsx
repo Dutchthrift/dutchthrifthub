@@ -465,6 +465,9 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
     return (
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Loading Case...</DialogTitle>
+          </DialogHeader>
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-muted rounded"></div>
             <div className="h-64 bg-muted rounded"></div>
