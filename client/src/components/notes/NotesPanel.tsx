@@ -116,7 +116,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
 
   const createNoteMutation = useMutation({
     mutationFn: async (noteData: { content: string; plainText: string; visibility: string; tagIds: string[] }) => {
-      const response = await apiRequest("/api/notes", "POST", {
+      const response = await apiRequest("POST", "/api/notes", {
         entityType,
         entityId,
         content: noteData.content,
@@ -129,7 +129,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
       if (noteData.tagIds.length > 0) {
         await Promise.all(
           noteData.tagIds.map((tagId) =>
-            apiRequest(`/api/notes/${newNote.id}/tags/${tagId}`, "POST")
+            apiRequest("POST", `/api/notes/${newNote.id}/tags/${tagId}`)
           )
         );
       }
@@ -154,7 +154,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
 
   const pinNoteMutation = useMutation({
     mutationFn: async (noteId: string) => {
-      return apiRequest(`/api/notes/${noteId}/pin`, "POST");
+      return apiRequest("POST", `/api/notes/${noteId}/pin`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId] });
@@ -171,7 +171,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
 
   const unpinNoteMutation = useMutation({
     mutationFn: async (noteId: string) => {
-      return apiRequest(`/api/notes/${noteId}/pin`, "DELETE");
+      return apiRequest("DELETE", `/api/notes/${noteId}/pin`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId] });
@@ -184,7 +184,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
       const reason = window.prompt("Why are you deleting this note?");
       if (!reason) throw new Error("Delete reason is required");
       
-      return apiRequest(`/api/notes/${noteId}`, "DELETE", { deleteReason: reason });
+      return apiRequest("DELETE", `/api/notes/${noteId}`, { deleteReason: reason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId] });
@@ -203,7 +203,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
 
   const reactToNoteMutation = useMutation({
     mutationFn: async ({ noteId, emoji }: { noteId: string; emoji: string }) => {
-      return apiRequest(`/api/notes/${noteId}/reactions`, "POST", {
+      return apiRequest("POST", `/api/notes/${noteId}/reactions`, {
         userId: currentUser.id,
         emoji,
       });

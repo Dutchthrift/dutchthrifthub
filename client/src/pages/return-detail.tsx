@@ -311,7 +311,11 @@ export default function ReturnDetail() {
                   {returnData.returnNumber}
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                  Created {format(new Date(returnData.createdAt), "PPP")}
+                  {returnData.createdAt ? (
+                    <>Created {format(new Date(returnData.createdAt), "PPP")}</>
+                  ) : (
+                    "No creation date"
+                  )}
                 </p>
               </div>
               <div className="flex gap-2">
