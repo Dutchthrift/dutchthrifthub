@@ -22,6 +22,7 @@ interface PurchaseOrdersTableProps {
   onPOArchive: (id: string) => void;
   onPOUnarchive: (id: string) => void;
   onPODelete: (id: string) => void;
+  onPOStatusChange: (id: string, newStatus: string) => void;
 }
 
 export function PurchaseOrdersTable({
@@ -33,6 +34,7 @@ export function PurchaseOrdersTable({
   onPOArchive,
   onPOUnarchive,
   onPODelete,
+  onPOStatusChange,
 }: PurchaseOrdersTableProps) {
   const getSupplierName = (supplierId: string | null) => {
     if (!supplierId) return "-";
@@ -70,11 +72,13 @@ export function PurchaseOrdersTable({
             <PurchaseOrderContextMenu
               key={po.id}
               purchaseOrderId={po.id}
+              currentStatus={po.status}
               isArchived={po.archived || false}
               onOpen={onPOOpen}
               onArchive={onPOArchive}
               onUnarchive={onPOUnarchive}
               onDelete={onPODelete}
+              onStatusChange={onPOStatusChange}
             >
               <TableRow
                 className="cursor-pointer hover:bg-muted/50"

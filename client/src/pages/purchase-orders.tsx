@@ -229,6 +229,31 @@ export default function PurchaseOrders() {
     }
   };
 
+  // Status change mutation
+  const statusChangeMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      return apiRequest("PATCH", `/api/purchase-orders/${id}`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      toast({
+        title: "Status bijgewerkt",
+        description: "Inkoop order status is gewijzigd",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Fout",
+        description: "Kon status niet wijzigen",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handlePOStatusChange = (id: string, newStatus: string) => {
+    statusChangeMutation.mutate({ id, status: newStatus });
+  };
+
   const isLoading = isLoadingPOs || isLoadingSuppliers;
 
   return (
@@ -434,6 +459,7 @@ export default function PurchaseOrders() {
                 onPOArchive={handlePOArchive}
                 onPOUnarchive={handlePOUnarchive}
                 onPODelete={handlePODelete}
+                onPOStatusChange={handlePOStatusChange}
               />
             ) : (
               <PurchaseOrdersCards
@@ -445,6 +471,7 @@ export default function PurchaseOrders() {
                 onPOArchive={handlePOArchive}
                 onPOUnarchive={handlePOUnarchive}
                 onPODelete={handlePODelete}
+                onPOStatusChange={handlePOStatusChange}
               />
             )}
           </TabsContent>

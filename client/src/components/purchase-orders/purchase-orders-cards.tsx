@@ -15,6 +15,7 @@ interface PurchaseOrdersCardsProps {
   onPOArchive: (id: string) => void;
   onPOUnarchive: (id: string) => void;
   onPODelete: (id: string) => void;
+  onPOStatusChange: (id: string, newStatus: string) => void;
 }
 
 export function PurchaseOrdersCards({
@@ -26,6 +27,7 @@ export function PurchaseOrdersCards({
   onPOArchive,
   onPOUnarchive,
   onPODelete,
+  onPOStatusChange,
 }: PurchaseOrdersCardsProps) {
   const getSupplierName = (supplierId: string | null) => {
     if (!supplierId) return "-";
@@ -50,11 +52,13 @@ export function PurchaseOrdersCards({
         <PurchaseOrderContextMenu
           key={po.id}
           purchaseOrderId={po.id}
+          currentStatus={po.status}
           isArchived={po.archived || false}
           onOpen={onPOOpen}
           onArchive={onPOArchive}
           onUnarchive={onPOUnarchive}
           onDelete={onPODelete}
+          onStatusChange={onPOStatusChange}
         >
           <Card
             className="cursor-pointer hover:shadow-md transition-shadow"
