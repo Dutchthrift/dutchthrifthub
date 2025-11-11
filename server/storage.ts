@@ -140,6 +140,7 @@ export interface IStorage {
   getReturn(id: string): Promise<Return | undefined>;
   getReturnByReturnNumber(returnNumber: string): Promise<Return | undefined>;
   createReturn(returnData: InsertReturn): Promise<Return>;
+  createReturnWithItems(returnData: InsertReturn, items: Omit<InsertReturnItem, 'returnId'>[]): Promise<Return>;
   updateReturn(id: string, returnData: Partial<InsertReturn>): Promise<Return>;
   deleteReturn(id: string): Promise<void>;
   generateReturnNumber(): Promise<string>;
@@ -1221,6 +1222,42 @@ export class DatabaseStorage implements IStorage {
     });
     
     return result[0];
+  }
+
+  async createReturnWithItems(returnData: InsertReturn, items: Omit<InsertReturnItem, 'returnId'>[]): Promise<Return> {
+    const returnNumber = await this.generateReturnNumber();
+    
+    // Use transaction to ensure atomicity
+    const newReturn = await db.transaction(async (tx) => {
+      // Create return within transaction
+      const result = await tx.insert(returns).values({ 
+        ...returnData, 
+        returnNumber 
+      } as any).returning();
+      
+      const createdReturn = result[0];
+      
+      // Create return items within transaction if provided
+      if (items && items.length > 0) {
+        const itemsWithReturnId = items.map(item => ({
+          ...item,
+          returnId: createdReturn.id,
+        }));
+        
+        await tx.insert(returnItems).values(itemsWithReturnId as any);
+      }
+      
+      return createdReturn;
+    });
+    
+    // Create activity log (outside transaction, non-critical)
+    await this.createActivity({
+      type: 'return_created',
+      description: `Return ${returnNumber} created with ${items.length} item(s)`,
+      metadata: { returnId: newReturn.id, itemCount: items.length },
+    });
+    
+    return newReturn;
   }
 
   async updateReturn(id: string, returnData: Partial<InsertReturn>): Promise<Return> {

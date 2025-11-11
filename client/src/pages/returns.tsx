@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import type { User } from "@shared/schema";
 import { Navigation } from "@/components/layout/navigation";
+import { queryClient } from "@/lib/queryClient";
 import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -457,6 +458,19 @@ export default function Returns() {
       <CreateReturnModal 
         open={showCreateModal} 
         onOpenChange={setShowCreateModal}
+        onReturnCreated={async (returnId) => {
+          // Refetch returns to get the newly created one
+          await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+          
+          // Wait a bit for the query to update, then find and open the return
+          setTimeout(() => {
+            const newReturn = allReturns.find(r => r.id === returnId);
+            if (newReturn) {
+              setSelectedReturn(newReturn);
+              setShowReturnDetails(true);
+            }
+          }, 100);
+        }}
       />
 
       {/* Return Details Dialog */}

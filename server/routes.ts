@@ -3601,15 +3601,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/returns", requireAuth, async (req: any, res: any) => {
     try {
-      const validatedData = insertReturnSchema.parse(req.body);
-      const returnData = await storage.createReturn(validatedData as any);
+      const { items, ...returnFields } = req.body;
+      const validatedData = insertReturnSchema.parse(returnFields);
+      
+      // If items are provided, validate and create atomically
+      if (items && Array.isArray(items) && items.length > 0) {
+        // Validate items
+        const validatedItems = items.map((item: any) => insertReturnItemSchema.omit({ returnId: true }).parse(item));
+        
+        // If orderId is provided, validate items against order line items
+        if (validatedData.orderId) {
+          const order = await storage.getOrder(validatedData.orderId);
+          if (order && order.orderData) {
+            const lineItems = (order.orderData as any).line_items || [];
+            
+            // Validate each item exists in order and quantity is valid
+            for (const item of validatedItems) {
+              const lineItem = lineItems.find((li: any) => li.sku === item.sku || li.title === item.productName);
+              if (!lineItem) {
+                return res.status(400).json({
+                  message: `Item "${item.productName}" not found in order`,
+                });
+              }
+              if ((item.quantity || 0) > lineItem.quantity) {
+                return res.status(400).json({
+                  message: `Return quantity for "${item.productName}" exceeds ordered quantity`,
+                });
+              }
+            }
+          }
+        }
+        
+        // Create return with items atomically
+        const returnData = await storage.createReturnWithItems(validatedData as any, validatedItems);
+        
+        await auditLog(req, "CREATE", "returns", returnData.id, {
+          returnNumber: returnData.returnNumber,
+          status: returnData.status,
+          itemCount: items.length,
+        });
+        
+        res.status(201).json(returnData);
+      } else {
+        // Create return without items (legacy behavior)
+        const returnData = await storage.createReturn(validatedData as any);
 
-      await auditLog(req, "CREATE", "returns", returnData.id, {
-        returnNumber: returnData.returnNumber,
-        status: returnData.status,
-      });
+        await auditLog(req, "CREATE", "returns", returnData.id, {
+          returnNumber: returnData.returnNumber,
+          status: returnData.status,
+        });
 
-      res.status(201).json(returnData);
+        res.status(201).json(returnData);
+      }
     } catch (error: any) {
       console.error("Error creating return:", error);
       res.status(400).json({
