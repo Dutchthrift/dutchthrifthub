@@ -42,6 +42,7 @@ Preferred communication style: Simple, everyday language.
 - **Repairs**: Repair workflow management with status progression
 - **Todos**: Task management with priority and assignment
 - **Activities**: Audit trail and team activity tracking
+- **Notes Domain**: Advanced notes system with threading, attachments, mentions, reactions, templates, and smart linking (see Notes System section below)
 
 ### Authentication & Authorization
 - **Session Management**: Express sessions with PostgreSQL storage
@@ -78,6 +79,48 @@ Preferred communication style: Simple, everyday language.
 - **Personal Todos**: User-specific task assignments
 - **Priority Management**: Task prioritization with deadline tracking
 - **Team Collaboration**: Task assignment and status updates
+
+### Notes System (Advanced)
+The platform features a comprehensive Shopify-quality Notes system for centralized communication, decisions, and evidence tracking across all entities (customers, orders, repairs, email threads, cases, returns).
+
+**Core Features:**
+- **Polymorphic Linking**: Notes can be attached to any entity type via entity_type and entity_id fields
+- **Visibility Control**: Three visibility levels (internal, customer_visible, system) with backend enforcement
+- **Threading**: Reply support with parent_note_id and thread_depth tracking (max depth enforced via application logic)
+- **Rich Content**: HTML content with server-side sanitization (rendered_html) and plain text extraction for search
+
+**Collaboration Features:**
+- **Mentions**: @user autocomplete with notification tracking (note_mentions table)
+- **Reactions**: Emoji reactions (👍 👀 ✅) with unique constraint per user+emoji combination
+- **Pinning**: Up to 3 pinned notes per entity for visibility
+- **Tags**: Freeform categorization with note_tags catalog and note_tag_assignments junction table
+
+**Content Management:**
+- **Attachments**: File uploads via note_attachments linking to object storage
+- **Templates**: Reusable note templates with variable substitution (note_templates)
+- **Smart Links**: Auto-detection and linking of order IDs, tracking codes, SKUs (note_links)
+- **Status Prompts**: Contextual templates based on entity status
+
+**Workflow Integration:**
+- **Follow-ups**: Convertible to Todos with due dates and assignees (note_followups)
+- **Audit Trail**: Complete edit history with delta tracking (note_revisions)
+- **Soft Delete**: Deletion requires reason, preserves audit log
+
+**Search & Export:**
+- **Full-Text Search**: GIN index on plain_text for efficient searching
+- **Filters**: By visibility, tag, author, date range, attachments
+- **Export**: Markdown export with visibility filtering
+
+**Performance Optimization:**
+- Composite indexes on (entity_type, entity_id, deleted_at, created_at) for listing
+- Partial indexes on parent_note_id (threading) and is_pinned (quick pin lookup)
+- Unique constraints prevent duplicate tags, mentions, and reactions
+- GIN index for full-text search on note content
+
+**Data Integrity:**
+- CASCADE DELETE on all child tables (tags, mentions, reactions, attachments, revisions, links, follow-ups)
+- NO ACTION on user references to preserve audit trail
+- Unique constraints on note_tag_assignments, note_mentions, and note_reactions
 
 ## External Dependencies
 
