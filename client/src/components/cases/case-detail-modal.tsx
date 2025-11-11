@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { User } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +44,7 @@ import {
   Wrench,
   CheckSquare,
   StickyNote,
-  User,
+  User as UserIcon,
   Clock,
   Link as LinkIcon,
   MessageSquare,
@@ -56,7 +57,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Case, CaseWithDetails, EmailThread, Order, Repair, Todo, InternalNote } from "@/lib/types";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { InternalNotes } from "@/components/notes/internal-notes";
+import { NotesPanel } from "@/components/notes/NotesPanel";
 import { EmailCompose } from "@/components/email/email-compose";
 
 const CASE_STATUS_OPTIONS = [
@@ -157,6 +158,16 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
   const { data: users = [] } = useQuery<any[]>({
     queryKey: ["/api/users/list"],
     enabled: open,
+  });
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/session"],
+    queryFn: async () => {
+      const response = await fetch("/api/auth/session");
+      if (!response.ok) throw new Error("Not authenticated");
+      const data = await response.json();
+      return data.user;
+    },
   });
 
   const { data: caseLinks = [] } = useQuery<any[]>({
@@ -698,7 +709,9 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
 
               <div className="pt-4">
                 <h3 className="font-medium mb-3">Internal Notes</h3>
-                <InternalNotes entityType="case" entityId={caseId} />
+                {currentUser && (
+                  <NotesPanel entityType="case" entityId={caseId} currentUser={currentUser} />
+                )}
               </div>
             </TabsContent>
 

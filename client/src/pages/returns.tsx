@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import type { User } from "@shared/schema";
 import { Navigation } from "@/components/layout/navigation";
 import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { CreateReturnModal } from "@/components/forms/create-return-modal";
-import { InternalNotes } from "@/components/notes/internal-notes";
+import { NotesPanel } from "@/components/notes/NotesPanel";
 import { useToast } from "@/hooks/use-toast";
 
 type Return = {
@@ -151,6 +152,16 @@ export default function Returns() {
   const { data: enrichedReturnData, isLoading: isLoadingDetails } = useQuery<EnrichedReturnData>({
     queryKey: ["/api/returns", selectedReturn?.id],
     enabled: !!selectedReturn?.id && showReturnDetails,
+  });
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/session"],
+    queryFn: async () => {
+      const response = await fetch("/api/auth/session");
+      if (!response.ok) throw new Error("Not authenticated");
+      const data = await response.json();
+      return data.user;
+    },
   });
 
   // Check for returnId in URL and fetch/open return details
@@ -831,10 +842,13 @@ export default function Returns() {
                   <CardTitle className="text-lg">Interne Notities</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <InternalNotes 
-                    entityType="return" 
-                    entityId={enrichedReturnData.return.id}
-                  />
+                  {currentUser && (
+                    <NotesPanel 
+                      entityType="return" 
+                      entityId={enrichedReturnData.return.id}
+                      currentUser={currentUser}
+                    />
+                  )}
                 </CardContent>
               </Card>
             </div>

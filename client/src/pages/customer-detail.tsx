@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
+import type { User as UserType } from "@shared/schema";
 import { ArrowLeft, Mail, ShoppingCart, Wrench, User, Calendar, Phone, MapPin } from "lucide-react";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { InternalNotes } from "@/components/notes/internal-notes";
+import { NotesPanel } from "@/components/notes/NotesPanel";
 import type { Customer, Order, EmailThread, Repair } from "@/lib/types";
 
 interface CustomerWithDetails extends Customer {
@@ -37,6 +38,16 @@ export default function CustomerDetail() {
   const { data: repairs = [], isLoading: repairsLoading } = useQuery<Repair[]>({
     queryKey: [`/api/customers/${customerId}/repairs`],
     enabled: !!customerId,
+  });
+
+  const { data: currentUser } = useQuery<UserType>({
+    queryKey: ["/api/auth/session"],
+    queryFn: async () => {
+      const response = await fetch("/api/auth/session");
+      if (!response.ok) throw new Error("Not authenticated");
+      const data = await response.json();
+      return data.user;
+    },
   });
 
   if (!match) {
@@ -297,11 +308,13 @@ export default function CustomerDetail() {
           </TabsContent>
 
           <TabsContent value="notes" className="space-y-4">
-            <InternalNotes 
-              entityType="customer"
-              entityId={customerId!}
-              entityTitle={customer ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email : undefined}
-            />
+            {currentUser && (
+              <NotesPanel 
+                entityType="customer"
+                entityId={customerId!}
+                currentUser={currentUser}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </div>

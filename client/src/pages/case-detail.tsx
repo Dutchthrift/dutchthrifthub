@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
+import type { User } from "@shared/schema";
 import { Navigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,7 @@ import {
   CheckSquare,
   StickyNote,
   Calendar,
-  User,
+  User as UserIcon,
   AlertTriangle,
   Clock,
   Link as LinkIcon,
@@ -53,7 +54,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { InternalNotes } from "@/components/notes/internal-notes";
+import { NotesPanel } from "@/components/notes/NotesPanel";
 import { EmailCompose } from "@/components/email/email-compose";
 
 const CASE_STATUS_OPTIONS = [
@@ -135,6 +136,16 @@ export default function CaseDetail() {
       return response.json();
     },
     enabled: !!caseId,
+  });
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/session"],
+    queryFn: async () => {
+      const response = await fetch("/api/auth/session");
+      if (!response.ok) throw new Error("Not authenticated");
+      const data = await response.json();
+      return data.user;
+    },
   });
 
   const { data: internalNotes } = useQuery<InternalNote[]>({
@@ -845,7 +856,9 @@ export default function CaseDetail() {
                     {/* Internal Notes */}
                     <div>
                       <h4 className="font-medium text-sm mb-3">Internal Notes</h4>
-                      <InternalNotes entityType="case" entityId={caseId!} />
+                      {currentUser && (
+                        <NotesPanel entityType="case" entityId={caseId!} currentUser={currentUser} />
+                      )}
                     </div>
                   </TabsContent>
                 </CardContent>
@@ -866,7 +879,7 @@ export default function CaseDetail() {
                   Send Email
                 </Button>
                 <Button className="w-full justify-start" variant="outline" onClick={() => setShowAssignDialog(true)} data-testid="assign-case-button">
-                  <User className="mr-2 h-4 w-4" />
+                  <UserIcon className="mr-2 h-4 w-4" />
                   Assign Case
                 </Button>
                 <Button className="w-full justify-start" variant="outline" onClick={() => setShowLinkDialog(true)} data-testid="link-items-button">

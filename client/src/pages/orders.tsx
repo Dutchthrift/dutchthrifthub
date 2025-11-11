@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Order } from "@/lib/types";
+import type { User } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -57,7 +58,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { InternalNotes } from "@/components/notes/internal-notes";
+import { NotesPanel } from "@/components/notes/NotesPanel";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type SortField = 'orderNumber' | 'customer' | 'totalAmount' | 'status' | 'paymentStatus' | 'createdAt' | 'orderDate';
@@ -104,6 +105,16 @@ export default function Orders() {
     delivered: number;
   }>({
     queryKey: ["/api/orders/stats"],
+  });
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/session"],
+    queryFn: async () => {
+      const response = await fetch("/api/auth/session");
+      if (!response.ok) throw new Error("Not authenticated");
+      const data = await response.json();
+      return data.user;
+    },
   });
 
   // Handle both paginated and non-paginated data structures
@@ -996,10 +1007,13 @@ export default function Orders() {
                     <CardTitle className="text-lg">Team Notes</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <InternalNotes 
-                      entityType="order" 
-                      entityId={selectedOrder.id}
-                    />
+                    {currentUser && (
+                      <NotesPanel 
+                        entityType="order" 
+                        entityId={selectedOrder.id}
+                        currentUser={currentUser}
+                      />
+                    )}
                   </CardContent>
                 </Card>
               </div>
