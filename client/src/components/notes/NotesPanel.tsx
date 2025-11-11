@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { NoteComposer } from "./NoteComposer";
 import { NoteItem } from "./NoteItem";
 import { Button } from "@/components/ui/button";
-import { Loader2, Filter } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Filter, Search, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Note, NoteTag, User } from "@shared/schema";
@@ -19,12 +22,21 @@ interface NotesPanelProps {
 export function NotesPanel({ entityType, entityId, currentUser, className }: NotesPanelProps) {
   const { toast } = useToast();
   const [visibilityFilter, setVisibilityFilter] = useState<string | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [authorFilter, setAuthorFilter] = useState<string | undefined>(undefined);
+  const [selectedTagFilters, setSelectedTagFilters] = useState<string[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const { data: notes = [], isLoading } = useQuery<(Note & { author?: User; tags?: NoteTag[] })[]>({
-    queryKey: ["/api/notes", entityType, entityId, visibilityFilter],
+    queryKey: ["/api/notes", entityType, entityId, visibilityFilter, authorFilter, selectedTagFilters],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (visibilityFilter) params.set("visibility", visibilityFilter);
+      if (authorFilter) params.set("authorId", authorFilter);
+      if (selectedTagFilters.length > 0) {
+        selectedTagFilters.forEach(tagId => params.append("tagIds", tagId));
+      }
       
       const url = `/api/notes/${entityType}/${entityId}${params.toString() ? `?${params}` : ""}`;
       const response = await fetch(url);
@@ -36,6 +48,71 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
   const { data: availableTags = [] } = useQuery<NoteTag[]>({
     queryKey: ["/api/note-tags"],
   });
+
+  const { data: allUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/users/list"],
+  });
+
+  const uniqueAuthors = useMemo(() => {
+    const authorMap = new Map<string, User>();
+    notes.forEach(note => {
+      if (note.author && !authorMap.has(note.author.id)) {
+        authorMap.set(note.author.id, note.author);
+      }
+    });
+    return Array.from(authorMap.values());
+  }, [notes]);
+
+  const filteredNotes = useMemo(() => {
+    let filtered = [...notes];
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(note =>
+        note.plainText?.toLowerCase().includes(query) ||
+        note.content?.toLowerCase().includes(query)
+      );
+    }
+
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom);
+      fromDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(note => {
+        if (!note.createdAt) return false;
+        const noteDate = new Date(note.createdAt);
+        return noteDate >= fromDate;
+      });
+    }
+
+    if (dateTo) {
+      const toDate = new Date(dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(note => {
+        if (!note.createdAt) return false;
+        const noteDate = new Date(note.createdAt);
+        return noteDate <= toDate;
+      });
+    }
+
+    return filtered;
+  }, [notes, searchQuery, dateFrom, dateTo]);
+
+  const toggleTagFilter = (tagId: string) => {
+    setSelectedTagFilters(prev =>
+      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
+    );
+  };
+
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setVisibilityFilter(undefined);
+    setAuthorFilter(undefined);
+    setSelectedTagFilters([]);
+    setDateFrom("");
+    setDateTo("");
+  };
+
+  const hasActiveFilters = searchQuery || visibilityFilter || authorFilter || selectedTagFilters.length > 0 || dateFrom || dateTo;
 
   const createNoteMutation = useMutation({
     mutationFn: async (noteData: { content: string; plainText: string; visibility: string; tagIds: string[] }) => {
@@ -136,9 +213,9 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
     },
   });
 
-  const pinnedNotes = notes.filter((note) => note.isPinned && !note.deletedAt);
-  const unpinnedNotes = notes.filter((note) => !note.isPinned && !note.deletedAt);
-  const deletedNotes = notes.filter((note) => note.deletedAt);
+  const pinnedNotes = filteredNotes.filter((note) => note.isPinned && !note.deletedAt);
+  const unpinnedNotes = filteredNotes.filter((note) => !note.isPinned && !note.deletedAt);
+  const deletedNotes = filteredNotes.filter((note) => note.deletedAt);
 
   if (isLoading) {
     return (
@@ -156,35 +233,152 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
         availableTags={availableTags}
       />
 
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-muted-foreground" data-testid="notes-count">
-          {notes.length} {notes.length === 1 ? "note" : "notes"}
-        </h3>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={visibilityFilter === undefined ? "default" : "outline"}
-            size="sm"
-            onClick={() => setVisibilityFilter(undefined)}
-            data-testid="filter-all"
-          >
-            All
-          </Button>
-          <Button
-            variant={visibilityFilter === "internal" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setVisibilityFilter("internal")}
-            data-testid="filter-internal"
-          >
-            Internal
-          </Button>
-          <Button
-            variant={visibilityFilter === "customer_visible" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setVisibilityFilter("customer_visible")}
-            data-testid="filter-customer"
-          >
-            Customer
-          </Button>
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search notes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="notes-search-input"
+          />
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-start sm:items-center">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant={visibilityFilter === undefined ? "default" : "outline"}
+              size="sm"
+              onClick={() => setVisibilityFilter(undefined)}
+              data-testid="filter-all"
+            >
+              All
+            </Button>
+            <Button
+              variant={visibilityFilter === "internal" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setVisibilityFilter("internal")}
+              data-testid="filter-internal"
+            >
+              Internal
+            </Button>
+            <Button
+              variant={visibilityFilter === "customer_visible" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setVisibilityFilter("customer_visible")}
+              data-testid="filter-customer"
+            >
+              Customer
+            </Button>
+          </div>
+
+          {uniqueAuthors.length > 0 && (
+            <Select value={authorFilter || "all"} onValueChange={(val) => setAuthorFilter(val === "all" ? undefined : val)}>
+              <SelectTrigger className="w-[150px] h-9" data-testid="filter-author">
+                <SelectValue placeholder="All authors" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All authors</SelectItem>
+                {uniqueAuthors.map((author) => (
+                  <SelectItem key={author.id} value={author.id}>
+                    {author.firstName} {author.lastName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {availableTags.length > 0 && (
+            <Select value="" onValueChange={toggleTagFilter}>
+              <SelectTrigger className="w-[120px] h-9" data-testid="filter-tags">
+                <SelectValue placeholder="Filter by tag" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableTags.map((tag) => (
+                  <SelectItem key={tag.id} value={tag.id}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: tag.color || "#64748b" }}
+                      />
+                      {tag.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              placeholder="From"
+              className="w-[140px] h-9"
+              data-testid="filter-date-from"
+            />
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              placeholder="To"
+              className="w-[140px] h-9"
+              data-testid="filter-date-to"
+            />
+          </div>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAllFilters}
+              data-testid="filter-clear-all"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear filters
+            </Button>
+          )}
+        </div>
+
+        {selectedTagFilters.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">Active tag filters:</span>
+            {selectedTagFilters.map((tagId) => {
+              const tag = availableTags.find((t) => t.id === tagId);
+              if (!tag) return null;
+              const tagColor = tag.color || "#64748b";
+              return (
+                <Badge
+                  key={tagId}
+                  variant="secondary"
+                  className="gap-1"
+                  style={{ backgroundColor: tagColor + "20", color: tagColor, borderColor: tagColor }}
+                  data-testid={`filter-tag-badge-${tagId}`}
+                >
+                  {tag.name}
+                  <button
+                    type="button"
+                    onClick={() => toggleTagFilter(tagId)}
+                    className="hover:bg-black/10 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-muted-foreground" data-testid="notes-count">
+            {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
+            {hasActiveFilters && notes.length !== filteredNotes.length && (
+              <span className="text-xs ml-1">(filtered from {notes.length})</span>
+            )}
+          </h3>
         </div>
       </div>
 

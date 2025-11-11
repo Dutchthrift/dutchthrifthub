@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -6,8 +7,16 @@ import Link from "@tiptap/extension-link";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Send, Bold, Italic, UnderlineIcon, List, ListOrdered, Link as LinkIcon, X } from "lucide-react";
+import { Send, Bold, Italic, UnderlineIcon, List, ListOrdered, Link as LinkIcon, X, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+
+interface NoteTemplate {
+  id: string;
+  name: string;
+  content: string;
+  description?: string | null;
+}
 
 interface NoteComposerProps {
   onSubmit: (note: { content: string; plainText: string; visibility: string; tagIds: string[] }) => void;
@@ -15,11 +24,20 @@ interface NoteComposerProps {
   placeholder?: string;
   availableTags?: Array<{ id: string; name: string; color: string | null }>;
   className?: string;
+  contextData?: {
+    orderNumber?: string;
+    customerName?: string;
+    [key: string]: any;
+  };
 }
 
-export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...", availableTags = [], className }: NoteComposerProps) {
+export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...", availableTags = [], className, contextData = {} }: NoteComposerProps) {
   const [visibility, setVisibility] = useState<string>("internal");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  const { data: templates = [] } = useQuery<NoteTemplate[]>({
+    queryKey: ["/api/note-templates"],
+  });
 
   const editor = useEditor({
     extensions: [
@@ -59,17 +77,56 @@ export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...
     setSelectedTags([]);
   };
 
+  // Keyboard shortcuts
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
   const toggleTag = (tagId: string) => {
     setSelectedTags((prev) =>
       prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
     );
   };
 
+  const substituteVariables = (content: string): string => {
+    let substituted = content;
+    
+    if (contextData.orderNumber) {
+      substituted = substituted.replace(/\{\{orderNumber\}\}/g, contextData.orderNumber);
+    }
+    
+    if (contextData.customerName) {
+      substituted = substituted.replace(/\{\{customerName\}\}/g, contextData.customerName);
+    }
+    
+    substituted = substituted.replace(/\{\{today\}\}/g, format(new Date(), "MMMM d, yyyy"));
+    
+    return substituted;
+  };
+
+  const handleTemplateSelect = (templateId: string) => {
+    const template = templates.find((t) => t.id === templateId);
+    if (template && editor) {
+      const content = substituteVariables(template.content);
+      editor.commands.setContent(content);
+      editor.commands.focus();
+    }
+  };
+
   const selectedTagObjects = availableTags.filter((tag) => selectedTags.includes(tag.id));
 
   return (
-    <div className={cn("border rounded-lg bg-card", className)} data-testid="note-composer">
-      <div className="border-b p-2 flex items-center gap-2 bg-muted/50">
+    <div 
+      className={cn("border rounded-lg bg-card", className)} 
+      data-testid="note-composer"
+      onKeyDown={handleKeyDown}
+      role="form"
+      aria-label="Note composer"
+    >
+      <div className="border-b p-2 flex items-center gap-2 bg-muted/50" role="toolbar" aria-label="Formatting toolbar">
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleBold().run()}
@@ -142,6 +199,28 @@ export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...
         >
           <LinkIcon className="h-4 w-4" />
         </button>
+        {templates.length > 0 && (
+          <>
+            <div className="w-px h-4 bg-border" />
+            <Select value="" onValueChange={handleTemplateSelect}>
+              <SelectTrigger className="w-auto h-auto p-1.5 border-0 hover:bg-accent" data-testid="note-composer-template">
+                <FileText className="h-4 w-4" />
+              </SelectTrigger>
+              <SelectContent>
+                {templates.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{template.name}</span>
+                      {template.description && (
+                        <span className="text-xs text-muted-foreground">{template.description}</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
       </div>
 
       <EditorContent editor={editor} />
@@ -210,6 +289,7 @@ export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...
           onClick={handleSubmit}
           disabled={isPending || !editor?.getText().trim()}
           data-testid="note-composer-submit"
+          aria-label="Submit note (Ctrl+Enter)"
         >
           <Send className="h-4 w-4" />
         </Button>
