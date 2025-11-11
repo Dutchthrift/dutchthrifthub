@@ -11,6 +11,7 @@ import {
   type PurchaseOrder, type InsertPurchaseOrder,
   type Supplier, type InsertSupplier,
   type PurchaseOrderItem, type InsertPurchaseOrderItem,
+  type PurchaseOrderFile, type InsertPurchaseOrderFile,
   type Return, type InsertReturn,
   type ReturnItem, type InsertReturnItem,
   type Case, type InsertCase,
@@ -19,7 +20,7 @@ import {
   type CaseEvent, type InsertCaseEvent,
   type Activity, type InsertActivity,
   type AuditLog, type InsertAuditLog,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, returns, returnItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql } from "drizzle-orm";
@@ -117,6 +118,12 @@ export interface IStorage {
   createPurchaseOrderItem(item: InsertPurchaseOrderItem): Promise<PurchaseOrderItem>;
   updatePurchaseOrderItem(id: string, item: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem>;
   deletePurchaseOrderItem(id: string): Promise<void>;
+
+  // Purchase Order Files
+  getPurchaseOrderFiles(purchaseOrderId: string): Promise<PurchaseOrderFile[]>;
+  getPurchaseOrderFile(id: string): Promise<PurchaseOrderFile | undefined>;
+  createPurchaseOrderFile(file: InsertPurchaseOrderFile): Promise<PurchaseOrderFile>;
+  deletePurchaseOrderFile(id: string): Promise<void>;
 
   // Returns
   getReturns(filters?: { status?: string; customerId?: string; orderId?: string; assignedUserId?: string }): Promise<Return[]>;
@@ -1052,6 +1059,25 @@ export class DatabaseStorage implements IStorage {
 
   async deletePurchaseOrderItem(id: string): Promise<void> {
     await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.id, id));
+  }
+
+  // Purchase Order Files
+  async getPurchaseOrderFiles(purchaseOrderId: string): Promise<PurchaseOrderFile[]> {
+    return await db.select().from(purchaseOrderFiles).where(eq(purchaseOrderFiles.purchaseOrderId, purchaseOrderId)).orderBy(purchaseOrderFiles.uploadedAt);
+  }
+
+  async getPurchaseOrderFile(id: string): Promise<PurchaseOrderFile | undefined> {
+    const result = await db.select().from(purchaseOrderFiles).where(eq(purchaseOrderFiles.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createPurchaseOrderFile(file: InsertPurchaseOrderFile): Promise<PurchaseOrderFile> {
+    const result = await db.insert(purchaseOrderFiles).values(file as any).returning();
+    return result[0];
+  }
+
+  async deletePurchaseOrderFile(id: string): Promise<void> {
+    await db.delete(purchaseOrderFiles).where(eq(purchaseOrderFiles.id, id));
   }
 
   // Returns

@@ -106,8 +106,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize order matching service
   const orderMatchingService = new OrderMatchingService(storage);
 
-  // Configure multer for file uploads (memory storage for CSV)
-  const upload = multer({ storage: multer.memoryStorage() });
+  // Configure multer for file uploads (memory storage with limits)
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { 
+      fileSize: 10 * 1024 * 1024, // 10MB max file size
+      files: 10 // max 10 files per request
+    }
+  });
 
   // Authentication routes
   app.post("/api/auth/signin", async (req, res) => {
@@ -3145,6 +3151,222 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting purchase order:", error);
       res.status(400).json({ message: "Failed to delete purchase order" });
+    }
+  });
+
+  // Upload files to a purchase order
+  app.post(
+    "/api/purchase-orders/:id/upload",
+    requireAuth,
+    upload.array("files", 10),
+    async (req: any, res) => {
+      const uploadedPaths: string[] = [];
+      try {
+        const { id } = req.params;
+        const files = req.files as Express.Multer.File[];
+
+        if (!files || files.length === 0) {
+          return res.status(400).json({ message: "No files provided" });
+        }
+
+        const purchaseOrder = await storage.getPurchaseOrder(id);
+        if (!purchaseOrder) {
+          return res.status(404).json({ message: "Purchase order not found" });
+        }
+
+        // Check existing file count
+        const existingFiles = await storage.getPurchaseOrderFiles(id);
+        if (existingFiles.length + files.length > 20) {
+          return res.status(400).json({ message: "Maximum 20 files per purchase order" });
+        }
+
+        // Validate files
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        const ALLOWED_TYPES = [
+          'application/pdf',
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+
+        for (const file of files) {
+          if (file.size > MAX_FILE_SIZE) {
+            return res.status(400).json({ message: `File ${file.originalname} is too large (max 10MB)` });
+          }
+          if (!ALLOWED_TYPES.includes(file.mimetype)) {
+            return res.status(400).json({ message: `File type ${file.mimetype} not allowed` });
+          }
+        }
+
+        const objectStorage = new ObjectStorageService();
+        const uploadedFiles: any[] = [];
+
+        for (const file of files) {
+          try {
+            // Create a safe filename
+            const timestamp = Date.now();
+            const safeOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const filename = `purchase-order-${id}-${timestamp}-${safeOriginalName}`;
+            
+            console.log(`Uploading purchase order file: ${filename} (${file.size} bytes, ${file.mimetype})`);
+            const url = await objectStorage.saveAttachment(
+              filename,
+              file.buffer,
+              file.mimetype,
+            );
+            uploadedPaths.push(url);
+            console.log(`Uploaded to: ${url}`);
+            
+            // Create file record in database
+            const fileRecord = await storage.createPurchaseOrderFile({
+              purchaseOrderId: id,
+              fileName: file.originalname,
+              filePath: url,
+              fileType: file.mimetype,
+              fileSize: file.size,
+              uploadedBy: req.user.id,
+            });
+            
+            uploadedFiles.push({
+              id: fileRecord.id,
+              fileName: fileRecord.fileName,
+              fileSize: fileRecord.fileSize,
+              uploadedAt: fileRecord.uploadedAt,
+            });
+          } catch (fileError) {
+            // Rollback: delete already uploaded files
+            console.error(`Error uploading file ${file.originalname}, rolling back...`, fileError);
+            for (const path of uploadedPaths) {
+              try {
+                await objectStorage.deleteAttachment(path);
+              } catch (cleanupError) {
+                console.error(`Failed to cleanup file ${path}:`, cleanupError);
+              }
+            }
+            // Delete DB records
+            for (const uploaded of uploadedFiles) {
+              try {
+                await storage.deletePurchaseOrderFile(uploaded.id);
+              } catch (cleanupError) {
+                console.error(`Failed to cleanup DB record ${uploaded.id}:`, cleanupError);
+              }
+            }
+            throw fileError;
+          }
+        }
+
+        // Create activity log with file details
+        await storage.createActivity({
+          type: "purchase_order_updated",
+          description: `Uploaded ${uploadedFiles.length} file(s) to purchase order: ${purchaseOrder.title}`,
+          userId: req.user.id,
+          metadata: { 
+            purchaseOrderId: id,
+            fileCount: uploadedFiles.length,
+            fileNames: uploadedFiles.map(f => f.fileName),
+          },
+        });
+
+        console.log(`Successfully uploaded ${uploadedFiles.length} files to purchase order ${id}`);
+        res.json({ 
+          files: uploadedFiles,
+          total: uploadedFiles.length 
+        });
+      } catch (error) {
+        console.error("Error uploading files to purchase order:", error);
+        res.status(500).json({ 
+          message: error instanceof Error ? error.message : "Failed to upload files",
+          uploaded: uploadedPaths.length,
+        });
+      }
+    },
+  );
+
+  // Get files for a purchase order
+  app.get("/api/purchase-orders/:id/files", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const files = await storage.getPurchaseOrderFiles(id);
+      res.json(files);
+    } catch (error) {
+      console.error("Error fetching purchase order files:", error);
+      res.status(500).json({ message: "Failed to fetch files" });
+    }
+  });
+
+  // Download a purchase order file
+  app.get("/api/purchase-order-files/:id/download", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const file = await storage.getPurchaseOrderFile(id);
+      
+      if (!file) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      const objectStorage = new ObjectStorageService();
+      const fileObj = await objectStorage.getAttachmentFile(file.filePath);
+      await objectStorage.downloadObject(fileObj, res, 3600, false);
+    } catch (error) {
+      console.error("Error downloading purchase order file:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to download file" });
+      }
+    }
+  });
+
+  // Delete a purchase order file
+  app.delete("/api/purchase-order-files/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      
+      // Get file details using storage interface
+      const file = await storage.getPurchaseOrderFile(id);
+      
+      if (!file) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      // Authorization check: only file uploader or admin can delete (handle null uploadedBy)
+      const isUploader = file.uploadedBy === req.user.id;
+      const isAdmin = req.user.role === 'admin';
+      const noUploader = !file.uploadedBy; // Allow deletion if no uploader set
+      
+      if (!isUploader && !isAdmin && !noUploader) {
+        return res.status(403).json({ message: "Not authorized to delete this file" });
+      }
+
+      // Get purchase order for activity log
+      const purchaseOrder = await storage.getPurchaseOrder(file.purchaseOrderId);
+      
+      // Delete from object storage first - fail fast if this doesn't work
+      const objectStorage = new ObjectStorageService();
+      await objectStorage.deleteAttachment(file.filePath);
+      
+      // Only delete from database if object storage deletion succeeded
+      await storage.deletePurchaseOrderFile(id);
+
+      // Create activity log with detailed file info
+      await storage.createActivity({
+        type: "purchase_order_updated",
+        description: `Deleted file "${file.fileName}" from purchase order: ${purchaseOrder?.title || 'Unknown'}`,
+        userId: req.user.id,
+        metadata: { 
+          purchaseOrderId: file.purchaseOrderId,
+          fileName: file.fileName,
+          fileSize: file.fileSize,
+          fileType: file.fileType,
+        },
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting purchase order file:", error);
+      res.status(500).json({ message: "Failed to delete file" });
     }
   });
 

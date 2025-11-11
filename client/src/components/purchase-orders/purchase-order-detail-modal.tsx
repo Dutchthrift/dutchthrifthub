@@ -31,7 +31,10 @@ import {
   Activity,
   Package,
   Edit,
-  Trash2
+  Trash2,
+  Download,
+  Upload,
+  Clock
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -358,17 +361,11 @@ export function PurchaseOrderDetailModal({
           </TabsContent>
 
           <TabsContent value="files" className="space-y-4">
-            <div className="text-center py-8">
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">Bestandsbeheer komt binnenkort</p>
-            </div>
+            <PurchaseOrderFiles purchaseOrderId={purchaseOrder.id} />
           </TabsContent>
 
           <TabsContent value="activity" className="space-y-4">
-            <div className="text-center py-8">
-              <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">Activiteitenlog komt binnenkort</p>
-            </div>
+            <PurchaseOrderActivities purchaseOrderId={purchaseOrder.id} />
           </TabsContent>
         </Tabs>
       </DialogContent>
@@ -403,5 +400,201 @@ export function PurchaseOrderDetailModal({
         </AlertDialogContent>
       </AlertDialog>
     </Dialog>
+  );
+}
+
+// Files component for purchase order
+function PurchaseOrderFiles({ purchaseOrderId }: { purchaseOrderId: string }) {
+  const { toast } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
+
+  const { data: files, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/purchase-orders", purchaseOrderId, "files"],
+    queryFn: async () => {
+      const response = await fetch(`/api/purchase-orders/${purchaseOrderId}/files`, {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch files");
+      return response.json();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (fileId: string) => {
+      await apiRequest("DELETE", `/api/purchase-order-files/${fileId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", purchaseOrderId, "files"] });
+      toast({ title: "Bestand verwijderd" });
+    },
+    onError: () => {
+      toast({ title: "Fout bij verwijderen", variant: "destructive" });
+    },
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles || selectedFiles.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      Array.from(selectedFiles).forEach(file => {
+        formData.append('files', file);
+      });
+
+      const response = await fetch(`/api/purchase-orders/${purchaseOrderId}/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Upload failed");
+
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", purchaseOrderId, "files"] });
+      toast({ title: "Bestanden geüpload" });
+    } catch (error) {
+      toast({ title: "Upload mislukt", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  if (isLoading) {
+    return <div className="text-center py-8 text-muted-foreground">Laden...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-sm font-medium">Bestanden ({files?.length || 0})</h3>
+        <label htmlFor="file-upload-po" className="cursor-pointer">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isUploading}
+            onClick={() => document.getElementById('file-upload-po')?.click()}
+            data-testid="button-upload-files"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {isUploading ? "Uploaden..." : "Upload"}
+          </Button>
+          <input
+            type="file"
+            id="file-upload-po"
+            multiple
+            onChange={handleFileUpload}
+            className="hidden"
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+          />
+        </label>
+      </div>
+
+      {!files || files.length === 0 ? (
+        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground">Geen bestanden</p>
+          <p className="text-xs text-muted-foreground mt-1">Upload facturen, pakbonnen of andere documenten</p>
+        </div>
+      ) : (
+        <div className="border rounded-lg">
+          {files.map((file) => (
+            <div
+              key={file.id}
+              className="flex items-center justify-between p-3 border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800"
+              data-testid={`file-item-${file.id}`}
+            >
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-sm truncate">{file.fileName}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {(file.fileSize / 1024).toFixed(1)} KB • {file.uploadedAt && format(new Date(file.uploadedAt), "d MMM yyyy HH:mm", { locale: nl })}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <a
+                  href={`/api/purchase-order-files/${file.id}/download`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button size="sm" variant="ghost" data-testid={`button-download-${file.id}`}>
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </a>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => deleteMutation.mutate(file.id)}
+                  disabled={deleteMutation.isPending}
+                  data-testid={`button-delete-${file.id}`}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Activities component for purchase order
+function PurchaseOrderActivities({ purchaseOrderId }: { purchaseOrderId: string }) {
+  const { data: activities, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/activities", "purchase_order", purchaseOrderId],
+    queryFn: async () => {
+      const response = await fetch(`/api/activities`, {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch activities");
+      const allActivities = await response.json();
+      // Filter activities related to this purchase order
+      return allActivities.filter((activity: any) => 
+        activity.metadata?.purchaseOrderId === purchaseOrderId
+      );
+    },
+  });
+
+  if (isLoading) {
+    return <div className="text-center py-8 text-muted-foreground">Laden...</div>;
+  }
+
+  if (!activities || activities.length === 0) {
+    return (
+      <div className="text-center py-12 border-2 border-dashed rounded-lg">
+        <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+        <p className="text-sm text-muted-foreground">Geen activiteiten</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {activities.map((activity) => (
+        <div
+          key={activity.id}
+          className="flex gap-3 p-3 border rounded-lg"
+          data-testid={`activity-${activity.id}`}
+        >
+          <div className="flex-shrink-0 mt-0.5">
+            <div className="h-8 w-8 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
+              <Activity className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-gray-900 dark:text-gray-100">{activity.description}</p>
+            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {activity.createdAt && format(new Date(activity.createdAt), "d MMMM yyyy 'om' HH:mm", { locale: nl })}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

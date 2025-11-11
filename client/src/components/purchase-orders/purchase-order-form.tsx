@@ -152,7 +152,39 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: 
 
       return purchaseOrder;
     },
-    onSuccess: () => {
+    onSuccess: async (purchaseOrder) => {
+      // Upload files if any were selected
+      if (uploadedFiles.length > 0) {
+        try {
+          const formData = new FormData();
+          uploadedFiles.forEach(file => {
+            formData.append('files', file);
+          });
+
+          const response = await fetch(`/api/purchase-orders/${purchaseOrder.id}/upload`, {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.message || "Upload failed");
+          }
+          
+          console.log(`Uploaded ${uploadedFiles.length} files to purchase order ${purchaseOrder.id}`);
+        } catch (error) {
+          console.error("Error uploading files:", error);
+          const message = error instanceof Error ? error.message : "Bestanden konden niet worden geüpload";
+          toast({
+            title: "Bestanden niet geüpload",
+            description: `De inkoop order is aangemaakt, maar: ${message}`,
+            variant: "destructive"
+          });
+          return; // Don't close form, let user retry
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
       toast({ 
         title: "Inkoop order aangemaakt", 
@@ -162,6 +194,7 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: 
       form.reset();
       setLineItems([]);
       setAmountInput("");
+      setUploadedFiles([]);
     },
     onError: (error: any) => {
       toast({ 

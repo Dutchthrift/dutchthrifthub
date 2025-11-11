@@ -318,6 +318,18 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Purchase Order Files table
+export const purchaseOrderFiles = pgTable("purchase_order_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  purchaseOrderId: varchar("purchase_order_id").references(() => purchaseOrders.id, { onDelete: "cascade" }).notNull(),
+  fileName: text("file_name").notNull(),
+  filePath: text("file_path").notNull(), // Object storage path
+  fileType: text("file_type").notNull(), // MIME type
+  fileSize: integer("file_size").notNull(), // Size in bytes
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
 // Returns table - Product returns management
 export const returns = pgTable("returns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -481,6 +493,11 @@ export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderIte
   updatedAt: true,
 });
 
+export const insertPurchaseOrderFileSchema = createInsertSchema(purchaseOrderFiles).omit({
+  id: true,
+  uploadedAt: true,
+});
+
 export const insertCaseSchema = createInsertSchema(cases).omit({
   id: true,
   caseNumber: true, // Auto-generated
@@ -603,6 +620,9 @@ export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 
 export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
 export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
+
+export type PurchaseOrderFile = typeof purchaseOrderFiles.$inferSelect;
+export type InsertPurchaseOrderFile = z.infer<typeof insertPurchaseOrderFileSchema>;
 
 export type Return = typeof returns.$inferSelect;
 export type InsertReturn = z.infer<typeof insertReturnSchema>;

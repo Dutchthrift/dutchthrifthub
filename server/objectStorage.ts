@@ -177,6 +177,22 @@ export class ObjectStorageService {
     
     return objectFile;
   }
+
+  // Delete an attachment file from object storage
+  async deleteAttachment(attachmentPath: string): Promise<void> {
+    try {
+      const file = await this.getAttachmentFile(attachmentPath);
+      await file.delete();
+      console.log(`Deleted attachment from object storage: ${attachmentPath}`);
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) {
+        // File already gone, not an error
+        console.log(`Attachment not found in object storage (may have been already deleted): ${attachmentPath}`);
+        return;
+      }
+      throw error;
+    }
+  }
 }
 
 function parseObjectPath(path: string): {
