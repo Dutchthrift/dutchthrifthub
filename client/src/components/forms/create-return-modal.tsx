@@ -272,7 +272,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
                             {orders.map((order) => (
                               <CommandItem
                                 key={order.id}
-                                value={order.id}
+                                value={`${order.orderNumber} ${order.customerEmail} ${order.shopifyOrderId || ''}`}
                                 onSelect={() => handleOrderSelect(order.id)}
                                 data-testid={`order-option-${order.id}`}
                               >
