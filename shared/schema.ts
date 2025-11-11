@@ -332,6 +332,7 @@ export const returns = pgTable("returns", {
   // Return details
   status: returnStatusEnum("status").notNull().default("nieuw_onderweg"),
   returnReason: returnReasonEnum("return_reason"),
+  otherReason: text("other_reason"), // Custom reason when returnReason is "other"
   trackingNumber: text("tracking_number"),
   
   // Dates

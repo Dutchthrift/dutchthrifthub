@@ -53,9 +53,19 @@ const createReturnFormSchema = insertReturnSchema.extend({
   customerId: z.string().min(1, "Klant is verplicht"),
   orderId: z.string().optional().nullable(),
   returnReason: z.enum(["wrong_item", "damaged", "defective", "size_issue", "changed_mind", "other"]),
+  otherReason: z.string().optional().nullable(),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
   trackingNumber: z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
+}).refine((data) => {
+  // If returnReason is "other", otherReason must be provided
+  if (data.returnReason === "other" && !data.otherReason) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Specificeer de reden wanneer 'Anders' is geselecteerd",
+  path: ["otherReason"],
 });
 
 type CreateReturnFormValues = z.infer<typeof createReturnFormSchema>;
@@ -77,9 +87,28 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
     queryKey: ["/api/customers"],
   });
 
-  const { data: orders } = useQuery<any[]>({
-    queryKey: ["/api/orders"],
+  // Fetch specific order when orderId is preset
+  const { data: presetOrder } = useQuery<any>({
+    queryKey: ["/api/orders", orderId],
+    enabled: !!orderId,
   });
+
+  // Fetch orders with search query (or recent orders if no search)
+  const { data: ordersData } = useQuery<{ orders: any[], total: number }>({
+    queryKey: ["/api/orders", { page: 1, limit: 50, search: orderSearchQuery || undefined }],
+  });
+
+  // Combine preset order with search results
+  const orders = useMemo(() => {
+    const ordersList = ordersData?.orders || [];
+    
+    // If we have a preset order and it's not in the list, add it
+    if (presetOrder && !ordersList.find(o => o.id === presetOrder.id)) {
+      return [presetOrder, ...ordersList];
+    }
+    
+    return ordersList;
+  }, [ordersData, presetOrder]);
 
   const form = useForm<CreateReturnFormValues>({
     resolver: zodResolver(createReturnFormSchema),
@@ -87,6 +116,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
       customerId: customerId || "",
       orderId: orderId || null,
       returnReason: "other" as const,
+      otherReason: null,
       priority: "medium" as const,
       status: "nieuw_onderweg" as const,
       trackingNumber: null,
@@ -109,19 +139,18 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
 
   // Populate customerId when modal opens with preset orderId
   useEffect(() => {
-    if (open && orderId && orders) {
-      const order = orders.find(o => o.id === orderId);
-      if (order && order.customerId) {
-        form.setValue("customerId", order.customerId);
-      }
+    if (open && presetOrder && presetOrder.customerId) {
+      form.setValue("customerId", presetOrder.customerId);
+      form.setValue("orderId", presetOrder.id);
     }
-  }, [open, orderId, orders, form]);
+  }, [open, presetOrder, form]);
 
   const createReturnMutation = useMutation({
     mutationFn: async (data: CreateReturnFormValues) => {
       const returnData = {
         ...data,
         orderId: (data.orderId && data.orderId !== "none") ? data.orderId : null,
+        otherReason: data.returnReason === "other" ? data.otherReason : null,
         trackingNumber: data.trackingNumber || null,
         internalNotes: data.internalNotes || null,
       };
@@ -157,18 +186,8 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
     createReturnMutation.mutate(data);
   };
 
-  // Filter orders by search query
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
-    if (!orderSearchQuery) return orders;
-    
-    const query = orderSearchQuery.toLowerCase();
-    return orders.filter((order) => 
-      order.orderNumber?.toLowerCase().includes(query) ||
-      order.shopifyOrderId?.toLowerCase().includes(query) ||
-      order.customerEmail?.toLowerCase().includes(query)
-    );
-  }, [orders, orderSearchQuery]);
+  // Watch for return reason to show/hide other reason field
+  const returnReason = form.watch("returnReason");
 
   // Get selected order and customer info
   const selectedOrderId = form.watch("orderId");
@@ -234,7 +253,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
                         <CommandList>
                           <CommandEmpty>Geen bestellingen gevonden.</CommandEmpty>
                           <CommandGroup>
-                            {filteredOrders.slice(0, 50).map((order) => (
+                            {orders.map((order) => (
                               <CommandItem
                                 key={order.id}
                                 value={order.id}
@@ -318,6 +337,27 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId }: C
                   </FormItem>
                 )}
               />
+
+              {returnReason === "other" && (
+                <FormField
+                  control={form.control}
+                  name="otherReason"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Specificeer reden *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Bijv. Verkeerde kleur besteld"
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="return-other-reason-input"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
