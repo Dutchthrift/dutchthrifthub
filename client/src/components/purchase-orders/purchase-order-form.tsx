@@ -41,6 +41,7 @@ interface PurchaseOrderFormProps {
   open: boolean;
   onClose: () => void;
   suppliers: Supplier[];
+  purchaseOrders: any[];
 }
 
 interface LineItem {
@@ -51,7 +52,7 @@ interface LineItem {
   unitPrice: number;
 }
 
-export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFormProps) {
+export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders }: PurchaseOrderFormProps) {
   const { toast } = useToast();
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
@@ -63,18 +64,26 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
   const [newSupplierName, setNewSupplierName] = useState("");
   const { user } = useAuth();
 
-  // Get 10 most recent suppliers (sorted by supplier code descending - highest number first)
-  const recentSuppliers = [...suppliers]
-    .sort((a, b) => b.supplierCode.localeCompare(a.supplierCode, undefined, { numeric: true }))
-    .slice(0, 10);
+  // Calculate status counts
+  const statusCounts = {
+    aangekocht: purchaseOrders.filter(po => po.status === 'sent' || po.status === 'awaiting_delivery').length,
+    ontvangen: purchaseOrders.filter(po => po.status === 'partially_received' || po.status === 'fully_received').length,
+    verwerkt: purchaseOrders.filter(po => po.status === 'cancelled').length,
+  };
+
+  // Sort all suppliers by supplier code descending (highest number first)
+  const sortedSuppliers = [...suppliers]
+    .sort((a, b) => b.supplierCode.localeCompare(a.supplierCode, undefined, { numeric: true }));
 
   // Filter suppliers based on search
   const filteredSuppliers = supplierSearch.trim() === ""
-    ? recentSuppliers
-    : suppliers.filter(s => 
-        s.supplierCode.toLowerCase().includes(supplierSearch.toLowerCase()) ||
-        s.name.toLowerCase().includes(supplierSearch.toLowerCase())
-      ).slice(0, 10);
+    ? sortedSuppliers
+    : suppliers
+        .filter(s => 
+          s.supplierCode.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+          s.name.toLowerCase().includes(supplierSearch.toLowerCase())
+        )
+        .sort((a, b) => b.supplierCode.localeCompare(a.supplierCode, undefined, { numeric: true }));
 
   const form = useForm({
     resolver: zodResolver(insertPurchaseOrderSchema.omit({ poNumber: true })),
@@ -283,9 +292,9 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                           ) : (
                             <>
                               <div className="px-3 py-2 text-xs text-muted-foreground border-b">
-                                10 nieuwste leveranciers (hoogste nummer eerst)
+                                Alle leveranciers (hoogste nummer eerst)
                               </div>
-                              {recentSuppliers.map((supplier) => (
+                              {sortedSuppliers.map((supplier) => (
                                 <div
                                   key={supplier.id}
                                   className="px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -356,10 +365,11 @@ export function PurchaseOrderForm({ open, onClose, suppliers }: PurchaseOrderFor
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="sent">Aangekocht</SelectItem>
+                        <SelectItem value="sent">Aangekocht ({statusCounts.aangekocht})</SelectItem>
                         <SelectItem value="awaiting_delivery">Onderweg</SelectItem>
-                        <SelectItem value="partially_received">Gedeeltelijk Ontvangen</SelectItem>
+                        <SelectItem value="partially_received">Ontvangen ({statusCounts.ontvangen})</SelectItem>
                         <SelectItem value="fully_received">Volledig Ontvangen</SelectItem>
+                        <SelectItem value="cancelled">Verwerkt ({statusCounts.verwerkt})</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

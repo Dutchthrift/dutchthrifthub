@@ -362,6 +362,7 @@ export default function PurchaseOrders() {
           open={showNewPO}
           onClose={() => setShowNewPO(false)}
           suppliers={suppliers || []}
+          purchaseOrders={purchaseOrders || []}
         />
       )}
 
