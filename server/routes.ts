@@ -12,6 +12,7 @@ import {
   insertReturnSchema,
   insertReturnItemSchema,
   insertCaseSchema,
+  insertCaseItemSchema,
   insertCaseLinkSchema,
   insertCaseNoteSchema,
   insertUserSchema,
@@ -3975,7 +3976,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/cases", async (req, res) => {
     try {
-      const validatedData = insertCaseSchema.parse(req.body);
+      const { items, ...caseData } = req.body;
+      const validatedData = insertCaseSchema.parse(caseData);
+
+      // Validate items if provided
+      let validatedItems: any[] = [];
+      if (items && items.length > 0) {
+        // Create array schema for case items with required non-empty SKU
+        const caseItemArraySchema = z.array(
+          insertCaseItemSchema.omit({ caseId: true }).refine(
+            (item) => item.sku && item.sku.trim().length > 0,
+            { message: "SKU is required and cannot be empty" }
+          )
+        );
+        validatedItems = caseItemArraySchema.parse(items);
+
+        // If orderId is provided, validate that items belong to that order
+        if (validatedData.orderId) {
+          const order = await storage.getOrder(validatedData.orderId);
+          if (!order) {
+            return res.status(400).json({ message: "Order not found" });
+          }
+
+          // Safely extract SKUs from order line items in orderData
+          const orderData = order.orderData as any;
+          if (!orderData || !orderData.line_items) {
+            return res.status(400).json({ 
+              message: "Order does not have line items data. Cannot validate case items against this order." 
+            });
+          }
+
+          const orderLineItems = orderData.line_items;
+          const orderSkus = new Set(orderLineItems.map((item: any) => item.sku).filter(Boolean));
+
+          // Validate that all case item SKUs exist in the order
+          const invalidItems = validatedItems.filter(item => !orderSkus.has(item.sku));
+          if (invalidItems.length > 0) {
+            return res.status(400).json({ 
+              message: "Some items do not belong to the specified order",
+              invalidSkus: invalidItems.map(item => item.sku)
+            });
+          }
+        }
+      }
 
       // Handle date conversions
       if (
@@ -3997,19 +4040,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedData.closedAt = new Date(validatedData.closedAt);
       }
 
-      const newCase = await storage.createCase(validatedData);
+      // Create case with or without items
+      const newCase = validatedItems.length > 0
+        ? await storage.createCaseWithItems(validatedData, validatedItems)
+        : await storage.createCase(validatedData);
 
       // Create activity
       await storage.createActivity({
         type: "case_created",
-        description: `Created case: ${newCase.title}`,
+        description: `Created case: ${newCase.title}${validatedItems.length > 0 ? ` with ${validatedItems.length} item(s)` : ''}`,
         userId: newCase.assignedUserId,
-        metadata: { caseId: newCase.id, caseNumber: newCase.caseNumber },
+        metadata: { caseId: newCase.id, caseNumber: newCase.caseNumber, itemCount: validatedItems.length },
       });
 
       res.status(201).json(newCase);
     } catch (error) {
       console.error("Error creating case:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: error.errors 
+        });
+      }
       res.status(400).json({ message: "Failed to create case" });
     }
   });
@@ -4032,6 +4084,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching case:", error);
       res.status(500).json({ message: "Failed to fetch case" });
+    }
+  });
+
+  app.get("/api/cases/:id/items", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const items = await storage.getCaseItems(id);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching case items:", error);
+      res.status(500).json({ message: "Failed to fetch case items" });
     }
   });
 

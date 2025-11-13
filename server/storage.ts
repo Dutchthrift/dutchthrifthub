@@ -824,55 +824,76 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCaseWithItems(caseData: InsertCase, items: Omit<InsertCaseItem, 'caseId'>[]): Promise<Case> {
-    // Use transaction to ensure atomicity
-    const newCase = await db.transaction(async (tx) => {
-      // Generate case number within transaction to prevent duplicates
-      // Fetch all case numbers and find max numerically to handle numbers beyond 3 digits
-      const existingCases = await tx.select({ caseNumber: cases.caseNumber }).from(cases);
-      
-      const maxNumber = existingCases
-        .map(c => {
-          const match = c.caseNumber.match(/^CASE-(\d+)$/);
-          return match ? parseInt(match[1], 10) : 0;
-        })
-        .reduce((max, num) => Math.max(max, num), 0);
-      
-      const newCaseNumber = `CASE-${String(maxNumber + 1).padStart(3, '0')}`;
-      
-      // Normalize date fields
-      const createData = {
-        ...caseData,
-        caseNumber: newCaseNumber
-      };
+    // Retry loop to handle concurrent case creation with unique constraint conflicts
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-      if (createData.slaDeadline && typeof createData.slaDeadline === 'string') {
-        createData.slaDeadline = new Date(createData.slaDeadline);
-      }
-      if (createData.resolvedAt && typeof createData.resolvedAt === 'string') {
-        createData.resolvedAt = new Date(createData.resolvedAt);
-      }
-      if (createData.closedAt && typeof createData.closedAt === 'string') {
-        createData.closedAt = new Date(createData.closedAt);
-      }
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Use transaction to ensure atomicity
+        const newCase = await db.transaction(async (tx) => {
+          // Generate case number within transaction to prevent duplicates
+          // Fetch all case numbers and find max numerically to handle numbers beyond 3 digits
+          const existingCases = await tx.select({ caseNumber: cases.caseNumber }).from(cases);
+          
+          const maxNumber = existingCases
+            .map(c => {
+              const match = c.caseNumber.match(/^CASE-(\d+)$/);
+              return match ? parseInt(match[1], 10) : 0;
+            })
+            .reduce((max, num) => Math.max(max, num), 0);
+          
+          const newCaseNumber = `CASE-${String(maxNumber + 1).padStart(3, '0')}`;
+          
+          // Normalize date fields
+          const createData = {
+            ...caseData,
+            caseNumber: newCaseNumber
+          };
 
-      // Create case within transaction
-      const result = await tx.insert(cases).values(createData as any).returning();
-      const createdCase = result[0];
-      
-      // Create case items within transaction if provided
-      if (items && items.length > 0) {
-        const itemsWithCaseId = items.map(item => ({
-          ...item,
-          caseId: createdCase.id,
-        }));
+          if (createData.slaDeadline && typeof createData.slaDeadline === 'string') {
+            createData.slaDeadline = new Date(createData.slaDeadline);
+          }
+          if (createData.resolvedAt && typeof createData.resolvedAt === 'string') {
+            createData.resolvedAt = new Date(createData.resolvedAt);
+          }
+          if (createData.closedAt && typeof createData.closedAt === 'string') {
+            createData.closedAt = new Date(createData.closedAt);
+          }
+
+          // Create case within transaction
+          const caseResult = await tx.insert(cases).values(createData as any).returning();
+          const createdCase = caseResult[0];
+          
+          // Create case items within transaction if provided
+          if (items && items.length > 0) {
+            const itemsWithCaseId = items.map(item => ({
+              ...item,
+              caseId: createdCase.id,
+            }));
+            
+            await tx.insert(caseItems).values(itemsWithCaseId as any);
+          }
+          
+          return createdCase;
+        });
         
-        await tx.insert(caseItems).values(itemsWithCaseId as any);
+        // Success - return the created case
+        return newCase;
+      } catch (error: any) {
+        // Check if this is a unique constraint violation on case_number
+        if (error?.code === '23505' && error?.constraint?.includes('case_number')) {
+          lastError = error;
+          // Retry with a new number
+          continue;
+        }
+        // For other errors, throw immediately
+        throw error;
       }
-      
-      return createdCase;
-    });
-    
-    return newCase;
+    }
+
+    // If we exhausted all retries, throw a clear error
+    throw new Error(`Failed to create case after ${maxRetries} attempts due to concurrent case number conflicts. Please try again.`, { cause: lastError });
   }
 
   async getCaseItems(caseId: string): Promise<CaseItem[]> {
