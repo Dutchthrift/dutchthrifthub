@@ -15,6 +15,7 @@ import {
   type Return, type InsertReturn,
   type ReturnItem, type InsertReturnItem,
   type Case, type InsertCase,
+  type CaseItem, type InsertCaseItem,
   type CaseLink, type InsertCaseLink,
   type CaseNote, type InsertCaseNote,
   type CaseEvent, type InsertCaseEvent,
@@ -30,7 +31,7 @@ import {
   type NoteRevision, type InsertNoteRevision,
   type NoteTemplate, type InsertNoteTemplate,
   type NoteLink, type InsertNoteLink,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns } from "drizzle-orm";
@@ -170,8 +171,10 @@ export interface IStorage {
   getCases(status?: string, search?: string): Promise<Case[]>;
   getCase(id: string): Promise<Case | undefined>;
   createCase(caseData: InsertCase): Promise<Case>;
+  createCaseWithItems(caseData: InsertCase, items: Omit<InsertCaseItem, 'caseId'>[]): Promise<Case>;
   updateCase(id: string, caseData: Partial<InsertCase>): Promise<Case>;
   deleteCase(id: string): Promise<void>;
+  getCaseItems(caseId: string): Promise<CaseItem[]>;
   linkEntityToCase(caseId: string, entityType: 'email' | 'repair' | 'todo' | 'order' | 'note', entityId: string): Promise<void>;
   unlinkEntityFromCase(entityType: 'email' | 'repair' | 'todo' | 'order' | 'note', entityId: string): Promise<void>;
   createCaseFromEmailThread(threadId: string): Promise<Case>;
@@ -818,6 +821,62 @@ export class DatabaseStorage implements IStorage {
     
     // Now safe to delete the case
     await db.delete(cases).where(eq(cases.id, id));
+  }
+
+  async createCaseWithItems(caseData: InsertCase, items: Omit<InsertCaseItem, 'caseId'>[]): Promise<Case> {
+    // Use transaction to ensure atomicity
+    const newCase = await db.transaction(async (tx) => {
+      // Generate case number within transaction to prevent duplicates
+      // Fetch all case numbers and find max numerically to handle numbers beyond 3 digits
+      const existingCases = await tx.select({ caseNumber: cases.caseNumber }).from(cases);
+      
+      const maxNumber = existingCases
+        .map(c => {
+          const match = c.caseNumber.match(/^CASE-(\d+)$/);
+          return match ? parseInt(match[1], 10) : 0;
+        })
+        .reduce((max, num) => Math.max(max, num), 0);
+      
+      const newCaseNumber = `CASE-${String(maxNumber + 1).padStart(3, '0')}`;
+      
+      // Normalize date fields
+      const createData = {
+        ...caseData,
+        caseNumber: newCaseNumber
+      };
+
+      if (createData.slaDeadline && typeof createData.slaDeadline === 'string') {
+        createData.slaDeadline = new Date(createData.slaDeadline);
+      }
+      if (createData.resolvedAt && typeof createData.resolvedAt === 'string') {
+        createData.resolvedAt = new Date(createData.resolvedAt);
+      }
+      if (createData.closedAt && typeof createData.closedAt === 'string') {
+        createData.closedAt = new Date(createData.closedAt);
+      }
+
+      // Create case within transaction
+      const result = await tx.insert(cases).values(createData as any).returning();
+      const createdCase = result[0];
+      
+      // Create case items within transaction if provided
+      if (items && items.length > 0) {
+        const itemsWithCaseId = items.map(item => ({
+          ...item,
+          caseId: createdCase.id,
+        }));
+        
+        await tx.insert(caseItems).values(itemsWithCaseId as any);
+      }
+      
+      return createdCase;
+    });
+    
+    return newCase;
+  }
+
+  async getCaseItems(caseId: string): Promise<CaseItem[]> {
+    return await db.select().from(caseItems).where(eq(caseItems.caseId, caseId)).orderBy(caseItems.createdAt);
   }
 
   async linkEntityToCase(caseId: string, entityType: 'email' | 'repair' | 'todo' | 'order' | 'note', entityId: string): Promise<void> {
