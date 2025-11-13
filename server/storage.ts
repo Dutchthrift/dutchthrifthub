@@ -120,6 +120,7 @@ export interface IStorage {
   getPurchaseOrders(): Promise<PurchaseOrder[]>;
   getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined>;
   createPurchaseOrder(purchaseOrder: InsertPurchaseOrder): Promise<PurchaseOrder>;
+  createPurchaseOrderWithItems(purchaseOrder: InsertPurchaseOrder, items: Omit<InsertPurchaseOrderItem, 'purchaseOrderId'>[]): Promise<PurchaseOrder>;
   updatePurchaseOrder(id: string, purchaseOrder: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder>;
   deletePurchaseOrder(id: string): Promise<void>;
   generatePONumber(): Promise<string>;
@@ -1188,6 +1189,73 @@ export class DatabaseStorage implements IStorage {
   async createPurchaseOrder(purchaseOrder: InsertPurchaseOrder): Promise<PurchaseOrder> {
     const result = await db.insert(purchaseOrders).values(purchaseOrder as any).returning();
     return result[0];
+  }
+
+  async createPurchaseOrderWithItems(purchaseOrder: InsertPurchaseOrder, items: Omit<InsertPurchaseOrderItem, 'purchaseOrderId'>[] = []): Promise<PurchaseOrder> {
+    // Use transaction to ensure atomicity (including PO number generation)
+    const newPurchaseOrder = await db.transaction(async (tx) => {
+      // Generate PO number within transaction to prevent conflicts
+      const existingOrders = await tx.select({ poNumber: purchaseOrders.poNumber }).from(purchaseOrders);
+      const year = new Date().getFullYear();
+      const yearPrefix = `PO-${year}-`;
+      
+      const maxNumber = existingOrders
+        .map(p => {
+          const match = p.poNumber?.match(new RegExp(`^PO-${year}-(\\d+)$`));
+          return match ? parseInt(match[1], 10) : 0;
+        })
+        .reduce((max, num) => Math.max(max, num), 0);
+      
+      const poNumber = `${yearPrefix}${String(maxNumber + 1).padStart(4, '0')}`;
+      
+      // Create purchase order within transaction
+      const result = await tx.insert(purchaseOrders).values({ 
+        ...purchaseOrder, 
+        poNumber 
+      } as any).returning();
+      
+      const createdPurchaseOrder = result[0];
+      
+      // Create purchase order items within transaction if provided
+      if (items && items.length > 0) {
+        // Validate and normalize items
+        const normalizedItems = items.map(item => {
+          // Ensure required fields
+          if (!item.productName || item.quantity == null || item.unitPrice == null) {
+            throw new Error(`Invalid purchase order item: missing required fields (productName, quantity, or unitPrice)`);
+          }
+          
+          // Normalize price fields to cents if they're not already
+          const unitPriceCents = typeof item.unitPrice === 'number' && item.unitPrice < 1000
+            ? Math.round(item.unitPrice * 100)
+            : Math.round(item.unitPrice);
+          
+          const subtotalCents = Math.round(item.quantity * unitPriceCents);
+          
+          return {
+            ...item,
+            purchaseOrderId: createdPurchaseOrder.id,
+            unitPrice: unitPriceCents,
+            subtotal: subtotalCents,
+            sku: item.sku || '',
+          };
+        });
+        
+        await tx.insert(purchaseOrderItems).values(normalizedItems as any);
+      }
+      
+      return createdPurchaseOrder;
+    });
+    
+    // Create activity log (outside transaction, non-critical)
+    const itemCount = items?.length || 0;
+    await this.createActivity({
+      type: 'purchase_order_created',
+      description: `Purchase order ${newPurchaseOrder.poNumber} created with ${itemCount} item(s)`,
+      metadata: { purchaseOrderId: newPurchaseOrder.id, itemCount },
+    });
+    
+    return newPurchaseOrder;
   }
 
   async updatePurchaseOrder(id: string, purchaseOrder: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder> {

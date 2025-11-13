@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,10 +15,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { PurchaseOrder, Supplier, PurchaseOrderItem } from "@shared/schema";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -34,7 +39,9 @@ import {
   Trash2,
   Download,
   Upload,
-  Clock
+  Clock,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -65,9 +72,10 @@ export function PurchaseOrderDetailModal({
   purchaseOrders,
 }: PurchaseOrderDetailModalProps) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("details");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showFiles, setShowFiles] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
 
   const supplier = suppliers.find(s => s.id === purchaseOrder.supplierId);
 
@@ -79,6 +87,33 @@ export function PurchaseOrderDetailModal({
       });
       if (!response.ok) throw new Error("Failed to fetch items");
       return response.json();
+    },
+    enabled: open,
+  });
+
+  const { data: files } = useQuery<any[]>({
+    queryKey: ["/api/purchase-orders", purchaseOrder.id, "files"],
+    queryFn: async () => {
+      const response = await fetch(`/api/purchase-orders/${purchaseOrder.id}/files`, {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch files");
+      return response.json();
+    },
+    enabled: open,
+  });
+
+  const { data: activities } = useQuery<any[]>({
+    queryKey: ["/api/activities", "purchase_order", purchaseOrder.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/activities`, {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch activities");
+      const allActivities = await response.json();
+      return allActivities.filter((activity: any) => 
+        activity.metadata?.purchaseOrderId === purchaseOrder.id
+      );
     },
     enabled: open,
   });
@@ -148,11 +183,24 @@ export function PurchaseOrderDetailModal({
   const totalItems = lineItems?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
   const totalAmount = lineItems?.reduce((sum, item) => sum + ((item.subtotal || 0) / 100), 0) || (purchaseOrder.totalAmount || 0) / 100;
 
+  // Auto-expand collapsible sections when data is available
+  useEffect(() => {
+    if (files && files.length > 0) {
+      setShowFiles(true);
+    }
+  }, [files]);
+
+  useEffect(() => {
+    if (activities && activities.length > 0) {
+      setShowActivity(true);
+    }
+  }, [activities]);
+
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="text-2xl">{purchaseOrder.title}</DialogTitle>
@@ -177,213 +225,252 @@ export function PurchaseOrderDetailModal({
           </div>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="details" data-testid="tab-details">Details</TabsTrigger>
-            <TabsTrigger value="items" data-testid="tab-items">
-              Items ({lineItems?.length || 0})
-            </TabsTrigger>
-            <TabsTrigger value="delivery" data-testid="tab-delivery">Levering</TabsTrigger>
-            <TabsTrigger value="files" data-testid="tab-files">Bestanden</TabsTrigger>
-            <TabsTrigger value="activity" data-testid="tab-activity">Activiteit</TabsTrigger>
-          </TabsList>
+        <ScrollArea className="flex-1 px-6">
+          <div className="grid lg:grid-cols-[1.75fr_1fr] gap-6 pb-6">
+            {/* Left Column */}
+            <div className="space-y-6">
+              {/* Supplier & Order Details */}
+              <Card>
+                <CardHeader className="bg-muted/50 border-b">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Leverancier & Order Informatie
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm font-medium">Leverancier</div>
+                      <div className="text-sm text-muted-foreground">
+                        {supplier?.name || "Onbekend"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium">Order Datum</div>
+                      <div className="text-sm text-muted-foreground">
+                        {purchaseOrder.orderDate 
+                          ? format(new Date(purchaseOrder.orderDate), "d MMMM yyyy", { locale: nl })
+                          : "-"
+                        }
+                      </div>
+                    </div>
+                    {supplier?.email && (
+                      <div>
+                        <div className="text-sm font-medium">Email</div>
+                        <div className="text-sm text-muted-foreground">{supplier.email}</div>
+                      </div>
+                    )}
+                    {supplier?.phone && (
+                      <div>
+                        <div className="text-sm font-medium">Telefoon</div>
+                        <div className="text-sm text-muted-foreground">{supplier.phone}</div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {purchaseOrder.notes && (
+                    <div>
+                      <div className="text-sm font-medium">Notities</div>
+                      <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {purchaseOrder.notes}
+                      </div>
+                    </div>
+                  )}
 
-          <TabsContent value="details" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Leverancier Informatie
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div>
-                  <div className="text-sm font-medium">Naam</div>
-                  <div className="text-sm text-muted-foreground">
-                    {supplier?.name || "Onbekend"}
+                  {/* Status Actions */}
+                  <div className="flex gap-2 pt-2 border-t">
+                    {purchaseOrder.status === 'draft' && (
+                      <Button 
+                        onClick={() => updateStatusMutation.mutate('sent')}
+                        disabled={updateStatusMutation.isPending}
+                        data-testid="button-mark-sent"
+                        size="sm"
+                      >
+                        Markeer als Verzonden
+                      </Button>
+                    )}
+                    {purchaseOrder.status === 'sent' && (
+                      <Button 
+                        onClick={() => updateStatusMutation.mutate('awaiting_delivery')}
+                        disabled={updateStatusMutation.isPending}
+                        data-testid="button-mark-awaiting"
+                        size="sm"
+                      >
+                        Markeer als Onderweg
+                      </Button>
+                    )}
+                    {purchaseOrder.status === 'awaiting_delivery' && (
+                      <Button 
+                        onClick={() => updateStatusMutation.mutate('fully_received')}
+                        disabled={updateStatusMutation.isPending}
+                        data-testid="button-mark-received"
+                        size="sm"
+                      >
+                        Markeer als Ontvangen
+                      </Button>
+                    )}
+                    <Button 
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowDeleteDialog(true)}
+                      disabled={deleteMutation.isPending}
+                      data-testid="button-delete-po"
+                      className="ml-auto"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Verwijderen
+                    </Button>
                   </div>
-                </div>
-                {supplier?.email && (
-                  <div>
-                    <div className="text-sm font-medium">Email</div>
-                    <div className="text-sm text-muted-foreground">{supplier.email}</div>
-                  </div>
-                )}
-                {supplier?.phone && (
-                  <div>
-                    <div className="text-sm font-medium">Telefoon</div>
-                    <div className="text-sm text-muted-foreground">{supplier.phone}</div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Order Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="grid grid-cols-2 gap-4">
+              {/* Line Items */}
+              <Card>
+                <CardHeader className="bg-muted/50 border-b">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Order Items ({lineItems?.length || 0})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {lineItems && lineItems.length > 0 ? (
+                    <div className="max-h-[300px] overflow-y-auto">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-background">
+                          <TableRow>
+                            <TableHead>SKU</TableHead>
+                            <TableHead>Omschrijving</TableHead>
+                            <TableHead className="text-right">Aantal</TableHead>
+                            <TableHead className="text-right">Prijs</TableHead>
+                            <TableHead className="text-right">Subtotaal</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {lineItems.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell className="font-medium">{item.sku}</TableCell>
+                              <TableCell>{item.productName}</TableCell>
+                              <TableCell className="text-right">{item.quantity}</TableCell>
+                              <TableCell className="text-right">
+                                €{((item.unitPrice || 0) / 100).toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                €{((item.subtotal || 0) / 100).toFixed(2)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">Geen items toegevoegd</p>
+                    </div>
+                  )}
+                  {lineItems && lineItems.length > 0 && (
+                    <div className="border-t bg-muted/30 px-6 py-3">
+                      <div className="flex justify-between items-center font-medium">
+                        <span>Totaal ({totalItems} items):</span>
+                        <span className="text-lg">€{totalAmount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Delivery Information */}
+              <Card>
+                <CardHeader className="bg-muted/50 border-b">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    Levering
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-4">
                   <div>
-                    <div className="text-sm font-medium">Order Datum</div>
+                    <div className="text-sm font-medium">Verwachte Leverdatum</div>
                     <div className="text-sm text-muted-foreground">
-                      {purchaseOrder.orderDate 
-                        ? format(new Date(purchaseOrder.orderDate), "d MMMM yyyy", { locale: nl })
-                        : "-"
+                      {purchaseOrder.expectedDeliveryDate 
+                        ? format(new Date(purchaseOrder.expectedDeliveryDate), "d MMMM yyyy", { locale: nl })
+                        : "Niet ingesteld"
                       }
                     </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium">Bedrag</div>
-                    <div className="text-sm text-muted-foreground">
-                      €{totalAmount.toLocaleString('nl-NL', { minimumFractionDigits: 2 })}
+                  {purchaseOrder.receivedDate && (
+                    <div>
+                      <div className="text-sm font-medium">Ontvangen Datum</div>
+                      <div className="text-sm text-muted-foreground">
+                        {format(new Date(purchaseOrder.receivedDate), "d MMMM yyyy 'om' HH:mm", { locale: nl })}
+                      </div>
                     </div>
-                  </div>
-                </div>
-                {purchaseOrder.notes && (
-                  <div>
-                    <div className="text-sm font-medium">Notities</div>
-                    <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {purchaseOrder.notes}
+                  )}
+                  {purchaseOrder.receivedBy && (
+                    <div>
+                      <div className="text-sm font-medium">Ontvangen Door</div>
+                      <div className="text-sm text-muted-foreground">{purchaseOrder.receivedBy}</div>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
 
-            <div className="flex gap-2 justify-between">
-              <div className="flex gap-2">
-                {purchaseOrder.status === 'draft' && (
-                  <Button 
-                    onClick={() => updateStatusMutation.mutate('sent')}
-                    disabled={updateStatusMutation.isPending}
-                    data-testid="button-mark-sent"
-                  >
-                    Markeer als Verzonden
-                  </Button>
-                )}
-                {purchaseOrder.status === 'sent' && (
-                  <Button 
-                    onClick={() => updateStatusMutation.mutate('awaiting_delivery')}
-                    disabled={updateStatusMutation.isPending}
-                    data-testid="button-mark-awaiting"
-                  >
-                    Markeer als Onderweg
-                  </Button>
-                )}
-                {purchaseOrder.status === 'awaiting_delivery' && (
-                  <Button 
-                    onClick={() => updateStatusMutation.mutate('fully_received')}
-                    disabled={updateStatusMutation.isPending}
-                    data-testid="button-mark-received"
-                  >
-                    Markeer als Ontvangen
-                  </Button>
-                )}
-              </div>
-              <Button 
-                variant="destructive"
-                onClick={() => setShowDeleteDialog(true)}
-                disabled={deleteMutation.isPending}
-                data-testid="button-delete-po"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Verwijderen
-              </Button>
+              {/* Files Section - Collapsible */}
+              <Collapsible open={showFiles} onOpenChange={setShowFiles}>
+                <Card>
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="bg-muted/50 border-b cursor-pointer hover:bg-muted/70">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          Bestanden ({files?.length || 0})
+                        </CardTitle>
+                        {showFiles ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </div>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="pt-4">
+                      <PurchaseOrderFiles purchaseOrderId={purchaseOrder.id} />
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+
+              {/* Activity Section - Collapsible */}
+              <Collapsible open={showActivity} onOpenChange={setShowActivity}>
+                <Card>
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="bg-muted/50 border-b cursor-pointer hover:bg-muted/70">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Activity className="h-4 w-4" />
+                          Activiteit ({activities?.length || 0})
+                        </CardTitle>
+                        {showActivity ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </div>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="pt-4">
+                      <PurchaseOrderActivities purchaseOrderId={purchaseOrder.id} />
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
             </div>
-          </TabsContent>
-
-          <TabsContent value="items" className="space-y-4">
-            {lineItems && lineItems.length > 0 ? (
-              <div className="border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Omschrijving</TableHead>
-                      <TableHead className="text-right">Aantal</TableHead>
-                      <TableHead className="text-right">Prijs</TableHead>
-                      <TableHead className="text-right">Subtotaal</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lineItems.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.sku}</TableCell>
-                        <TableCell>{item.productName}</TableCell>
-                        <TableCell className="text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-right">
-                          €{((item.unitPrice || 0) / 100).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          €{((item.subtotal || 0) / 100).toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-right font-medium">Totaal:</TableCell>
-                      <TableCell className="text-right font-bold">
-                        €{totalAmount.toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Geen items toegevoegd</p>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="delivery" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Truck className="h-4 w-4" />
-                  Levering Informatie
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <div className="text-sm font-medium">Verwachte Leverdatum</div>
-                  <div className="text-sm text-muted-foreground">
-                    {purchaseOrder.expectedDeliveryDate 
-                      ? format(new Date(purchaseOrder.expectedDeliveryDate), "d MMMM yyyy", { locale: nl })
-                      : "Niet ingesteld"
-                    }
-                  </div>
-                </div>
-                {purchaseOrder.receivedDate && (
-                  <div>
-                    <div className="text-sm font-medium">Ontvangen Datum</div>
-                    <div className="text-sm text-muted-foreground">
-                      {format(new Date(purchaseOrder.receivedDate), "d MMMM yyyy 'om' HH:mm", { locale: nl })}
-                    </div>
-                  </div>
-                )}
-                {purchaseOrder.receivedBy && (
-                  <div>
-                    <div className="text-sm font-medium">Ontvangen Door</div>
-                    <div className="text-sm text-muted-foreground">{purchaseOrder.receivedBy}</div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="files" className="space-y-4">
-            <PurchaseOrderFiles purchaseOrderId={purchaseOrder.id} />
-          </TabsContent>
-
-          <TabsContent value="activity" className="space-y-4">
-            <PurchaseOrderActivities purchaseOrderId={purchaseOrder.id} />
-          </TabsContent>
-        </Tabs>
+          </div>
+        </ScrollArea>
       </DialogContent>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -492,8 +579,7 @@ function PurchaseOrderFiles({ purchaseOrderId }: { purchaseOrderId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-sm font-medium">Bestanden ({files?.length || 0})</h3>
+      <div className="flex justify-end">
         <label htmlFor="file-upload-po" className="cursor-pointer">
           <Button
             type="button"
@@ -518,17 +604,17 @@ function PurchaseOrderFiles({ purchaseOrderId }: { purchaseOrderId: string }) {
       </div>
 
       {!files || files.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed rounded-lg">
-          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+        <div className="text-center py-8 border-2 border-dashed rounded-lg">
+          <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-sm text-muted-foreground">Geen bestanden</p>
           <p className="text-xs text-muted-foreground mt-1">Upload facturen, pakbonnen of andere documenten</p>
         </div>
       ) : (
-        <div className="border rounded-lg">
+        <div className="space-y-2">
           {files.map((file) => (
             <div
               key={file.id}
-              className="flex items-center justify-between p-3 border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
               data-testid={`file-item-${file.id}`}
             >
               <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -591,8 +677,8 @@ function PurchaseOrderActivities({ purchaseOrderId }: { purchaseOrderId: string 
 
   if (!activities || activities.length === 0) {
     return (
-      <div className="text-center py-12 border-2 border-dashed rounded-lg">
-        <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+      <div className="text-center py-8 border-2 border-dashed rounded-lg">
+        <Activity className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
         <p className="text-sm text-muted-foreground">Geen activiteiten</p>
       </div>
     );
@@ -603,20 +689,18 @@ function PurchaseOrderActivities({ purchaseOrderId }: { purchaseOrderId: string 
       {activities.map((activity) => (
         <div
           key={activity.id}
-          className="flex gap-3 p-3 border rounded-lg"
-          data-testid={`activity-${activity.id}`}
+          className="flex gap-3 pb-3 border-b last:border-b-0 last:pb-0"
         >
-          <div className="flex-shrink-0 mt-0.5">
-            <div className="h-8 w-8 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
-              <Activity className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+          <div className="flex-shrink-0 mt-1">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <Activity className="h-4 w-4 text-primary" />
             </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-gray-900 dark:text-gray-100">{activity.description}</p>
-            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
+          <div className="flex-1">
+            <p className="text-sm font-medium">{activity.description}</p>
+            <p className="text-xs text-muted-foreground">
               {activity.createdAt && format(new Date(activity.createdAt), "d MMMM yyyy 'om' HH:mm", { locale: nl })}
-            </div>
+            </p>
           </div>
         </div>
       ))}

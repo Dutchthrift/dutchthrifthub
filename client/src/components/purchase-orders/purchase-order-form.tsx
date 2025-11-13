@@ -190,24 +190,9 @@ export function PurchaseOrderForm({ open, onClose, suppliers, purchaseOrders, ed
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      // First create the PO
+      // Send PO with line items in a single request (backend handles atomically)
       const poResponse = await apiRequest("POST", "/api/purchase-orders", data);
       const purchaseOrder = await poResponse.json();
-
-      // Then create line items if any
-      if (data.lineItems && data.lineItems.length > 0) {
-        for (const item of data.lineItems) {
-          await apiRequest("POST", "/api/purchase-order-items", {
-            purchaseOrderId: purchaseOrder.id,
-            sku: item.sku,
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: Math.round(item.unitPrice * 100), // Convert to cents
-            subtotal: Math.round(item.quantity * item.unitPrice * 100),
-          });
-        }
-      }
-
       return purchaseOrder;
     },
     onSuccess: async (purchaseOrder) => {

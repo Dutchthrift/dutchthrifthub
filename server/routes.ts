@@ -3062,7 +3062,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const validatedData = insertPurchaseOrderSchema.parse(req.body);
+      // Extract lineItems from request body before validation
+      const { lineItems, ...purchaseOrderFields } = req.body;
+
+      const validatedData = insertPurchaseOrderSchema.parse(purchaseOrderFields);
 
       // Convert orderDate string to Date object for database if needed
       const purchaseOrderData = {
@@ -3071,26 +3074,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           typeof validatedData.orderDate === "string"
             ? new Date(validatedData.orderDate)
             : validatedData.orderDate,
-        // Also generate PO number if not provided
-        poNumber: await storage.generatePONumber(),
       };
 
-      const purchaseOrder = await storage.createPurchaseOrder(
+      // Use createPurchaseOrderWithItems (handles PO number generation, items, and activity)
+      const purchaseOrder = await storage.createPurchaseOrderWithItems(
         purchaseOrderData as any,
+        lineItems || []
       );
-
-      // Create activity
-      await storage.createActivity({
-        type: "purchase_order_created",
-        description: `Created purchase order: ${purchaseOrder.title}`,
-        userId: null, // TODO: Get from session
-        metadata: { purchaseOrderId: purchaseOrder.id },
-      });
 
       res.status(201).json(purchaseOrder);
     } catch (error) {
       console.error("Error creating purchase order:", error);
-      res.status(400).json({ message: "Failed to create purchase order" });
+      const errorMessage = error instanceof Error ? error.message : "Failed to create purchase order";
+      res.status(400).json({ message: errorMessage });
     }
   });
 
