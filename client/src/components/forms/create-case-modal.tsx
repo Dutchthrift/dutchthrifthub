@@ -427,7 +427,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
+                      <PopoverContent className="w-[400px] p-0" align="start">
                         <Command>
                           <CommandInput
                             placeholder="Zoek op ordernummer, naam, email..."
@@ -435,32 +435,30 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                             onValueChange={setOrderSearchQuery}
                             data-testid="order-search-input"
                           />
-                          <CommandList>
+                          <CommandList className="max-h-[300px]">
                             <CommandEmpty>Geen bestellingen gevonden.</CommandEmpty>
                             <CommandGroup>
-                              <ScrollArea className="h-[200px]">
-                                {orders.map((order: any) => (
-                                  <CommandItem
-                                    key={order.id}
-                                    value={`${order.orderNumber} ${order.customerEmail}`}
-                                    onSelect={() => handleOrderSelect(order.id)}
-                                    data-testid={`order-option-${order.orderNumber}`}
-                                  >
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        field.value === order.id ? "opacity-100" : "opacity-0"
-                                      )}
-                                    />
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">#{order.orderNumber}</span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {order.customerEmail} • €{(order.totalAmount / 100).toFixed(2)}
-                                      </span>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </ScrollArea>
+                              {orders.map((order: any) => (
+                                <CommandItem
+                                  key={order.id}
+                                  value={`${order.orderNumber} ${order.customerEmail}`}
+                                  onSelect={() => handleOrderSelect(order.id)}
+                                  data-testid={`order-option-${order.orderNumber}`}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      field.value === order.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">#{order.orderNumber}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {order.customerEmail} • €{(order.totalAmount / 100).toFixed(2)}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
                             </CommandGroup>
                           </CommandList>
                         </Command>
