@@ -23,14 +23,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import type { Case, CaseWithDetails } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { CaseForm } from "../components/forms/case-form";
+import { CreateCaseModal } from "../components/forms/create-case-modal";
 import { CaseContextMenu } from "../components/cases/case-context-menu";
 import { CaseDetailModal } from "../components/cases/case-detail-modal";
 
@@ -472,20 +465,20 @@ export default function Cases() {
               <h1 className="text-3xl font-bold tracking-tight">Cases</h1>
               <p className="text-muted-foreground">Manage customer cases and track progress</p>
             </div>
-            <Dialog open={showNewCase} onOpenChange={setShowNewCase}>
-              <DialogTrigger asChild>
-                <Button data-testid="new-case-button" className="sm:flex-shrink-0">
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Case
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Create New Case</DialogTitle>
-                </DialogHeader>
-                <CaseForm onSuccess={() => setShowNewCase(false)} />
-              </DialogContent>
-            </Dialog>
+            <div>
+              <Button 
+                data-testid="new-case-button" 
+                className="sm:flex-shrink-0"
+                onClick={() => setShowNewCase(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Case
+              </Button>
+              <CreateCaseModal 
+                open={showNewCase} 
+                onOpenChange={setShowNewCase}
+              />
+            </div>
           </div>
         </div>
 
