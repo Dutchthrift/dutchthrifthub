@@ -261,15 +261,15 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
     handleFinalSubmit(data);
   };
 
-  const toggleItemSelection = (itemId: string) => {
+  const toggleItemSelection = (itemId: string, checked: boolean) => {
     const newMap = new Map(selectedItems);
-    if (newMap.has(itemId)) {
-      newMap.delete(itemId);
-    } else {
+    if (checked) {
       newMap.set(itemId, {
         quantity: 1,
         itemNotes: "",
       });
+    } else {
+      newMap.delete(itemId);
     }
     setSelectedItems(newMap);
   };
@@ -524,7 +524,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                         >
                           <Checkbox
                             checked={selectedItems.has(item.id)}
-                            onCheckedChange={() => toggleItemSelection(item.id)}
+                            onCheckedChange={(checked) => toggleItemSelection(item.id, checked as boolean)}
                             data-testid={`checkbox-item-${item.sku}`}
                           />
                           <div className="flex-1 space-y-2">
