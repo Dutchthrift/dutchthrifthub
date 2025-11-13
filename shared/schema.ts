@@ -197,6 +197,7 @@ export const cases = pgTable("cases", {
   description: text("description"),
   customerId: varchar("customer_id").references(() => customers.id),
   customerEmail: text("customer_email"),
+  orderId: varchar("order_id").references(() => orders.id), // Primary order link
   assignedUserId: varchar("assigned_user_id").references(() => users.id),
   status: caseStatusEnum("status").notNull().default("new"),
   priority: priorityEnum("priority").default("medium"),
@@ -240,6 +241,22 @@ export const caseEvents = pgTable("case_events", {
   metadata: jsonb("metadata"), // Additional context (e.g., old/new values for status changes)
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Case Items table - Specific items from linked order with notes
+export const caseItems = pgTable("case_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").references(() => cases.id, { onDelete: "cascade" }).notNull(),
+  
+  sku: text("sku"),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: integer("unit_price"), // in cents
+  imageUrl: text("image_url"),
+  notes: text("notes"), // User-entered notes like "camera broken", "didn't arrive"
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // System Settings table - for tracking system-wide configurations like last sync times
@@ -677,6 +694,12 @@ export const insertCaseEventSchema = createInsertSchema(caseEvents).omit({
   createdAt: true,
 });
 
+export const insertCaseItemSchema = createInsertSchema(caseItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertActivitySchema = createInsertSchema(activities).omit({
   id: true,
   createdAt: true,
@@ -819,6 +842,9 @@ export type InsertCaseNote = z.infer<typeof insertCaseNoteSchema>;
 
 export type CaseEvent = typeof caseEvents.$inferSelect;
 export type InsertCaseEvent = z.infer<typeof insertCaseEventSchema>;
+
+export type CaseItem = typeof caseItems.$inferSelect;
+export type InsertCaseItem = z.infer<typeof insertCaseItemSchema>;
 
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
