@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -24,21 +24,50 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertCaseSchema } from "@shared/schema";
-import type { EmailThread, User } from "@/lib/types";
-
-interface ThreadWithMessages extends EmailThread {
-  messages?: { body?: string | null; }[];
-}
 import { z } from "zod";
+import { Check, ChevronsUpDown, Package, Mail } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface ShopifyLineItem {
+  id: string;
+  title: string;
+  sku: string;
+  variantTitle?: string;
+  quantity: number;
+  price?: string;
+}
+
+interface SelectedItemData {
+  quantity: number;
+  itemNotes: string;
+}
 
 const createCaseFormSchema = insertCaseSchema.extend({
-  assignedToId: z.string().optional(),
+  assignedUserId: z.string().optional().nullable(),
+  orderId: z.string().optional().nullable(),
 });
 
 type CreateCaseFormValues = z.infer<typeof createCaseFormSchema>;
@@ -46,72 +75,163 @@ type CreateCaseFormValues = z.infer<typeof createCaseFormSchema>;
 interface CreateCaseModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  emailThread?: ThreadWithMessages;
+  emailThread?: any;
 }
 
 export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseModalProps) {
   const { toast } = useToast();
+  const [orderSearchOpen, setOrderSearchOpen] = useState(false);
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [selectedItems, setSelectedItems] = useState<Map<string, SelectedItemData>>(new Map());
 
-  const { data: users } = useQuery<User[]>({
+  const { data: users } = useQuery<any[]>({
     queryKey: ["/api/users"],
+  });
+
+  const { data: customers } = useQuery<any[]>({
+    queryKey: ["/api/customers"],
+  });
+
+  // Fetch orders with search query
+  const { data: ordersData } = useQuery<{ orders: any[], total: number }>({
+    queryKey: ["/api/orders", 1, 50, orderSearchQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "50",
+      });
+      
+      if (orderSearchQuery) {
+        params.append("search", orderSearchQuery);
+      }
+      
+      const response = await fetch(`/api/orders?${params}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch orders");
+      }
+      return response.json();
+    },
   });
 
   const form = useForm<CreateCaseFormValues>({
     resolver: zodResolver(createCaseFormSchema),
     defaultValues: {
       title: emailThread?.subject || "",
-      description: "",
-      priority: "medium" as const,
-      status: "new" as const,
+      description: emailThread ? `Case aangemaakt van email thread: ${emailThread.subject}` : "",
+      priority: "medium",
+      status: "new",
+      customerId: emailThread?.customerId || null,
+      customerEmail: emailThread?.customerEmail || null,
+      assignedUserId: null,
+      orderId: null,
     },
   });
 
+  // Reset form and selections when modal closes
+  useEffect(() => {
+    if (!open) {
+      setSelectedItems(new Map());
+      form.reset();
+    }
+  }, [open, form]);
+
+  // Watch for selected order ID to fetch it separately
+  const selectedOrderId = form.watch("orderId");
+
+  // Fetch specific order when one is selected
+  const { data: selectedOrderData } = useQuery<any>({
+    queryKey: ["/api/orders", selectedOrderId],
+    enabled: !!selectedOrderId,
+  });
+
+  // Combine selected order with search results to ensure it's always available
+  const orders = useMemo(() => {
+    const ordersList = ordersData?.orders || [];
+    
+    if (selectedOrderData && !ordersList.find((o: any) => o.id === selectedOrderData.id)) {
+      return [selectedOrderData, ...ordersList];
+    }
+    
+    return ordersList;
+  }, [ordersData, selectedOrderData]);
+
+  // Get selected order and customer info
+  const selectedOrder = orders?.find((o: any) => o.id === selectedOrderId);
+  const selectedCustomerId = form.watch("customerId");
+  const selectedCustomer = customers?.find((c: any) => c.id === selectedCustomerId);
+
+  // Extract line items from selected order
+  const orderLineItems = useMemo(() => {
+    if (!selectedOrder || !selectedOrder.orderData) return [];
+    const lineItems = (selectedOrder.orderData as any).line_items || [];
+    return lineItems.map((item: any, index: number): ShopifyLineItem => ({
+      id: item.id?.toString() || item.sku || `${selectedOrder.id}-line-${index}`,
+      title: item.title || "Unknown Product",
+      sku: item.sku || "",
+      variantTitle: item.variant_title || "",
+      quantity: item.quantity || 1,
+      price: item.price || "0",
+    }));
+  }, [selectedOrder]);
+
+  // Handle order selection
+  const handleOrderSelect = (orderId: string) => {
+    const order = orders?.find((o: any) => o.id === orderId);
+    if (order) {
+      // If changing order, reset item selections
+      const currentOrderId = form.getValues("orderId");
+      if (currentOrderId && currentOrderId !== orderId && selectedItems.size > 0) {
+        if (confirm("Bestelling wijzigen zal geselecteerde artikelen wissen. Doorgaan?")) {
+          setSelectedItems(new Map());
+        } else {
+          return;
+        }
+      }
+      
+      form.setValue("orderId", orderId);
+      form.setValue("customerId", order.customerId || null);
+      form.setValue("customerEmail", order.customerEmail || null);
+    }
+    setOrderSearchOpen(false);
+  };
+
   const createCaseMutation = useMutation({
-    mutationFn: async (data: CreateCaseFormValues) => {
+    mutationFn: async (data: CreateCaseFormValues & { items?: any[] }) => {
+      const { items, ...caseFields } = data;
+      
       const caseData = {
-        ...data,
-        assignedToId: data.assignedToId || null,
+        ...caseFields,
+        orderId: (caseFields.orderId && caseFields.orderId !== "none") ? caseFields.orderId : null,
+        assignedUserId: caseFields.assignedUserId || null,
+        items: items || [],
       };
       
-      const response = await fetch("/api/cases", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(caseData),
-      });
-      
-      if (!response.ok) throw new Error("Failed to create case");
+      const response = await apiRequest("POST", "/api/cases", caseData);
       const newCase = await response.json();
       
       return newCase;
     },
     onSuccess: async (newCase) => {
-      // Link the email thread to the case if provided
+      // Link email thread if provided
       if (emailThread?.id) {
         try {
-          // Link the email thread to the case by updating the emailThread's caseId
-          const linkResponse = await fetch(`/api/email-threads/${emailThread.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ caseId: newCase.id }),
-          });
-          
-          if (!linkResponse.ok) throw new Error("Failed to link email thread to case");
+          await apiRequest("PATCH", `/api/email-threads/${emailThread.id}`, { caseId: newCase.id });
         } catch (error) {
           console.error("Failed to link email thread to case:", error);
         }
       }
 
-      // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/email-threads"] });
       
       toast({
         title: "Case aangemaakt",
-        description: `Case "${newCase.title}" is succesvol aangemaakt.`,
+        description: `Case "${newCase.title}" (${newCase.caseNumber}) is succesvol aangemaakt${selectedItems.size > 0 ? ` met ${selectedItems.size} artikel(en)` : ''}.`,
       });
       
       onOpenChange(false);
       form.reset();
+      setSelectedItems(new Map());
     },
     onError: (error: any) => {
       toast({
@@ -122,60 +242,78 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
     },
   });
 
+  const handleFinalSubmit = (data: CreateCaseFormValues) => {
+    // Convert selectedItems map to array format
+    const items = Array.from(selectedItems.entries()).map(([itemId, itemData]) => {
+      const lineItem = orderLineItems.find((li: ShopifyLineItem) => li.id === itemId);
+      return {
+        sku: lineItem?.sku || "",
+        productName: lineItem?.title || "",
+        quantity: itemData.quantity,
+        itemNotes: itemData.itemNotes || "",
+      };
+    });
+
+    createCaseMutation.mutate({ ...data, items });
+  };
+
   const onSubmit = (data: CreateCaseFormValues) => {
-    createCaseMutation.mutate(data);
+    handleFinalSubmit(data);
+  };
+
+  const toggleItemSelection = (itemId: string) => {
+    const newMap = new Map(selectedItems);
+    if (newMap.has(itemId)) {
+      newMap.delete(itemId);
+    } else {
+      newMap.set(itemId, {
+        quantity: 1,
+        itemNotes: "",
+      });
+    }
+    setSelectedItems(newMap);
+  };
+
+  const updateItemData = (itemId: string, field: keyof SelectedItemData, value: any) => {
+    const newMap = new Map(selectedItems);
+    const itemData = newMap.get(itemId);
+    if (itemData) {
+      newMap.set(itemId, { ...itemData, [field]: value });
+      setSelectedItems(newMap);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]" data-testid="create-case-modal">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="create-case-dialog">
         <DialogHeader>
-          <DialogTitle>Nieuwe Case Aanmaken</DialogTitle>
+          <DialogTitle data-testid="dialog-title">
+            Nieuwe Case Aanmaken
+          </DialogTitle>
           <DialogDescription>
             Maak een nieuwe case aan om dit klantverzoek gestructureerd te beheren.
           </DialogDescription>
         </DialogHeader>
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Titel van de Case</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Bijv. Reparatieverzoek iPhone"
-                      {...field}
-                      data-testid="case-title-input"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">Basis Informatie</h3>
+              
               <FormField
                 control={form.control}
-                name="priority"
+                name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Prioriteit</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="case-priority-select">
-                          <SelectValue placeholder="Selecteer prioriteit" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="low">Laag</SelectItem>
-                        <SelectItem value="medium">Gemiddeld</SelectItem>
-                        <SelectItem value="high">Hoog</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Titel van de Case</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Bijv. Reparatieverzoek iPhone"
+                        {...field}
+                        data-testid="case-title-input"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -183,77 +321,297 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
 
               <FormField
                 control={form.control}
-                name="assignedToId"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Toewijzen aan</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger data-testid="case-assignee-select">
-                          <SelectValue placeholder="Selecteer teamlid" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {users?.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Beschrijving</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Beschrijf de case..."
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="case-description-input"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prioriteit</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || "medium"}>
+                        <FormControl>
+                          <SelectTrigger data-testid="case-priority-select">
+                            <SelectValue placeholder="Selecteer prioriteit" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="low">Laag</SelectItem>
+                          <SelectItem value="medium">Gemiddeld</SelectItem>
+                          <SelectItem value="high">Hoog</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="assignedUserId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Toewijzen aan</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger data-testid="case-assignee-select">
+                            <SelectValue placeholder="Selecteer teamlid" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {users?.map((user: any) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
-            {emailThread && (
-              <div className="bg-muted p-4 rounded-lg">
-                <h4 className="font-medium text-sm mb-2">Klantgegevens</h4>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Email:</strong> {emailThread.customerEmail}
-                </p>
-                {emailThread.orderId && (
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Gekoppelde Order:</strong> {emailThread.orderId}
-                  </p>
-                )}
+            <Separator />
+
+            {/* Order Selection */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Bestelling Koppelen (Optioneel)</h3>
+                <Badge variant="secondary" className="text-xs">
+                  <Package className="h-3 w-3 mr-1" />
+                  Optioneel
+                </Badge>
               </div>
+
+              <FormField
+                control={form.control}
+                name="orderId"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Zoek Bestelling</FormLabel>
+                    <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                            data-testid="order-search-button"
+                          >
+                            {field.value
+                              ? orders.find((order: any) => order.id === field.value)?.orderNumber || "Selecteer bestelling"
+                              : "Selecteer bestelling"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput
+                            placeholder="Zoek op ordernummer, naam, email..."
+                            value={orderSearchQuery}
+                            onValueChange={setOrderSearchQuery}
+                            data-testid="order-search-input"
+                          />
+                          <CommandList>
+                            <CommandEmpty>Geen bestellingen gevonden.</CommandEmpty>
+                            <CommandGroup>
+                              <ScrollArea className="h-[200px]">
+                                {orders.map((order: any) => (
+                                  <CommandItem
+                                    key={order.id}
+                                    value={`${order.orderNumber} ${order.customerEmail}`}
+                                    onSelect={() => handleOrderSelect(order.id)}
+                                    data-testid={`order-option-${order.orderNumber}`}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value === order.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">#{order.orderNumber}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {order.customerEmail} • €{(order.totalAmount / 100).toFixed(2)}
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </ScrollArea>
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {selectedOrder && (
+                <div className="rounded-lg border bg-card p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Bestelling #{selectedOrder.orderNumber}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedOrder.customerEmail}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{selectedOrder.status}</Badge>
+                  </div>
+
+                  {selectedCustomer && (
+                    <div className="space-y-1 text-sm">
+                      <p><strong>Klant:</strong> {selectedCustomer.firstName} {selectedCustomer.lastName}</p>
+                      {selectedCustomer.phone && (
+                        <p><strong>Telefoon:</strong> {selectedCustomer.phone}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-muted-foreground">
+                      Totaal: <strong>€{(selectedOrder.totalAmount / 100).toFixed(2)}</strong>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Datum: {new Date(selectedOrder.orderDate).toLocaleDateString('nl-NL')}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Item Selection */}
+            {selectedOrder && orderLineItems.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">Selecteer Artikelen (Optioneel)</h3>
+                    <Badge variant="secondary" className="text-xs">
+                      {selectedItems.size} van {orderLineItems.length} geselecteerd
+                    </Badge>
+                  </div>
+
+                  <ScrollArea className="h-[300px] rounded-md border p-4">
+                    <div className="space-y-4">
+                      {orderLineItems.map((item: ShopifyLineItem) => (
+                        <div
+                          key={item.id}
+                          className="flex items-start space-x-3 rounded-lg border p-3"
+                          data-testid={`item-${item.sku}`}
+                        >
+                          <Checkbox
+                            checked={selectedItems.has(item.id)}
+                            onCheckedChange={() => toggleItemSelection(item.id)}
+                            data-testid={`checkbox-item-${item.sku}`}
+                          />
+                          <div className="flex-1 space-y-2">
+                            <div>
+                              <p className="font-medium text-sm">{item.title}</p>
+                              {item.variantTitle && (
+                                <p className="text-xs text-muted-foreground">{item.variantTitle}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
+                            </div>
+
+                            {selectedItems.has(item.id) && (
+                              <div className="space-y-2 pt-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-xs font-medium">Aantal</label>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      max={item.quantity}
+                                      value={selectedItems.get(item.id)?.quantity || 1}
+                                      onChange={(e) =>
+                                        updateItemData(item.id, "quantity", parseInt(e.target.value) || 1)
+                                      }
+                                      className="h-8"
+                                      data-testid={`quantity-input-${item.sku}`}
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="text-xs font-medium">Notities</label>
+                                  <Textarea
+                                    placeholder="Bijv. camera werkt niet, scherm kapot..."
+                                    value={selectedItems.get(item.id)?.itemNotes || ""}
+                                    onChange={(e) =>
+                                      updateItemData(item.id, "itemNotes", e.target.value)
+                                    }
+                                    className="min-h-[60px] text-sm"
+                                    data-testid={`notes-input-${item.sku}`}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </>
             )}
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Beschrijving</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Beschrijf het probleem of verzoek..."
-                      className="min-h-[100px]"
-                      {...field}
-                      value={field.value || ""}
-                      data-testid="case-description-input"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Email Thread Info */}
+            {emailThread && (
+              <>
+                <Separator />
+                <div className="rounded-lg border bg-muted p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    <h4 className="font-medium text-sm">Email Thread Gekoppeld</h4>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Van:</strong> {emailThread.customerEmail}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Onderwerp:</strong> {emailThread.subject}
+                  </p>
+                </div>
+              </>
+            )}
 
-            <div className="flex justify-end space-x-2 pt-4">
+            {/* Submit Buttons */}
+            <div className="flex justify-end gap-2 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                data-testid="cancel-case-button"
+                data-testid="cancel-button"
               >
                 Annuleren
               </Button>
               <Button
                 type="submit"
                 disabled={createCaseMutation.isPending}
-                data-testid="submit-case-button"
+                data-testid="submit-button"
               >
                 {createCaseMutation.isPending ? "Aanmaken..." : "Case Aanmaken"}
               </Button>
