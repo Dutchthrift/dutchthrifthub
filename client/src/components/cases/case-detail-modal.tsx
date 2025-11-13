@@ -105,6 +105,18 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
     enabled: !!caseId && open,
   });
 
+  // Fetch case items (selected during case creation)
+  const { data: caseItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/cases", caseId, "items"],
+    enabled: !!caseId && open,
+  });
+
+  // Fetch the directly linked order (from case.orderId)
+  const { data: linkedOrder } = useQuery<any>({
+    queryKey: ["/api/orders", caseData?.orderId],
+    enabled: !!caseData?.orderId && open,
+  });
+
   // Fetch case links
   const { data: caseLinksData = [] } = useQuery<any[]>({
     queryKey: ["/api/cases", caseId, "links"],
@@ -512,6 +524,101 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
                   </CardContent>
                 </Card>
 
+                {/* Order Information Card */}
+                {linkedOrder && (
+                  <Card>
+                    <CardHeader className="bg-card-header border-b">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Order Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Order Number</label>
+                          <p className="mt-1 font-medium" data-testid="order-number">#{linkedOrder.orderNumber}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Order Date</label>
+                          <p className="mt-1" data-testid="order-date">{formatDateTime(linkedOrder.orderDate)}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Customer</label>
+                          <p className="mt-1" data-testid="order-customer">{linkedOrder.customerName || linkedOrder.customerEmail}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Total Amount</label>
+                          <p className="mt-1 font-medium" data-testid="order-total">€{((linkedOrder.totalAmount || 0) / 100).toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Status</label>
+                          <Badge variant="secondary" className="mt-1" data-testid="order-status">{linkedOrder.status}</Badge>
+                        </div>
+                      </div>
+
+                      {/* Shipping Address */}
+                      {linkedOrder.orderData?.shipping_address && (
+                        <div className="pt-4 border-t">
+                          <label className="text-sm font-medium text-muted-foreground">Shipping Address</label>
+                          <div className="mt-2 text-sm" data-testid="shipping-address">
+                            <p>{linkedOrder.orderData.shipping_address.name}</p>
+                            <p>{linkedOrder.orderData.shipping_address.address1}</p>
+                            {linkedOrder.orderData.shipping_address.address2 && (
+                              <p>{linkedOrder.orderData.shipping_address.address2}</p>
+                            )}
+                            <p>
+                              {linkedOrder.orderData.shipping_address.zip} {linkedOrder.orderData.shipping_address.city}
+                            </p>
+                            <p>{linkedOrder.orderData.shipping_address.country}</p>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Case Items Card */}
+                {caseItems.length > 0 && (
+                  <Card>
+                    <CardHeader className="bg-card-header border-b">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Case Items ({caseItems.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                      <div className="space-y-3">
+                        {caseItems.map((item: any, index: number) => (
+                          <div 
+                            key={item.id || index} 
+                            className="p-3 border rounded-md space-y-2"
+                            data-testid={`case-item-${index}`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="font-medium" data-testid={`item-product-${index}`}>{item.productName}</p>
+                                <p className="text-sm text-muted-foreground" data-testid={`item-sku-${index}`}>SKU: {item.sku}</p>
+                              </div>
+                              <Badge variant="outline" data-testid={`item-quantity-${index}`}>
+                                Qty: {item.quantity}
+                              </Badge>
+                            </div>
+                            {item.itemNotes && (
+                              <div className="pt-2 border-t">
+                                <label className="text-xs font-medium text-muted-foreground">Notes:</label>
+                                <p className="text-sm mt-1 whitespace-pre-wrap" data-testid={`item-notes-${index}`}>
+                                  {item.itemNotes}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Linked Items Card */}
                 <Card>
                   <CardHeader className="bg-card-header border-b">
@@ -799,11 +906,13 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="h-[600px]">
-                      <NotesPanel
-                        entityType="case"
-                        entityId={caseId}
-                        currentUser={currentUser}
-                      />
+                      {currentUser && (
+                        <NotesPanel
+                          entityType="case"
+                          entityId={caseId}
+                          currentUser={currentUser}
+                        />
+                      )}
                     </div>
                   </CardContent>
                 </Card>
