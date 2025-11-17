@@ -66,7 +66,10 @@ export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...
     const content = editor.getHTML();
     const plainText = editor.getText();
 
-    if (!plainText.trim()) return;
+    if (!plainText.trim()) {
+      // Allow click but don't submit if empty
+      return;
+    }
 
     onSubmit({
       content,
@@ -277,7 +280,7 @@ export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...
         <Button
           size="sm"
           onClick={handleSubmit}
-          disabled={isPending || !editor || !editor.getText().trim()}
+          disabled={isPending}
           data-testid="note-composer-submit"
           aria-label="Submit note (Ctrl+Enter)"
         >
