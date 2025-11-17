@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import type { User } from "@shared/schema";
 import { Navigation } from "@/components/layout/navigation";
 import { queryClient } from "@/lib/queryClient";
-import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText } from "lucide-react";
+import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { CreateReturnModal } from "@/components/forms/create-return-modal";
 import { NotesPanel } from "@/components/notes/NotesPanel";
+import { ReturnsKanban } from "@/components/returns/returns-kanban";
 import { useToast } from "@/hooks/use-toast";
 
 type Return = {
@@ -140,6 +141,7 @@ export default function Returns() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showReturnDetails, setShowReturnDetails] = useState(false);
   const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
@@ -262,6 +264,26 @@ export default function Returns() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <div className="flex items-center border rounded-lg p-1">
+                  <Button
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("list")}
+                    data-testid="button-view-list"
+                    className="h-8"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "kanban" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("kanban")}
+                    data-testid="button-view-kanban"
+                    className="h-8"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </div>
                 <Button 
                   onClick={() => setShowCreateModal(true)}
                   data-testid="button-create-return"
@@ -377,6 +399,8 @@ export default function Returns() {
               </p>
             </CardContent>
           </Card>
+        ) : viewMode === "kanban" ? (
+          <ReturnsKanban returns={filteredReturns} isLoading={isLoading} />
         ) : (
           <div className="space-y-3">
             {filteredReturns.map((ret) => (
