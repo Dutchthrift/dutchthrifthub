@@ -513,23 +513,24 @@ export default function Returns() {
 
       {/* Return Details Dialog */}
       <Dialog open={showReturnDetails} onOpenChange={setShowReturnDetails}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-3">
             <div className="flex items-start justify-between">
               <div>
-                <DialogTitle>Retour Details {selectedReturn?.returnNumber}</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-lg font-medium">Retour Details {selectedReturn?.returnNumber}</DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
                   Volledige retourinformatie en order details
                 </DialogDescription>
               </div>
               <Button
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 onClick={() => setIsEditing(true)}
                 data-testid="button-edit-return"
+                className="h-8"
               >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Bewerken
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                <span className="text-xs">Bewerken</span>
               </Button>
             </div>
           </DialogHeader>
@@ -541,36 +542,34 @@ export default function Returns() {
               <Skeleton className="h-48 w-full" />
             </div>
           ) : enrichedReturnData && (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {/* Return Overview & Customer Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {/* Return Information */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Retour Informatie</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 pt-0">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Retournummer:</span>
-                      <span className="font-medium">{enrichedReturnData.return.returnNumber}</span>
+                <div className="border rounded-lg p-3">
+                  <h3 className="text-sm font-medium mb-2">Retour Informatie</h3>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-xs text-muted-foreground">Retournummer:</span>
+                      <span className="text-sm">{enrichedReturnData.return.returnNumber}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status:</span>
-                      <Badge variant="outline" className={STATUS_COLORS[enrichedReturnData.return.status] || ""}>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Status:</span>
+                      <Badge variant="outline" className={`text-xs h-5 ${STATUS_COLORS[enrichedReturnData.return.status] || ""}`}>
                         {getStatusLabel(enrichedReturnData.return.status)}
                       </Badge>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Prioriteit:</span>
-                      <Badge variant="outline" className={PRIORITY_COLORS[enrichedReturnData.return.priority || 'medium'] || ""}>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Prioriteit:</span>
+                      <Badge variant="outline" className={`text-xs h-5 ${PRIORITY_COLORS[enrichedReturnData.return.priority || 'medium'] || ""}`}>
                         {enrichedReturnData.return.priority === "low" ? "Laag" : 
                          enrichedReturnData.return.priority === "high" ? "Hoog" : 
                          enrichedReturnData.return.priority === "urgent" ? "Urgent" : "Normaal"}
                       </Badge>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Reden:</span>
-                      <span className="font-medium text-right max-w-[200px]">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-xs text-muted-foreground">Reden:</span>
+                      <span className="text-sm text-right max-w-[180px]">
                         {enrichedReturnData.return.returnReason === "defect" ? "Defect" :
                          enrichedReturnData.return.returnReason === "wrong_item" ? "Verkeerd artikel" :
                          enrichedReturnData.return.returnReason === "not_as_described" ? "Niet zoals beschreven" :
@@ -579,297 +578,276 @@ export default function Returns() {
                          enrichedReturnData.return.returnReason || "-"}
                       </span>
                     </div>
-                    <Separator />
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Aangevraagd:</span>
-                      <span className="font-medium">
+                    <Separator className="my-1.5" />
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-xs text-muted-foreground">Aangevraagd:</span>
+                      <span className="text-sm">
                         {format(new Date(enrichedReturnData.return.requestedAt), "dd MMM yyyy HH:mm")}
                       </span>
                     </div>
                     {enrichedReturnData.return.receivedAt && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Ontvangen:</span>
-                        <span className="font-medium">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-xs text-muted-foreground">Ontvangen:</span>
+                        <span className="text-sm">
                           {format(new Date(enrichedReturnData.return.receivedAt), "dd MMM yyyy HH:mm")}
                         </span>
                       </div>
                     )}
                     {enrichedReturnData.assignedUser && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Toegewezen aan:</span>
-                        <span className="font-medium">{enrichedReturnData.assignedUser.fullName}</span>
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-xs text-muted-foreground">Toegewezen aan:</span>
+                        <span className="text-sm">{enrichedReturnData.assignedUser.fullName}</span>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
                 {/* Customer Information */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Klantinformatie</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 pt-0">
+                <div className="border rounded-lg p-3">
+                  <h3 className="text-sm font-medium mb-2">Klantinformatie</h3>
+                  <div className="space-y-1.5">
                     {enrichedReturnData.customer ? (
                       <>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Naam:</span>
-                          <span className="font-medium">
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="text-xs text-muted-foreground">Naam:</span>
+                          <span className="text-sm">
                             {enrichedReturnData.customer.firstName} {enrichedReturnData.customer.lastName}
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Email:</span>
-                          <span className="font-medium">{enrichedReturnData.customer.email}</span>
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="text-xs text-muted-foreground">Email:</span>
+                          <span className="text-sm">{enrichedReturnData.customer.email}</span>
                         </div>
                         {enrichedReturnData.customer.phone && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Telefoon:</span>
-                            <span className="font-medium">{enrichedReturnData.customer.phone}</span>
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-xs text-muted-foreground">Telefoon:</span>
+                            <span className="text-sm">{enrichedReturnData.customer.phone}</span>
                           </div>
                         )}
                       </>
                     ) : enrichedReturnData.order?.orderData?.customer ? (
                       <>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Naam:</span>
-                          <span className="font-medium">
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="text-xs text-muted-foreground">Naam:</span>
+                          <span className="text-sm">
                             {enrichedReturnData.order.orderData.customer.first_name} {enrichedReturnData.order.orderData.customer.last_name}
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Email:</span>
-                          <span className="font-medium">{enrichedReturnData.order.orderData.customer.email}</span>
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="text-xs text-muted-foreground">Email:</span>
+                          <span className="text-sm">{enrichedReturnData.order.orderData.customer.email}</span>
                         </div>
                         {enrichedReturnData.order.orderData.customer.phone && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Telefoon:</span>
-                            <span className="font-medium">{enrichedReturnData.order.orderData.customer.phone}</span>
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-xs text-muted-foreground">Telefoon:</span>
+                            <span className="text-sm">{enrichedReturnData.order.orderData.customer.phone}</span>
                           </div>
                         )}
                       </>
                     ) : (
-                      <div className="text-muted-foreground">Geen klantinformatie beschikbaar</div>
+                      <div className="text-xs text-muted-foreground">Geen klantinformatie beschikbaar</div>
                     )}
                     {enrichedReturnData.return.customerNotes && (
                       <>
-                        <Separator />
+                        <Separator className="my-1.5" />
                         <div>
-                          <span className="text-sm text-muted-foreground block mb-1">Klant notities:</span>
-                          <p className="text-sm">{enrichedReturnData.return.customerNotes}</p>
+                          <span className="text-xs text-muted-foreground block mb-0.5">Klant notities:</span>
+                          <p className="text-xs">{enrichedReturnData.return.customerNotes}</p>
                         </div>
                       </>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </div>
 
               {/* Order Information from Shopify */}
               {enrichedReturnData.order && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">Originele Order Informatie</CardTitle>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(`/orders?orderId=${enrichedReturnData.order.id}`, '_blank')}
-                        data-testid="button-view-order"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Bekijk Order
-                      </Button>
+                <div className="border rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium">Originele Order Informatie</h3>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={() => window.open(`/orders?orderId=${enrichedReturnData.order.id}`, '_blank')}
+                      data-testid="button-view-order"
+                      className="h-6 text-xs p-0"
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Bekijk Order
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <span className="text-xs text-muted-foreground block mb-0.5">Ordernummer</span>
+                      <p className="text-sm">#{enrichedReturnData.order.orderNumber}</p>
                     </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div>
-                        <span className="text-sm text-muted-foreground">Ordernummer:</span>
-                        <p className="font-medium">{enrichedReturnData.order.orderNumber}</p>
-                      </div>
-                      <div>
-                        <span className="text-sm text-muted-foreground">Orderdatum:</span>
-                        <p className="font-medium">
-                          {enrichedReturnData.order.orderDate ? 
-                            format(new Date(enrichedReturnData.order.orderDate), "dd MMM yyyy") : 
-                            "-"}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-sm text-muted-foreground">Status:</span>
-                        <p className="font-medium capitalize">{enrichedReturnData.order.status}</p>
-                      </div>
-                      <div>
-                        <span className="text-sm text-muted-foreground">Totaal bedrag:</span>
-                        <p className="font-medium">
-                          {formatCurrency(enrichedReturnData.order.totalAmount)}
-                        </p>
-                      </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground block mb-0.5">Orderdatum</span>
+                      <p className="text-sm">
+                        {enrichedReturnData.order.orderDate ? 
+                          format(new Date(enrichedReturnData.order.orderDate), "dd MMM yyyy") : 
+                          "-"}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div>
+                      <span className="text-xs text-muted-foreground block mb-0.5">Status</span>
+                      <p className="text-sm capitalize">{enrichedReturnData.order.status}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground block mb-0.5">Totaal bedrag</span>
+                      <p className="text-sm">
+                        {formatCurrency(enrichedReturnData.order.totalAmount)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* Return Items */}
               {enrichedReturnData.returnItems && enrichedReturnData.returnItems.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Geretourneerde Artikelen</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-2">
-                      {enrichedReturnData.returnItems.map((item) => (
-                        <div key={item.id} className="flex items-start justify-between p-2 border rounded-lg" data-testid={`return-item-${item.id}`}>
-                          <div className="flex-1">
-                            <div className="font-medium">{item.productName}</div>
+                <div className="border rounded-lg p-3">
+                  <h3 className="text-sm font-medium mb-2">Geretourneerde Artikelen</h3>
+                  <div className="space-y-1.5">
+                    {enrichedReturnData.returnItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-2 border rounded hover:bg-muted/30 transition-colors" data-testid={`return-item-${item.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{item.productName}</div>
+                          <div className="flex items-center gap-2 flex-wrap">
                             {item.sku && (
-                              <div className="text-sm text-muted-foreground">SKU: {item.sku}</div>
+                              <span className="text-xs text-muted-foreground">SKU: {item.sku}</span>
                             )}
-                            <div className="text-sm text-muted-foreground">Aantal: {item.quantity}</div>
+                            <span className="text-xs text-muted-foreground">Aantal: {item.quantity}</span>
                             {item.condition && (
-                              <Badge variant="outline" className="mt-1">
+                              <Badge variant="outline" className="text-xs h-4 px-1.5">
                                 {item.condition === "unopened" ? "Ongeopend" :
-                                 item.condition === "opened_unused" ? "Geopend, ongebruikt" :
+                                 item.condition === "opened_unused" ? "Geopend" :
                                  item.condition === "used" ? "Gebruikt" :
                                  item.condition === "damaged" ? "Beschadigd" :
                                  item.condition}
                               </Badge>
                             )}
                             {item.restockable && (
-                              <Badge variant="outline" className="mt-1 ml-2 bg-chart-2/10 text-chart-2 border-chart-2/20">
-                                Kan opnieuw verkocht
+                              <Badge variant="outline" className="text-xs h-4 px-1.5 bg-chart-2/10 text-chart-2 border-chart-2/20">
+                                Herstelbaar
                               </Badge>
                             )}
                           </div>
-                          <div className="text-right">
-                            {item.unitPrice && (
-                              <>
-                                <div className="font-medium">{formatCurrency(item.unitPrice)}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  Totaal: {formatCurrency(item.unitPrice * item.quantity)}
-                                </div>
-                              </>
-                            )}
-                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        {item.unitPrice && (
+                          <div className="text-right ml-3">
+                            <div className="text-sm font-medium">{formatCurrency(item.unitPrice)}</div>
+                            <div className="text-xs text-muted-foreground">
+                              Totaal: {formatCurrency(item.unitPrice * item.quantity)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {/* Tracking Information */}
               {enrichedReturnData.tracking && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Tracking Informatie</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {/* Return Tracking */}
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">Retour Tracking</span>
-                        </div>
-                        {enrichedReturnData.tracking.returnTracking?.trackingNumber ? (
+                <div className="border rounded-lg p-3">
+                  <h3 className="text-sm font-medium mb-2">Tracking Informatie</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {/* Return Tracking */}
+                    <div className="p-2.5 bg-muted/30 rounded border">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-xs font-medium">Retour Tracking</span>
+                      </div>
+                      {enrichedReturnData.tracking.returnTracking?.trackingNumber ? (
                         <>
-                          <p className="font-mono text-sm">{enrichedReturnData.tracking.returnTracking.trackingNumber}</p>
+                          <p className="font-mono text-xs">{enrichedReturnData.tracking.returnTracking.trackingNumber}</p>
                           {enrichedReturnData.tracking.returnTracking.expectedReturnDate && (
-                            <p className="text-sm text-muted-foreground mt-1">
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               Verwacht: {format(new Date(enrichedReturnData.tracking.returnTracking.expectedReturnDate), "dd MMM yyyy")}
                             </p>
                           )}
                         </>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Geen tracking beschikbaar</p>
+                        <p className="text-xs text-muted-foreground">Geen tracking beschikbaar</p>
                       )}
                     </div>
 
                     {/* Order Tracking */}
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Truck className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">Originele Order Tracking</span>
+                    <div className="p-2.5 bg-muted/30 rounded border">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-xs font-medium">Originele Order Tracking</span>
                       </div>
                       {enrichedReturnData.tracking.orderTracking ? (
                         <>
-                          <p className="font-mono text-sm">{enrichedReturnData.tracking.orderTracking.trackingNumber}</p>
+                          <p className="font-mono text-xs">{enrichedReturnData.tracking.orderTracking.trackingNumber}</p>
                           {enrichedReturnData.tracking.orderTracking.trackingCompany && (
-                            <p className="text-sm text-muted-foreground">{enrichedReturnData.tracking.orderTracking.trackingCompany}</p>
+                            <p className="text-xs text-muted-foreground">{enrichedReturnData.tracking.orderTracking.trackingCompany}</p>
                           )}
                           {enrichedReturnData.tracking.orderTracking.trackingUrl && (
                             <Button
                               variant="link"
                               size="sm"
-                              className="p-0 h-auto mt-1"
+                              className="p-0 h-auto mt-0.5 text-xs"
                               onClick={() => window.open(enrichedReturnData.tracking.orderTracking!.trackingUrl, '_blank')}
                               data-testid="button-track-shipment"
                             >
-                              <ExternalLink className="h-3 w-3 mr-1" />
+                              <ExternalLink className="h-3 w-3 mr-0.5" />
                               Track verzending
                             </Button>
                           )}
                         </>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Geen tracking beschikbaar</p>
+                        <p className="text-xs text-muted-foreground">Geen tracking beschikbaar</p>
                       )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
               )}
 
               {/* Photos & Evidence */}
               {enrichedReturnData.photos && enrichedReturnData.photos.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4" />
-                      Foto's & Bewijs
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {enrichedReturnData.photos.map((photo, index) => (
-                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
-                          <img 
-                            src={photo} 
-                            alt={`Return photo ${index + 1}`}
-                            className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => window.open(photo, '_blank')}
-                            data-testid={`return-photo-${index}`}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    {enrichedReturnData.return.conditionNotes && (
-                      <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">Conditie Notities</span>
-                        </div>
-                        <p className="text-sm">{enrichedReturnData.return.conditionNotes}</p>
+                <div className="border rounded-lg p-3">
+                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                    <ImageIcon className="h-3.5 w-3.5" />
+                    Foto's & Bewijs
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {enrichedReturnData.photos.map((photo, index) => (
+                      <div key={index} className="relative aspect-square rounded overflow-hidden border">
+                        <img 
+                          src={photo} 
+                          alt={`Return photo ${index + 1}`}
+                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => window.open(photo, '_blank')}
+                          data-testid={`return-photo-${index}`}
+                        />
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    ))}
+                  </div>
+                  {enrichedReturnData.return.conditionNotes && (
+                    <div className="mt-2.5 p-2.5 bg-muted/30 rounded border">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-xs font-medium">Conditie Notities</span>
+                      </div>
+                      <p className="text-xs">{enrichedReturnData.return.conditionNotes}</p>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Internal Notes */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Interne Notities</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {currentUser && (
-                    <NotesPanel 
-                      entityType="return" 
-                      entityId={enrichedReturnData.return.id}
-                      currentUser={currentUser}
-                    />
-                  )}
-                </CardContent>
-              </Card>
+              <div className="border rounded-lg p-3">
+                <h3 className="text-sm font-medium mb-2">Interne Notities</h3>
+                {currentUser && (
+                  <NotesPanel 
+                    entityType="return" 
+                    entityId={enrichedReturnData.return.id}
+                    currentUser={currentUser}
+                  />
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
