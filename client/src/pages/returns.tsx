@@ -710,55 +710,57 @@ export default function Returns() {
               )}
 
               {/* Financial Details */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Financiële Details</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <span className="text-sm text-muted-foreground block mb-1">Origineel bedrag:</span>
-                      <p className="text-lg font-semibold">
-                        {formatCurrency(enrichedReturnData.financialComparison.originalAmount)}
-                      </p>
+              {enrichedReturnData.financialComparison && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Financiële Details</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <span className="text-sm text-muted-foreground block mb-1">Origineel bedrag:</span>
+                        <p className="text-lg font-semibold">
+                          {formatCurrency(enrichedReturnData.financialComparison.originalAmount)}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <span className="text-sm text-muted-foreground block mb-1">Terugbetaling:</span>
+                        <p className="text-lg font-semibold">
+                          {formatCurrency(enrichedReturnData.financialComparison.refundAmount)}
+                        </p>
+                        <span className="text-xs text-muted-foreground">
+                          {enrichedReturnData.return.refundStatus === "pending" ? "In afwachting" :
+                           enrichedReturnData.return.refundStatus === "processing" ? "Verwerken" :
+                           enrichedReturnData.return.refundStatus === "completed" ? "Voltooid" :
+                           enrichedReturnData.return.refundStatus === "failed" ? "Mislukt" :
+                           enrichedReturnData.return.refundStatus || "Pending"}
+                        </span>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <span className="text-sm text-muted-foreground block mb-1">Verschil:</span>
+                        <p className="text-lg font-semibold">
+                          {formatCurrency(enrichedReturnData.financialComparison.difference)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <span className="text-sm text-muted-foreground block mb-1">Terugbetaling:</span>
-                      <p className="text-lg font-semibold">
-                        {formatCurrency(enrichedReturnData.financialComparison.refundAmount)}
-                      </p>
-                      <span className="text-xs text-muted-foreground">
-                        {enrichedReturnData.return.refundStatus === "pending" ? "In afwachting" :
-                         enrichedReturnData.return.refundStatus === "processing" ? "Verwerken" :
-                         enrichedReturnData.return.refundStatus === "completed" ? "Voltooid" :
-                         enrichedReturnData.return.refundStatus === "failed" ? "Mislukt" :
-                         enrichedReturnData.return.refundStatus || "Pending"}
-                      </span>
-                    </div>
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <span className="text-sm text-muted-foreground block mb-1">Verschil:</span>
-                      <p className="text-lg font-semibold">
-                        {formatCurrency(enrichedReturnData.financialComparison.difference)}
-                      </p>
-                    </div>
-                  </div>
-                  {enrichedReturnData.return.refundMethod && (
-                    <div className="mt-4">
-                      <span className="text-sm text-muted-foreground">Terugbetalingsmethode: </span>
-                      <span className="font-medium capitalize">{enrichedReturnData.return.refundMethod}</span>
-                    </div>
-                  )}
-                  {enrichedReturnData.return.shopifyRefundId && (
-                    <div className="mt-2">
-                      <span className="text-sm text-muted-foreground">Shopify Refund ID: </span>
-                      <span className="font-mono text-sm">{enrichedReturnData.return.shopifyRefundId}</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    {enrichedReturnData.return.refundMethod && (
+                      <div className="mt-4">
+                        <span className="text-sm text-muted-foreground">Terugbetalingsmethode: </span>
+                        <span className="font-medium capitalize">{enrichedReturnData.return.refundMethod}</span>
+                      </div>
+                    )}
+                    {enrichedReturnData.return.shopifyRefundId && (
+                      <div className="mt-2">
+                        <span className="text-sm text-muted-foreground">Shopify Refund ID: </span>
+                        <span className="font-mono text-sm">{enrichedReturnData.return.shopifyRefundId}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Return Items */}
-              {enrichedReturnData.returnItems.length > 0 && (
+              {enrichedReturnData.returnItems && enrichedReturnData.returnItems.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Geretourneerde Artikelen</CardTitle>
