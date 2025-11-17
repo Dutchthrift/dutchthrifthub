@@ -32,7 +32,6 @@ interface NoteComposerProps {
 }
 
 export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...", availableTags = [], className, contextData = {} }: NoteComposerProps) {
-  const [visibility, setVisibility] = useState<string>("internal");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const { data: templates = [] } = useQuery<NoteTemplate[]>({
@@ -69,7 +68,7 @@ export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...
     onSubmit({
       content,
       plainText,
-      visibility,
+      visibility: "internal",
       tagIds: selectedTags,
     });
 
@@ -227,17 +226,6 @@ export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...
 
       <div className="border-t p-3 bg-muted/50 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-1 flex-wrap">
-          <Select value={visibility} onValueChange={setVisibility}>
-            <SelectTrigger className="w-[140px] h-8" data-testid="note-composer-visibility">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="internal">Internal only</SelectItem>
-              <SelectItem value="customer_visible">Customer visible</SelectItem>
-              <SelectItem value="system">System note</SelectItem>
-            </SelectContent>
-          </Select>
-
           {selectedTagObjects.map((tag) => {
             const tagColor = tag.color || "#64748b";
             return (
