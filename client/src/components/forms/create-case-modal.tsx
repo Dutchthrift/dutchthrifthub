@@ -435,7 +435,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                             onValueChange={setOrderSearchQuery}
                             data-testid="order-search-input"
                           />
-                          <CommandList className="max-h-[300px]">
+                          <CommandList className="max-h-[300px] overflow-y-auto">
                             <CommandEmpty>Geen bestellingen gevonden.</CommandEmpty>
                             <CommandGroup>
                               {orders.map((order: any) => (
