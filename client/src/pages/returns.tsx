@@ -541,15 +541,15 @@ export default function Returns() {
               <Skeleton className="h-48 w-full" />
             </div>
           ) : enrichedReturnData && (
-            <div className="space-y-6">
+            <div className="space-y-3">
               {/* Return Overview & Customer Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Return Information */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Retour Informatie</CardTitle>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Retour Informatie</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-2 pt-0">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Retournummer:</span>
                       <span className="font-medium">{enrichedReturnData.return.returnNumber}</span>
@@ -605,10 +605,10 @@ export default function Returns() {
 
                 {/* Customer Information */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Klantinformatie</CardTitle>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Klantinformatie</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-2 pt-0">
                     {enrichedReturnData.customer ? (
                       <>
                         <div className="flex justify-between">
@@ -666,9 +666,9 @@ export default function Returns() {
               {/* Order Information from Shopify */}
               {enrichedReturnData.order && (
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">Originele Order Informatie</CardTitle>
+                      <CardTitle className="text-base">Originele Order Informatie</CardTitle>
                       <Button
                         variant="outline"
                         size="sm"
@@ -680,8 +680,8 @@ export default function Returns() {
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <CardContent className="pt-0">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
                         <span className="text-sm text-muted-foreground">Ordernummer:</span>
                         <p className="font-medium">{enrichedReturnData.order.orderNumber}</p>
@@ -709,66 +709,16 @@ export default function Returns() {
                 </Card>
               )}
 
-              {/* Financial Details */}
-              {enrichedReturnData.financialComparison && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Financiële Details</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <span className="text-sm text-muted-foreground block mb-1">Origineel bedrag:</span>
-                        <p className="text-lg font-semibold">
-                          {formatCurrency(enrichedReturnData.financialComparison.originalAmount)}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <span className="text-sm text-muted-foreground block mb-1">Terugbetaling:</span>
-                        <p className="text-lg font-semibold">
-                          {formatCurrency(enrichedReturnData.financialComparison.refundAmount)}
-                        </p>
-                        <span className="text-xs text-muted-foreground">
-                          {enrichedReturnData.return.refundStatus === "pending" ? "In afwachting" :
-                           enrichedReturnData.return.refundStatus === "processing" ? "Verwerken" :
-                           enrichedReturnData.return.refundStatus === "completed" ? "Voltooid" :
-                           enrichedReturnData.return.refundStatus === "failed" ? "Mislukt" :
-                           enrichedReturnData.return.refundStatus || "Pending"}
-                        </span>
-                      </div>
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <span className="text-sm text-muted-foreground block mb-1">Verschil:</span>
-                        <p className="text-lg font-semibold">
-                          {formatCurrency(enrichedReturnData.financialComparison.difference)}
-                        </p>
-                      </div>
-                    </div>
-                    {enrichedReturnData.return.refundMethod && (
-                      <div className="mt-4">
-                        <span className="text-sm text-muted-foreground">Terugbetalingsmethode: </span>
-                        <span className="font-medium capitalize">{enrichedReturnData.return.refundMethod}</span>
-                      </div>
-                    )}
-                    {enrichedReturnData.return.shopifyRefundId && (
-                      <div className="mt-2">
-                        <span className="text-sm text-muted-foreground">Shopify Refund ID: </span>
-                        <span className="font-mono text-sm">{enrichedReturnData.return.shopifyRefundId}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
               {/* Return Items */}
               {enrichedReturnData.returnItems && enrichedReturnData.returnItems.length > 0 && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Geretourneerde Artikelen</CardTitle>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Geretourneerde Artikelen</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
+                  <CardContent className="pt-0">
+                    <div className="space-y-2">
                       {enrichedReturnData.returnItems.map((item) => (
-                        <div key={item.id} className="flex items-start justify-between p-3 border rounded-lg" data-testid={`return-item-${item.id}`}>
+                        <div key={item.id} className="flex items-start justify-between p-2 border rounded-lg" data-testid={`return-item-${item.id}`}>
                           <div className="flex-1">
                             <div className="font-medium">{item.productName}</div>
                             {item.sku && (
@@ -810,13 +760,13 @@ export default function Returns() {
               {/* Tracking Information */}
               {enrichedReturnData.tracking && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Tracking Informatie</CardTitle>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Tracking Informatie</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <CardContent className="pt-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {/* Return Tracking */}
-                      <div className="p-4 bg-muted/50 rounded-lg">
+                      <div className="p-3 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
                           <Package className="h-4 w-4 text-muted-foreground" />
                           <span className="font-medium">Retour Tracking</span>
@@ -836,7 +786,7 @@ export default function Returns() {
                     </div>
 
                     {/* Order Tracking */}
-                    <div className="p-4 bg-muted/50 rounded-lg">
+                    <div className="p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <Truck className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">Originele Order Tracking</span>
@@ -872,14 +822,14 @@ export default function Returns() {
               {/* Photos & Evidence */}
               {enrichedReturnData.photos && enrichedReturnData.photos.length > 0 && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <ImageIcon className="h-5 w-5" />
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" />
                       Foto's & Bewijs
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <CardContent className="pt-0">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {enrichedReturnData.photos.map((photo, index) => (
                         <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
                           <img 
