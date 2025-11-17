@@ -112,13 +112,13 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
   const hasActiveFilters = searchQuery || authorFilter || selectedTagFilters.length > 0 || dateFrom || dateTo;
 
   const createNoteMutation = useMutation({
-    mutationFn: async (noteData: { content: string; plainText: string; visibility: string; tagIds: string[] }) => {
+    mutationFn: async (noteData: { content: string; plainText: string; tagIds: string[] }) => {
       const response = await apiRequest("POST", "/api/notes", {
         entityType,
         entityId,
         content: noteData.content,
         plainText: noteData.plainText,
-        visibility: noteData.visibility,
+        visibility: "internal",
         authorId: currentUser.id,
       });
       const newNote = await response.json();
