@@ -10,7 +10,10 @@ import {
   Calendar,
   MoreHorizontal,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
+  Edit,
+  Archive,
+  Trash2
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -22,6 +25,16 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+} from "@/components/ui/context-menu";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
@@ -31,6 +44,9 @@ interface ReturnsKanbanProps {
   returns: Return[];
   isLoading: boolean;
   onViewReturn: (returnItem: Return) => void;
+  onEditReturn?: (returnItem: Return) => void;
+  onDeleteReturn?: (returnItem: Return) => void;
+  onArchiveReturn?: (returnItem: Return) => void;
 }
 
 const STATUS_COLUMNS = [
@@ -84,7 +100,7 @@ const STATUS_COLUMNS = [
   },
 ];
 
-export function ReturnsKanban({ returns, isLoading, onViewReturn }: ReturnsKanbanProps) {
+export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, onDeleteReturn, onArchiveReturn }: ReturnsKanbanProps) {
   const { toast } = useToast();
 
   const updateReturnMutation = useMutation({
@@ -273,17 +289,19 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn }: ReturnsKanba
                       column.returns.map((returnItem, index) => (
                         <Draggable key={returnItem.id} draggableId={returnItem.id} index={index}>
                           {(provided, snapshot) => (
-                            <Card
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className={`cursor-pointer hover:shadow-md transition-all ${
-                                snapshot.isDragging ? 'shadow-lg rotate-2' : 'bg-card'
-                              } ${getPriorityColor(returnItem.priority)}`}
-                              onClick={() => handleViewReturn(returnItem)}
-                              data-testid={`return-card-${returnItem.id}`}
-                            >
-                              <CardContent className="p-2.5">
+                            <ContextMenu>
+                              <ContextMenuTrigger>
+                                <Card
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={`cursor-pointer hover:shadow-md transition-all ${
+                                    snapshot.isDragging ? 'shadow-lg rotate-2' : 'bg-card'
+                                  } ${getPriorityColor(returnItem.priority)}`}
+                                  onClick={() => handleViewReturn(returnItem)}
+                                  data-testid={`return-card-${returnItem.id}`}
+                                >
+                                  <CardContent className="p-2.5">
                       <div className="flex items-start justify-between mb-1.5">
                         <h4 className="text-xs font-medium truncate flex-1 mr-1 font-mono">
                           {returnItem.returnNumber}
@@ -405,6 +423,60 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn }: ReturnsKanba
                       </div>
                               </CardContent>
                             </Card>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                <ContextMenuItem onClick={() => handleViewReturn(returnItem)}>
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Bekijk Details
+                                </ContextMenuItem>
+                                <ContextMenuItem onClick={() => onEditReturn?.(returnItem)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Bewerken
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuSub>
+                                  <ContextMenuSubTrigger>
+                                    <ArrowRight className="h-4 w-4 mr-2" />
+                                    Wijzig Status
+                                  </ContextMenuSubTrigger>
+                                  <ContextMenuSubContent>
+                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'nieuw_onderweg')}>
+                                      Nieuw / Onderweg
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'ontvangen_controle')}>
+                                      Ontvangen
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'akkoord_terugbetaling')}>
+                                      Akkoord
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'vermiste_pakketten')}>
+                                      Vermist
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'wachten_klant')}>
+                                      Wacht Klant
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'opnieuw_versturen')}>
+                                      Opnieuw Versturen
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'klaar')}>
+                                      Klaar
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'niet_ontvangen')}>
+                                      Niet Ontvangen
+                                    </ContextMenuItem>
+                                  </ContextMenuSubContent>
+                                </ContextMenuSub>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem onClick={() => onArchiveReturn?.(returnItem)}>
+                                  <Archive className="h-4 w-4 mr-2" />
+                                  Archiveren
+                                </ContextMenuItem>
+                                <ContextMenuItem className="text-destructive" onClick={() => onDeleteReturn?.(returnItem)}>
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Verwijderen
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
                           )}
                         </Draggable>
                       ))

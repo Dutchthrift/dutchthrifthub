@@ -315,6 +315,25 @@ export default function Returns() {
             returns={filteredReturns} 
             isLoading={isLoading}
             onViewReturn={handleViewDetails}
+            onEditReturn={(returnItem) => {
+              setSelectedReturn(returnItem);
+              setIsEditing(true);
+            }}
+            onDeleteReturn={(returnItem) => {
+              if (confirm(`Weet je zeker dat je retour ${returnItem.returnNumber} wilt verwijderen?`)) {
+                toast({
+                  title: "Functie niet beschikbaar",
+                  description: "Verwijderen van retouren is nog niet geïmplementeerd.",
+                  variant: "destructive",
+                });
+              }
+            }}
+            onArchiveReturn={(returnItem) => {
+              toast({
+                title: "Functie niet beschikbaar",
+                description: "Archiveren van retouren is nog niet geïmplementeerd.",
+              });
+            }}
           />
         )}
       </main>
