@@ -134,7 +134,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
       return newNote;
     },
     onSuccess: async (newNote) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId], exact: false });
       toast({
         title: "Note added",
         description: "Your note has been added successfully.",
@@ -154,7 +154,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
       return apiRequest("POST", `/api/notes/${noteId}/pin`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId], exact: false });
       toast({ title: "Note pinned" });
     },
     onError: (error: any) => {
@@ -171,7 +171,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
       return apiRequest("DELETE", `/api/notes/${noteId}/pin`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId], exact: false });
       toast({ title: "Note unpinned" });
     },
   });
@@ -184,7 +184,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
       return apiRequest("DELETE", `/api/notes/${noteId}`, { deleteReason: reason });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId], exact: false });
       toast({ title: "Note deleted" });
     },
     onError: (error: any) => {
@@ -206,7 +206,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notes", entityType, entityId], exact: false });
     },
   });
 

@@ -51,7 +51,7 @@ export function InternalNotes({ entityType, entityId, entityTitle }: InternalNot
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/notes', entityType, entityId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notes', entityType, entityId], exact: false });
       setNewNote("");
       setIsExpanded(false);
       toast({
@@ -76,7 +76,7 @@ export function InternalNotes({ entityType, entityId, entityTitle }: InternalNot
       if (!response.ok) throw new Error('Failed to delete note');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/notes', entityType, entityId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notes', entityType, entityId], exact: false });
       setNoteToDelete(null);
       toast({
         title: "Note deleted",
