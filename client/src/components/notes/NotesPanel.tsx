@@ -21,7 +21,6 @@ interface NotesPanelProps {
 
 export function NotesPanel({ entityType, entityId, currentUser, className }: NotesPanelProps) {
   const { toast } = useToast();
-  const [visibilityFilter, setVisibilityFilter] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState("");
   const [authorFilter, setAuthorFilter] = useState<string | undefined>(undefined);
   const [selectedTagFilters, setSelectedTagFilters] = useState<string[]>([]);
@@ -29,10 +28,9 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
   const [dateTo, setDateTo] = useState("");
 
   const { data: notes = [], isLoading } = useQuery<(Note & { author?: User; tags?: NoteTag[] })[]>({
-    queryKey: ["/api/notes", entityType, entityId, visibilityFilter, authorFilter, selectedTagFilters],
+    queryKey: ["/api/notes", entityType, entityId, authorFilter, selectedTagFilters],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (visibilityFilter) params.set("visibility", visibilityFilter);
       if (authorFilter) params.set("authorId", authorFilter);
       if (selectedTagFilters.length > 0) {
         selectedTagFilters.forEach(tagId => params.append("tagIds", tagId));
@@ -105,14 +103,13 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
 
   const clearAllFilters = () => {
     setSearchQuery("");
-    setVisibilityFilter(undefined);
     setAuthorFilter(undefined);
     setSelectedTagFilters([]);
     setDateFrom("");
     setDateTo("");
   };
 
-  const hasActiveFilters = searchQuery || visibilityFilter || authorFilter || selectedTagFilters.length > 0 || dateFrom || dateTo;
+  const hasActiveFilters = searchQuery || authorFilter || selectedTagFilters.length > 0 || dateFrom || dateTo;
 
   const createNoteMutation = useMutation({
     mutationFn: async (noteData: { content: string; plainText: string; visibility: string; tagIds: string[] }) => {
@@ -247,33 +244,6 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-start sm:items-center">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant={visibilityFilter === undefined ? "default" : "outline"}
-              size="sm"
-              onClick={() => setVisibilityFilter(undefined)}
-              data-testid="filter-all"
-            >
-              All
-            </Button>
-            <Button
-              variant={visibilityFilter === "internal" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setVisibilityFilter("internal")}
-              data-testid="filter-internal"
-            >
-              Internal
-            </Button>
-            <Button
-              variant={visibilityFilter === "customer_visible" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setVisibilityFilter("customer_visible")}
-              data-testid="filter-customer"
-            >
-              Customer
-            </Button>
-          </div>
-
           {uniqueAuthors.length > 0 && (
             <Select value={authorFilter || "all"} onValueChange={(val) => setAuthorFilter(val === "all" ? undefined : val)}>
               <SelectTrigger className="w-[150px] h-9" data-testid="filter-author">

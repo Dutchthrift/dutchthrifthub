@@ -9,7 +9,7 @@ import type { Note, NoteTag, User } from "@shared/schema";
 interface NoteThreadProps {
   note: Note & { author?: User; tags?: NoteTag[]; replies?: (Note & { author?: User; tags?: NoteTag[] })[] };
   currentUserId: string;
-  onReply: (parentId: string, noteData: { content: string; plainText: string; visibility: string; tagIds: string[] }) => void;
+  onReply: (parentId: string, noteData: { content: string; plainText: string; tagIds: string[] }) => void;
   onEdit?: (noteId: string) => void;
   onDelete?: (noteId: string) => void;
   onPin?: (noteId: string) => void;
@@ -41,7 +41,7 @@ export function NoteThread({
   const hasReplies = note.replies && note.replies.length > 0;
   const canReply = depth < 2; // Max depth of 2
 
-  const handleReply = (noteData: { content: string; plainText: string; visibility: string; tagIds: string[] }) => {
+  const handleReply = (noteData: { content: string; plainText: string; tagIds: string[] }) => {
     onReply(note.id, noteData);
     setShowReplyComposer(false);
   };

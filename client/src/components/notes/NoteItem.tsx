@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Pin, MoreVertical, Reply, Edit, Trash, Eye, EyeOff, ThumbsUp, AlertCircle } from "lucide-react";
+import { Pin, MoreVertical, Reply, Edit, Trash, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Note, NoteTag, User } from "@shared/schema";
 
@@ -40,8 +40,6 @@ export function NoteItem({
 
   const isAuthor = note.authorId === currentUserId;
   const isPinned = note.isPinned;
-  const visibilityIcon = note.visibility === "customer_visible" ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />;
-  const visibilityLabel = note.visibility === "customer_visible" ? "Customer visible" : note.visibility === "system" ? "System" : "Internal";
 
   const authorInitials = note.author
     ? `${note.author.username[0]}${note.author.email[0]}`.toUpperCase()
@@ -79,10 +77,6 @@ export function NoteItem({
               {isPinned && (
                 <Pin className="h-3 w-3 text-[var(--brand-orange-600)]" data-testid="note-pinned-icon" />
               )}
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                {visibilityIcon}
-                <span>{visibilityLabel}</span>
-              </div>
             </div>
 
             {note.tags && note.tags.length > 0 && (

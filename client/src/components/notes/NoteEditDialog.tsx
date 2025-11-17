@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bold, Italic, UnderlineIcon, List, ListOrdered, Link as LinkIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Note } from "@shared/schema";
@@ -21,12 +20,11 @@ interface NoteEditDialogProps {
   note: Note;
   open: boolean;
   onClose: () => void;
-  onSave: (updates: { content: string; plainText: string; visibility: string }) => Promise<void>;
+  onSave: (updates: { content: string; plainText: string }) => Promise<void>;
   isPending?: boolean;
 }
 
 export function NoteEditDialog({ note, open, onClose, onSave, isPending }: NoteEditDialogProps) {
-  const [visibility, setVisibility] = useState(note.visibility);
 
   const editor = useEditor({
     extensions: [
@@ -56,7 +54,6 @@ export function NoteEditDialog({ note, open, onClose, onSave, isPending }: NoteE
     await onSave({
       content,
       plainText,
-      visibility,
     });
 
     onClose();
@@ -149,17 +146,6 @@ export function NoteEditDialog({ note, open, onClose, onSave, isPending }: NoteE
           </div>
 
           <EditorContent editor={editor} />
-
-          <Select value={visibility} onValueChange={(value) => setVisibility(value as typeof visibility)}>
-            <SelectTrigger className="w-[140px]" data-testid="edit-visibility">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="internal">Internal only</SelectItem>
-              <SelectItem value="customer_visible">Customer visible</SelectItem>
-              <SelectItem value="system">System note</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         <DialogFooter>
