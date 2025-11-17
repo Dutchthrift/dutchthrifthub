@@ -49,7 +49,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertReturnSchema } from "@shared/schema";
 import { z } from "zod";
-import { Check, ChevronsUpDown, Package, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronsUpDown, Package, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const createReturnFormSchema = insertReturnSchema.extend({
@@ -200,6 +200,22 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
       form.reset();
     }
   }, [open, form]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-testid="order-search-input"]') && 
+          !target.closest('[data-testid="order-search-dropdown"]')) {
+        setOrderSearchOpen(false);
+      }
+    };
+
+    if (orderSearchOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [orderSearchOpen]);
 
   // Watch for return reason to show/hide other reason field
   const returnReason = form.watch("returnReason");
@@ -379,41 +395,44 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Bestelling *</FormLabel>
-                      <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen} modal={false}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={cn(
-                                "justify-between",
-                                !field.value && "text-muted-foreground"
-                              )}
-                              data-testid="order-search-button"
-                            >
-                              {field.value && selectedOrder
-                                ? `${selectedOrder.orderNumber} - €${(selectedOrder.totalAmount / 100).toFixed(2)}`
-                                : "Zoek bestelling..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[600px] p-0" data-testid="order-search-popover">
-                          <Command>
-                            <CommandInput 
-                              placeholder="Zoek op bestelnummer of email..." 
-                              value={orderSearchQuery}
-                              onValueChange={setOrderSearchQuery}
-                              data-testid="order-search-input"
-                            />
-                            <CommandList className="max-h-[300px] overflow-y-auto">
-                              <CommandEmpty>Geen bestellingen gevonden.</CommandEmpty>
-                              <CommandGroup>
+                      <div className="relative">
+                        <FormControl>
+                          <Input
+                            placeholder="Zoek op bestelnummer of email..."
+                            value={orderSearchQuery}
+                            onChange={(e) => {
+                              setOrderSearchQuery(e.target.value);
+                              setOrderSearchOpen(true);
+                            }}
+                            onFocus={() => setOrderSearchOpen(true)}
+                            data-testid="order-search-input"
+                            className="pr-10"
+                          />
+                        </FormControl>
+                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        
+                        {orderSearchOpen && (
+                          <div 
+                            className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-[300px] overflow-y-auto"
+                            data-testid="order-search-dropdown"
+                          >
+                            {orders.length === 0 ? (
+                              <div className="p-4 text-center text-sm text-muted-foreground">
+                                Geen bestellingen gevonden.
+                              </div>
+                            ) : (
+                              <div className="p-1">
                                 {orders.map((order) => (
-                                  <CommandItem
+                                  <div
                                     key={order.id}
-                                    value={`${order.orderNumber} ${order.customerEmail} ${order.shopifyOrderId || ''}`}
-                                    onSelect={() => handleOrderSelect(order.id)}
+                                    onClick={() => {
+                                      handleOrderSelect(order.id);
+                                      setOrderSearchOpen(false);
+                                    }}
+                                    className={cn(
+                                      "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                      field.value === order.id && "bg-accent"
+                                    )}
                                     data-testid={`order-option-${order.id}`}
                                   >
                                     <Check
@@ -436,13 +455,18 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                                         {order.customerEmail}
                                       </div>
                                     </div>
-                                  </CommandItem>
+                                  </div>
                                 ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {selectedOrder && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Geselecteerd: {selectedOrder.orderNumber} - €{(selectedOrder.totalAmount / 100).toFixed(2)}
+                        </div>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
