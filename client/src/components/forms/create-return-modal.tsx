@@ -402,9 +402,15 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                             value={orderSearchQuery}
                             onChange={(e) => {
                               setOrderSearchQuery(e.target.value);
-                              setOrderSearchOpen(true);
+                              if (e.target.value.length > 0) {
+                                setOrderSearchOpen(true);
+                              }
                             }}
-                            onFocus={() => setOrderSearchOpen(true)}
+                            onFocus={() => {
+                              if (orderSearchQuery.length > 0) {
+                                setOrderSearchOpen(true);
+                              }
+                            }}
                             data-testid="order-search-input"
                             className="pr-10"
                           />

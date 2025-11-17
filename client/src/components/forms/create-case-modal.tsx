@@ -431,9 +431,15 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                           value={orderSearchQuery}
                           onChange={(e) => {
                             setOrderSearchQuery(e.target.value);
-                            setOrderSearchOpen(true);
+                            if (e.target.value.length > 0) {
+                              setOrderSearchOpen(true);
+                            }
                           }}
-                          onFocus={() => setOrderSearchOpen(true)}
+                          onFocus={() => {
+                            if (orderSearchQuery.length > 0) {
+                              setOrderSearchOpen(true);
+                            }
+                          }}
                           data-testid="order-search-input"
                           className="pr-10"
                         />
@@ -442,7 +448,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                       
                       {orderSearchOpen && (
                         <div 
-                          className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-[300px] overflow-y-auto"
+                          className="absolute z-[100] w-full mt-1 bg-popover border rounded-md shadow-md max-h-[300px] overflow-y-auto"
                           data-testid="order-search-dropdown"
                         >
                           {orders.length === 0 ? (
