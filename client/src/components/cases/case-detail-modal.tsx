@@ -363,42 +363,43 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col p-0">
           {/* Sticky Header */}
-          <div className="border-b bg-background p-6 sticky top-0 z-10">
+          <div className="border-b bg-background p-4 sticky top-0 z-10">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <DialogTitle className="text-2xl">Case #{caseData.caseNumber}</DialogTitle>
-                  <Badge variant={getStatusVariant(caseData.status)} data-testid="case-status-badge">
+                <div className="flex items-center gap-2 mb-1">
+                  <DialogTitle className="text-lg font-medium">Case #{caseData.caseNumber}</DialogTitle>
+                  <Badge variant={getStatusVariant(caseData.status)} data-testid="case-status-badge" className="text-xs h-5">
                     {statusLabel}
                   </Badge>
-                  <Badge variant={getPriorityVariant(caseData.priority)} data-testid="case-priority-badge">
+                  <Badge variant={getPriorityVariant(caseData.priority)} data-testid="case-priority-badge" className="text-xs h-5">
                     {caseData.priority}
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Created {formatDateTime(caseData.createdAt)} • Customer: {caseData.customerEmail}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Button 
                   variant="ghost" 
                   size="sm"
                   onClick={() => setShowEmailDialog(true)}
                   data-testid="send-email-button"
+                  className="h-8 text-xs"
                 >
-                  <Mail className="mr-2 h-4 w-4" />
-                  Send Email
+                  <Mail className="mr-1.5 h-3.5 w-3.5" />
+                  Email
                 </Button>
                 <Button 
                   variant="ghost" 
                   size="sm"
                   onClick={() => setShowDeleteDialog(true)}
                   data-testid="delete-case-button"
-                  className="text-destructive hover:text-destructive"
+                  className="text-destructive hover:text-destructive h-8 text-xs"
                 >
-                  <Trash2 className="mr-2 h-4 w-4" />
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                   Delete
                 </Button>
               </div>
@@ -407,23 +408,21 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
 
           {/* Two-column scrollable content */}
           <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 p-3">
               {/* Left Column: Case Details & Linked Items */}
-              <div className="space-y-6">
+              <div className="space-y-2.5">
                 {/* Case Info Card */}
-                <Card>
-                  <CardHeader className="bg-card-header border-b">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">Case Details</CardTitle>
-                      {!isEditing && (
-                        <Button variant="ghost" size="sm" onClick={handleStartEdit} data-testid="edit-case-button">
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-6 space-y-4">
+                <div className="border rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium">Case Details</h3>
+                    {!isEditing && (
+                      <Button variant="ghost" size="sm" onClick={handleStartEdit} data-testid="edit-case-button" className="h-6 text-xs">
+                        <Edit className="h-3.5 w-3.5 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-2.5">
                     {isEditing ? (
                       <>
                         <div>
@@ -508,8 +507,8 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                         </div>
                       </>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
                 {/* Order Information Card */}
                 {linkedOrder && (
