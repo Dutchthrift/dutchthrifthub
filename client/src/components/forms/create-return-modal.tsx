@@ -379,7 +379,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Bestelling *</FormLabel>
-                      <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen}>
+                      <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen} modal={false}>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button

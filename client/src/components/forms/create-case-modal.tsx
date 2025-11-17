@@ -408,7 +408,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Zoek Bestelling</FormLabel>
-                    <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen}>
+                    <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen} modal={false}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
