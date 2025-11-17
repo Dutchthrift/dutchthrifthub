@@ -25,20 +25,7 @@ import {
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
-
-type Return = {
-  id: string;
-  returnNumber: string;
-  status: string;
-  customerId: string | null;
-  orderId: string | null;
-  returnReason: string | null;
-  trackingNumber: string | null;
-  requestedAt: string;
-  expectedReturnDate: string | null;
-  refundAmount: number | null;
-  priority: string | null;
-};
+import type { Return } from "@shared/schema";
 
 interface ReturnsKanbanProps {
   returns: Return[];

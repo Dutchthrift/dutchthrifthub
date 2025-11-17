@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import type { User } from "@shared/schema";
+import type { User, Return, ReturnItem } from "@shared/schema";
 import { Navigation } from "@/components/layout/navigation";
 import { queryClient } from "@/lib/queryClient";
 import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText } from "lucide-react";
@@ -30,48 +30,6 @@ import { CreateReturnModal } from "@/components/forms/create-return-modal";
 import { NotesPanel } from "@/components/notes/NotesPanel";
 import { ReturnsKanban } from "@/components/returns/returns-kanban";
 import { useToast } from "@/hooks/use-toast";
-
-type Return = {
-  id: string;
-  returnNumber: string;
-  status: string;
-  customerId: string | null;
-  orderId: string | null;
-  returnReason: string | null;
-  otherReason: string | null;
-  trackingNumber: string | null;
-  requestedAt: string;
-  receivedAt: string | null;
-  expectedReturnDate: string | null;
-  completedAt: string | null;
-  refundAmount: number | null;
-  refundStatus: string | null;
-  refundMethod: string | null;
-  shopifyRefundId: string | null;
-  customerNotes: string | null;
-  internalNotes: string | null;
-  conditionNotes: string | null;
-  photos: string[] | null;
-  priority: string | null;
-  tags: string[] | null;
-  assignedUserId: string | null;
-  caseId: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type ReturnItem = {
-  id: string;
-  returnId: string;
-  sku: string | null;
-  productName: string;
-  quantity: number;
-  unitPrice: number | null;
-  condition: string | null;
-  imageUrl: string | null;
-  restockable: boolean | null;
-  restockedAt: string | null;
-};
 
 type EnrichedReturnData = {
   return: Return;
