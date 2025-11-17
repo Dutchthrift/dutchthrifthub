@@ -2775,7 +2775,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Activities
   app.get("/api/activities", async (req, res) => {
     try {
-      const activities = await storage.getActivities();
+      const { purchaseOrderId } = req.query;
+      let activities = await storage.getActivities();
+      
+      // Filter by purchaseOrderId if provided
+      if (purchaseOrderId) {
+        activities = activities.filter((activity: any) => 
+          activity.metadata?.purchaseOrderId === purchaseOrderId
+        );
+      }
+      
       res.json(activities);
     } catch (error) {
       console.error("Error fetching activities:", error);

@@ -106,14 +106,11 @@ export function PurchaseOrderDetailModal({
   const { data: activities } = useQuery<any[]>({
     queryKey: ["/api/activities", "purchase_order", purchaseOrder.id],
     queryFn: async () => {
-      const response = await fetch(`/api/activities`, {
+      const response = await fetch(`/api/activities?purchaseOrderId=${purchaseOrder.id}`, {
         credentials: "include"
       });
       if (!response.ok) throw new Error("Failed to fetch activities");
-      const allActivities = await response.json();
-      return allActivities.filter((activity: any) => 
-        activity.metadata?.purchaseOrderId === purchaseOrder.id
-      );
+      return response.json();
     },
     enabled: open,
   });
