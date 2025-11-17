@@ -78,6 +78,7 @@ interface CreateReturnModalProps {
   customerId?: string;
   orderId?: string;
   onReturnCreated?: (returnId: string) => void;
+  editReturn?: any;
 }
 
 interface SelectedItemData {
@@ -86,7 +87,7 @@ interface SelectedItemData {
   notes?: string;
 }
 
-export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onReturnCreated }: CreateReturnModalProps) {
+export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onReturnCreated, editReturn }: CreateReturnModalProps) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [orderSearchOpen, setOrderSearchOpen] = useState(false);
@@ -137,7 +138,29 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
 
   const form = useForm<CreateReturnFormValues>({
     resolver: zodResolver(createReturnFormSchema),
-    defaultValues: {
+    defaultValues: editReturn ? {
+      customerId: editReturn.customerId || "",
+      orderId: editReturn.orderId || null,
+      returnReason: editReturn.returnReason || "other" as const,
+      otherReason: editReturn.otherReason || null,
+      priority: editReturn.priority || "medium" as const,
+      status: editReturn.status || "nieuw_onderweg" as const,
+      trackingNumber: editReturn.trackingNumber || null,
+      internalNotes: editReturn.internalNotes || null,
+      customerNotes: editReturn.customerNotes || null,
+      conditionNotes: editReturn.conditionNotes || null,
+      refundAmount: editReturn.refundAmount || null,
+      refundStatus: editReturn.refundStatus || "pending" as const,
+      refundMethod: editReturn.refundMethod || null,
+      shopifyRefundId: editReturn.shopifyRefundId || null,
+      photos: editReturn.photos || null,
+      assignedUserId: editReturn.assignedUserId || null,
+      caseId: editReturn.caseId || null,
+      requestedAt: undefined,
+      receivedAt: editReturn.receivedAt || null,
+      expectedReturnDate: editReturn.expectedReturnDate || null,
+      completedAt: editReturn.completedAt || null,
+    } : {
       customerId: customerId || "",
       orderId: orderId || null,
       returnReason: "other" as const,
@@ -233,17 +256,24 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
         items: items || [],
       };
       
-      const response = await apiRequest("POST", "/api/returns", returnData);
-      const newReturn = await response.json();
-      
-      return newReturn;
+      if (editReturn) {
+        const response = await apiRequest("PATCH", `/api/returns/${editReturn.id}`, returnData);
+        const updatedReturn = await response.json();
+        return updatedReturn;
+      } else {
+        const response = await apiRequest("POST", "/api/returns", returnData);
+        const newReturn = await response.json();
+        return newReturn;
+      }
     },
-    onSuccess: async (newReturn) => {
+    onSuccess: async (returnData) => {
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
       
       toast({
-        title: "Retour aangemaakt",
-        description: `Retour "${newReturn.returnNumber}" is succesvol aangemaakt${selectedItems.size > 0 ? ` met ${selectedItems.size} artikel(en)` : ''}.`,
+        title: editReturn ? "Retour bijgewerkt" : "Retour aangemaakt",
+        description: editReturn 
+          ? `Retour "${returnData.returnNumber}" is succesvol bijgewerkt.`
+          : `Retour "${returnData.returnNumber}" is succesvol aangemaakt${selectedItems.size > 0 ? ` met ${selectedItems.size} artikel(en)` : ''}.`,
       });
       
       onOpenChange(false);
@@ -252,13 +282,13 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
       
       // Instead of navigating, call the callback or open modal
       if (onReturnCreated) {
-        onReturnCreated(newReturn.id);
+        onReturnCreated(returnData.id);
       }
     },
     onError: (error: any) => {
       toast({
-        title: "Fout bij aanmaken retour",
-        description: error.message || "Er is een fout opgetreden bij het aanmaken van de retour.",
+        title: editReturn ? "Fout bij bijwerken retour" : "Fout bij aanmaken retour",
+        description: error.message || `Er is een fout opgetreden bij het ${editReturn ? 'bijwerken' : 'aanmaken'} van de retour.`,
         variant: "destructive",
       });
     },
@@ -330,9 +360,9 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col p-0" data-testid="create-return-modal">
         <DialogHeader className="px-6 pt-4 pb-3 flex-shrink-0">
-          <DialogTitle className="text-lg">Nieuwe Retour Aanmaken</DialogTitle>
+          <DialogTitle className="text-lg">{editReturn ? 'Retour Bewerken' : 'Nieuwe Retour Aanmaken'}</DialogTitle>
           <DialogDescription className="text-sm">
-            Selecteer een bestelling en vul de retourinformatie in
+            {editReturn ? 'Wijzig de retourinformatie' : 'Selecteer een bestelling en vul de retourinformatie in'}
           </DialogDescription>
         </DialogHeader>
         
@@ -701,14 +731,16 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                   )}
                   <Button
                     type="submit"
-                    disabled={createReturnMutation.isPending || !selectedOrderId}
+                    disabled={createReturnMutation.isPending || (!editReturn && !selectedOrderId)}
                     data-testid="button-create-return"
                   >
                     {createReturnMutation.isPending 
-                      ? "Aanmaken..." 
-                      : selectedItems.size > 0 
-                        ? `Retour Aanmaken (${selectedItems.size} ${selectedItems.size === 1 ? 'artikel' : 'artikelen'})`
-                        : "Retour Aanmaken"}
+                      ? (editReturn ? "Bijwerken..." : "Aanmaken...") 
+                      : editReturn
+                        ? "Retour Bijwerken"
+                        : selectedItems.size > 0 
+                          ? `Retour Aanmaken (${selectedItems.size} ${selectedItems.size === 1 ? 'artikel' : 'artikelen'})`
+                          : "Retour Aanmaken"}
                   </Button>
                 </div>
               </div>

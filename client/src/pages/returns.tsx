@@ -97,6 +97,7 @@ export default function Returns() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showReturnDetails, setShowReturnDetails] = useState(false);
   const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
@@ -336,14 +337,37 @@ export default function Returns() {
         }}
       />
 
+      <CreateReturnModal 
+        open={isEditing} 
+        onOpenChange={setIsEditing}
+        editReturn={selectedReturn}
+        onReturnCreated={async () => {
+          await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+          setShowReturnDetails(false);
+        }}
+      />
+
       {/* Return Details Dialog */}
       <Dialog open={showReturnDetails} onOpenChange={setShowReturnDetails}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Retour Details {selectedReturn?.returnNumber}</DialogTitle>
-            <DialogDescription>
-              Volledige retourinformatie en order details
-            </DialogDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <DialogTitle>Retour Details {selectedReturn?.returnNumber}</DialogTitle>
+                <DialogDescription>
+                  Volledige retourinformatie en order details
+                </DialogDescription>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsEditing(true)}
+                data-testid="button-edit-return"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Bewerken
+              </Button>
+            </div>
           </DialogHeader>
           
           {isLoadingDetails ? (
