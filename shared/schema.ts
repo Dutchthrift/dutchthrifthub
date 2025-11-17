@@ -386,6 +386,7 @@ export const returns = pgTable("returns", {
   // Metadata
   priority: priorityEnum("priority").default("medium"),
   tags: text("tags").array(),
+  isArchived: boolean("is_archived").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
