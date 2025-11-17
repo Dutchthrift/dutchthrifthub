@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import type { User, Return, ReturnItem } from "@shared/schema";
 import { Navigation } from "@/components/layout/navigation";
 import { queryClient } from "@/lib/queryClient";
-import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText } from "lucide-react";
+import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText, Archive, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -98,6 +98,9 @@ export default function Returns() {
   const [showReturnDetails, setShowReturnDetails] = useState(false);
   const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
@@ -158,8 +161,10 @@ export default function Returns() {
     }
   }, [location, allReturns, setLocation, toast]);
 
-  // Filter by status
-  const returns = allReturns;
+  // Filter by archived status
+  const returns = allReturns.filter(ret => 
+    showArchived ? ret.isArchived === true : ret.isArchived !== true
+  );
 
   // Filter returns by search query and priority
   const filteredReturns = returns.filter((ret) => {
@@ -172,6 +177,12 @@ export default function Returns() {
 
     return matchesSearch && matchesPriority;
   });
+
+  // Pagination for archived view
+  const totalPages = Math.ceil(filteredReturns.length / itemsPerPage);
+  const paginatedReturns = showArchived 
+    ? filteredReturns.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+    : filteredReturns;
 
   // Count returns by status
   const statusCounts = returns.reduce(
@@ -218,6 +229,17 @@ export default function Returns() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <Button 
+                  variant={showArchived ? "outline" : "ghost"}
+                  onClick={() => {
+                    setShowArchived(!showArchived);
+                    setCurrentPage(1);
+                  }}
+                  data-testid="button-toggle-archived"
+                >
+                  <Archive className="h-4 w-4 mr-2" />
+                  {showArchived ? "Toon Actief" : "Toon Archief"}
+                </Button>
                 <Button 
                   onClick={() => setShowCreateModal(true)}
                   data-testid="button-create-return"
@@ -301,15 +323,117 @@ export default function Returns() {
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Package className="h-12 w-12 text-muted-foreground mb-3" />
               <h3 className="text-lg font-medium mb-1">
-                Geen retouren gevonden
+                {showArchived ? "Geen gearchiveerde retouren" : "Geen retouren gevonden"}
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {searchQuery || priorityFilter !== "all"
                   ? "Probeer een andere zoekopdracht of filter"
-                  : "Er zijn nog geen retouren in dit overzicht"}
+                  : showArchived 
+                    ? "Er zijn nog geen gearchiveerde retouren"
+                    : "Er zijn nog geen retouren in dit overzicht"}
               </p>
             </CardContent>
           </Card>
+        ) : showArchived ? (
+          <>
+            {/* Archived List View */}
+            <div className="space-y-3">
+              {paginatedReturns.map((returnItem) => (
+                <Card 
+                  key={returnItem.id} 
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => handleViewDetails(returnItem)}
+                  data-testid={`archived-return-card-${returnItem.id}`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-semibold font-mono">{returnItem.returnNumber}</h3>
+                          <Badge variant="outline" className={STATUS_COLORS[returnItem.status] || ""}>
+                            {getStatusLabel(returnItem.status)}
+                          </Badge>
+                          <Badge variant="outline" className={PRIORITY_COLORS[returnItem.priority || 'medium'] || ""}>
+                            {returnItem.priority === "low" ? "Laag" : 
+                             returnItem.priority === "high" ? "Hoog" : 
+                             returnItem.priority === "urgent" ? "Urgent" : "Normaal"}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Aangevraagd:</span>
+                            <p className="font-medium">
+                              {returnItem.requestedAt ? format(new Date(returnItem.requestedAt), "dd MMM yyyy") : "-"}
+                            </p>
+                          </div>
+                          {returnItem.trackingNumber && (
+                            <div>
+                              <span className="text-muted-foreground">Tracking:</span>
+                              <p className="font-medium font-mono">{returnItem.trackingNumber}</p>
+                            </div>
+                          )}
+                          {returnItem.refundAmount && (
+                            <div>
+                              <span className="text-muted-foreground">Terugbetaling:</span>
+                              <p className="font-medium">€{(returnItem.refundAmount / 100).toFixed(2)}</p>
+                            </div>
+                          )}
+                          {returnItem.returnReason && (
+                            <div>
+                              <span className="text-muted-foreground">Reden:</span>
+                              <p className="font-medium">
+                                {returnItem.returnReason === "defect" ? "Defect" :
+                                 returnItem.returnReason === "wrong_item" ? "Verkeerd artikel" :
+                                 returnItem.returnReason === "not_as_described" ? "Niet zoals beschreven" :
+                                 returnItem.returnReason === "no_longer_needed" ? "Niet meer nodig" :
+                                 returnItem.returnReason === "other" ? returnItem.otherReason || "Anders" :
+                                 returnItem.returnReason}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Card className="mt-6">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Pagina {currentPage} van {totalPages} ({filteredReturns.length} resultaten)
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        data-testid="button-prev-page"
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Vorige
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        data-testid="button-next-page"
+                      >
+                        Volgende
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
         ) : (
           <ReturnsKanban 
             returns={filteredReturns} 
@@ -328,11 +452,30 @@ export default function Returns() {
                 });
               }
             }}
-            onArchiveReturn={(returnItem) => {
-              toast({
-                title: "Functie niet beschikbaar",
-                description: "Archiveren van retouren is nog niet geïmplementeerd.",
-              });
+            onArchiveReturn={async (returnItem) => {
+              try {
+                const response = await fetch(`/api/returns/${returnItem.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ isArchived: true }),
+                  credentials: "include",
+                });
+
+                if (!response.ok) throw new Error("Failed to archive return");
+
+                await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+                
+                toast({
+                  title: "Gearchiveerd",
+                  description: `Retour ${returnItem.returnNumber} is gearchiveerd.`,
+                });
+              } catch (error) {
+                toast({
+                  title: "Fout",
+                  description: "Er is een fout opgetreden bij het archiveren.",
+                  variant: "destructive",
+                });
+              }
             }}
           />
         )}
