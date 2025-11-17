@@ -366,7 +366,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="flex-1 px-6 pb-4">
+        <div className="flex-1 overflow-y-auto px-6 pb-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               {/* Section 1: Order & Return Details */}
@@ -746,7 +746,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
               </div>
             </form>
           </Form>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
