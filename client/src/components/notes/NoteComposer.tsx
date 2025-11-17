@@ -19,7 +19,7 @@ interface NoteTemplate {
 }
 
 interface NoteComposerProps {
-  onSubmit: (note: { content: string; plainText: string; visibility: string; tagIds: string[] }) => void;
+  onSubmit: (note: { content: string; plainText: string; tagIds: string[] }) => void;
   isPending?: boolean;
   placeholder?: string;
   availableTags?: Array<{ id: string; name: string; color: string | null }>;
@@ -68,7 +68,6 @@ export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...
     onSubmit({
       content,
       plainText,
-      visibility: "internal",
       tagIds: selectedTags,
     });
 
