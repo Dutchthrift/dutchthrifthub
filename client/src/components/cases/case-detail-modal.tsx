@@ -458,23 +458,23 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                     ) : (
                       <>
                         <div>
-                          <label className="text-sm font-medium text-muted-foreground">Title</label>
-                          <p className="mt-1" data-testid="case-title">{caseData.title}</p>
+                          <label className="text-xs text-muted-foreground">Title</label>
+                          <p className="text-sm mt-0.5" data-testid="case-title">{caseData.title}</p>
                         </div>
                         {caseData.description && (
                           <div>
-                            <label className="text-sm font-medium text-muted-foreground">Description</label>
-                            <p className="mt-1 whitespace-pre-wrap" data-testid="case-description">{caseData.description}</p>
+                            <label className="text-xs text-muted-foreground">Description</label>
+                            <p className="text-sm mt-0.5 whitespace-pre-wrap" data-testid="case-description">{caseData.description}</p>
                           </div>
                         )}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-2.5">
                           <div>
-                            <label className="text-sm font-medium text-muted-foreground">Status</label>
+                            <label className="text-xs text-muted-foreground block mb-0.5">Status</label>
                             <Select
                               value={caseData.status}
                               onValueChange={(value) => updateCaseMutation.mutate({ id: caseId, data: { status: value as any } })}
                             >
-                              <SelectTrigger className="mt-1" data-testid="status-select">
+                              <SelectTrigger className="h-8 text-sm" data-testid="status-select">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -487,12 +487,12 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                             </Select>
                           </div>
                           <div>
-                            <label className="text-sm font-medium text-muted-foreground">Priority</label>
+                            <label className="text-xs text-muted-foreground block mb-0.5">Priority</label>
                             <Select
                               value={caseData.priority || "medium"}
                               onValueChange={(value) => updateCaseMutation.mutate({ id: caseId, data: { priority: value as any } })}
                             >
-                              <SelectTrigger className="mt-1" data-testid="priority-select">
+                              <SelectTrigger className="h-8 text-sm" data-testid="priority-select">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -512,42 +512,40 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
 
                 {/* Order Information Card */}
                 {linkedOrder && (
-                  <Card>
-                    <CardHeader className="bg-card-header border-b">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Package className="h-5 w-5" />
-                        Order Information
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6 space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                  <div className="border rounded-lg p-3">
+                    <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                      <Package className="h-3.5 w-3.5" />
+                      Order Information
+                    </h3>
+                    <div className="space-y-2.5">
+                      <div className="grid grid-cols-2 gap-2.5">
                         <div>
-                          <label className="text-sm font-medium text-muted-foreground">Order Number</label>
-                          <p className="mt-1 font-medium" data-testid="order-number">#{linkedOrder.orderNumber}</p>
+                          <label className="text-xs text-muted-foreground block mb-0.5">Order Number</label>
+                          <p className="text-sm" data-testid="order-number">#{linkedOrder.orderNumber}</p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-muted-foreground">Order Date</label>
-                          <p className="mt-1" data-testid="order-date">{formatDateTime(linkedOrder.orderDate)}</p>
+                          <label className="text-xs text-muted-foreground block mb-0.5">Order Date</label>
+                          <p className="text-sm" data-testid="order-date">{formatDateTime(linkedOrder.orderDate)}</p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-muted-foreground">Customer</label>
-                          <p className="mt-1" data-testid="order-customer">{linkedOrder.customerName || linkedOrder.customerEmail}</p>
+                          <label className="text-xs text-muted-foreground block mb-0.5">Customer</label>
+                          <p className="text-sm" data-testid="order-customer">{linkedOrder.customerName || linkedOrder.customerEmail}</p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-muted-foreground">Total Amount</label>
-                          <p className="mt-1 font-medium" data-testid="order-total">€{((linkedOrder.totalAmount || 0) / 100).toFixed(2)}</p>
+                          <label className="text-xs text-muted-foreground block mb-0.5">Total Amount</label>
+                          <p className="text-sm" data-testid="order-total">€{((linkedOrder.totalAmount || 0) / 100).toFixed(2)}</p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-muted-foreground">Status</label>
-                          <Badge variant="secondary" className="mt-1" data-testid="order-status">{linkedOrder.status}</Badge>
+                          <label className="text-xs text-muted-foreground block mb-0.5">Status</label>
+                          <Badge variant="secondary" className="text-xs h-5" data-testid="order-status">{linkedOrder.status}</Badge>
                         </div>
                       </div>
 
                       {/* Shipping Address */}
                       {linkedOrder.orderData?.shipping_address && (
-                        <div className="pt-4 border-t">
-                          <label className="text-sm font-medium text-muted-foreground">Shipping Address</label>
-                          <div className="mt-2 text-sm" data-testid="shipping-address">
+                        <div className="pt-2 border-t">
+                          <label className="text-xs text-muted-foreground block mb-0.5">Shipping Address</label>
+                          <div className="text-xs" data-testid="shipping-address">
                             <p>{linkedOrder.orderData.shipping_address.name}</p>
                             <p>{linkedOrder.orderData.shipping_address.address1}</p>
                             {linkedOrder.orderData.shipping_address.address2 && (
@@ -560,60 +558,54 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                           </div>
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 )}
 
                 {/* Case Items Card */}
                 {caseItems.length > 0 && (
-                  <Card>
-                    <CardHeader className="bg-card-header border-b">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Package className="h-5 w-5" />
-                        Case Items ({caseItems.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="space-y-3">
-                        {caseItems.map((item: any, index: number) => (
-                          <div 
-                            key={item.id || index} 
-                            className="p-3 border rounded-md space-y-2"
-                            data-testid={`case-item-${index}`}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <p className="font-medium" data-testid={`item-product-${index}`}>{item.productName}</p>
-                                <p className="text-sm text-muted-foreground" data-testid={`item-sku-${index}`}>SKU: {item.sku}</p>
-                              </div>
-                              <Badge variant="outline" data-testid={`item-quantity-${index}`}>
-                                Qty: {item.quantity}
-                              </Badge>
+                  <div className="border rounded-lg p-3">
+                    <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                      <Package className="h-3.5 w-3.5" />
+                      Case Items ({caseItems.length})
+                    </h3>
+                    <div className="space-y-1.5">
+                      {caseItems.map((item: any, index: number) => (
+                        <div 
+                          key={item.id || index} 
+                          className="p-2 border rounded space-y-1"
+                          data-testid={`case-item-${index}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium" data-testid={`item-product-${index}`}>{item.productName}</p>
+                              <p className="text-xs text-muted-foreground" data-testid={`item-sku-${index}`}>SKU: {item.sku}</p>
                             </div>
-                            {item.itemNotes && (
-                              <div className="pt-2 border-t">
-                                <label className="text-xs font-medium text-muted-foreground">Notes:</label>
-                                <p className="text-sm mt-1 whitespace-pre-wrap" data-testid={`item-notes-${index}`}>
-                                  {item.itemNotes}
-                                </p>
-                              </div>
-                            )}
+                            <Badge variant="outline" className="text-xs h-5" data-testid={`item-quantity-${index}`}>
+                              Qty: {item.quantity}
+                            </Badge>
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                          {item.itemNotes && (
+                            <div className="pt-1 border-t">
+                              <label className="text-xs text-muted-foreground">Notes:</label>
+                              <p className="text-xs mt-0.5 whitespace-pre-wrap" data-testid={`item-notes-${index}`}>
+                                {item.itemNotes}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
 
                 {/* Linked Items Card */}
-                <Card>
-                  <CardHeader className="bg-card-header border-b">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <LinkIcon className="h-5 w-5" />
-                      Related Items ({relatedEmails.length + relatedOrders.length + relatedRepairs.length + relatedTodos.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-6 space-y-4">
+                <div className="border rounded-lg p-3">
+                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                    <LinkIcon className="h-3.5 w-3.5" />
+                    Related Items ({relatedEmails.length + relatedOrders.length + relatedRepairs.length + relatedTodos.length})
+                  </h3>
+                  <div className="space-y-2.5">
                     {/* Quick Link Section */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Link New Item</label>
@@ -839,69 +831,61 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                     )}
 
                     {relatedEmails.length === 0 && relatedOrders.length === 0 && relatedRepairs.length === 0 && relatedTodos.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-4">
+                      <p className="text-xs text-muted-foreground text-center py-3">
                         No linked items. Use the search above to link emails, orders, repairs, or todos.
                       </p>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
                 {/* Activity Timeline */}
-                <Card>
-                  <CardHeader className="bg-card-header border-b">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <ActivityIcon className="h-5 w-5" />
-                      Activity Timeline
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="space-y-4">
-                      {caseEvents.length > 0 ? (
-                        caseEvents.map((event: any, index: number) => (
-                          <div key={event.id || index} className="flex gap-3">
-                            <div className="flex flex-col items-center">
-                              <div className="w-2 h-2 rounded-full bg-primary mt-1" />
-                              {index < caseEvents.length - 1 && (
-                                <div className="w-0.5 flex-1 bg-border mt-1" />
-                              )}
-                            </div>
-                            <div className="flex-1 pb-4">
-                              <p className="text-sm font-medium">{event.message}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatDateTime(event.createdAt)}
-                              </p>
-                            </div>
+                <div className="border rounded-lg p-3">
+                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                    <ActivityIcon className="h-3.5 w-3.5" />
+                    Activity Timeline
+                  </h3>
+                  <div className="space-y-2">
+                    {caseEvents.length > 0 ? (
+                      caseEvents.map((event: any, index: number) => (
+                        <div key={event.id || index} className="flex gap-2">
+                          <div className="flex flex-col items-center">
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1" />
+                            {index < caseEvents.length - 1 && (
+                              <div className="w-0.5 flex-1 bg-border mt-1" />
+                            )}
                           </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">No activity yet</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                          <div className="flex-1 pb-2">
+                            <p className="text-xs font-medium">{event.message}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDateTime(event.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-3">No activity yet</p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Right Column: Notes */}
-              <div className="space-y-6">
-                <Card className="h-full">
-                  <CardHeader className="bg-card-header border-b">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5" />
-                      Notes & Communication
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="h-[600px]">
-                      {currentUser && (
-                        <NotesPanel
-                          entityType="case"
-                          entityId={caseId}
-                          currentUser={currentUser}
-                        />
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="space-y-2.5">
+                <div className="border rounded-lg p-3 h-full">
+                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Notes & Communication
+                  </h3>
+                  <div className="h-[600px]">
+                    {currentUser && (
+                      <NotesPanel
+                        entityType="case"
+                        entityId={caseId}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
