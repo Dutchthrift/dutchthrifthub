@@ -134,29 +134,30 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
   const linkedRepairIds = caseLinksData.filter((link: any) => link.linkType === "repair").map((link: any) => link.linkedId);
   const linkedTodoIds = caseLinksData.filter((link: any) => link.linkType === "todo").map((link: any) => link.linkedId);
 
+  // Only fetch these lists when user is actively trying to link items
   const { data: allEmailsData = [] } = useQuery<EmailThread[]>({
     queryKey: ["/api/email-threads"],
-    enabled: !!caseId && open && (linkedEmailIds.length > 0 || linkType === "email"),
+    enabled: !!caseId && open && linkType === "email",
   });
 
   const { data: allOrdersData } = useQuery<any>({
-    queryKey: ["/api/orders", { page: 1, limit: 1000 }],
+    queryKey: ["/api/orders", { page: 1, limit: 100 }],
     queryFn: async () => {
-      const response = await fetch("/api/orders?page=1&limit=1000");
+      const response = await fetch("/api/orders?page=1&limit=100");
       if (!response.ok) throw new Error("Failed to fetch orders");
       return response.json();
     },
-    enabled: !!caseId && open && (linkedOrderIds.length > 0 || linkType === "order"),
+    enabled: !!caseId && open && linkType === "order",
   });
 
   const { data: allRepairsData } = useQuery<Repair[]>({
     queryKey: ["/api/repairs"],
-    enabled: !!caseId && open && (linkedRepairIds.length > 0 || linkType === "repair"),
+    enabled: !!caseId && open && linkType === "repair",
   });
 
   const { data: allTodosData } = useQuery<Todo[]>({
     queryKey: ["/api/todos"],
-    enabled: !!caseId && open && (linkedTodoIds.length > 0 || linkType === "todo"),
+    enabled: !!caseId && open && linkType === "todo",
   });
 
   const { data: caseEvents = [] } = useQuery<any[]>({
