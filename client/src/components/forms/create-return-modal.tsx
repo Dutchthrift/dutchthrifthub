@@ -328,20 +328,20 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-hidden flex flex-col p-0" data-testid="create-return-modal">
-        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
-          <DialogTitle>Nieuwe Retour Aanmaken</DialogTitle>
-          <DialogDescription>
-            Selecteer een bestelling en vul de retourinformatie in. Kies optioneel specifieke artikelen om te retourneren.
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col p-0" data-testid="create-return-modal">
+        <DialogHeader className="px-6 pt-4 pb-3 flex-shrink-0">
+          <DialogTitle className="text-lg">Nieuwe Retour Aanmaken</DialogTitle>
+          <DialogDescription className="text-sm">
+            Selecteer een bestelling en vul de retourinformatie in
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="flex-1 px-6 pb-6">
+        <ScrollArea className="flex-1 px-6 pb-4">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               {/* Section 1: Order & Return Details */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground">Bestelling & Retour Details</h3>
+              <div className="space-y-3">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bestelling & Details</h3>
                 
                 <FormField
                   control={form.control}
@@ -419,9 +419,8 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                 />
 
                 {selectedOrder && selectedCustomer && (
-                  <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                    <div className="text-sm font-medium">Klantinformatie</div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="p-2 bg-muted/50 rounded-md">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
                         <span className="text-muted-foreground">Naam:</span>{" "}
                         <span className="font-medium">
@@ -509,36 +508,39 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                   />
                 )}
 
-                <FormField
-                  control={form.control}
-                  name="trackingNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Track & Trace (Optioneel)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Bijv. 3SABCD1234567890"
-                          {...field}
-                          value={field.value || ""}
-                          data-testid="return-tracking-input"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="trackingNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Track & Trace</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Bijv. 3SABCD1234567890"
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="return-tracking-input"
+                            className="h-9"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div></div>
+                </div>
 
                 <FormField
                   control={form.control}
                   name="internalNotes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Interne Notities (Optioneel)</FormLabel>
+                      <FormLabel className="text-sm">Interne Notities</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder="Interne notities over deze retour..."
-                          className="resize-none"
-                          rows={3}
+                          className="resize-none h-16"
                           {...field}
                           value={field.value || ""}
                           data-testid="return-notes-input"
@@ -552,17 +554,14 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
               </div>
 
               {/* Separator */}
-              <Separator className="my-6" />
+              <Separator className="my-3" />
 
               {/* Section 2: Item Selection */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground">Artikelen uit Bestelling</h3>
-                    {!selectedOrderId && (
-                      <p className="text-xs text-muted-foreground mt-1">Selecteer eerst een bestelling om artikelen te zien</p>
-                    )}
-                  </div>
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Artikelen {!selectedOrderId && <span className="text-xs normal-case font-normal ml-2">(selecteer eerst bestelling)</span>}
+                  </h3>
                   {selectedOrderId && orderLineItems.length > 0 && (
                     <Badge variant="outline">
                       {selectedItems.size} van {orderLineItems.length} geselecteerd
@@ -571,13 +570,13 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                 </div>
 
                 {!selectedOrderId ? (
-                  <div className="border rounded-lg p-8 text-center text-muted-foreground bg-muted/30">
-                    <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p>Selecteer een bestelling om artikelen te selecteren</p>
+                  <div className="border rounded-md p-4 text-center text-muted-foreground bg-muted/30">
+                    <Package className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">Selecteer een bestelling</p>
                   </div>
                 ) : orderLineItems.length === 0 ? (
-                  <div className="border rounded-lg p-8 text-center text-muted-foreground">
-                    <p>Geen artikelen gevonden in deze bestelling</p>
+                  <div className="border rounded-md p-4 text-center text-muted-foreground text-sm">
+                    <p>Geen artikelen gevonden</p>
                   </div>
                 ) : (
                   <>
@@ -589,6 +588,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                         onClick={selectAllItems}
                         disabled={!selectedOrderId}
                         data-testid="button-select-all"
+                        className="h-8 text-xs"
                       >
                         Alles Selecteren
                       </Button>
@@ -599,12 +599,13 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                         onClick={deselectAllItems}
                         disabled={!selectedOrderId || selectedItems.size === 0}
                         data-testid="button-deselect-all"
+                        className="h-8 text-xs"
                       >
                         Alles Deselecteren
                       </Button>
                     </div>
 
-                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
                       {orderLineItems.map((lineItem) => {
                         const isSelected = selectedItems.has(lineItem.id);
                         const itemData = selectedItems.get(lineItem.id);
@@ -613,53 +614,54 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                           <div
                             key={lineItem.id}
                             className={cn(
-                              "border rounded-lg p-4 space-y-3 transition-colors",
+                              "border rounded-md p-2 space-y-2 transition-colors",
                               isSelected ? "border-primary bg-primary/5" : "border-border"
                             )}
                           >
-                            <div className="flex items-start gap-3">
+                            <div className="flex items-start gap-2">
                               <Checkbox
                                 checked={isSelected}
                                 onCheckedChange={() => toggleItemSelection(lineItem.id)}
                                 data-testid={`checkbox-item-${lineItem.id}`}
+                                className="mt-1"
                               />
-                              <div className="flex-1">
-                                <div className="font-medium">{lineItem.title}</div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm truncate">{lineItem.title}</div>
                                 {lineItem.variantTitle && (
-                                  <div className="text-sm text-muted-foreground">{lineItem.variantTitle}</div>
+                                  <div className="text-xs text-muted-foreground">{lineItem.variantTitle}</div>
                                 )}
-                                <div className="text-sm text-muted-foreground">
-                                  SKU: {lineItem.sku || "N/A"} • Besteld: {lineItem.quantity} • €{parseFloat(lineItem.price).toFixed(2)}
+                                <div className="text-xs text-muted-foreground">
+                                  SKU: {lineItem.sku || "N/A"} • {lineItem.quantity}x • €{parseFloat(lineItem.price).toFixed(2)}
                                 </div>
                               </div>
                             </div>
 
                             {isSelected && itemData && (
-                              <div className="grid grid-cols-2 gap-3 pl-8">
+                              <div className="grid grid-cols-2 gap-2 pl-6">
                                 <div>
-                                  <label className="text-sm font-medium">Aantal Retour</label>
+                                  <label className="text-xs font-medium">Aantal</label>
                                   <Input
                                     type="number"
                                     min={1}
                                     max={lineItem.quantity}
                                     value={itemData.quantity}
                                     onChange={(e) => updateItemData(lineItem.id, "quantity", parseInt(e.target.value) || 1)}
-                                    className="mt-1"
+                                    className="mt-1 h-8"
                                     data-testid={`input-quantity-${lineItem.id}`}
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-sm font-medium">Conditie *</label>
+                                  <label className="text-xs font-medium">Conditie</label>
                                   <Select
                                     value={itemData.condition}
                                     onValueChange={(value) => updateItemData(lineItem.id, "condition", value)}
                                   >
-                                    <SelectTrigger className="mt-1" data-testid={`select-condition-${lineItem.id}`}>
+                                    <SelectTrigger className="mt-1 h-8" data-testid={`select-condition-${lineItem.id}`}>
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="unopened">Ongeopend</SelectItem>
-                                      <SelectItem value="opened_unused">Geopend, Ongebruikt</SelectItem>
+                                      <SelectItem value="opened_unused">Geopend</SelectItem>
                                       <SelectItem value="used">Gebruikt</SelectItem>
                                       <SelectItem value="damaged">Beschadigd</SelectItem>
                                     </SelectContent>
@@ -676,7 +678,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
               </div>
 
               {/* Footer Actions */}
-              <div className="flex justify-between gap-3 pt-4">
+              <div className="flex justify-between gap-3 pt-3">
                 <Button
                   type="button"
                   variant="outline"
