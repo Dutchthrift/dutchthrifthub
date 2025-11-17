@@ -4073,8 +4073,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get related items
       const relatedItems = await storage.getCaseRelatedItems(id);
 
+      // Return flattened structure with case fields at top level
       res.json({
-        case: caseItem,
+        ...caseItem,
         ...relatedItems,
       });
     } catch (error) {
