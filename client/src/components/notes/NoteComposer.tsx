@@ -55,6 +55,9 @@ export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...
         class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[80px] px-3 py-2 text-sm",
       },
     },
+    onUpdate: () => {
+      // Force re-render when editor content changes
+    },
   });
 
   const handleSubmit = () => {
@@ -274,7 +277,7 @@ export function NoteComposer({ onSubmit, isPending, placeholder = "Add a note...
         <Button
           size="sm"
           onClick={handleSubmit}
-          disabled={isPending || !editor?.getText().trim()}
+          disabled={isPending || !editor || !editor.getText().trim()}
           data-testid="note-composer-submit"
           aria-label="Submit note (Ctrl+Enter)"
         >
