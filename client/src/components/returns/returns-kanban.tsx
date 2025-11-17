@@ -15,7 +15,6 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +43,7 @@ type Return = {
 interface ReturnsKanbanProps {
   returns: Return[];
   isLoading: boolean;
+  onViewReturn: (returnItem: Return) => void;
 }
 
 const STATUS_COLUMNS = [
@@ -97,9 +97,8 @@ const STATUS_COLUMNS = [
   },
 ];
 
-export function ReturnsKanban({ returns, isLoading }: ReturnsKanbanProps) {
+export function ReturnsKanban({ returns, isLoading, onViewReturn }: ReturnsKanbanProps) {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
 
   const updateReturnMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Return> }) => {
@@ -206,8 +205,8 @@ export function ReturnsKanban({ returns, isLoading }: ReturnsKanbanProps) {
     });
   };
 
-  const handleViewReturn = (returnId: string) => {
-    setLocation(`/returns/${returnId}`);
+  const handleViewReturn = (returnItem: Return) => {
+    onViewReturn(returnItem);
   };
 
   const handleDragEnd = (result: DropResult) => {
@@ -294,7 +293,7 @@ export function ReturnsKanban({ returns, isLoading }: ReturnsKanbanProps) {
                               className={`cursor-pointer hover:shadow-md transition-all ${
                                 snapshot.isDragging ? 'shadow-lg rotate-2' : 'bg-card'
                               } ${getPriorityColor(returnItem.priority)}`}
-                              onClick={() => handleViewReturn(returnItem.id)}
+                              onClick={() => handleViewReturn(returnItem)}
                               data-testid={`return-card-${returnItem.id}`}
                             >
                               <CardContent className="p-2.5">
@@ -311,7 +310,7 @@ export function ReturnsKanban({ returns, isLoading }: ReturnsKanbanProps) {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={(e) => {
                               e.stopPropagation();
-                              handleViewReturn(returnItem.id);
+                              handleViewReturn(returnItem);
                             }}>
                               <ExternalLink className="h-3 w-3 mr-2" />
                               Bekijk Details

@@ -352,7 +352,11 @@ export default function Returns() {
             </CardContent>
           </Card>
         ) : (
-          <ReturnsKanban returns={filteredReturns} isLoading={isLoading} />
+          <ReturnsKanban 
+            returns={filteredReturns} 
+            isLoading={isLoading}
+            onViewReturn={handleViewDetails}
+          />
         )}
       </main>
 
