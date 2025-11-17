@@ -398,15 +398,15 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[600px] p-0" data-testid="order-search-popover">
-                          <Command className="max-h-[400px]">
+                        <PopoverContent className="w-[600px] p-0 overflow-hidden" data-testid="order-search-popover">
+                          <Command>
                             <CommandInput 
                               placeholder="Zoek op bestelnummer of email..." 
                               value={orderSearchQuery}
                               onValueChange={setOrderSearchQuery}
                               data-testid="order-search-input"
                             />
-                            <CommandList>
+                            <CommandList className="max-h-[300px]">
                               <CommandEmpty>Geen bestellingen gevonden.</CommandEmpty>
                               <CommandGroup>
                                 {orders.map((order) => (
