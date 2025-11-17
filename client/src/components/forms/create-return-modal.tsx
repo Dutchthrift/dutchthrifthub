@@ -406,7 +406,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                               onValueChange={setOrderSearchQuery}
                               data-testid="order-search-input"
                             />
-                            <CommandList>
+                            <CommandList className="max-h-[300px] overflow-y-auto">
                               <CommandEmpty>Geen bestellingen gevonden.</CommandEmpty>
                               <CommandGroup>
                                 {orders.map((order) => (
