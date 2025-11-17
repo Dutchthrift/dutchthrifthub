@@ -328,15 +328,15 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col" data-testid="create-return-modal">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-hidden flex flex-col p-0" data-testid="create-return-modal">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle>Nieuwe Retour Aanmaken</DialogTitle>
           <DialogDescription>
             Selecteer een bestelling en vul de retourinformatie in. Kies optioneel specifieke artikelen om te retourneren.
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 px-6 pb-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               {/* Section 1: Order & Return Details */}
