@@ -4488,12 +4488,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/notes - Create a new note
   app.post("/api/notes", requireAuth, async (req: any, res: any) => {
     try {
+      console.log("DEBUG: Creating note with body:", JSON.stringify(req.body, null, 2));
+      
       const validatedData = insertNoteSchema.parse({
         ...req.body,
         authorId: req.user.id,
       });
 
+      console.log("DEBUG: Validated data:", JSON.stringify(validatedData, null, 2));
+      
       const note = await storage.createNote(validatedData);
+
+      console.log("DEBUG: Created note:", JSON.stringify(note, null, 2));
 
       await auditLog(req, "CREATE", "notes", note.id, {
         entityType: note.entityType,
@@ -4504,6 +4510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating note:", error);
       if (error instanceof z.ZodError) {
+        console.log("DEBUG: Zod validation error:", JSON.stringify(error.errors, null, 2));
         res.status(400).json({ error: "Invalid note data", details: error.errors });
       } else {
         res.status(400).json({ error: "Failed to create note" });
