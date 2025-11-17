@@ -122,6 +122,11 @@
     @apply font-semibold tracking-tight;
   }
   
+  /* Fix SelectItem visibility - prevent white text on white background */
+  [data-radix-select-viewport] [data-state="checked"] {
+    @apply text-foreground bg-accent;
+  }
+  
   h1 {
     @apply text-3xl md:text-4xl lg:text-5xl;
   }
