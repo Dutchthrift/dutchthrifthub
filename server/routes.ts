@@ -4464,6 +4464,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { entityType, entityId } = req.params;
       const { visibility, tagIds, authorId } = req.query;
 
+      console.log("DEBUG GET: Fetching notes for", entityType, entityId);
+      console.log("DEBUG GET: Filters:", { visibility, tagIds, authorId });
+
       const filters: any = {};
       if (visibility) filters.visibility = visibility;
       if (authorId) filters.authorId = authorId;
@@ -4472,6 +4475,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const notes = await storage.getNotes(entityType, entityId, filters);
+      
+      console.log("DEBUG GET: Found notes:", notes.length);
       
       // Disable caching to ensure fresh data
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
