@@ -4079,13 +4079,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Case not found" });
       }
 
-      // Get related items
-      const relatedItems = await storage.getCaseRelatedItems(id);
+      // Fetch all related data in parallel
+      const [caseItems, caseLinks, caseEvents, caseNotes] = await Promise.all([
+        storage.getCaseItems(id),
+        storage.getCaseLinks(id),
+        storage.getCaseEvents(id),
+        storage.getCaseNotes(id)
+      ]);
 
-      // Return flattened structure with case fields at top level
+      // Return complete case data in one response
       res.json({
         ...caseItem,
-        ...relatedItems,
+        items: caseItems,
+        links: caseLinks,
+        events: caseEvents,
+        notes: caseNotes,
       });
     } catch (error) {
       console.error("Error fetching case:", error);

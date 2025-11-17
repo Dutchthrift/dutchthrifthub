@@ -105,27 +105,15 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
     enabled: !!caseId && open,
   });
 
-  // Fetch case items (selected during case creation)
-  const { data: caseItems = [] } = useQuery<any[]>({
-    queryKey: ["/api/cases", caseId, "items"],
-    enabled: !!caseId && open,
-  });
+  // All data now comes from the main case endpoint
+  const caseItems = caseData?.items || [];
+  const caseLinksData = caseData?.links || [];
+  const caseEvents = caseData?.events || [];
 
   // Fetch the directly linked order (from case.orderId)
   const { data: linkedOrder } = useQuery<any>({
     queryKey: ["/api/orders", caseData?.orderId],
     enabled: !!caseData?.orderId && open,
-  });
-
-  // Fetch case links
-  const { data: caseLinksData = [] } = useQuery<any[]>({
-    queryKey: ["/api/cases", caseId, "links"],
-    queryFn: async () => {
-      const response = await fetch(`/api/cases/${caseId}/links`);
-      if (!response.ok) throw new Error('Failed to fetch case links');
-      return response.json();
-    },
-    enabled: !!caseId && open,
   });
 
   // Extract linked entity IDs by type
@@ -158,11 +146,6 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
   const { data: allTodosData } = useQuery<Todo[]>({
     queryKey: ["/api/todos"],
     enabled: !!caseId && open && linkType === "todo",
-  });
-
-  const { data: caseEvents = [] } = useQuery<any[]>({
-    queryKey: ["/api/cases", caseId, "events"],
-    enabled: !!caseId && open,
   });
 
   const { data: users = [] } = useQuery<any[]>({
