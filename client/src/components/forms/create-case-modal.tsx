@@ -48,7 +48,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertCaseSchema } from "@shared/schema";
 import { z } from "zod";
-import { Check, ChevronsUpDown, Package, Mail } from "lucide-react";
+import { Check, ChevronsUpDown, Package, Mail, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ShopifyLineItem {
@@ -134,6 +134,22 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
       form.reset();
     }
   }, [open, form]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-testid="order-search-input"]') && 
+          !target.closest('[data-testid="order-search-dropdown"]')) {
+        setOrderSearchOpen(false);
+      }
+    };
+
+    if (orderSearchOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [orderSearchOpen]);
 
   // Watch for selected order ID to fetch it separately
   const selectedOrderId = form.watch("orderId");
@@ -408,41 +424,44 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Zoek Bestelling</FormLabel>
-                    <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen} modal={false}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className={cn(
-                              "w-full justify-between",
-                              !field.value && "text-muted-foreground"
-                            )}
-                            data-testid="order-search-button"
-                          >
-                            {field.value
-                              ? orders.find((order: any) => order.id === field.value)?.orderNumber || "Selecteer bestelling"
-                              : "Selecteer bestelling"}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0" align="start">
-                        <Command>
-                          <CommandInput
-                            placeholder="Zoek op ordernummer, naam, email..."
-                            value={orderSearchQuery}
-                            onValueChange={setOrderSearchQuery}
-                            data-testid="order-search-input"
-                          />
-                          <CommandList className="max-h-[300px] overflow-y-auto">
-                            <CommandEmpty>Geen bestellingen gevonden.</CommandEmpty>
-                            <CommandGroup>
+                    <div className="relative">
+                      <FormControl>
+                        <Input
+                          placeholder="Zoek op ordernummer, naam, email..."
+                          value={orderSearchQuery}
+                          onChange={(e) => {
+                            setOrderSearchQuery(e.target.value);
+                            setOrderSearchOpen(true);
+                          }}
+                          onFocus={() => setOrderSearchOpen(true)}
+                          data-testid="order-search-input"
+                          className="pr-10"
+                        />
+                      </FormControl>
+                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      
+                      {orderSearchOpen && (
+                        <div 
+                          className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-[300px] overflow-y-auto"
+                          data-testid="order-search-dropdown"
+                        >
+                          {orders.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-muted-foreground">
+                              Geen bestellingen gevonden.
+                            </div>
+                          ) : (
+                            <div className="p-1">
                               {orders.map((order: any) => (
-                                <CommandItem
+                                <div
                                   key={order.id}
-                                  value={`${order.orderNumber} ${order.customerEmail}`}
-                                  onSelect={() => handleOrderSelect(order.id)}
+                                  onClick={() => {
+                                    handleOrderSelect(order.id);
+                                    setOrderSearchOpen(false);
+                                  }}
+                                  className={cn(
+                                    "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                    field.value === order.id && "bg-accent"
+                                  )}
                                   data-testid={`order-option-${order.orderNumber}`}
                                 >
                                   <Check
@@ -451,19 +470,24 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                                       field.value === order.id ? "opacity-100" : "opacity-0"
                                     )}
                                   />
-                                  <div className="flex flex-col">
+                                  <div className="flex flex-col flex-1">
                                     <span className="font-medium">#{order.orderNumber}</span>
                                     <span className="text-xs text-muted-foreground">
                                       {order.customerEmail} • €{(order.totalAmount / 100).toFixed(2)}
                                     </span>
                                   </div>
-                                </CommandItem>
+                                </div>
                               ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {selectedOrder && (
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Geselecteerd: #{selectedOrder.orderNumber} - €{(selectedOrder.totalAmount / 100).toFixed(2)}
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
