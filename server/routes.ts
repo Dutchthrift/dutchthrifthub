@@ -4472,6 +4472,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const notes = await storage.getNotes(entityType, entityId, filters);
+      
+      // Disable caching to ensure fresh data
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
       res.json(notes);
     } catch (error) {
       console.error("Error fetching notes:", error);
