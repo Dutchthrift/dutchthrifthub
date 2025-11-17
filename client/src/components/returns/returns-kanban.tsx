@@ -106,19 +106,44 @@ export function ReturnsKanban({ returns, isLoading }: ReturnsKanbanProps) {
       const response = await apiRequest("PATCH", `/api/returns/${id}`, data);
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-      toast({
-        title: "Retour bijgewerkt",
-        description: "Status is succesvol gewijzigd",
-      });
+    onMutate: async ({ id, data }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["/api/returns"] });
+
+      // Snapshot the previous value
+      const previousReturns = queryClient.getQueryData<Return[]>(["/api/returns"]);
+
+      // Optimistically update to the new value
+      if (previousReturns) {
+        queryClient.setQueryData<Return[]>(
+          ["/api/returns"],
+          previousReturns.map(r => r.id === id ? { ...r, ...data } : r)
+        );
+      }
+
+      // Return context with previous data for rollback
+      return { previousReturns };
     },
-    onError: () => {
+    onError: (_error, _variables, context) => {
+      // Rollback to previous data on error
+      if (context?.previousReturns) {
+        queryClient.setQueryData(["/api/returns"], context.previousReturns);
+      }
       toast({
         title: "Fout",
         description: "Status kon niet worden bijgewerkt",
         variant: "destructive",
       });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Retour bijgewerkt",
+        description: "Status is succesvol gewijzigd",
+      });
+    },
+    onSettled: () => {
+      // Always refetch after error or success
+      queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
     }
   });
 

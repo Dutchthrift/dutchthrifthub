@@ -7,7 +7,6 @@ import { queryClient } from "@/lib/queryClient";
 import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -135,7 +134,6 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 export default function Returns() {
-  const [currentStatus, setCurrentStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -202,9 +200,7 @@ export default function Returns() {
   }, [location, allReturns, setLocation, toast]);
 
   // Filter by status
-  const returns = currentStatus === "all" 
-    ? allReturns 
-    : allReturns.filter(ret => ret.status === currentStatus);
+  const returns = allReturns;
 
   // Filter returns by search query and priority
   const filteredReturns = returns.filter((ret) => {
@@ -303,32 +299,9 @@ export default function Returns() {
           </CardContent>
         </Card>
 
-        {/* Tabs and Filters Card */}
+        {/* Filters Card */}
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <Tabs value={currentStatus} onValueChange={setCurrentStatus} className="w-full">
-              <TabsList className="mb-4 flex-wrap h-auto">
-                {STATUS_TABS.map((tab) => (
-                  <TabsTrigger
-                    key={tab.value}
-                    value={tab.value}
-                    data-testid={`tab-${tab.value}`}
-                  >
-                    {tab.label}
-                    {tab.value !== "all" && statusCounts[tab.value] > 0 && (
-                      <Badge
-                        variant="secondary"
-                        className="ml-2 h-5 min-w-[20px] rounded-full px-1.5 text-xs"
-                      >
-                        {statusCounts[tab.value]}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-
-            {/* Filters */}
             <div className="flex items-center gap-3">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
