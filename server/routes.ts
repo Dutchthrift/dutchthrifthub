@@ -4457,6 +4457,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NOTES SYSTEM API ROUTES
   // ==========================================
 
+  // Disable ETags for all notes routes to prevent 304 cached responses
+  app.use('/api/notes*', (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('ETag', ''); // Disable ETag
+    next();
+  });
+
   // Core Notes Routes
   // GET /api/notes/:entityType/:entityId - Get all notes for an entity
   app.get("/api/notes/:entityType/:entityId", requireAuth, async (req: any, res: any) => {
@@ -4477,11 +4486,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const notes = await storage.getNotes(entityType, entityId, filters);
       
       console.log("DEBUG GET: Found notes:", notes.length);
-      
-      // Disable caching to ensure fresh data
-      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-      res.set('Pragma', 'no-cache');
-      res.set('Expires', '0');
       
       res.json(notes);
     } catch (error) {
