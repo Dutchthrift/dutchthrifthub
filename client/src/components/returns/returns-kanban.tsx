@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 
 type Return = {
   id: string;
@@ -184,6 +185,31 @@ export function ReturnsKanban({ returns, isLoading }: ReturnsKanbanProps) {
     setLocation(`/returns/${returnId}`);
   };
 
+  const handleDragEnd = (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+
+    // No destination or dropped in same position
+    if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) {
+      return;
+    }
+
+    // Find the return item being dragged
+    const returnItem = returns.find(r => r.id === draggableId);
+    if (!returnItem) return;
+
+    // Get the new status from the destination column
+    const destinationColumn = STATUS_COLUMNS.find(col => col.id === destination.droppableId);
+    if (!destinationColumn || !destinationColumn.statuses[0]) return;
+
+    const newStatus = destinationColumn.statuses[0];
+
+    // Update the return's status
+    updateReturnMutation.mutate({
+      id: returnItem.id,
+      data: { status: newStatus as any }
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3" data-testid="kanban-loading">
@@ -204,36 +230,49 @@ export function ReturnsKanban({ returns, isLoading }: ReturnsKanbanProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3" data-testid="returns-kanban">
-      {columns.map((column) => (
-        <Card key={column.id} className="flex flex-col h-[calc(100vh-240px)]" data-testid={`kanban-column-${column.id}`}>
-          <CardHeader className="pb-2 px-3 pt-3 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${column.color}`}></div>
-                <CardTitle className="text-xs font-medium">{column.title}</CardTitle>
-              </div>
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                {column.returns.length}
-              </Badge>
-            </div>
-          </CardHeader>
-          
-          <ScrollArea className="flex-1 px-3 pb-3">
-            <div className="space-y-2">
-              {column.returns.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-xs">
-                  Geen retours
+    <DragDropContext onDragEnd={handleDragEnd}>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3" data-testid="returns-kanban">
+        {columns.map((column) => (
+          <Card key={column.id} className="flex flex-col h-[calc(100vh-240px)]" data-testid={`kanban-column-${column.id}`}>
+            <CardHeader className="pb-2 px-3 pt-3 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className={`w-2 h-2 rounded-full ${column.color}`}></div>
+                  <CardTitle className="text-xs font-medium">{column.title}</CardTitle>
                 </div>
-              ) : (
-                column.returns.map((returnItem) => (
-                  <Card
-                    key={returnItem.id}
-                    className={`cursor-pointer hover:shadow-md transition-all bg-card ${getPriorityColor(returnItem.priority)}`}
-                    onClick={() => handleViewReturn(returnItem.id)}
-                    data-testid={`return-card-${returnItem.id}`}
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                  {column.returns.length}
+                </Badge>
+              </div>
+            </CardHeader>
+            
+            <Droppable droppableId={column.id}>
+              {(provided, snapshot) => (
+                <ScrollArea className="flex-1 px-3 pb-3">
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`space-y-2 min-h-[100px] ${snapshot.isDraggingOver ? 'bg-primary/5 rounded-md' : ''}`}
                   >
-                    <CardContent className="p-2.5">
+                    {column.returns.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground text-xs">
+                        Geen retours
+                      </div>
+                    ) : (
+                      column.returns.map((returnItem, index) => (
+                        <Draggable key={returnItem.id} draggableId={returnItem.id} index={index}>
+                          {(provided, snapshot) => (
+                            <Card
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className={`cursor-pointer hover:shadow-md transition-all ${
+                                snapshot.isDragging ? 'shadow-lg rotate-2' : 'bg-card'
+                              } ${getPriorityColor(returnItem.priority)}`}
+                              onClick={() => handleViewReturn(returnItem.id)}
+                              data-testid={`return-card-${returnItem.id}`}
+                            >
+                              <CardContent className="p-2.5">
                       <div className="flex items-start justify-between mb-1.5">
                         <h4 className="text-xs font-medium truncate flex-1 mr-1 font-mono">
                           {returnItem.returnNumber}
@@ -353,14 +392,20 @@ export function ReturnsKanban({ returns, isLoading }: ReturnsKanbanProps) {
                           {getPriorityBadge(returnItem.priority)}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))
+                              </CardContent>
+                            </Card>
+                          )}
+                        </Draggable>
+                      ))
+                    )}
+                    {provided.placeholder}
+                  </div>
+                </ScrollArea>
               )}
-            </div>
-          </ScrollArea>
-        </Card>
-      ))}
-    </div>
+            </Droppable>
+          </Card>
+        ))}
+      </div>
+    </DragDropContext>
   );
 }
