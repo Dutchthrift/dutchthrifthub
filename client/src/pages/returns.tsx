@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import type { User } from "@shared/schema";
 import { Navigation } from "@/components/layout/navigation";
 import { queryClient } from "@/lib/queryClient";
-import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText, LayoutGrid, List } from "lucide-react";
+import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -141,7 +141,6 @@ export default function Returns() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showReturnDetails, setShowReturnDetails] = useState(false);
   const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
@@ -264,26 +263,6 @@ export default function Returns() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center border rounded-lg p-1">
-                  <Button
-                    variant={viewMode === "list" ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("list")}
-                    data-testid="button-view-list"
-                    className="h-8"
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "kanban" ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("kanban")}
-                    data-testid="button-view-kanban"
-                    className="h-8"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
-                </div>
                 <Button 
                   onClick={() => setShowCreateModal(true)}
                   data-testid="button-create-return"
@@ -399,83 +378,8 @@ export default function Returns() {
               </p>
             </CardContent>
           </Card>
-        ) : viewMode === "kanban" ? (
-          <ReturnsKanban returns={filteredReturns} isLoading={isLoading} />
         ) : (
-          <div className="space-y-3">
-            {filteredReturns.map((ret) => (
-              <Card 
-                key={ret.id}
-                className="transition-all hover:border-primary/40 hover:shadow-soft cursor-pointer"
-                onClick={() => handleViewDetails(ret)}
-                data-testid={`card-return-${ret.id}`}
-              >
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="font-mono text-sm font-semibold">
-                          {ret.returnNumber}
-                        </span>
-                        <Badge 
-                          variant="outline" 
-                          className={STATUS_COLORS[ret.status] || ""}
-                        >
-                          {getStatusLabel(ret.status)}
-                        </Badge>
-                        {ret.priority && ret.priority !== "medium" && (
-                          <Badge 
-                            variant="outline"
-                            className={PRIORITY_COLORS[ret.priority] || ""}
-                          >
-                            {ret.priority === "low"
-                              ? "Laag"
-                              : ret.priority === "high"
-                              ? "Hoog"
-                              : ret.priority === "urgent"
-                              ? "Urgent"
-                              : ret.priority}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        {ret.trackingNumber && (
-                          <div className="flex items-center gap-1">
-                            <Package className="h-4 w-4" />
-                            <span>{ret.trackingNumber}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>{format(new Date(ret.requestedAt), "dd MMM yyyy")}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      {ret.refundAmount && (
-                        <div className="text-lg font-semibold">
-                          {formatCurrency(ret.refundAmount)}
-                        </div>
-                      )}
-                      {ret.refundStatus && (
-                        <div className="text-xs text-muted-foreground">
-                          {ret.refundStatus === "pending"
-                            ? "In afwachting"
-                            : ret.refundStatus === "processing"
-                            ? "Verwerken"
-                            : ret.refundStatus === "completed"
-                            ? "Voltooid"
-                            : ret.refundStatus === "failed"
-                            ? "Mislukt"
-                            : ret.refundStatus}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <ReturnsKanban returns={filteredReturns} isLoading={isLoading} />
         )}
       </main>
 

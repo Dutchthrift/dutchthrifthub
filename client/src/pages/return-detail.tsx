@@ -591,7 +591,7 @@ export default function ReturnDetail() {
                                   </p>
                                 )}
                               </div>
-                              {item.refundAmount !== null && (
+                              {item.refundAmount != null && (
                                 <div className="text-right">
                                   <p className="text-lg font-medium" data-testid={`text-item-refund-${item.id}`}>
                                     €{item.refundAmount.toFixed(2)}
