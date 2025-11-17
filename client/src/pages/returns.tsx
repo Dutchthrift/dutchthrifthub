@@ -808,19 +808,20 @@ export default function Returns() {
               )}
 
               {/* Tracking Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Tracking Informatie</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Return Tracking */}
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">Retour Tracking</span>
-                      </div>
-                      {enrichedReturnData.tracking.returnTracking.trackingNumber ? (
+              {enrichedReturnData.tracking && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Tracking Informatie</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Return Tracking */}
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">Retour Tracking</span>
+                        </div>
+                        {enrichedReturnData.tracking.returnTracking?.trackingNumber ? (
                         <>
                           <p className="font-mono text-sm">{enrichedReturnData.tracking.returnTracking.trackingNumber}</p>
                           {enrichedReturnData.tracking.returnTracking.expectedReturnDate && (
@@ -866,9 +867,10 @@ export default function Returns() {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               {/* Photos & Evidence */}
-              {enrichedReturnData.photos.length > 0 && (
+              {enrichedReturnData.photos && enrichedReturnData.photos.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
