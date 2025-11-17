@@ -114,6 +114,8 @@ export default function Returns() {
   const { data: enrichedReturnData, isLoading: isLoadingDetails } = useQuery<EnrichedReturnData>({
     queryKey: ["/api/returns", selectedReturn?.id],
     enabled: !!selectedReturn?.id && showReturnDetails,
+    initialData: selectedReturn ? { return: selectedReturn } as EnrichedReturnData : undefined,
+    staleTime: 0, // Always refetch in background
   });
 
   const { data: currentUser } = useQuery<User>({
