@@ -40,7 +40,7 @@ export default function Cases() {
   const [showNewCase, setShowNewCase] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [columns, setColumns] = useState(Object.keys(CASE_STATUS_CONFIG));
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [selectedCase, setSelectedCase] = useState<CaseWithDetails | null>(null);
   const { toast } = useToast();
 
   const { data: cases, isLoading } = useQuery<CaseWithDetails[]>({
@@ -280,7 +280,8 @@ export default function Cases() {
 
   // Context menu handlers
   const handleCaseOpen = (caseId: string) => {
-    setSelectedCaseId(caseId);
+    const caseItem = cases?.find(c => c.id === caseId);
+    if (caseItem) setSelectedCase(caseItem);
   };
 
   const handleCaseArchive = (caseId: string) => {
@@ -346,7 +347,7 @@ export default function Cases() {
             className={`mb-3 cursor-pointer hover:shadow-md transition-shadow ${
               snapshot.isDragging ? "rotate-3 shadow-lg" : ""
             } ${caseItem.archived ? "opacity-60" : ""}`}
-            onClick={() => setSelectedCaseId(caseItem.id)}
+            onClick={() => setSelectedCase(caseItem)}
             data-testid={`case-card-${caseItem.id}`}
           >
             <CardContent className="p-4">
@@ -619,11 +620,12 @@ export default function Cases() {
       </main>
 
       {/* Case Detail Modal */}
-      {selectedCaseId && (
+      {selectedCase && (
         <CaseDetailModal
-          caseId={selectedCaseId}
-          open={!!selectedCaseId}
-          onClose={() => setSelectedCaseId(null)}
+          caseId={selectedCase.id}
+          initialData={selectedCase}
+          open={!!selectedCase}
+          onClose={() => setSelectedCase(null)}
         />
       )}
     </div>

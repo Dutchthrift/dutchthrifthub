@@ -82,11 +82,12 @@ const PRIORITY_OPTIONS = [
 
 interface CaseDetailModalProps {
   caseId: string;
+  initialData?: CaseWithDetails;
   open: boolean;
   onClose: () => void;
 }
 
-export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps) {
+export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDetailModalProps) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -103,6 +104,8 @@ export function CaseDetailModal({ caseId, open, onClose }: CaseDetailModalProps)
   const { data: caseData, isLoading } = useQuery<CaseWithDetails>({
     queryKey: ["/api/cases", caseId],
     enabled: !!caseId && open,
+    initialData: initialData,
+    staleTime: 0, // Always refetch in background
   });
 
   // All data now comes from the main case endpoint
