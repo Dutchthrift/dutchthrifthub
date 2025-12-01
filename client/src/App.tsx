@@ -107,6 +107,17 @@ function Router() {
         )}
       />
 
+      <Route
+        path="/mail"
+        component={(props: any) => (
+          <ProtectedRoute
+            component={Mail}
+            roles={["ADMIN", "SUPPORT"]}
+            {...props}
+          />
+        )}
+      />
+
       {/* Other protected routes */}
       <Route
         path="/orders"
