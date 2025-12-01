@@ -1,62 +1,6 @@
-# Dependencies
 node_modules
 dist
-
-# Environment variables & secrets
-.env
-.env.local
-.env.*.local
-
-# OS files
 .DS_Store
-Thumbs.db
-
-# Build artifacts
 server/public
 vite.config.ts.*
 *.tar.gz
-
-# Local development
-.local/
-.config/
-
-# Database files
-db/
-*.db
-*.sqlite
-
-# Email storage (bevat gevoelige data)
-mail/
-
-# Uploads (user content)
-uploads/
-
-# Logs & debug files
-*.log
-debug_*.log
-sync_output.log
-
-# Debug & test scripts (tijdelijk)
-check*.mjs
-check*.ts
-check*.js
-debug*.ts
-debug*.mjs
-test*.mjs
-query*.mjs
-trigger*.mjs
-sync*.mjs
-fix*.mjs
-full*.mjs
-reset*.ts
-update*.ts
-run*.ts
-
-# Backup files
-*.backup
-
-# Snappymail plugin (external)
-snappymail-plugin/
-
-# Docs folder (if temporary)
-docs/

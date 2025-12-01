@@ -1,0 +1,519 @@
+import { useState, useEffect, useRef } from 'react';
+import { Navigation } from "@/components/layout/navigation";
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    RefreshCw,
+    Search,
+    Reply,
+    Forward,
+    Trash2,
+    Archive,
+    Star,
+    Mail,
+    MailOpen,
+    Paperclip,
+    Link as LinkIcon,
+    Inbox,
+    Send,
+    FileText,
+    Trash
+} from 'lucide-react';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import DOMPurify from 'isomorphic-dompurify';
+import { CreateCaseModal } from '@/components/forms/create-case-modal';
+import { CreateReturnDialog } from '@/components/mail/dialogs/CreateReturnDialog';
+import { CreateRepairDialog } from '@/components/mail/dialogs/CreateRepairDialog';
+import { LinkOrderDialog } from '@/components/mail/dialogs/LinkOrderDialog';
+import { LinkCaseDialog } from '@/components/mail/dialogs/LinkCaseDialog';
+import { LinkReturnDialog } from '@/components/mail/dialogs/LinkReturnDialog';
+import { LinkRepairDialog } from '@/components/mail/dialogs/LinkRepairDialog';
+import { EmailContextMenu } from '@/components/mail/EmailContextMenu';
+
+// Types
+interface Email {
+    id: string;
+    subject: string;
+    fromName: string;
+    fromEmail: string;
+    html?: string;
+    text?: string;
+    date: string;
+    imapUid: number;
+    createdAt: string;
+}
+
+interface EmailDetails extends Email {
+    attachments: Array<{
+        id: string;
+        filename: string;
+        mimeType: string;
+        size: number;
+        storagePath: string;
+    }>;
+    links: Array<{
+        id: string;
+        entityType: 'order' | 'case' | 'return' | 'repair';
+        entityId: string;
+        createdAt: string;
+    }>;
+}
+
+export default function MailPage() {
+    const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeFolder, setActiveFolder] = useState<'inbox' | 'sent' | 'drafts' | 'trash'>('inbox');
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
+
+    // Dialog states
+    const [showCreateCase, setShowCreateCase] = useState(false);
+    const [showCreateReturn, setShowCreateReturn] = useState(false);
+    const [showCreateRepair, setShowCreateRepair] = useState(false);
+    const [showLinkOrder, setShowLinkOrder] = useState(false);
+    const [showLinkCase, setShowLinkCase] = useState(false);
+    const [showLinkReturn, setShowLinkReturn] = useState(false);
+    const [showLinkRepair, setShowLinkRepair] = useState(false);
+
+    // Fetch mail list with infinite scroll
+    const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading: isLoadingList
+    } = useInfiniteQuery<
+        { emails: Email[]; hasMore: boolean },
+        Error,
+        unknown,
+        string[],
+        { date: string; id: string } | undefined
+    >({
+        queryKey: ['emails', activeFolder, searchQuery],
+        queryFn: async ({ pageParam }: { pageParam?: { date: string; id: string } }) => {
+            let url = '/api/mail/list?limit=50';
+
+            if (pageParam) {
+                url += `&before=${encodeURIComponent(pageParam.date)}&beforeId=${pageParam.id}`;
+            }
+
+            const res = await fetch(url, { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to fetch emails');
+            return res.json() as Promise<{ emails: Email[]; hasMore: boolean }>;
+        },
+        getNextPageParam: (lastPage: { emails: Email[]; hasMore: boolean }) => {
+            if (!lastPage.hasMore || lastPage.emails.length === 0) return undefined;
+
+            const lastEmail = lastPage.emails[lastPage.emails.length - 1];
+            return { date: lastEmail.date, id: lastEmail.id };
+        },
+        initialPageParam: undefined
+    });
+
+    // Flatten all pages into single email list
+    const allEmails = data?.pages.flatMap((page: any) => page.emails) || [];
+
+    console.log('[DEBUG] Infinite Query State:', {
+        totalPages: data?.pages.length,
+        totalEmails: allEmails.length,
+        hasNextPage,
+        isFetchingNextPage,
+        lastPage: data?.pages?.[data.pages.length - 1]
+    });
+
+    // Fetch selected email details
+    const { data: emailDetails, isLoading: isLoadingDetails } = useQuery({
+        queryKey: ['email', selectedEmailId],
+        queryFn: async () => {
+            if (!selectedEmailId) return null;
+            const res = await fetch(`/api/mail/${selectedEmailId}`, {
+                credentials: 'include'
+            });
+            if (!res.ok) throw new Error('Failed to fetch email');
+            return res.json() as Promise<EmailDetails>;
+        },
+        enabled: !!selectedEmailId
+    });
+
+    // Refresh mutation
+    const refreshMutation = useMutation({
+        mutationFn: async () => {
+            // First reset
+            await fetch('/api/mail/reset', { method: 'POST', credentials: 'include' });
+
+            // Then refresh (force sync)
+            const res = await fetch('/api/mail/refresh?force=true', {
+                method: 'POST',
+                credentials: 'include'
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'Failed to refresh');
+            }
+            return res.json();
+        },
+        onSuccess: (data: any) => {
+            queryClient.invalidateQueries({ queryKey: ['emails'] });
+            toast({
+                title: "Emails vernieuwd",
+                description: `${data.newMails} nieuwe email(s) gesynchroniseerd`,
+            });
+        },
+        onError: (error: Error) => {
+            toast({
+                title: "Vernieuwen mislukt",
+    ) || [];
+
+            // Mail actions
+            const handleReply = () => {
+                toast({ title: "Antwoorden", description: "Antwoorden functie komt binnenkort" });
+            };
+
+            const handleForward = () => {
+                toast({ title: "Doorsturen", description: "Doorsturen functie komt binnenkort" });
+            };
+
+            const handleDelete = () => {
+                toast({ title: "Verwijderen", description: "Verwijderen functie komt binnenkort" });
+            };
+
+            const handleArchive = () => {
+                toast({ title: "Archiveren", description: "Archiveren functie komt binnenkort" });
+            };
+
+            const handleStar = () => {
+                toast({ title: "Ster", description: "Ster functie komt binnenkort" });
+            };
+
+            const handleMarkRead = () => {
+                toast({ title: "Markeer als gelezen", description: "Markeer als gelezen functie komt binnenkort" });
+            };
+
+            // Intersection Observer for infinite scroll
+            const loadMoreRef = useRef<HTMLDivElement>(null);
+
+            useEffect(() => {
+                const currentRef = loadMoreRef.current;
+                if (!currentRef || !hasNextPage || isFetchingNextPage) return;
+
+                const observer = new IntersectionObserver(
+                    (entries) => {
+                        // Only trigger if element is intersecting AND we can load more
+                        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+                            fetchNextPage();
+                        }
+                    },
+                    {
+                        threshold: 0.1, // Trigger when 10% visible
+                        rootMargin: '100px' // Start loading 100px before element is visible
+                    }
+                );
+
+                observer.observe(currentRef);
+
+                return () => {
+                    if (currentRef) {
+                        observer.unobserve(currentRef);
+                    }
+                    observer.disconnect();
+                };
+            }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+            return (
+                <div className="min-h-screen bg-background">
+                    <Navigation />
+
+                    <main className="container mx-auto px-4 py-6">
+                        {/* Header */}
+                        <div className="bg-card rounded-lg p-6 mb-6 border">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                <div>
+                                    <h1 className="text-3xl font-bold tracking-tight">Mail</h1>
+                                    <p className="text-muted-foreground">Beheer je emails en koppel ze aan orders, cases, retours en reparaties</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        onClick={() => refreshMutation.mutate()}
+                                        disabled={refreshMutation.isPending}
+                                        variant="default"
+                                    >
+                                        <RefreshCw className={`mr-2 h-4 w-4 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+                                        {refreshMutation.isPending ? 'Synchroniseren...' : 'Vernieuwen'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Mail Layout */}
+                        <div className="flex gap-4">
+                            {/* Sidebar - Mail List */}
+                            <Card className="w-80 flex-shrink-0">
+                                <CardContent className="p-4 flex flex-col gap-3 h-[calc(100vh-280px)]">
+                                    {/* Folder Tabs */}
+                                    <Tabs value={activeFolder} onValueChange={(value) => setActiveFolder(value as any)}>
+                                        <TabsList className="grid w-full grid-cols-2 mb-2">
+                                            <TabsTrigger value="inbox" className="text-xs gap-1">
+                                                <Inbox className="h-3 w-3" />
+                                                Postvak IN
+                                            </TabsTrigger>
+                                            <TabsTrigger value="sent" className="text-xs gap-1">
+                                                <Send className="h-3 w-3" />
+                                                Verzonden
+                                            </TabsTrigger>
+                                        </TabsList>
+                                        <TabsList className="grid w-full grid-cols-2">
+                                            <TabsTrigger value="drafts" className="text-xs gap-1">
+                                                <FileText className="h-3 w-3" />
+                                                Concepten
+                                            </TabsTrigger>
+                                            <TabsTrigger value="trash" className="text-xs gap-1">
+                                                <Trash className="h-3 w-3" />
+                                                Prullenbak
+                                            </TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
+
+                                    {/* Search */}
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                            type="text"
+                                            placeholder="Zoek emails..."
+                                            value={searchQuery}
+                                            onChange={e => setSearchQuery(e.target.value)}
+                                            className="pl-10"
+                                        />
+                                    </div>
+
+                                    {/* Mail List */}
+                                    <div className="flex-1 overflow-auto space-y-1">
+                                        {isLoadingList ? (
+                                            <div className="flex justify-center py-8">
+                                                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                                            </div>
+                                        ) : activeFolder !== 'inbox' ? (
+                                            <div className="text-center py-8 text-muted-foreground text-sm">
+                                                <div className="mb-2">
+                                                    {activeFolder === 'sent' && <Send className="h-8 w-8 mx-auto mb-2 opacity-30" />}
+                                                    {activeFolder === 'drafts' && <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />}
+                                                    {activeFolder === 'trash' && <Trash className="h-8 w-8 mx-auto mb-2 opacity-30" />}
+                                                </div>
+                                                Nog niet beschikbaar
+                                            </div>
+                                        ) : filteredEmails.length === 0 && !isLoadingList ? (
+                                            <div className="text-center py-8 text-muted-foreground text-sm">
+                                                Geen emails gevonden
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {filteredEmails.map((email: Email) => (
+                                                    <div
+                                                        key={email.id}
+                                                        onClick={() => setSelectedEmailId(email.id)}
+                                                        className={`p-3 rounded-lg cursor-pointer transition-colors border ${selectedEmailId === email.id
+                                                            ? 'bg-primary/10 border-primary'
+                                                            : 'hover:bg-muted border-transparent'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-start justify-between mb-1">
+                                                            <span className="font-semibold text-sm line-clamp-1">
+                                                                {email.fromName || email.fromEmail}
+                                                            </span>
+                                                            <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+                                                                {new Date(email.date).toLocaleDateString('nl-NL')}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-sm line-clamp-1 mb-1">
+                                                            {email.subject || '(Geen onderwerp)'}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground line-clamp-1">
+                                                            {email.fromEmail}
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                                {/* Infinite scroll trigger */}
+                                                {hasNextPage && (
+                                                    <div ref={loadMoreRef} className="py-4 text-center">
+                                                        {isFetchingNextPage ? (
+                                                            <RefreshCw className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">Scrollen voor meer...</span>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* End of emails */}
+                                                {!hasNextPage && filteredEmails.length > 0 && (
+                                                    <div className="py-4 text-center text-xs text-muted-foreground">
+                                                        Geen oudere emails
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Email Viewer */}
+                            <Card className="flex-1">
+                                <CardContent className="p-0">
+                                    {!selectedEmailId ? (
+                                        <div className="flex items-center justify-center h-[calc(100vh-280px)] text-muted-foreground">
+                                            <div className="text-center">
+                                                <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                                <p className="text-lg font-medium">Selecteer een email om te bekijken</p>
+                                                <p className="text-sm mt-1">Kies een email uit de lijst om de inhoud te lezen</p>
+                                            </div>
+                                        </div>
+                                    ) : isLoadingDetails ? (
+                                        <div className="flex justify-center items-center h-[calc(100vh-280px)]">
+                                            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                                        </div>
+                                    ) : emailDetails ? (
+                                        <div className="flex flex-col h-[calc(100vh-280px)]">
+                                            {/* Email Header */}
+                                            <div className="p-6 border-b bg-muted/30">
+                                                <h2 className="text-2xl font-bold mb-3">
+                                                    {emailDetails.subject || '(Geen onderwerp)'}
+                                                </h2>
+                                                <div className="flex items-start justify-between mb-4">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-semibold">{emailDetails.fromName || 'Onbekend'}</span>
+                                                            <Badge variant="outline" className="text-xs">
+                                                                {emailDetails.fromEmail}
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {new Date(emailDetails.date).toLocaleString('nl-NL')}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Action Buttons */}
+                                                <div className="flex gap-2 flex-wrap">
+                                                    <Button onClick={handleReply} size="sm" variant="default">
+                                                        <Reply className="mr-2 h-4 w-4" />
+                                                        Beantwoorden
+                                                    </Button>
+                                                    <Button onClick={handleForward} size="sm" variant="outline">
+                                                        <Forward className="mr-2 h-4 w-4" />
+                                                        Doorsturen
+                                                    </Button>
+                                                    <Button onClick={handleArchive} size="sm" variant="outline">
+                                                        <Archive className="mr-2 h-4 w-4" />
+                                                        Archiveren
+                                                    </Button>
+                                                    <Button onClick={handleDelete} size="sm" variant="outline">
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        Verwijderen
+                                                    </Button>
+                                                    <Button onClick={handleStar} size="sm" variant="outline">
+                                                        <Star className="mr-2 h-4 w-4" />
+                                                        Markeren
+                                                    </Button>
+                                                    <Button onClick={handleMarkRead} size="sm" variant="outline">
+                                                        <MailOpen className="mr-2 h-4 w-4" />
+                                                        Als gelezen
+                                                    </Button>
+                                                </div>
+                                            </div>
+
+                                            {/* Email Body */}
+                                            <div className="flex-1 overflow-auto p-6">
+                                                {emailDetails.html ? (
+                                                    <div
+                                                        className="prose prose-sm max-w-none dark:prose-invert"
+                                                        dangerouslySetInnerHTML={{
+                                                            __html: DOMPurify.sanitize(emailDetails.html, {
+                                                                ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'img', 'div', 'span', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th'],
+                                                                ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'style']
+                                                            })
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <pre className="whitespace-pre-wrap font-sans text-sm">
+                                                        {emailDetails.text || '(Geen inhoud)'}
+                                                    </pre>
+                                                )}
+
+                                                {/* Attachments */}
+                                                {emailDetails.attachments && emailDetails.attachments.length > 0 && (
+                                                    <div className="mt-6 pt-6 border-t">
+                                                        <h3 className="font-semibold mb-3 flex items-center gap-2">
+                                                            <Paperclip className="h-4 w-4" />
+                                                            Bijlagen ({emailDetails.attachments.length})
+                                                        </h3>
+                                                        <div className="space-y-2">
+                                                            {emailDetails.attachments.map(att => (
+                                                                <div key={att.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Paperclip className="h-4 w-4 text-muted-foreground" />
+                                                                        <div>
+                                                                            <div className="font-medium text-sm">{att.filename}</div>
+                                                                            <div className="text-xs text-muted-foreground">
+                                                                                {(att.size / 1024).toFixed(1)} KB
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={async () => {
+                                                                            try {
+                                                                                const res = await fetch(`/api/mail/attachments/${att.id}/download`, {
+                                                                                    credentials: 'include'
+                                                                                });
+                                                                                const data = await res.json();
+                                                                                toast({
+                                                                                    title: "Download",
+                                                                                    description: data.message || "Attachment download coming soon",
+                                                                                });
+                                                                            } catch (error) {
+                                                                                toast({
+                                                                                    title: "Download failed",
+                                                                                    description: "Could not download attachment",
+                                                                                    variant: "destructive"
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        Downloaden
+                                                                    </Button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Linked Entities */}
+                                                {emailDetails.links && emailDetails.links.length > 0 && (
+                                                    <div className="mt-6 pt-6 border-t">
+                                                        <h3 className="font-semibold mb-3 flex items-center gap-2">
+                                                            <LinkIcon className="h-4 w-4" />
+                                                            Gekoppeld aan ({emailDetails.links.length})
+                                                        </h3>
+                                                        <div className="flex gap-2 flex-wrap">
+                                                            {emailDetails.links.map(link => (
+                                                                <Badge key={link.id} variant="secondary" className="px-3 py-1">
+                                                                    {link.entityType.toUpperCase()}: {link.entityId}
+                                                                </Badge>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </main>
+                </div>
+            );
+        }

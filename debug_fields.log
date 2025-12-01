@@ -1,0 +1,56 @@
+{
+  "__type": {
+    "name": "ReturnLineItemType",
+    "fields": [
+      {
+        "name": "customerNote",
+        "type": {
+          "name": "String",
+          "kind": "SCALAR"
+        }
+      },
+      {
+        "name": "id",
+        "type": {
+          "name": null,
+          "kind": "NON_NULL"
+        }
+      },
+      {
+        "name": "quantity",
+        "type": {
+          "name": null,
+          "kind": "NON_NULL"
+        }
+      },
+      {
+        "name": "refundableQuantity",
+        "type": {
+          "name": null,
+          "kind": "NON_NULL"
+        }
+      },
+      {
+        "name": "refundedQuantity",
+        "type": {
+          "name": null,
+          "kind": "NON_NULL"
+        }
+      },
+      {
+        "name": "returnReason",
+        "type": {
+          "name": null,
+          "kind": "NON_NULL"
+        }
+      },
+      {
+        "name": "returnReasonNote",
+        "type": {
+          "name": null,
+          "kind": "NON_NULL"
+        }
+      }
+    ]
+  }
+}
