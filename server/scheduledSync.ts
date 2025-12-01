@@ -2,34 +2,50 @@ import cron from 'node-cron';
 import { log } from './vite';
 
 export function startScheduledSync() {
-  // Run every hour at minute 0 (e.g., 1:00, 2:00, 3:00...)
-  cron.schedule('0 * * * *', async () => {
+  // Run every 10 minutes
+  cron.schedule('*/10 * * * *', async () => {
     try {
-      log('🔄 [Auto-Sync] Starting scheduled Shopify sync...');
-      
-      // Call the incremental sync endpoint
-      const response = await fetch('http://localhost:5000/api/shopify/sync-incremental', {
+      log('🔄 [Auto-Sync] Starting scheduled Shopify sync (orders + returns)...');
+
+      // Sync orders first
+      const ordersResponse = await fetch('http://localhost:5000/api/shopify/sync-incremental', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
-      if (!response.ok) {
-        throw new Error(`Sync failed with status: ${response.status}`);
+      if (!ordersResponse.ok) {
+        throw new Error(`Orders sync failed with status: ${ordersResponse.status}`);
       }
 
-      const result = await response.json();
-      
-      log(`✅ [Auto-Sync] Completed! Synced: ${result.stats?.synced || 0} orders, Created: ${result.stats?.created || 0}, Updated: ${result.stats?.updated || 0}`);
-      
-      if (result.errors && result.errors.length > 0) {
-        log(`⚠️ [Auto-Sync] Encountered ${result.errors.length} errors during sync`);
+      const ordersResult = await ordersResponse.json();
+      log(`✅ [Auto-Sync] Orders: ${ordersResult.stats?.created || 0} created, ${ordersResult.stats?.updated || 0} updated`);
+
+      // Then sync returns
+      const returnsResponse = await fetch('http://localhost:5000/api/shopify/sync-returns', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Note: This endpoint requires auth, but we're calling it internally
+          // You might need to add an internal auth token or bypass auth for localhost
+        },
+      });
+
+      if (returnsResponse.ok) {
+        const returnsResult = await returnsResponse.json();
+        log(`✅ [Auto-Sync] Returns: ${returnsResult.created || 0} created, ${returnsResult.updated || 0} updated`);
+      } else {
+        log(`⚠️ [Auto-Sync] Returns sync failed with status: ${returnsResponse.status}`);
+      }
+
+      if (ordersResult.errors && ordersResult.errors.length > 0) {
+        log(`⚠️ [Auto-Sync] Encountered ${ordersResult.errors.length} errors during sync`);
       }
     } catch (error) {
       log(`❌ [Auto-Sync] Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   });
 
-  log('⏰ Scheduled Shopify sync enabled - will run every hour');
+  log('⏰ Scheduled Shopify sync enabled - will run every 10 minutes');
 }

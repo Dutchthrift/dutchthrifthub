@@ -4,54 +4,70 @@
 
 :root {
   /* ========== FOUNDATION - WARM & CLEAN ========== */
-  --background: hsl(0 0% 97.25%);          /* #F8F8F8 */
-  --foreground: hsl(0 0% 11%);             /* #1C1C1C */
-  --card: hsl(0 0% 100%);                  /* Pure white */
+  --background: hsl(0 0% 97.25%);
+  /* #F8F8F8 */
+  --foreground: hsl(0 0% 11%);
+  /* #1C1C1C */
+  --card: hsl(0 0% 100%);
+  /* Pure white */
   --card-foreground: hsl(0 0% 11%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(0 0% 11%);
-  
+
   /* ========== PRIMARY - VIBRANT ORANGE ========== */
-  --primary: 24 100% 50%;                  /* #FF6600 */
+  --primary: 24 100% 50%;
+  /* #FF6600 */
   --primary-foreground: hsl(0 0% 100%);
-  
+
   /* ========== BRAND ORANGE (Shopify-style) ========== */
-  --brand-orange-100: #FEF3C7;             /* Light background */
-  --brand-orange-600: #F59E0B;             /* Primary accent */
-  --brand-orange-700: #D97706;             /* Hover/active */
-  
+  --brand-orange-100: #FEF3C7;
+  /* Light background */
+  --brand-orange-600: #F59E0B;
+  /* Primary accent */
+  --brand-orange-700: #D97706;
+  /* Hover/active */
+
   /* ========== NEUTRALS - CLEAN GRAYS ========== */
   --secondary: hsl(0 0% 94%);
   --secondary-foreground: hsl(0 0% 11%);
   --muted: hsl(0 0% 96%);
-  --muted-foreground: hsl(0 0% 45%);       /* Medium gray */
+  --muted-foreground: hsl(0 0% 45%);
+  /* Medium gray */
   --accent: hsl(0 0% 94%);
   --accent-foreground: hsl(0 0% 11%);
-  
+
   /* ========== TEXT COLORS ========== */
-  --text-primary: hsl(0 0% 11%);           /* #1C1C1C */
-  --text-secondary: hsl(0 0% 70%);         /* #B3B3B3 */
-  
+  --text-primary: hsl(0 0% 11%);
+  /* #1C1C1C */
+  --text-secondary: hsl(0 0% 70%);
+  /* #B3B3B3 */
+
   /* ========== STATUS COLORS - NO BLUE/PURPLE ========== */
-  --destructive: hsl(0 84% 60%);           /* Red */
+  --destructive: hsl(0 84% 60%);
+  /* Red */
   --destructive-foreground: hsl(0 0% 100%);
-  --success: hsl(142 71% 45%);             /* Green */
+  --success: hsl(142 71% 45%);
+  /* Green */
   --success-foreground: hsl(0 0% 100%);
-  --warning: hsl(38 92% 50%);              /* Amber */
+  --warning: hsl(38 92% 50%);
+  /* Amber */
   --warning-foreground: hsl(0 0% 11%);
-  
+
   /* ========== BORDERS & INPUTS ========== */
   --border: hsl(0 0% 89%);
   --input: hsl(0 0% 100%);
-  --ring: 24 100% 50%;                     /* Orange focus ring */
-  
+  --ring: 24 100% 50%;
+  /* Orange focus ring */
+
   /* ========== SIDEBAR COLORS ========== */
   --sidebar-bg: hsla(0 0% 100% / 0.95);
-  --sidebar-foreground: hsl(0 0% 20%);     /* Dark gray text */
-  --sidebar-accent: hsl(24 100% 50%);      /* Orange active */
+  --sidebar-foreground: hsl(0 0% 20%);
+  /* Dark gray text */
+  --sidebar-accent: hsl(24 100% 50%);
+  /* Orange active */
   --sidebar-accent-foreground: hsl(0 0% 100%);
   --sidebar-border: hsl(0 0% 89%);
-  
+
   /* ========== DESIGN TOKENS ========== */
   --radius: 0.75rem;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
@@ -59,22 +75,28 @@
 
 .dark {
   /* ========== FOUNDATION - DEEP NEUTRAL ========== */
-  --background: hsl(0 0% 5.5%);            /* #0E0E0E */
-  --foreground: hsl(0 0% 93%);             /* #EDEDED */
+  --background: hsl(0 0% 5.5%);
+  /* #0E0E0E */
+  --foreground: hsl(0 0% 93%);
+  /* #EDEDED */
   --card: hsl(0 0% 10%);
   --card-foreground: hsl(0 0% 93%);
   --popover: hsl(0 0% 10%);
   --popover-foreground: hsl(0 0% 93%);
-  
+
   /* ========== PRIMARY - VIBRANT ORANGE ========== */
-  --primary: 24 100% 55%;                  /* Slightly brighter for dark */
+  --primary: 24 100% 55%;
+  /* Slightly brighter for dark */
   --primary-foreground: hsl(0 0% 100%);
-  
+
   /* ========== BRAND ORANGE (Shopify-style) ========== */
-  --brand-orange-100: #451A03;             /* Dark background */
-  --brand-orange-600: #F59E0B;             /* Primary accent */
-  --brand-orange-700: #FBBF24;             /* Hover/active (lighter for dark mode) */
-  
+  --brand-orange-100: #451A03;
+  /* Dark background */
+  --brand-orange-600: #F59E0B;
+  /* Primary accent */
+  --brand-orange-700: #FBBF24;
+  /* Hover/active (lighter for dark mode) */
+
   /* ========== NEUTRALS - DARK GRAYS ========== */
   --secondary: hsl(0 0% 14%);
   --secondary-foreground: hsl(0 0% 93%);
@@ -82,11 +104,13 @@
   --muted-foreground: hsl(0 0% 60%);
   --accent: hsl(0 0% 14%);
   --accent-foreground: hsl(0 0% 93%);
-  
+
   /* ========== TEXT COLORS ========== */
-  --text-primary: hsl(0 0% 93%);           /* #EDEDED */
-  --text-secondary: hsl(0 0% 70%);         /* #B3B3B3 */
-  
+  --text-primary: hsl(0 0% 93%);
+  /* #EDEDED */
+  --text-secondary: hsl(0 0% 70%);
+  /* #B3B3B3 */
+
   /* ========== STATUS COLORS ========== */
   --destructive: hsl(0 84% 65%);
   --destructive-foreground: hsl(0 0% 100%);
@@ -94,15 +118,17 @@
   --success-foreground: hsl(0 0% 100%);
   --warning: hsl(38 92% 55%);
   --warning-foreground: hsl(0 0% 5.5%);
-  
+
   /* ========== BORDERS & INPUTS ========== */
   --border: hsl(0 0% 18%);
   --input: hsl(0 0% 12%);
   --ring: 24 100% 55%;
-  
+
   /* ========== SIDEBAR COLORS - HIGH CONTRAST ========== */
-  --sidebar-bg: hsla(0 0% 8% / 0.55);      /* Translucent dark with blur */
-  --sidebar-foreground: hsl(0 0% 80%);     /* Light gray for readability */
+  --sidebar-bg: hsla(0 0% 8% / 0.55);
+  /* Translucent dark with blur */
+  --sidebar-foreground: hsl(0 0% 80%);
+  /* Light gray for readability */
   --sidebar-accent: hsl(24 100% 55%);
   --sidebar-accent-foreground: hsl(0 0% 100%);
   --sidebar-border: hsl(0 0% 18%);
@@ -117,59 +143,65 @@
     @apply font-sans antialiased bg-background text-foreground;
     letter-spacing: -0.011em;
   }
-  
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold tracking-tight;
   }
-  
+
   /* Fix SelectItem visibility - prevent white text on white background */
   [data-radix-select-viewport] [data-state="checked"] {
     @apply text-foreground bg-accent;
   }
-  
+
   h1 {
     @apply text-3xl md:text-4xl lg:text-5xl;
   }
-  
+
   h2 {
     @apply text-2xl md:text-3xl lg:text-4xl;
   }
-  
+
   h3 {
     @apply text-xl md:text-2xl;
   }
-  
+
   h4 {
     @apply text-lg md:text-xl;
   }
 }
 
 @layer components {
+
   /* ========== SHADOW SYSTEM ========== */
   .shadow-soft {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
   }
-  
+
   .shadow-card {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
   }
-  
+
   .shadow-card-hover {
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12), 0 3px 6px rgba(0, 0, 0, 0.08);
   }
-  
+
   .shadow-modal {
     box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18), 0 12px 24px rgba(0, 0, 0, 0.12);
   }
-  
+
   .shadow-orange {
     box-shadow: 0 8px 24px rgba(255, 102, 0, 0.25);
   }
-  
+
   .dark .shadow-orange {
     box-shadow: 0 8px 24px rgba(255, 102, 0, 0.35);
   }
-  
+
   /* ========== GLASSMORPHISM ========== */
   .glass {
     background: rgba(255, 255, 255, 0.7);
@@ -177,109 +209,116 @@
     -webkit-backdrop-filter: blur(14px);
     border: 1px solid rgba(255, 255, 255, 0.2);
   }
-  
+
   .dark .glass {
     background: rgba(20, 20, 20, 0.55);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
-  
+
   .glass-strong {
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
   }
-  
+
   .dark .glass-strong {
     background: rgba(20, 20, 20, 0.75);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
   }
-  
+
   /* ========== SIDEBAR SPECIFIC ========== */
   .sidebar-glass {
     background: var(--sidebar-bg);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
   }
-  
+
   /* ========== ANIMATIONS ========== */
   .animate-fade-in {
     animation: fadeIn 0.2s ease-out;
   }
-  
+
   .animate-slide-in {
     animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  
+
   .animate-scale-in {
     animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  
+
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
   }
-  
+
   @keyframes slideIn {
     from {
       opacity: 0;
       transform: translateX(-10px);
     }
+
     to {
       opacity: 1;
       transform: translateX(0);
     }
   }
-  
+
   @keyframes scaleIn {
     from {
       opacity: 0;
       transform: scale(0.96);
     }
+
     to {
       opacity: 1;
       transform: scale(1);
     }
   }
-  
+
   /* ========== INTERACTIVE ELEMENTS ========== */
   .card-interactive {
     @apply transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5;
   }
-  
+
   .btn-primary {
     @apply bg-[#FF6600] text-white hover:bg-[#FF6600]/90 shadow-soft hover:shadow-orange transition-all duration-300;
   }
-  
+
   .btn-secondary {
     @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all duration-300;
   }
-  
+
   .btn-ghost {
     @apply hover:bg-accent hover:text-accent-foreground transition-all duration-300;
   }
-  
+
   .btn-danger {
     @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all duration-300;
   }
-  
+
   /* ========== FOCUS STATES ========== */
   .focus-ring {
     @apply focus:outline-none focus:ring-2 focus:ring-[#FF6600] focus:ring-offset-2 focus:ring-offset-background;
   }
-  
+
   .focus-ring-inset {
     @apply focus:outline-none focus:ring-2 focus:ring-[#FF6600] focus:ring-inset;
   }
-  
+
   /* ========== MOBILE OPTIMIZATIONS ========== */
   @media (max-width: 768px) {
     .mobile-overlay {
       @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-fade-in;
     }
-    
+
     .mobile-drawer {
       @apply fixed inset-y-0 left-0 w-64 z-50 animate-slide-in;
     }

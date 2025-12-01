@@ -1,82 +1,54 @@
-import { Wrench, Plus, Search, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Plus, Package, ShoppingCart, FileText } from "lucide-react";
+import { useLocation } from "wouter";
 
 interface QuickActionsWidgetProps {
-  onOpenTodo?: () => void;
-  onOpenRepair?: () => void;
+  onOpenReturn?: () => void;
 }
 
-export function QuickActionsWidget({ onOpenTodo, onOpenRepair }: QuickActionsWidgetProps) {
-  const quickActions = [
+export function QuickActionsWidget({ onOpenReturn }: QuickActionsWidgetProps) {
+  const [, setLocation] = useLocation();
+
+  const actions = [
     {
-      id: "new-repair",
-      title: "Start New Repair",
-      description: "Create repair request",
-      icon: Wrench,
-      color: "bg-primary/10 text-primary",
-      action: () => {
-        onOpenRepair?.();
-      }
+      label: "Create Return",
+      icon: Package,
+      color: "bg-blue-500 hover:bg-blue-600",
+      onClick: () => setLocation('/returns'),
     },
     {
-      id: "new-todo",
-      title: "Create To-do",
-      description: "Add new task",
-      icon: Plus,
-      color: "bg-chart-2/10 text-chart-2",
-      action: () => {
-        onOpenTodo?.();
-      }
+      label: "View All Returns",
+      icon: FileText,
+      color: "bg-purple-500 hover:bg-purple-600",
+      onClick: () => setLocation('/returns'),
     },
     {
-      id: "search-orders",
-      title: "Search Orders",
-      description: "Find customer orders",
-      icon: Search,
-      color: "bg-chart-4/10 text-chart-4",
-      action: () => {
-        // TODO: Navigate to orders with search focus
-        console.log("Navigating to orders search");
-      }
+      label: "View Orders",
+      icon: ShoppingCart,
+      color: "bg-green-500 hover:bg-green-600",
+      onClick: () => setLocation('/orders'),
     },
-    {
-      id: "compose-email",
-      title: "Compose Email",
-      description: "Send customer email",
-      icon: Mail,
-      color: "bg-chart-1/10 text-chart-1",
-      action: () => {
-        // TODO: Open email composer
-        console.log("Opening email composer");
-      }
-    }
   ];
 
   return (
-    <Card data-testid="quick-actions-widget">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-lg font-medium">Quick Actions</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Plus className="h-5 w-5" />
+          Quick Actions
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-          {quickActions.map((action) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {actions.map((action) => (
             <Button
-              key={action.id}
-              variant="outline"
-              className="h-auto p-4 justify-start text-left"
-              onClick={action.action}
-              data-testid={`quick-action-${action.id}`}
+              key={action.label}
+              onClick={action.onClick}
+              className={`${action.color} text-white h-auto py-4 flex flex-col items-center gap-2`}
             >
-              <div className="flex items-center space-x-3 w-full">
-                <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${action.color}`}>
-                  <action.icon className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{action.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{action.description}</p>
-                </div>
-              </div>
+              <action.icon className="h-6 w-6" />
+              <span className="text-sm font-medium">{action.label}</span>
             </Button>
           ))}
         </div>

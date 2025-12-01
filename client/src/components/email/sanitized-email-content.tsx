@@ -18,100 +18,16 @@ export function SanitizedEmailContent({ body, isHtml, encoding }: SanitizedEmail
     );
   }
 
-  const decodeEmailBody = (rawData: string, transferEncoding?: string): string => {
-    let decoded = rawData;
-
-    // Step 1: Remove multipart boundaries and MIME headers first
-    // This prevents them from interfering with decoding
-    const lines = decoded.split('\n');
-    const cleanedLines: string[] = [];
-    let skipUntilEmpty = false;
-    let inMimeHeaders = true;
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmedLine = line.trim();
-      
-      // Skip multipart boundaries
-      if (trimmedLine.startsWith('--') && trimmedLine.length > 10) {
-        skipUntilEmpty = true;
-        continue;
-      }
-      
-      // Skip MIME headers at the beginning
-      if (inMimeHeaders) {
-        if (trimmedLine === '') {
-          inMimeHeaders = false;
-          continue;
-        }
-        if (trimmedLine.match(/^[A-Za-z-]+:\s*.+/)) {
-          continue;
-        }
-        inMimeHeaders = false;
-      }
-      
-      // Skip lines after boundary until we hit content
-      if (skipUntilEmpty) {
-        if (trimmedLine === '' || trimmedLine.match(/^[A-Za-z-]+:\s*.+/)) {
-          continue;
-        }
-        skipUntilEmpty = false;
-      }
-      
-      // Skip standalone MIME headers anywhere in content
-      if (trimmedLine.match(/^(Content-Type|Content-Transfer-Encoding|Content-Disposition|Mime-Version|charset):/i)) {
-        continue;
-      }
-      
-      cleanedLines.push(line);
-    }
-    
-    decoded = cleanedLines.join('\n').trim();
-
-    // Step 2: Base64 decode if needed
-    if (transferEncoding?.toLowerCase() === 'base64' || 
-        (!decoded.includes('<') && !decoded.includes('=') && decoded.length > 100 && /^[A-Za-z0-9+/=\s]+$/.test(decoded.substring(0, 200)))) {
-      try {
-        const cleanBase64 = decoded.replace(/\s/g, '');
-        if (cleanBase64.length > 0) {
-          decoded = decodeBase64(cleanBase64);
-        }
-      } catch (e) {
-        console.error('Error decoding base64:', e);
-      }
-    }
-
-    // Step 3: Quoted-printable decode if detected
-    if (transferEncoding?.toLowerCase() === 'quoted-printable' ||
-        decoded.includes('=0A') || decoded.includes('=3D') || /=[0-9A-F]{2}/.test(decoded)) {
-      try {
-        decoded = decodeQuotedPrintable(decoded);
-      } catch (e) {
-        console.error('Error decoding quoted-printable:', e);
-      }
-    }
-
-    // Step 4: Remove any remaining MIME artifacts
-    decoded = decoded.replace(/--[a-zA-Z0-9_-]{10,}(--)?[\r\n]*/g, '');
-    decoded = decoded.replace(/^(Content-Type|Content-Transfer-Encoding|Content-Disposition|Mime-Version):[^\n]*\n?/gim, '');
-    decoded = decoded.replace(/charset="?[^"\n]*"?/gi, '');
-    
-    // Step 5: Clean up excessive whitespace
-    decoded = decoded.replace(/\n{3,}/g, '\n\n');
-    decoded = decoded.trim();
-
-    return decoded;
-  };
-
-  // Decode the email body with encoding hint
-  const decodedBody = decodeEmailBody(body, encoding);
+  // The backend already handles decoding (base64, quoted-printable, etc.)
+  // so we can use the body directly.
+  const decodedBody = body;
 
   // Check if this is HTML content
-  const isActuallyHtml = isHtml || 
-    decodedBody.includes('<!DOCTYPE') || 
-    decodedBody.includes('<html') || 
+  const isActuallyHtml = isHtml ||
+    decodedBody.includes('<!DOCTYPE') ||
+    decodedBody.includes('<html') ||
     decodedBody.includes('<body') ||
-    decodedBody.includes('<div') || 
+    decodedBody.includes('<div') ||
     decodedBody.includes('<p>') ||
     decodedBody.includes('<table');
 
@@ -161,13 +77,13 @@ export function SanitizedEmailContent({ body, isHtml, encoding }: SanitizedEmail
 
     // Remove style tags but keep inline styles for basic formatting
     cleanHtml = cleanHtml.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-    
+
     // Remove script tags
     cleanHtml = cleanHtml.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-    
+
     // Convert common entities
     cleanHtml = cleanHtml.replace(/&nbsp;/g, ' ');
-    
+
     // Ensure all links open in new tab
     cleanHtml = cleanHtml.replace(/<a\s/gi, '<a target="_blank" rel="noopener noreferrer" ');
 
@@ -204,7 +120,7 @@ export function SanitizedEmailContent({ body, isHtml, encoding }: SanitizedEmail
           max-width: 100% !important;
         }
       `}</style>
-      <div 
+      <div
         className="email-content-wrapper prose prose-sm max-w-none dark:prose-invert
           prose-p:my-2 prose-p:leading-relaxed
           prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold
@@ -222,10 +138,10 @@ export function SanitizedEmailContent({ body, isHtml, encoding }: SanitizedEmail
           text-foreground
           break-words overflow-wrap-anywhere
         "
-        style={{ 
-          wordBreak: 'break-word', 
+        style={{
+          wordBreak: 'break-word',
           overflowWrap: 'anywhere',
-          maxWidth: '100%' 
+          maxWidth: '100%'
         }}
         dangerouslySetInnerHTML={{ __html: sanitized }}
       />

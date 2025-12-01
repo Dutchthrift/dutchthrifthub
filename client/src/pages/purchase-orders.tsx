@@ -1,15 +1,15 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Navigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Search, 
+import {
+  Search,
   Plus,
-  Filter, 
-  Download, 
+  Filter,
+  Download,
   Package2,
   Building2,
   Euro,
@@ -76,11 +76,21 @@ export default function PurchaseOrders() {
     queryKey: ["/api/suppliers"],
   });
 
+  // Sync selectedPO with updated data when purchaseOrders changes
+  useEffect(() => {
+    if (selectedPO && purchaseOrders) {
+      const updatedPO = purchaseOrders.find(po => po.id === selectedPO.id);
+      if (updatedPO) {
+        setSelectedPO(updatedPO);
+      }
+    }
+  }, [purchaseOrders, selectedPO?.id]);
+
   const filteredPOs = purchaseOrders?.filter(po => {
     // Filter by archived status
     if (showArchived && !po.archived) return false;
     if (!showArchived && po.archived) return false;
-    
+
     // Filter by status
     if (statusFilter !== "all" && po.status !== statusFilter) {
       return false;
@@ -105,7 +115,7 @@ export default function PurchaseOrders() {
 
   // Analytics calculations (exclude archived orders)
   const activePOs = purchaseOrders?.filter(po => !po.archived) || [];
-  
+
   const statusCounts = {
     all: activePOs.length,
     aangekocht: activePOs.filter(po => po.status === 'aangekocht').length,
@@ -114,15 +124,8 @@ export default function PurchaseOrders() {
   };
 
   const totalAmount = activePOs.reduce((sum, po) => sum + ((po.totalAmount || 0) / 100), 0);
-  
-  const pendingDeliveries = activePOs.filter(po => 
-    po.status === 'aangekocht' && po.expectedDeliveryDate
-  ).length;
 
-  const overdueDeliveries = activePOs.filter(po => {
-    if (po.status !== 'aangekocht' || !po.expectedDeliveryDate) return false;
-    return new Date(po.expectedDeliveryDate) < new Date();
-  }).length;
+
 
   // Top supplier by spending (exclude archived orders)
   const supplierSpending = activePOs.reduce((acc, po) => {
@@ -133,7 +136,7 @@ export default function PurchaseOrders() {
   }, {} as Record<string, number>);
 
   const topSupplier = Object.entries(supplierSpending).sort((a, b) => b[1] - a[1])[0];
-  const topSupplierName = topSupplier 
+  const topSupplierName = topSupplier
     ? suppliers?.find(s => s.id === topSupplier[0])?.name || 'Onbekend'
     : 'Geen';
   const topSupplierAmount = topSupplier ? topSupplier[1] : 0;
@@ -286,7 +289,7 @@ export default function PurchaseOrders() {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+
       <main className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="bg-card rounded-lg p-6 mb-6 border">
@@ -342,24 +345,6 @@ export default function PurchaseOrders() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Alle orders gecombineerd
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Truck className="h-4 w-4 text-muted-foreground" />
-                Leveringen
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="stat-pending-deliveries">{pendingDeliveries}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {overdueDeliveries > 0 && (
-                  <span className="text-red-600">{overdueDeliveries} te laat</span>
-                )}
-                {overdueDeliveries === 0 && "Alles op schema"}
               </p>
             </CardContent>
           </Card>
@@ -550,7 +535,7 @@ export default function PurchaseOrders() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete">Annuleren</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete"

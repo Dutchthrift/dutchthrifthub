@@ -1,25 +1,29 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import { type Express } from "express";
+// Force restart for sync fix
 import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { storage } from "./storage";
 import { db } from "./services/supabaseClient";
+import { count } from "drizzle-orm";
+import { emails } from "@shared/schema";
+import { log } from "./vite";
 import {
-  insertTodoSchema,
-  insertRepairSchema,
-  insertInternalNoteSchema,
-  insertPurchaseOrderSchema,
-  insertReturnSchema,
-  insertReturnItemSchema,
+  insertUserSchema,
+  insertCustomerSchema,
+  insertOrderSchema,
   insertCaseSchema,
-  insertCaseItemSchema,
   insertCaseLinkSchema,
   insertCaseNoteSchema,
-  insertUserSchema,
+  insertCaseEventSchema,
+  insertCaseItemSchema,
+  insertActivitySchema,
   insertAuditLogSchema,
-  purchaseOrderItems,
+  insertReturnSchema,
+  insertReturnItemSchema,
   insertNoteSchema,
   insertNoteTagSchema,
+  insertNoteTagAssignmentSchema,
   insertNoteMentionSchema,
   insertNoteReactionSchema,
   insertNoteAttachmentSchema,
@@ -27,15 +31,30 @@ import {
   insertNoteRevisionSchema,
   insertNoteTemplateSchema,
   insertNoteLinkSchema,
+  insertPurchaseOrderSchema,
+  notes,
+  purchaseOrderItems,
+  subtasks,
+  todoAttachments,
+  systemSettings,
+  emailLinks,
 } from "@shared/schema";
-import { eq } from "drizzle-orm";
-import { syncEmails, sendEmail } from "./services/emailService";
+import { eq, desc, sql, like, and } from "drizzle-orm";
+
 import { shopifyClient } from "./services/shopifyClient";
 import { OrderMatchingService } from "./services/orderMatchingService";
 import { ObjectStorageService } from "./objectStorage";
-import { importAllEmails } from "./scripts/importAllEmails";
+
 import multer from "multer";
 import Papa from "papaparse";
+import path from "path";
+import fs from "fs";
+import express from "express";
+
+// Mail system imports
+import { ImapFlow } from 'imapflow';
+import { simpleParser } from 'mailparser';
+import DOMPurify from 'isomorphic-dompurify';
 
 // Extend Request type to include session
 interface AuthenticatedRequest extends Request {
@@ -52,7 +71,7 @@ const requireAuth = async (req: any, res: any, next: any) => {
 
   const user = await storage.getUser(userId);
   if (!user) {
-    req.session.destroy(() => {});
+    req.session.destroy(() => { });
     return res.status(401).json({ error: "User not found" });
   }
 
@@ -120,13 +139,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const orderMatchingService = new OrderMatchingService(storage);
 
   // Configure multer for file uploads (memory storage with limits)
-  const upload = multer({ 
+  const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { 
+    limits: {
       fileSize: 10 * 1024 * 1024, // 10MB max file size
       files: 10 // max 10 files per request
     }
   });
+
+  // Serve local uploads if in local storage mode
+  if (process.env.STORAGE_PROVIDER === "local") {
+    const uploadDir = path.join(process.cwd(), process.env.UPLOAD_DIR || "server/uploads");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    app.use("/uploads", express.static(uploadDir));
+    console.log(`Serving local uploads from ${uploadDir}`);
+  }
 
   // Authentication routes
   app.post("/api/auth/signin", async (req, res) => {
@@ -227,7 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = await storage.getUser(userId);
       if (!user) {
-        req.session.destroy(() => {});
+        req.session.destroy(() => { });
         return res.status(401).json({ error: "User not found" });
       }
 
@@ -762,6 +791,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/returns/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+
+      // Get return data before deletion for audit log
+      const returnData = await storage.getReturn(id);
+      if (!returnData) {
+        return res.status(404).json({ message: "Return not found" });
+      }
+
+      await storage.deleteReturn(id);
+
+      await auditLog(req, "DELETE", "returns", id, {
+        returnNumber: returnData.returnNumber,
+        status: returnData.status,
+      });
+
+      res.json({ message: "Return deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting return:", error);
+      res.status(400).json({ message: "Failed to delete return" });
+    }
+  });
+
   app.delete("/api/repairs/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -834,12 +887,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Determine if file is a photo or attachment based on mimetype
           const isPhoto = file.mimetype.startsWith('image/');
           const fileType = isPhoto ? 'photo' : 'attachment';
-          
+
           // Create a safe filename
           const timestamp = Date.now();
           const safeOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
           const filename = `repair-${id}-${fileType}-${timestamp}-${safeOriginalName}`;
-          
+
           console.log(`Uploading repair file: ${filename} (${file.size} bytes, ${file.mimetype})`);
           const url = await objectStorage.saveAttachment(
             filename,
@@ -847,7 +900,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             file.mimetype,
           );
           console.log(`Uploaded to: ${url}`);
-          
+
           if (isPhoto) {
             photoUrls.push(url);
           } else {
@@ -857,12 +910,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Update repair with new file URLs
         const updates: any = {};
-        
+
         if (photoUrls.length > 0) {
           const currentPhotos = repair.photos || [];
           updates.photos = [...currentPhotos, ...photoUrls];
         }
-        
+
         if (attachmentUrls.length > 0) {
           const currentAttachments = repair.attachments || [];
           updates.attachments = [...currentAttachments, ...attachmentUrls];
@@ -873,10 +926,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log(`Successfully uploaded ${photoUrls.length} photos and ${attachmentUrls.length} attachments to repair ${id}`);
-        res.json({ 
-          photoUrls, 
+        res.json({
+          photoUrls,
           attachmentUrls,
-          total: photoUrls.length + attachmentUrls.length 
+          total: photoUrls.length + attachmentUrls.length
         });
       } catch (error) {
         console.error("Error uploading files to repair:", error);
@@ -996,10 +1049,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         res.json(result);
       } else {
-        // Get all orders with optional limit for dropdowns (default 20 for UI performance)
+        // Get all orders with optional limit for dropdowns (default 1000 to show all orders)
         const limitNum = req.query.limit
           ? parseInt(req.query.limit as string)
-          : 20;
+          : 1000;
         const orders = await storage.getOrders(limitNum);
         res.json(orders);
       }
@@ -1054,10 +1107,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Try to get shop info first (lighter request)
       const response = await fetch(
-        `${
-          process.env.SHOPIFY_SHOP_DOMAIN
-            ? `https://${process.env.SHOPIFY_SHOP_DOMAIN.replace(".myshopify.com", "")}.myshopify.com`
-            : "https://shambu-nl.myshopify.com"
+        `${process.env.SHOPIFY_SHOP_DOMAIN
+          ? `https://${process.env.SHOPIFY_SHOP_DOMAIN.replace(".myshopify.com", "")}.myshopify.com`
+          : "https://shambu-nl.myshopify.com"
         }/admin/api/2024-01/shop.json`,
         {
           headers: {
@@ -1166,7 +1218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } else if (
               !existingCustomer.shopifyCustomerId ||
               existingCustomer.shopifyCustomerId !==
-                shopifyCustomer.id.toString()
+              shopifyCustomer.id.toString()
             ) {
               await storage.updateCustomer(existingCustomer.id, {
                 shopifyCustomerId: shopifyCustomer.id.toString(),
@@ -1259,7 +1311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } else if (
                 !customer.shopifyCustomerId ||
                 customer.shopifyCustomerId !==
-                  shopifyOrder.customer.id.toString()
+                shopifyOrder.customer.id.toString()
               ) {
                 // Update existing customer with Shopify ID and any missing data
                 try {
@@ -1388,11 +1440,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("🔄 Starting incremental Shopify sync (date-based)...");
 
       const LAST_SYNC_KEY = "shopify_last_order_sync_timestamp";
-      
+
       // Get the last sync timestamp from system settings
       const lastSyncStr = await storage.getSystemSetting(LAST_SYNC_KEY);
       let lastSyncDate: Date;
-      
+
       if (lastSyncStr) {
         lastSyncDate = new Date(lastSyncStr);
         console.log(`📅 Last sync was at: ${lastSyncDate.toISOString()}`);
@@ -1404,7 +1456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const syncStartTime = new Date(); // Record when this sync started
-      
+
       let orderStats = {
         synced: 0,
         created: 0,
@@ -1472,7 +1524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } else if (
                 !customer.shopifyCustomerId ||
                 customer.shopifyCustomerId !==
-                  shopifyOrder.customer.id.toString()
+                shopifyOrder.customer.id.toString()
               ) {
                 try {
                   await storage.updateCustomer(customer.id, {
@@ -1561,10 +1613,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         orderStats.total = shopifyOrders.length;
-        
+
         // Only update the last sync timestamp if the sync completed successfully
         await storage.setSystemSetting(LAST_SYNC_KEY, syncStartTime.toISOString());
-        
+
         console.log(
           `✅ Incremental order sync completed: ${orderStats.created} created, ${orderStats.updated} updated, ${orderStats.skipped} skipped from ${orderStats.total} orders`,
         );
@@ -1574,7 +1626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         errors.push(
           `Order sync failed: ${orderSyncError instanceof Error ? orderSyncError.message : String(orderSyncError)}`,
         );
-        
+
         // Don't update the timestamp if sync failed - this ensures we retry from the same point
         return res.status(500).json({
           success: false,
@@ -1689,7 +1741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Sync orders from Shopify - Enhanced with bulk import
+  // Sync orders from Shopify - Date-based incremental sync
   app.post("/api/orders/sync", async (req, res) => {
     try {
       const { fullSync } = req.query;
@@ -1701,8 +1753,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`📊 Order sync progress: ${processed} orders processed`);
         });
       } else {
-        console.log("🔄 Starting incremental order sync from Shopify...");
-        shopifyOrders = await shopifyClient.getOrders({ limit: 250 });
+        console.log(`Fetching latest 250 orders from Shopify (sorted by created_at DESC)`);
+
+        // Fetch latest orders sorted by creation date (newest first)
+        shopifyOrders = await shopifyClient.getOrders({
+          limit: 250,
+          status: 'any',
+          order: 'created_at desc' // Newest first
+        });
+
+        console.log(`Retrieved ${shopifyOrders.length} orders from Shopify`);
       }
 
       let synced = 0;
@@ -1752,11 +1812,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Create order
+            // Use Shopify's name field as order number (e.g. "#19035" or "05-13886-35414" for eBay)
+            // Strip leading # if present, but keep full text for eBay orders
+            const orderNumber = shopifyOrder.name?.replace(/^#/, '') || shopifyOrder.order_number?.toString() || '0';
+
             await storage.createOrder({
               shopifyOrderId: shopifyOrder.id.toString(),
-              orderNumber: shopifyOrder.order_number,
+              orderNumber: orderNumber,
               customerId: customer?.id,
               customerEmail: shopifyOrder.email,
+              orderDate: shopifyOrder.created_at ? new Date(shopifyOrder.created_at) : undefined,
               totalAmount: Math.round(
                 parseFloat(shopifyOrder.total_price) * 100,
               ),
@@ -1794,6 +1859,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           skipped++;
         }
+      }
+
+      // Update last sync time only if not full sync
+      if (fullSync !== "true") {
+        await storage.setSetting('shopify_orders_last_sync', new Date().toISOString());
       }
 
       console.log(
@@ -2144,7 +2214,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Email threads with filtering
+  // Get mailbox status (newest UID)
+  app.get("/api/emails/status", async (req, res) => {
+    try {
+      const uidNext = await emailService.getLatestUid();
+      res.json({ uidNext });
+    } catch (error) {
+      console.error("Error fetching mailbox status:", error);
+      res.status(500).json({ error: "Failed to fetch mailbox status" });
+    }
+  });
+
+  // Get emails by UID range (direct IMAP fetch + DB metadata merge)
+  app.get("/api/emails/list", async (req, res) => {
+    try {
+      const { startUid, endUid } = req.query;
+
+      if (!startUid || !endUid) {
+        return res.status(400).json({ error: "startUid and endUid are required" });
+      }
+
+      const range = `${startUid}:${endUid}`;
+      console.log(`Fetching emails for range: ${range}`);
+
+      // 1. Fetch from IMAP
+      const emails = await emailService.fetchEmails(range);
+
+      // 2. Fetch metadata from DB for these UIDs
+      const uids = emails.map(e => e.uid);
+      let metadataMap = new Map();
+
+      if (uids.length > 0) {
+        const metadata = await db.select({
+          uid: emailThreads.uid,
+          orderId: emailThreads.orderId,
+          caseId: emailThreads.caseId,
+          returnId: emailThreads.returnId,
+          repairId: emailThreads.repairId,
+          starred: emailThreads.starred,
+          archived: emailThreads.archived
+        })
+          .from(emailThreads)
+          .where(inArray(emailThreads.uid, uids));
+
+        metadata.forEach(m => {
+          if (m.uid) metadataMap.set(m.uid, m);
+        });
+      }
+
+      // 3. Merge metadata
+      const mergedEmails = emails.map(email => {
+        const meta = metadataMap.get(email.uid) || {};
+        return {
+          ...email,
+          orderId: meta.orderId,
+          caseId: meta.caseId,
+          returnId: meta.returnId,
+          repairId: meta.repairId,
+          starred: meta.starred || false,
+          archived: meta.archived || false
+        };
+      });
+
+      res.json(mergedEmails);
+    } catch (error) {
+      console.error("Error fetching email list:", error);
+      res.status(500).json({ error: "Failed to fetch email list" });
+    }
+  });
+
+  // Get email body on-demand (for detail view)
+  app.get("/api/emails/:uid/body", async (req, res) => {
+    try {
+      const uid = parseInt(req.params.uid);
+
+      if (isNaN(uid)) {
+        return res.status(400).json({ error: "Invalid UID" });
+      }
+
+      console.log(`Fetching body for email UID ${uid}...`);
+      const body = await emailService.fetchEmailBody(uid);
+
+      res.json(body);
+    } catch (error) {
+      console.error("Error fetching email body:", error);
+      res.status(500).json({ error: "Failed to fetch email body" });
+    }
+  });
+
+  // Email threads (Legacy/DB-based - keeping for reference or fallback)
   app.get("/api/email-threads", async (req, res) => {
     try {
       const { caseId, folder, starred, archived, isUnread, hasOrder, limit } =
@@ -2158,8 +2316,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(relatedItems.emails);
       } else {
         // Get email threads with database-level filtering
-        const threads = await storage.getEmailThreads({
-          limit: limit ? parseInt(limit as string) : undefined,
+        const limitVal = limit ? parseInt(limit as string) : 50;
+        const cursorVal = req.query.cursor ? parseInt(req.query.cursor as string) : 0;
+
+        const result = await storage.getEmailThreads({
+          limit: limitVal,
+          offset: cursorVal,
           folder: folder as string,
           starred:
             starred === "true" ? true : starred === "false" ? false : undefined,
@@ -2183,7 +2345,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 : undefined,
         });
 
-        res.json(threads);
+        const nextCursor = result.threads.length === limitVal ? cursorVal + limitVal : undefined;
+
+        res.json({
+          items: result.threads,
+          nextCursor,
+          total: result.total
+        });
       }
     } catch (error) {
       console.error("Error fetching email threads:", error);
@@ -2276,6 +2444,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching email thread:", error);
       res.status(500).json({ message: "Failed to fetch email thread" });
+    }
+  });
+
+  // Create sample emails for testing
+  app.post("/api/emails/create-samples", async (req, res) => {
+    try {
+      console.log("🧪 Creating sample emails...");
+
+      // 1. Create sample customers if they don't exist
+      const sampleCustomers = [
+        { email: "alice.wonderland@example.com", firstName: "Alice", lastName: "Wonderland" },
+        { email: "bob.builder@example.com", firstName: "Bob", lastName: "Builder" },
+        { email: "charlie.chocolate@example.com", firstName: "Charlie", lastName: "Bucket" },
+      ];
+
+      for (const cust of sampleCustomers) {
+        const existing = await storage.getCustomerByEmail(cust.email);
+        if (!existing) {
+          await storage.createCustomer({
+            email: cust.email,
+            firstName: cust.firstName,
+            lastName: cust.lastName,
+            phone: "555-0123",
+          });
+        }
+      }
+
+      // 2. Create sample threads and messages
+      const samples = [
+        {
+          subject: "Order #1001 - Where is my package?",
+          from: "alice.wonderland@example.com",
+          body: "Hi,\n\nI ordered this 3 days ago and still haven't received a tracking number. Can you please check?\n\nThanks,\nAlice",
+          date: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+          isUnread: true,
+          folder: "inbox",
+          hasOrder: true,
+        },
+        {
+          subject: "Return Request for Order #1002",
+          from: "bob.builder@example.com",
+          body: "Hello,\n\nThe item I received is damaged. I would like to return it. Please send me a return label.\n\nRegards,\nBob",
+          date: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
+          isUnread: true,
+          folder: "inbox",
+          hasOrder: true,
+        },
+        {
+          subject: "Question about iPhone 12 condition",
+          from: "charlie.chocolate@example.com",
+          body: "Hi there,\n\nI'm interested in the iPhone 12 you have listed. Is the screen scratch-free? Can you send more photos?\n\nBest,\nCharlie",
+          date: new Date(Date.now() - 1000 * 60 * 60 * 48), // 2 days ago
+          isUnread: false,
+          folder: "inbox",
+          hasOrder: false,
+        },
+        {
+          subject: "Newsletter Subscription Confirmed",
+          from: "newsletter@thrifthub.com",
+          body: "Welcome to ThriftHub Newsletter! Stay tuned for great deals.",
+          date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5), // 5 days ago
+          isUnread: false,
+          folder: "inbox",
+          hasOrder: false,
+        },
+        {
+          subject: "Your order #999 has been delivered",
+          from: "shipping@thrifthub.com",
+          body: "Good news! Your order #999 has been delivered to your mailbox.",
+          date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7), // 1 week ago
+          isUnread: false,
+          folder: "archive",
+          hasOrder: true,
+        }
+      ];
+
+      let createdCount = 0;
+
+      for (const sample of samples) {
+        // Check if thread already exists to avoid duplicates
+        const threadId = `sample-${sample.from}-${sample.subject.replace(/\s+/g, '-')}`;
+        const existingThread = await storage.getEmailThreadByThreadId(threadId);
+
+        if (!existingThread) {
+          const thread = await storage.createEmailThread({
+            threadId: threadId,
+            subject: sample.subject,
+            customerEmail: sample.from,
+            status: "open",
+            isUnread: sample.isUnread,
+            lastActivity: sample.date,
+            hasAttachment: false,
+            folder: sample.folder, // Note: Schema might not have folder column directly on thread, usually inferred or separate. 
+            // Checking schema... storage.getEmailThreads filters by folder but schema might rely on labels or status.
+            // For now, we'll assume default 'inbox' behavior or 'archived' flag.
+            archived: sample.folder === 'archive',
+          } as any); // Cast as any if folder isn't in schema, likely 'archived' boolean is used.
+
+          // Create the message
+          await storage.createEmailMessage({
+            messageId: `msg-${Date.now()}-${createdCount}`,
+            threadId: thread.id,
+            fromEmail: sample.from,
+            toEmail: "contact@dutchthrift.com",
+            subject: sample.subject,
+            body: sample.body,
+            isHtml: false,
+            sentAt: sample.date,
+          });
+
+          createdCount++;
+        }
+      }
+
+      res.json({ success: true, message: `Created ${createdCount} sample email threads` });
+    } catch (error) {
+      console.error("Error creating sample emails:", error);
+      res.status(500).json({ message: "Failed to create sample emails" });
     }
   });
 
@@ -2475,14 +2761,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log(`🚀 Starting full email import from 2025-01-01...`);
       const result = await importAllEmails();
-      
+
       if (result.success) {
         // Auto-match orders for newly imported emails
         console.log(`🔄 Auto-matching orders for imported emails...`);
         try {
           const threads = await storage.getEmailThreads({});
           const threadsWithoutOrders = threads.filter((thread) => !thread.orderId);
-          
+
           let matchedCount = 0;
           for (const thread of threadsWithoutOrders) {
             const messages = await storage.getEmailMessages(thread.id);
@@ -2493,7 +2779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 thread.customerEmail || "",
                 thread.subject || "",
               );
-              
+
               if (matchedOrder) {
                 await storage.updateEmailThread(thread.id, {
                   orderId: matchedOrder.id,
@@ -2502,12 +2788,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
           }
-          
+
           console.log(`✅ Matched ${matchedCount} threads with orders`);
         } catch (matchError) {
           console.error("Error auto-matching orders:", matchError);
         }
-        
+
         res.json({
           success: true,
           imported: result.imported,
@@ -2711,6 +2997,232 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === EMAIL METADATA API ENDPOINTS ===
+  // These endpoints ONLY store metadata (links), NOT email content
+  // Email content stays on IMAP server
+
+  // Link email thread to order
+  app.post("/api/emails/link-to-order", async (req, res) => {
+    try {
+      const { emailThreadId, orderId } = req.body;
+
+      if (!emailThreadId || !orderId) {
+        return res.status(400).json({
+          message: "Missing required fields: emailThreadId, orderId"
+        });
+      }
+
+      // Update email thread with order link (metadata only)
+      const updatedThread = await storage.updateEmailThread(emailThreadId, {
+        orderId: orderId,
+      });
+
+      // Create activity log
+      await storage.createActivity({
+        type: "email_linked_to_order",
+        description: `Email thread linked to order`,
+        userId: null, // TODO: Get from session
+        metadata: { emailThreadId, orderId },
+      });
+
+      res.json({
+        success: true,
+        thread: updatedThread,
+        message: "Email successfully linked to order"
+      });
+    } catch (error) {
+      console.error("Error linking email to order:", error);
+      res.status(500).json({ message: "Failed to link email to order" });
+    }
+  });
+
+  // Create case from email thread
+  app.post("/api/emails/create-case", async (req, res) => {
+    try {
+      const { emailThreadId, caseData } = req.body;
+
+      if (!emailThreadId || !caseData) {
+        return res.status(400).json({
+          message: "Missing required fields: emailThreadId, caseData"
+        });
+      }
+
+      // Create new case
+      const newCase = await storage.createCase({
+        title: caseData.title,
+        description: caseData.description,
+        customerEmail: caseData.customerEmail,
+        status: caseData.status || "new",
+        priority: "medium",
+      });
+
+      // Link email thread to case (metadata only)
+      await storage.updateEmailThread(emailThreadId, {
+        caseId: newCase.id,
+      });
+
+      // Create activity log
+      await storage.createActivity({
+        type: "case_created_from_email",
+        description: `Created case #${newCase.caseNumber} from email`,
+        userId: null, // TODO: Get from session
+        metadata: { emailThreadId, caseId: newCase.id },
+      });
+
+      res.json({
+        success: true,
+        caseId: newCase.id,
+        caseNumber: newCase.caseNumber,
+        message: "Case created and linked to email"
+      });
+    } catch (error) {
+      console.error("Error creating case from email:", error);
+      res.status(500).json({ message: "Failed to create case" });
+    }
+  });
+
+  // Create return from email thread
+  app.post("/api/emails/create-return", async (req, res) => {
+    try {
+      const { emailThreadId, orderId, returnData } = req.body;
+
+      if (!emailThreadId || !orderId) {
+        return res.status(400).json({
+          message: "Missing required fields: emailThreadId, orderId"
+        });
+      }
+
+      // Get order to fetch customer information
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Create new return
+      const newReturn = await storage.createReturn({
+        orderId: orderId,
+        customerId: order.customerId,
+        status: returnData?.status || "nieuw_onderweg",
+        returnReason: returnData?.reason || "other",
+        customerNotes: returnData?.notes || "",
+      });
+
+      // Link email thread to return via case  
+      // Create a case for the return
+      const returnCase = await storage.createCase({
+        title: `Return: ${order.orderNumber}`,
+        description: `Return request from email`,
+        customerEmail: order.customerEmail || "",
+        orderId: orderId,
+        status: "new",
+        priority: "medium",
+      });
+
+      // Update return with case link
+      await storage.updateReturn(newReturn.id, {
+        caseId: returnCase.id,
+      });
+
+      // Link email thread to case
+      await storage.updateEmailThread(emailThreadId, {
+        caseId: returnCase.id,
+      });
+
+      // Create activity log
+      await storage.createActivity({
+        type: "return_created_from_email",
+        description: `Created return #${newReturn.returnNumber} from email`,
+        userId: null, // TODO: Get from session
+        metadata: { emailThreadId, returnId: newReturn.id, orderId },
+      });
+
+      res.json({
+        success: true,
+        returnId: newReturn.id,
+        returnNumber: newReturn.returnNumber,
+        message: "Return created and linked to email"
+      });
+    } catch (error) {
+      console.error("Error creating return from email:", error);
+      res.status(500).json({ message: "Failed to create return" });
+    }
+  });
+
+  // Create repair from email thread
+  app.post("/api/emails/create-repair", async (req, res) => {
+    try {
+      const { emailThreadId, repairData } = req.body;
+
+      if (!emailThreadId || !repairData) {
+        return res.status(400).json({
+          message: "Missing required fields: emailThreadId, repairData"
+        });
+      }
+
+      // Create new repair
+      const newRepair = await storage.createRepair({
+        title: repairData.description || "Repair request from email",
+        description: repairData.description,
+        customerEmail: repairData.customerEmail,
+        customerName: repairData.customerName,
+        emailThreadId: emailThreadId,
+        status: repairData.status || "new",
+        priority: "medium",
+      });
+
+      // Create activity log
+      await storage.createActivity({
+        type: "repair_created_from_email",
+        description: `Created repair from email`,
+        userId: null, // TODO: Get from session
+        metadata: { emailThreadId, repairId: newRepair.id },
+      });
+
+      res.json({
+        success: true,
+        repairId: newRepair.id,
+        message: "Repair created and linked to email"
+      });
+    } catch (error) {
+      console.error("Error creating repair from email:", error);
+      res.status(500).json({ message: "Failed to create repair" });
+    }
+  });
+
+  // Fetch email body from IMAP
+  app.get("/api/emails/:uid/body", async (req, res) => {
+    try {
+      const { uid } = req.params;
+      if (!uid) {
+        return res.status(400).json({ message: "UID is required" });
+      }
+
+      const result = await fetchEmailBody(parseInt(uid));
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching email body:", error);
+      res.status(500).json({ message: "Failed to fetch email body" });
+    }
+  });
+
+  // Download attachment from IMAP
+  app.get("/api/emails/:uid/attachments/:partId", async (req, res) => {
+    try {
+      const { uid, partId } = req.params;
+      if (!uid || !partId) {
+        return res.status(400).json({ message: "UID and Part ID are required" });
+      }
+
+      const { buffer, contentType } = await downloadAttachment(parseInt(uid), partId);
+
+      res.setHeader('Content-Type', contentType);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error downloading attachment:", error);
+      res.status(500).json({ message: "Failed to download attachment" });
+    }
+  });
+
   // Attachment endpoints - handles both email and repair attachments
   app.get("/api/attachments/*", async (req, res) => {
     try {
@@ -2777,14 +3289,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { purchaseOrderId } = req.query;
       let activities = await storage.getActivities();
-      
+
       // Filter by purchaseOrderId if provided
       if (purchaseOrderId) {
-        activities = activities.filter((activity: any) => 
+        activities = activities.filter((activity: any) =>
           activity.metadata?.purchaseOrderId === purchaseOrderId
         );
       }
-      
+
       res.json(activities);
     } catch (error) {
       console.error("Error fetching activities:", error);
@@ -2827,72 +3339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Internal notes
-  app.get("/api/notes/:entityType/:entityId", async (req, res) => {
-    try {
-      const { entityType, entityId } = req.params;
-      const notes = await storage.getInternalNotes(entityId, entityType);
-      res.json(notes);
-    } catch (error) {
-      console.error("Error fetching notes:", error);
-      res.status(500).json({ message: "Failed to fetch notes" });
-    }
-  });
 
-  app.post("/api/notes", requireAuth, async (req: any, res) => {
-    try {
-      const validatedData = insertInternalNoteSchema.parse(req.body);
-      // Override authorId with the authenticated user's ID
-      const note = await storage.createInternalNote({
-        ...validatedData,
-        authorId: req.user.id,
-      });
-      res.status(201).json(note);
-    } catch (error) {
-      console.error("Error creating note:", error);
-      res.status(400).json({ message: "Failed to create note" });
-    }
-  });
-
-  app.delete("/api/notes/:noteId", requireAuth, async (req: any, res) => {
-    try {
-      const { noteId } = req.params;
-      await storage.deleteInternalNote(noteId);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting note:", error);
-      res.status(400).json({ message: "Failed to delete note" });
-    }
-  });
-
-  // Internal notes endpoint (alternate naming for frontend compatibility)
-  app.get("/api/internal-notes", async (req, res) => {
-    try {
-      const { entityType, entityId, caseId } = req.query;
-
-      if (caseId) {
-        // Get notes linked to a specific case
-        const relatedItems = await storage.getCaseRelatedItems(
-          caseId as string,
-        );
-        res.json(relatedItems.notes);
-      } else if (entityType && entityId) {
-        // Get notes for a specific entity
-        const notes = await storage.getInternalNotes(
-          entityId as string,
-          entityType as any,
-        );
-        res.json(notes);
-      } else {
-        res
-          .status(400)
-          .json({ message: "Either caseId or entityType+entityId required" });
-      }
-    } catch (error) {
-      console.error("Error fetching internal notes:", error);
-      res.status(500).json({ message: "Failed to fetch internal notes" });
-    }
-  });
 
   // Suppliers
   app.get("/api/suppliers", requireAuth, async (req: any, res: any) => {
@@ -3104,19 +3551,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { lineItems, ...updateFields } = req.body;
 
+      console.log("DEBUG PATCH PO - Received updateFields:", JSON.stringify(updateFields, null, 2));
+
       // Always validate with partial schema for data integrity
       const updateData = insertPurchaseOrderSchema.partial().parse(updateFields);
+
+      console.log("DEBUG PATCH PO - After schema parse:", JSON.stringify(updateData, null, 2));
 
       // Convert orderDate string to Date object for database if present
       const purchaseOrderUpdateData = updateData.orderDate
         ? {
-            ...updateData,
-            orderDate:
-              typeof updateData.orderDate === "string"
-                ? new Date(updateData.orderDate)
-                : updateData.orderDate,
-          }
+          ...updateData,
+          orderDate:
+            typeof updateData.orderDate === "string"
+              ? new Date(updateData.orderDate)
+              : updateData.orderDate,
+        }
         : updateData;
+
+      console.log("DEBUG PATCH PO - Final update data:", JSON.stringify(purchaseOrderUpdateData, null, 2));
 
       const purchaseOrder = await storage.updatePurchaseOrder(
         id,
@@ -3177,7 +3630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/purchase-orders/:id", requireAuth, async (req: any, res: any) => {
     try {
       const { id } = req.params;
-      
+
       // Get purchase order details before deletion for audit log
       const purchaseOrder = await storage.getPurchaseOrder(id);
       if (!purchaseOrder) {
@@ -3262,7 +3715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const timestamp = Date.now();
             const safeOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
             const filename = `purchase-order-${id}-${timestamp}-${safeOriginalName}`;
-            
+
             console.log(`Uploading purchase order file: ${filename} (${file.size} bytes, ${file.mimetype})`);
             const url = await objectStorage.saveAttachment(
               filename,
@@ -3271,7 +3724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
             uploadedPaths.push(url);
             console.log(`Uploaded to: ${url}`);
-            
+
             // Create file record in database
             const fileRecord = await storage.createPurchaseOrderFile({
               purchaseOrderId: id,
@@ -3281,7 +3734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               fileSize: file.size,
               uploadedBy: req.user.id,
             });
-            
+
             uploadedFiles.push({
               id: fileRecord.id,
               fileName: fileRecord.fileName,
@@ -3315,7 +3768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: "purchase_order_updated",
           description: `Uploaded ${uploadedFiles.length} file(s) to purchase order: ${purchaseOrder.title}`,
           userId: req.user.id,
-          metadata: { 
+          metadata: {
             purchaseOrderId: id,
             fileCount: uploadedFiles.length,
             fileNames: uploadedFiles.map(f => f.fileName),
@@ -3323,13 +3776,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         console.log(`Successfully uploaded ${uploadedFiles.length} files to purchase order ${id}`);
-        res.json({ 
+        res.json({
           files: uploadedFiles,
-          total: uploadedFiles.length 
+          total: uploadedFiles.length
         });
       } catch (error) {
         console.error("Error uploading files to purchase order:", error);
-        res.status(500).json({ 
+        res.status(500).json({
           message: error instanceof Error ? error.message : "Failed to upload files",
           uploaded: uploadedPaths.length,
         });
@@ -3354,7 +3807,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const file = await storage.getPurchaseOrderFile(id);
-      
+
       if (!file) {
         return res.status(404).json({ message: "File not found" });
       }
@@ -3374,10 +3827,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/purchase-order-files/:id", requireAuth, async (req: any, res: any) => {
     try {
       const { id } = req.params;
-      
+
       // Get file details using storage interface
       const file = await storage.getPurchaseOrderFile(id);
-      
+
       if (!file) {
         return res.status(404).json({ message: "File not found" });
       }
@@ -3386,18 +3839,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isUploader = file.uploadedBy === req.user.id;
       const isAdmin = req.user.role === 'admin';
       const noUploader = !file.uploadedBy; // Allow deletion if no uploader set
-      
+
       if (!isUploader && !isAdmin && !noUploader) {
         return res.status(403).json({ message: "Not authorized to delete this file" });
       }
 
       // Get purchase order for activity log
       const purchaseOrder = await storage.getPurchaseOrder(file.purchaseOrderId);
-      
+
       // Delete from object storage first - fail fast if this doesn't work
       const objectStorage = new ObjectStorageService();
       await objectStorage.deleteAttachment(file.filePath);
-      
+
       // Only delete from database if object storage deletion succeeded
       await storage.deletePurchaseOrderFile(id);
 
@@ -3406,7 +3859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: "purchase_order_updated",
         description: `Deleted file "${file.fileName}" from purchase order: ${purchaseOrder?.title || 'Unknown'}`,
         userId: req.user.id,
-        metadata: { 
+        metadata: {
           purchaseOrderId: file.purchaseOrderId,
           fileName: file.fileName,
           fileSize: file.fileSize,
@@ -3504,9 +3957,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (customerId) filters.customerId = customerId;
       if (orderId) filters.orderId = orderId;
       if (assignedUserId) filters.assignedUserId = assignedUserId;
-      
+
       const returns = await storage.getReturns(filters);
-      res.json(returns);
+
+      // Enhance returns with order numbers
+      const enhancedReturns = await Promise.all(
+        returns.map(async (returnItem) => {
+          if (returnItem.orderId) {
+            try {
+              const order = await storage.getOrder(returnItem.orderId);
+              return {
+                ...returnItem,
+                orderNumber: order?.orderNumber || null,
+              };
+            } catch (error) {
+              return { ...returnItem, orderNumber: null };
+            }
+          }
+          return { ...returnItem, orderNumber: null };
+        })
+      );
+
+      res.json(enhancedReturns);
     } catch (error) {
       console.error("Error fetching returns:", error);
       res.status(500).json({ message: "Failed to fetch returns" });
@@ -3525,10 +3997,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let order = null;
       let customer = null;
       let orderTracking = null;
-      
+
       if (returnData.orderId) {
         order = await storage.getOrder(returnData.orderId);
-        
+
         // Extract tracking from Shopify order data
         if (order?.orderData) {
           const fulfillments = (order.orderData as any)?.fulfillments || [];
@@ -3542,7 +4014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       // Fetch customer
       if (returnData.customerId) {
         customer = await storage.getCustomer(returnData.customerId);
@@ -3574,8 +4046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get photos from object storage (already in return)
       const photos = returnData.photos || [];
 
-      // Fetch internal notes
-      const notes = await storage.getInternalNotes('return', id);
+      // Notes are now handled via the unified notes system, not fetched here
 
       // Get assigned user details
       let assignedUser = null;
@@ -3592,7 +4063,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         financialComparison,
         tracking,
         photos,
-        notes,
         assignedUser: assignedUser ? {
           id: assignedUser.id,
           fullName: `${assignedUser.firstName || ''} ${assignedUser.lastName || ''}`.trim() || assignedUser.username,
@@ -3605,22 +4075,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get returns with optional search and limit
+  app.get("/api/returns", requireAuth, async (req: any, res: any) => {
+    try {
+      const { search, limit = "20", caseId } = req.query;
+      const limitNum = parseInt(limit as string);
+
+      let returns = await storage.getReturns();
+
+      // Filter by caseId if provided
+      if (caseId) {
+        returns = returns.filter((r: any) => r.caseId === caseId);
+      }
+
+      // Filter by search if provided
+      if (search) {
+        const searchLower = (search as string).toLowerCase();
+        returns = returns.filter((r: any) =>
+          r.returnNumber?.toLowerCase().includes(searchLower) ||
+          r.id?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Sort by creation date (newest first) and limit
+      returns = returns
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limitNum);
+
+      res.json(returns);
+    } catch (error) {
+      console.error("Error fetching returns:", error);
+      res.status(500).json({ message: "Failed to fetch returns" });
+    }
+  });
+
   app.post("/api/returns", requireAuth, async (req: any, res: any) => {
     try {
-      const { items, ...returnFields } = req.body;
+      const { items, emailThreadId, ...returnFields } = req.body;
       const validatedData = insertReturnSchema.parse(returnFields);
-      
+
       // If items are provided, validate and create atomically
       if (items && Array.isArray(items) && items.length > 0) {
         // Validate items
         const validatedItems = items.map((item: any) => insertReturnItemSchema.omit({ returnId: true }).parse(item));
-        
+
         // If orderId is provided, validate items against order line items
         if (validatedData.orderId) {
           const order = await storage.getOrder(validatedData.orderId);
           if (order && order.orderData) {
             const lineItems = (order.orderData as any).line_items || [];
-            
+
             // Validate each item exists in order and quantity is valid
             for (const item of validatedItems) {
               const lineItem = lineItems.find((li: any) => li.sku === item.sku || li.title === item.productName);
@@ -3637,20 +4141,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-        
+
         // Create return with items atomically
-        const returnData = await storage.createReturnWithItems(validatedData as any, validatedItems);
-        
+        const returnData = await storage.createReturnWithItems(
+          validatedData as any,
+          validatedItems,
+        );
+
+        if (emailThreadId && !validatedData.caseId) {
+          try {
+            // Create a case for this return
+            const customer = validatedData.customerId ? await storage.getCustomer(validatedData.customerId) : null;
+            const newCase = await storage.createCase({
+              title: `Retour: ${returnData.returnNumber}`,
+              description: `Retour aangemaakt vanuit email`,
+              customerEmail: customer?.email,
+              customerId: validatedData.customerId,
+              orderId: validatedData.orderId,
+              status: "new",
+              priority: "medium"
+            });
+
+            // Link Return to Case
+            await storage.updateReturn(returnData.id, { caseId: newCase.id });
+
+            // Link Email to Case
+            await storage.updateEmailThread(emailThreadId, { caseId: newCase.id });
+
+            // Update returnData with new caseId for response
+            returnData.caseId = newCase.id;
+          } catch (linkError) {
+            console.error("Error auto-linking case/email to return:", linkError);
+          }
+        }
+
         await auditLog(req, "CREATE", "returns", returnData.id, {
           returnNumber: returnData.returnNumber,
           status: returnData.status,
           itemCount: items.length,
         });
-        
+
         res.status(201).json(returnData);
       } else {
         // Create return without items (legacy behavior)
         const returnData = await storage.createReturn(validatedData as any);
+
+        if (emailThreadId && !validatedData.caseId) {
+          try {
+            // Create a case for this return
+            const customer = validatedData.customerId ? await storage.getCustomer(validatedData.customerId) : null;
+            const newCase = await storage.createCase({
+              title: `Retour: ${returnData.returnNumber}`,
+              description: `Retour aangemaakt vanuit email`,
+              customerEmail: customer?.email,
+              customerId: validatedData.customerId,
+              orderId: validatedData.orderId,
+              status: "new",
+              priority: "medium"
+            });
+
+            // Link Return to Case
+            await storage.updateReturn(returnData.id, { caseId: newCase.id });
+
+            // Link Email to Case
+            await storage.updateEmailThread(emailThreadId, { caseId: newCase.id });
+
+            // Update returnData with new caseId for response
+            returnData.caseId = newCase.id;
+          } catch (linkError) {
+            console.error("Error auto-linking case/email to return:", linkError);
+          }
+        }
 
         await auditLog(req, "CREATE", "returns", returnData.id, {
           returnNumber: returnData.returnNumber,
@@ -3663,6 +4224,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error creating return:", error);
       res.status(400).json({
         message: error.message || "Failed to create return",
+      });
+    }
+  });
+
+
+  // Get repairs with optional search and limit
+  app.get("/api/repairs", requireAuth, async (req: any, res: any) => {
+    try {
+      const { search, limit = "20", caseId } = req.query;
+      const limitNum = parseInt(limit as string);
+
+      let repairs = await storage.getRepairs();
+
+      // Filter by caseId if provided
+      if (caseId) {
+        repairs = repairs.filter((r: any) => r.caseId === caseId);
+      }
+
+      // Filter by search if provided
+      if (search) {
+        const searchLower = (search as string).toLowerCase();
+        repairs = repairs.filter((r: any) =>
+          r.title?.toLowerCase().includes(searchLower) ||
+          r.description?.toLowerCase().includes(searchLower) ||
+          r.id?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Sort by creation date (newest first) and limit
+      repairs = repairs
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limitNum);
+
+      res.json(repairs);
+    } catch (error) {
+      console.error("Error fetching repairs:", error);
+      res.status(500).json({ message: "Failed to fetch repairs" });
+    }
+  });
+
+  // Create repair
+  app.post("/api/repairs", requireAuth, async (req: any, res: any) => {
+    try {
+      const validatedData = insertRepairSchema.parse(req.body);
+      const repair = await storage.createRepair(validatedData as any);
+
+      await auditLog(req, "CREATE", "repairs", repair.id, {
+        title: repair.title,
+      });
+
+      res.status(201).json(repair);
+    } catch (error) {
+      console.error("Error creating repair:", error);
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to create repair",
       });
     }
   });
@@ -3762,7 +4378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/returns/:id/photos", requireAuth, photoUpload.single('photo'), async (req: any, res: any) => {
     try {
       const { id } = req.params;
-      
+
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
@@ -3784,7 +4400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the return's photos array
       const currentPhotos = returnData.photos || [];
       const updatedPhotos = [...currentPhotos, photoPath];
-      
+
       await storage.updateReturn(id, { photos: updatedPhotos });
 
       await auditLog(req, "UPDATE", "returns", id, {
@@ -3819,7 +4435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Remove the photo from the array
       const currentPhotos = returnData.photos || [];
       const updatedPhotos = currentPhotos.filter((p: string) => p !== photoPath);
-      
+
       await storage.updateReturn(id, { photos: updatedPhotos });
 
       await auditLog(req, "UPDATE", "returns", id, {
@@ -4006,8 +4622,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Safely extract SKUs from order line items in orderData
           const orderData = order.orderData as any;
           if (!orderData || !orderData.line_items) {
-            return res.status(400).json({ 
-              message: "Order does not have line items data. Cannot validate case items against this order." 
+            return res.status(400).json({
+              message: "Order does not have line items data. Cannot validate case items against this order."
             });
           }
 
@@ -4017,7 +4633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Validate that all case item SKUs exist in the order
           const invalidItems = validatedItems.filter(item => !orderSkus.has(item.sku));
           if (invalidItems.length > 0) {
-            return res.status(400).json({ 
+            return res.status(400).json({
               message: "Some items do not belong to the specified order",
               invalidSkus: invalidItems.map(item => item.sku)
             });
@@ -4062,9 +4678,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating case:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Validation error", 
-          errors: error.errors 
+        return res.status(400).json({
+          message: "Validation error",
+          errors: error.errors
         });
       }
       res.status(400).json({ message: "Failed to create case" });
@@ -4080,11 +4696,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fetch all related data in parallel
-      const [caseItems, caseLinks, caseEvents, caseNotes] = await Promise.all([
+      const [caseItems, caseLinks, caseEvents] = await Promise.all([
         storage.getCaseItems(id),
         storage.getCaseLinks(id),
-        storage.getCaseEvents(id),
-        storage.getCaseNotes(id)
+        storage.getCaseEvents(id)
       ]);
 
       // Return complete case data in one response
@@ -4093,7 +4708,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items: caseItems,
         links: caseLinks,
         events: caseEvents,
-        notes: caseNotes,
       });
     } catch (error) {
       console.error("Error fetching case:", error);
@@ -4457,6 +5071,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NOTES SYSTEM API ROUTES
   // ==========================================
 
+  // DEBUG ROUTE
+  app.get("/api/debug/notes", async (req, res) => {
+    try {
+      const allNotes = await db.select().from(notes).orderBy(desc(notes.createdAt)).limit(10);
+      const count = await db.select({ count: sql<number>`count(*)` }).from(notes);
+      const caseNotes = await db.select().from(notes).where(eq(notes.entityType, 'case'));
+
+      res.json({
+        totalCount: count[0].count,
+        recentNotes: allNotes,
+        caseNotes: caseNotes
+      });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  // DEBUG CREATE ROUTE
+  app.post("/api/debug/notes", async (req: any, res: any) => {
+    try {
+      // 1. Verify Enum
+      // Note: This raw query might vary based on postgres version, but works on standard pg
+      const enumResult = await db.execute(sql`SELECT unnest(enum_range(NULL::note_entity_type))`);
+      const enumValues = enumResult.map((r: any) => r.unnest);
+
+      // 2. Create Note
+      const testId = `debug-${Date.now()}`;
+      const noteData = {
+        entityType: "case",
+        entityId: testId,
+        content: "<p>Debug note persistence test</p>",
+        authorId: "00000000-0000-0000-0000-000000000000", // Force invalid ID
+        visibility: "internal",
+        source: "debug"
+      };
+
+      console.log("DEBUG: Attempting to create note", noteData);
+
+      const created = await storage.createNote(noteData as any);
+
+      console.log("DEBUG: Note created object", created);
+
+      // 3. Query back immediately
+      const queried = await db.select().from(notes).where(eq(notes.entityId, testId));
+
+      console.log("DEBUG: Queried back", queried);
+
+      res.json({
+        message: "Debug creation test",
+        enumValues,
+        created,
+        queried,
+        persisted: queried.length > 0,
+        match: queried.length > 0 && queried[0].id === created.id
+      });
+    } catch (error: any) {
+      console.error("DEBUG ERROR:", error);
+      res.status(500).json({ error: String(error), stack: error.stack });
+    }
+  });
+
   // Disable ETags for all notes routes to prevent 304 cached responses
   app.use('/api/notes*', (req, res, next) => {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
@@ -4484,9 +5159,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const notes = await storage.getNotes(entityType, entityId, filters);
-      
+
       console.log("DEBUG GET: Found notes:", notes.length);
-      
+
       res.json(notes);
     } catch (error) {
       console.error("Error fetching notes:", error);
@@ -4497,18 +5172,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/notes - Create a new note
   app.post("/api/notes", requireAuth, async (req: any, res: any) => {
     try {
-      console.log("DEBUG: Creating note with body:", JSON.stringify(req.body, null, 2));
-      
+      log(`DEBUG: Creating note with body: ${JSON.stringify(req.body, null, 2)}`);
+
+      // Explicitly remove deletedAt to prevent accidental soft-deletes
+      const cleanBody = { ...req.body };
+      delete cleanBody.deletedAt;
+      delete cleanBody.id; // Ensure ID is generated by DB/App
+
       const validatedData = insertNoteSchema.parse({
-        ...req.body,
+        ...cleanBody,
         authorId: req.user.id,
       });
 
-      console.log("DEBUG: Validated data:", JSON.stringify(validatedData, null, 2));
-      
+      log(`DEBUG: Validated data: ${JSON.stringify(validatedData, null, 2)}`);
+
       const note = await storage.createNote(validatedData);
 
-      console.log("DEBUG: Created note:", JSON.stringify(note, null, 2));
+      log(`DEBUG: Created note: ${JSON.stringify(note, null, 2)}`);
 
       await auditLog(req, "CREATE", "notes", note.id, {
         entityType: note.entityType,
@@ -5057,6 +5737,731 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching note links:", error);
       res.status(500).json({ error: "Failed to fetch note links" });
+    }
+  });
+
+  // ============================================
+  // TODO SUBTASKS ROUTES
+  // ============================================
+
+  // GET /api/todos/:todoId/subtasks
+  app.get("/api/todos/:todoId/subtasks", requireAuth, async (req: any, res: any) => {
+    try {
+      const { todoId } = req.params;
+      const result = await db
+        .select()
+        .from(subtasks)
+        .where(eq(subtasks.todoId, todoId))
+        .orderBy(subtasks.position);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching subtasks:", error);
+      res.status(500).json({ error: "Failed to fetch subtasks" });
+    }
+  });
+
+  // POST /api/todos/:todoId/subtasks
+  app.post("/api/todos/:todoId/subtasks", requireAuth, async (req: any, res: any) => {
+    try {
+      const { todoId } = req.params;
+      const { title } = req.body;
+
+      const maxPosition = await db
+        .select({ max: sql<number>`MAX(${subtasks.position})` })
+        .from(subtasks)
+        .where(eq(subtasks.todoId, todoId));
+
+      const position = (maxPosition[0]?.max || 0) + 1;
+
+      const [subtask] = await db
+        .insert(subtasks)
+        .values({
+          todoId,
+          title,
+          position,
+          completed: false,
+        })
+        .returning();
+
+      res.status(201).json(subtask);
+    } catch (error) {
+      console.error("Error creating subtask:", error);
+      res.status(400).json({ error: "Failed to create subtask" });
+    }
+  });
+
+  // PATCH /api/subtasks/:id
+  app.patch("/api/subtasks/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+
+      const [subtask] = await db
+        .update(subtasks)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(subtasks.id, id))
+        .returning();
+
+      res.json(subtask);
+    } catch (error) {
+      console.error("Error updating subtask:", error);
+      res.status(400).json({ error: "Failed to update subtask" });
+    }
+  });
+
+  // DELETE /api/subtasks/:id
+  app.delete("/api/subtasks/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      await db.delete(subtasks).where(eq(subtasks.id, id));
+      res.json({ message: "Subtask deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting subtask:", error);
+      res.status(400).json({ error: "Failed to delete subtask" });
+    }
+  });
+
+  // ============================================
+  // TODO ATTACHMENTS ROUTES
+  // ============================================
+
+  // GET /api/todos/:todoId/attachments
+  app.get("/api/todos/:todoId/attachments", requireAuth, async (req: any, res: any) => {
+    try {
+      const { todoId } = req.params;
+      const result = await db
+        .select()
+        .from(todoAttachments)
+        .where(eq(todoAttachments.todoId, todoId))
+        .orderBy(desc(todoAttachments.uploadedAt));
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching attachments:", error);
+      res.status(500).json({ error: "Failed to fetch attachments" });
+    }
+  });
+
+  // POST /api/todos/:todoId/attachments
+  app.post("/api/todos/:todoId/attachments", requireAuth, upload.single("file"), async (req: any, res: any) => {
+    try {
+      const { todoId } = req.params;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      const storageUrl = await objectStorage.uploadFile(file.buffer, file.originalname, file.mimetype);
+
+      const [attachment] = await db
+        .insert(todoAttachments)
+        .values({
+          todoId,
+          filename: file.originalname,
+          storageUrl,
+          contentType: file.mimetype,
+          size: file.size,
+          uploadedBy: req.user.id,
+        })
+        .returning();
+
+      res.status(201).json(attachment);
+    } catch (error) {
+      console.error("Error uploading attachment:", error);
+      res.status(400).json({ error: "Failed to upload attachment" });
+    }
+  });
+
+  // DELETE /api/todos/:todoId/attachments/:attachmentId
+  app.delete("/api/todos/:todoId/attachments/:attachmentId", requireAuth, async (req: any, res: any) => {
+    try {
+      const { attachmentId } = req.params;
+
+      const [attachment] = await db
+        .select()
+        .from(todoAttachments)
+        .where(eq(todoAttachments.id, attachmentId));
+
+      if (!attachment) {
+        return res.status(404).json({ error: "Attachment not found" });
+      }
+
+      await objectStorage.deleteFile(attachment.storageUrl);
+      await db.delete(todoAttachments).where(eq(todoAttachments.id, attachmentId));
+
+      res.json({ message: "Attachment deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting attachment:", error);
+      res.status(400).json({ error: "Failed to delete attachment" });
+    }
+  });
+
+  // ============================================
+  // MAIL SYSTEM ROUTES (NEW)
+  // ============================================
+
+
+
+  // POST /api/mail/refresh - Refresh mails from IMAP
+  app.post("/api/mail/refresh", requireAuth, async (req: any, res: any) => {
+    try {
+      const { force } = req.query;
+
+      // Rate limiting: max 1 refresh per 30s
+      const lastRefreshAt = await storage.getSetting('mail_last_refresh_at');
+      if (lastRefreshAt && !force) {
+        const timeSinceLastRefresh = Date.now() - new Date(lastRefreshAt).getTime();
+        if (timeSinceLastRefresh < 30000) {
+          return res.status(429).json({
+            error: 'Please wait 30 seconds between refreshes',
+            retryAfter: Math.ceil((30000 - timeSinceLastRefresh) / 1000)
+          });
+        }
+      }
+
+      // Get IMAP credentials from env
+      const imapHost = process.env.IMAP_HOST || 'imap.strato.de';
+      const imapPort = parseInt(process.env.IMAP_PORT || '993');
+      const imapUser = process.env.IMAP_USER;
+      const imapPass = process.env.IMAP_PASS;
+
+      if (!imapUser || !imapPass) {
+        return res.status(500).json({ error: 'IMAP credentials not configured' });
+      }
+
+      // Connect to IMAP
+      const client = new ImapFlow({
+        host: process.env.IMAP_HOST || '',
+        port: parseInt(process.env.IMAP_PORT || '993'),
+        secure: true,
+        auth: {
+          user: process.env.IMAP_USER || '',
+          pass: process.env.IMAP_PASS || ''
+        },
+        logger: false
+      });
+
+      await client.connect();
+      const mailbox = await client.mailboxOpen('INBOX');
+
+      // Get last sync timestamp
+      const lastSyncAt = await storage.getSetting('mail_last_sync_at');
+      const initialSyncDone = await storage.getSetting('mail_initial_sync_done');
+
+      let searchCriteria: any;
+      let syncMode: string;
+
+      // Determine sync strategy
+      if (force || !initialSyncDone) {
+        // Force sync or initial sync: Get last 2000 emails (newest)
+        const totalMessages = mailbox.exists;
+        if (totalMessages > 0) {
+          const startUid = Math.max(1, totalMessages - 1999);
+          searchCriteria = `${startUid}:*`;
+          syncMode = 'force';
+        } else {
+          searchCriteria = '1:*';
+          syncMode = 'force';
+        }
+      } else if (lastSyncAt) {
+        // Normal refresh: Get emails since last sync date
+        const lastSync = new Date(lastSyncAt);
+        searchCriteria = { since: lastSync };
+        syncMode = 'date-based';
+      } else {
+        // Fallback: get recent emails
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        searchCriteria = { since: yesterday };
+        syncMode = 'date-based';
+      }
+
+      let newMailCount = 0;
+
+      // Get UIDs to fetch
+      let uidsToFetch: number[];
+      if (syncMode === 'date-based') {
+        uidsToFetch = await client.search(searchCriteria);
+      } else {
+        uidsToFetch = [];
+      }
+
+      // Fetch emails
+      const fetchQuery = uidsToFetch.length > 0 ? uidsToFetch : searchCriteria;
+
+      for await (let msg of client.fetch(fetchQuery, { source: true, uid: true })) {
+        try {
+
+          // Check if already exists (deduplication)
+          const existing = await storage.getEmailByImapUid(msg.uid);
+          if (existing) {
+            continue;
+          }
+
+          // Parse email
+          const parsed = await simpleParser(msg.source);
+
+          // Sanitize HTML (server-side for security)
+          const cleanHtml = DOMPurify.sanitize(parsed.html || '', {
+            ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'img', 'div', 'span', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th'],
+            ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'style']
+          });
+
+          // Save email
+          const email = await storage.createEmail({
+            subject: parsed.subject || '(No subject)',
+            fromName: parsed.from?.value?.[0]?.name || '',
+            fromEmail: parsed.from?.value?.[0]?.address || '',
+            html: cleanHtml,
+            text: parsed.text || '',
+            date: parsed.date || new Date(),
+            imapUid: msg.uid
+          });
+
+          // Save attachments if any
+          if (parsed.attachments?.length) {
+            const attachmentData = [];
+
+            for (const att of parsed.attachments) {
+              // TODO: Save attachment to storage (Supabase or local)
+              // For now, just create metadata
+              const storagePath = `attachments/${email.id}/${att.filename}`;
+
+              attachmentData.push({
+                emailId: email.id,
+                filename: att.filename,
+                mimeType: att.contentType,
+                size: att.size,
+                storagePath: storagePath
+              });
+            }
+
+            if (attachmentData.length > 0) {
+              await storage.createEmailAttachmentBulk(attachmentData);
+            }
+          }
+
+          newMailCount++;
+        } catch (parseError) {
+          console.error('Failed to parse email:', parseError);
+          // Continue with next email
+        }
+      }
+
+      await client.logout();
+
+      // Update settings with current timestamp
+      await storage.setSetting('mail_last_sync_at', new Date().toISOString());
+      await storage.setSetting('mail_initial_sync_done', 'true');
+
+      // Keep only last 2000 emails
+      await storage.deleteOldEmails(2000);
+
+      res.json({
+        success: true,
+        newMails: newMailCount,
+        lastSync: new Date()
+      });
+
+    } catch (error: any) {
+      console.error('Mail refresh error:', error);
+
+      if (error.code === 'ETIMEDOUT') {
+        return res.status(503).json({ error: 'IMAP server timeout' });
+      }
+
+      res.status(500).json({
+        error: 'Failed to refresh mails',
+        message: error.message
+      });
+    }
+  });
+
+  // GET /api/mail/list - Get emails with cursor pagination
+  app.get("/api/mail/list", requireAuth, async (req: any, res: any) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const beforeDate = req.query.before as string; // ISO date
+      const beforeId = req.query.beforeId as string; // UUID
+
+      console.log('[MAIL] Pagination request:', { limit, beforeDate, beforeId });
+
+      // Fetch emails
+      const emails = await storage.getEmails({
+        limit,
+        beforeDate,
+        beforeId,
+        orderBy: 'date DESC'
+      });
+
+      console.log('[MAIL] Found emails:', emails.length);
+
+      // Check if there are more by fetching one more
+      let hasMore = false;
+      if (emails.length === limit) {
+        // Fetch one more to see if more exist
+        const lastEmail = emails[emails.length - 1];
+        const checkMore = await storage.getEmails({
+          limit: 1,
+          beforeDate: lastEmail.date,
+          beforeId: lastEmail.id,
+          orderBy: 'date DESC'
+        });
+        hasMore = checkMore.length > 0;
+      }
+
+      console.log('[MAIL] Returning:', { count: emails.length, hasMore });
+
+      // Fetch links for all emails
+      const emailsWithLinks = await Promise.all(
+        emails.map(async (email: any) => {
+          const links = await storage.getEmailLinks(email.id);
+          return {
+            ...email,
+            links: links || []
+          };
+        })
+      );
+
+      res.json({
+        emails: emailsWithLinks,
+        hasMore
+      });
+    } catch (error) {
+      console.error('Error fetching emails:', error);
+      res.status(500).json({ error: 'Failed to fetch emails' });
+    }
+  });
+
+  // GET /api/mail/:id - Get single email with attachments and links
+  app.get("/api/mail/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+
+      const email = await storage.getEmail(id);
+      if (!email) {
+        return res.status(404).json({ error: 'Email not found' });
+      }
+
+      const attachments = await storage.getEmailAttachmentsByEmailId(id);
+      const links = await storage.getEmailLinks(id);
+
+      res.json({
+        ...email,
+        attachments,
+        links
+      });
+    } catch (error) {
+      console.error('Error fetching email:', error);
+      res.status(500).json({ error: 'Failed to fetch email' });
+    }
+  });
+
+  // GET /api/email-threads - Get emails linked to a case
+  app.get("/api/email-threads", requireAuth, async (req: any, res: any) => {
+    try {
+      const { caseId } = req.query;
+
+      if (!caseId) {
+        return res.status(400).json({ error: 'caseId is required' });
+      }
+
+      console.log('[EMAIL-THREADS] Fetching emails for caseId:', caseId);
+
+      // Get all email links for this case
+      const links = await db.select()
+        .from(emailLinks)
+        .where(and(
+          eq(emailLinks.entityType, 'case'),
+          eq(emailLinks.entityId, caseId)
+        ));
+
+      console.log('[EMAIL-THREADS] Found', links.length, 'links');
+
+      // Fetch the actual emails
+      const emailIds = links.map(link => link.emailId);
+
+      if (emailIds.length === 0) {
+        return res.json([]);
+      }
+
+      const emailsData = await Promise.all(
+        emailIds.map(async (emailId) => {
+          const email = await storage.getEmail(emailId);
+          return email;
+        })
+      );
+
+      // Filter out any null results and format as email threads
+      const emails = emailsData
+        .filter(e => e !== null && e !== undefined)
+        .map(email => ({
+          id: email!.id,
+          subject: email!.subject || '(No subject)',
+          customerEmail: email!.fromEmail || 'Unknown',
+          isUnread: false,
+          createdAt: email!.createdAt
+        }));
+
+      console.log('[EMAIL-THREADS] Returning', emails.length, 'emails');
+
+      res.json(emails);
+    } catch (error) {
+      console.error('[EMAIL-THREADS] Error fetching email threads:', error);
+      res.status(500).json({ error: 'Failed to fetch email threads' });
+    }
+  });
+
+  // DELETE /api/cases/:caseId/emails/:emailId - Unlink email from case
+  app.delete("/api/cases/:caseId/emails/:emailId", requireAuth, async (req: any, res: any) => {
+    try {
+      const { caseId, emailId } = req.params;
+
+      if (!caseId || !emailId) {
+        return res.status(400).json({ error: 'caseId and emailId are required' });
+      }
+
+      console.log('[UNLINK-EMAIL] Unlinking email', emailId, 'from case', caseId);
+
+      // Delete from email_links
+      await db.delete(emailLinks)
+        .where(and(
+          eq(emailLinks.entityType, 'case'),
+          eq(emailLinks.entityId, caseId),
+          eq(emailLinks.emailId, emailId)
+        ));
+
+      res.json({ message: 'Email unlinked successfully' });
+    } catch (error) {
+      console.error('[UNLINK-EMAIL] Error unlinking email:', error);
+      res.status(500).json({ error: 'Failed to unlink email' });
+    }
+  });
+
+
+  // DELETE /api/mail/links/:id - Delete an email link
+  app.delete("/api/mail/links/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({ error: 'Link ID is required' });
+      }
+
+      console.log('[MAIL] Deleting link:', id);
+
+      await db.delete(emailLinks).where(eq(emailLinks.id, id));
+
+      res.json({ message: 'Link deleted successfully' });
+    } catch (error) {
+      console.error('[MAIL] Error deleting link:', error);
+      res.status(500).json({ error: 'Failed to delete link' });
+    }
+  });
+
+  // POST /api/mail/link - Link email to entity (order/case/return/repair)
+  app.post("/api/mail/link", requireAuth, async (req: any, res: any) => {
+    try {
+      const { emailId, entityType, entityId } = req.body;
+
+      if (!emailId || !entityType || !entityId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      const link = await storage.createEmailLink({
+        emailId,
+        entityType,
+        entityId
+      });
+
+      await auditLog(req, "LINK", "email_links", link.id, {
+        emailId,
+        entityType,
+        entityId
+      });
+
+      res.status(201).json({ link });
+    } catch (error) {
+      console.error('Error linking email:', error);
+      res.status(400).json({ error: 'Failed to link email' });
+    }
+  });
+
+  // POST /api/mail/threads/:id/link - Link email thread to entity (alternative endpoint format)
+  app.post("/api/mail/threads/:id/link", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id: emailId } = req.params;
+      const { type: entityType, entityId } = req.body;
+
+      if (!emailId || !entityType || !entityId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      const link = await storage.createEmailLink({
+        emailId,
+        entityType,
+        entityId
+      });
+
+      await auditLog(req, "LINK", "email_links", link.id, {
+        emailId,
+        entityType,
+        entityId
+      });
+
+      res.status(201).json({ link });
+    } catch (error) {
+      console.error('Error linking email:', error);
+      res.status(400).json({ error: 'Failed to link email' });
+    }
+  });
+
+  // GET /api/mail/attachments/:id/download - Download attachment
+  app.get("/api/mail/attachments/:id/download", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+
+      // Get attachment metadata
+      const attachments = await db.select()
+        .from(emailAttachments)
+        .where(eq(emailAttachments.id, id))
+        .limit(1);
+
+      if (attachments.length === 0) {
+        return res.status(404).json({ error: 'Attachment not found' });
+      }
+
+      const attachment = attachments[0];
+
+      // TODO: In production, retrieve actual file from storage
+      // For now, return a placeholder response with metadata
+      res.json({
+        message: 'Attachment download not yet implemented',
+        attachment: {
+          filename: attachment.filename,
+          mimeType: attachment.mimeType,
+          size: attachment.size,
+          storagePath: attachment.storagePath
+        },
+        note: 'File storage integration needed (Supabase Storage or local filesystem)'
+      });
+
+      // Future implementation would be:
+      // const fileBuffer = await objectStorage.getAttachment(attachment.storagePath);
+      // res.setHeader('Content-Type', attachment.mimeType);
+      // res.setHeader('Content-Disposition', `attachment; filename="${attachment.filename}"`);
+      // res.send(fileBuffer);
+
+    } catch (error) {
+      console.error('Error downloading attachment:', error);
+      res.status(500).json({ error: 'Failed to download attachment' });
+    }
+  });
+
+  // POST /api/shopify/sync-returns - Sync returns from Shopify
+  app.post("/api/shopify/sync-returns", async (req: any, res: any) => {
+    // Allow internal calls (from scheduled sync) without auth
+    const isInternalCall = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+
+    if (!isInternalCall && !req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      console.log('🔄 Starting Shopify returns sync via API request');
+
+      const { syncShopifyReturns } = await import('./services/shopifyReturnsSync');
+
+      // Check for fullSync parameter (one-time fetch of ALL returns)
+      const fullSync = req.query.fullSync === 'true';
+
+      let processedCount = 0;
+      let totalCount = 0;
+      let currentMessage = '';
+
+
+      const result = await syncShopifyReturns(storage, (current, total, message) => {
+        processedCount = current;
+        totalCount = total || processedCount;
+        currentMessage = message;
+        console.log(`Progress: ${message}`);
+      }, fullSync);
+
+      if (isInternalCall || req.user) {
+        await auditLog(req, "SYNC", "shopify_returns", null, {
+          ...result,
+          source: isInternalCall ? 'scheduled' : 'manual'
+        });
+      }
+
+      res.json({
+        success: true,
+        ...result,
+        message: `${result.created} nieuwe returns geïmporteerd, ${result.updated} bijgewerkt`
+      });
+    } catch (error: any) {
+      console.error('Error syncing Shopify returns:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to sync Shopify returns'
+      });
+    }
+  });
+
+  // POST /api/shopify/webhooks/returns - Webhook endpoint for Shopify returns
+  app.post('/api/shopify/webhooks/returns', express.raw({ type: 'application/json' }), async (req: any, res: any) => {
+    try {
+      const { validateShopifyWebhook, getWebhookTopic, getWebhookShop } = await import('./services/shopifyWebhookValidator');
+
+      // Get webhook secret from environment
+      const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        console.error('❌ SHOPIFY_WEBHOOK_SECRET not configured');
+        return res.status(500).json({ error: 'Webhook secret not configured' });
+      }
+
+      // Log webhook receipt
+      const topic = getWebhookTopic(req);
+      const shop = getWebhookShop(req);
+      console.log('📨 Received Shopify webhook:', { topic, shop });
+
+      // Validate HMAC signature
+      if (!validateShopifyWebhook(req, webhookSecret)) {
+        console.error('❌ Invalid webhook signature');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+
+      // Parse the body (it's raw buffer from express.raw())
+      const payload = JSON.parse(req.body.toString('utf8'));
+
+      console.log('✅ Webhook validated successfully', {
+        topic,
+        returnId: payload.id,
+        returnName: payload.name
+      });
+
+      // Process webhook asynchronously (don't block response)
+      setImmediate(async () => {
+        try {
+          const { processReturnWebhook } = await import('./services/shopifyReturnsWebhookProcessor');
+          const result = await processReturnWebhook(payload.id, storage);
+
+          if (result.success) {
+            console.log(`✅ Webhook processed successfully: ${result.returnNumber}`);
+          } else {
+            console.error(`❌ Webhook processing failed: ${result.error}`);
+          }
+        } catch (error) {
+          console.error('❌ Error processing return webhook:', error);
+        }
+      });
+
+      // Respond immediately to Shopify
+      res.status(200).json({ received: true });
+
+    } catch (error: any) {
+      console.error('❌ Webhook error:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 

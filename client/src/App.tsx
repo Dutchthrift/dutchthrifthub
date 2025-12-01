@@ -8,14 +8,14 @@ import { AuthProvider } from "@/providers/auth-provider";
 import ProtectedRoute from "@/components/auth/protected-route";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
-import Inbox from "@/pages/inbox";
+import Mail from "@/pages/mail";
 import Cases from "@/pages/cases";
 import Orders from "@/pages/orders";
 import PurchaseOrders from "@/pages/purchase-orders";
 import Repairs from "@/pages/repairs";
 import Todos from "@/pages/todos";
 import Returns from "@/pages/returns";
-import ReturnDetail from "@/pages/return-detail";
+import ReturnDetail from "@/pages/return-detail-page";
 import CustomerDetail from "@/pages/customer-detail";
 import CaseDetail from "@/pages/case-detail";
 import UserManagement from "@/pages/user-management";
@@ -25,154 +25,154 @@ function Router() {
   return (
     <Switch>
       {/* Dashboard - accessible by ADMIN and SUPPORT only */}
-      <Route 
-        path="/" 
+      <Route
+        path="/"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={Dashboard}
             roles={["ADMIN", "SUPPORT"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
       {/* User Management - ADMIN only */}
-      <Route 
-        path="/users" 
+      <Route
+        path="/users"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={UserManagement}
             roles={["ADMIN"]}
-            {...props} 
+            {...props}
           />
         )}
       />
 
       {/* Settings - ADMIN only */}
-      <Route 
-        path="/settings" 
+      <Route
+        path="/settings"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={Settings}
             roles={["ADMIN"]}
-            {...props} 
+            {...props}
           />
         )}
       />
 
       {/* Repairs - ADMIN and TECHNICUS only */}
-      <Route 
-        path="/repairs" 
+      <Route
+        path="/repairs"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={Repairs}
             roles={["ADMIN", "TECHNICUS"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
       {/* Cases - ADMIN and SUPPORT only */}
-      <Route 
-        path="/cases" 
+      <Route
+        path="/cases"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={Cases}
             roles={["ADMIN", "SUPPORT"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
-      <Route 
-        path="/cases/:id" 
+      <Route
+        path="/cases/:id"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={CaseDetail}
             roles={["ADMIN", "SUPPORT"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
-      {/* Inbox - ADMIN and SUPPORT only */}
-      <Route 
-        path="/inbox" 
+      {/* Mail - ADMIN and SUPPORT only */}
+      <Route
+        path="/inbox"
         component={(props: any) => (
-          <ProtectedRoute 
-            component={Inbox}
+          <ProtectedRoute
+            component={Mail}
             roles={["ADMIN", "SUPPORT"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
       {/* Other protected routes */}
-      <Route 
-        path="/orders" 
+      <Route
+        path="/orders"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={Orders}
             roles={["ADMIN", "SUPPORT"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
-      <Route 
-        path="/purchase-orders" 
+      <Route
+        path="/purchase-orders"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={PurchaseOrders}
             roles={["ADMIN", "SUPPORT"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
-      <Route 
-        path="/todos" 
+      <Route
+        path="/todos"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={Todos}
             roles={["ADMIN", "SUPPORT"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
       {/* Returns - ADMIN and SUPPORT only */}
-      <Route 
-        path="/returns" 
+      <Route
+        path="/returns"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={Returns}
             roles={["ADMIN", "SUPPORT"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
-      <Route 
-        path="/returns/:id" 
+      <Route
+        path="/returns/:id"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={ReturnDetail}
             roles={["ADMIN", "SUPPORT"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
-      <Route 
-        path="/customers/:id" 
+      <Route
+        path="/customers/:id"
         component={(props: any) => (
-          <ProtectedRoute 
+          <ProtectedRoute
             component={CustomerDetail}
             roles={["ADMIN", "SUPPORT"]}
-            {...props} 
+            {...props}
           />
-        )} 
+        )}
       />
 
       <Route component={NotFound} />

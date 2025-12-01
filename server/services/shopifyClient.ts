@@ -32,35 +32,35 @@ class ShopifyClient {
     // Support both old and new credential formats
     this.accessToken = process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_PASSWORD || '';
     this.shopDomain = process.env.SHOPIFY_SHOP_DOMAIN || '';
-    
+
     console.log('Shopify Client initialized with:', {
       hasAccessToken: !!this.accessToken,
       shopDomain: this.shopDomain,
       tokenLength: this.accessToken.length
     });
-    
+
     // Ensure proper domain format
     let domain = this.shopDomain;
     if (!domain.includes('.myshopify.com')) {
       domain = `${domain}.myshopify.com`;
     }
-    
-    this.baseUrl = `https://${domain}/admin/api/2024-01`;
+
+    this.baseUrl = `https://${domain}/admin/api/2024-10`;
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     if (!this.accessToken || !this.shopDomain) {
       throw new Error('Shopify credentials not configured. Please set SHOPIFY_ACCESS_TOKEN and SHOPIFY_SHOP_DOMAIN environment variables.');
     }
-    
+
     console.log('Making Shopify API request:', {
       url,
       hasToken: !!this.accessToken,
       tokenPrefix: this.accessToken.substring(0, 8) + '...',
     });
-    
+
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -86,14 +86,54 @@ class ShopifyClient {
     return result;
   }
 
+  public async makeGraphQLRequest(query: string, variables: any = {}) {
+    const url = `${this.baseUrl}/graphql.json`;
+
+    if (!this.accessToken || !this.shopDomain) {
+      throw new Error('Shopify credentials not configured');
+    }
+
+    console.log('Making Shopify GraphQL request');
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': this.accessToken,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Shopify GraphQL Error:', {
+        status: response.status,
+        errorText
+      });
+      throw new Error(`Shopify GraphQL error: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    if (result.errors) {
+      console.error('GraphQL Errors:', result.errors);
+      throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
+    }
+
+    console.log('Shopify GraphQL response received');
+    return result.data;
+  }
+
   async getOrders(params: {
     limit?: number;
     since_id?: string;
     created_at_min?: string;
+    updated_at_min?: string;
     status?: string;
+    order?: string;
   } = {}) {
     const searchParams = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
       if (value) {
         searchParams.append(key, value.toString());
@@ -102,7 +142,7 @@ class ShopifyClient {
 
     const endpoint = `/orders.json${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
     const response = await this.makeRequest(endpoint);
-    
+
     return response.orders as ShopifyOrder[];
   }
 
@@ -129,14 +169,14 @@ class ShopifyClient {
       }
 
       const batchOrders = await this.getOrders(params);
-      
+
       if (batchOrders.length === 0) {
         hasMore = false;
         break;
       }
 
       allOrders.push(...batchOrders);
-      
+
       // Update progress callback
       if (onProgress) {
         onProgress(allOrders.length);
@@ -166,7 +206,7 @@ class ShopifyClient {
     let hasMore = true;
     let batchCount = 0;
     let sinceId: string | undefined = undefined;
-    
+
     const createdAtMin = sinceDate.toISOString();
     console.log(`📅 Starting to fetch orders created since: ${createdAtMin}`);
 
@@ -186,14 +226,14 @@ class ShopifyClient {
       }
 
       const batchOrders = await this.getOrders(params);
-      
+
       if (batchOrders.length === 0) {
         hasMore = false;
         break;
       }
 
       allOrders.push(...batchOrders);
-      
+
       if (onProgress) {
         onProgress(allOrders.length);
       }
@@ -235,14 +275,14 @@ class ShopifyClient {
       }
 
       const batchCustomers = await this.getCustomers(params);
-      
+
       if (batchCustomers.length === 0) {
         hasMore = false;
         break;
       }
 
       allCustomers.push(...batchCustomers);
-      
+
       if (onProgress) {
         onProgress(allCustomers.length);
       }
@@ -272,7 +312,7 @@ class ShopifyClient {
     since_id?: string;
   } = {}) {
     const searchParams = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
       if (value) {
         searchParams.append(key, value.toString());
@@ -281,7 +321,7 @@ class ShopifyClient {
 
     const endpoint = `/customers.json${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
     const response = await this.makeRequest(endpoint);
-    
+
     return response.customers;
   }
 
@@ -298,6 +338,313 @@ class ShopifyClient {
 
     return response.order;
   }
+
+  // Returns methods using GraphQL
+  async getReturns(params: {
+    first?: number;
+    after?: string;
+    query?: string;
+  } = {}) {
+    const { first = 50, after, query: searchQuery } = params;
+
+    // Query orders to get returns, as there is no root returns query for listing
+    // Based on Shopify documentation example
+    const query = `
+      query getReturns($first: Int!, $after: String, $query: String) {
+        orders(first: $first, after: $after, query: $query) {
+          edges {
+            node {
+              id
+              name
+              createdAt
+              returns(first: 20) {
+                edges {
+                  node {
+                    id
+                    name
+                    status
+                    createdAt
+                    order {
+                      id
+                      name
+                    }
+                    returnLineItems(first: 50) {
+                      edges {
+                        node {
+                          id
+                          quantity
+                          returnReason
+                          returnReasonNote
+                          customerNote
+                          refundableQuantity
+                          refundedQuantity
+                          fulfillmentLineItem {
+                            lineItem {
+                              id
+                              title
+                              sku
+                              price
+                            }
+                          }
+                        }
+                      }
+                    }
+                    totalQuantity
+                  }
+                }
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      first,
+      after,
+      query: searchQuery
+    };
+
+    const data = await this.makeGraphQLRequest(query, variables);
+
+    // Flatten returns from all orders
+    const returns = data.orders.edges.flatMap((edge: any) =>
+      edge.node.returns.edges.map((returnEdge: any) => returnEdge.node)
+    );
+
+    return {
+      returns,
+      pageInfo: data.orders.pageInfo
+    };
+  }
+
+  async getReturnsSinceDate(sinceDate: Date, onProgress?: (processed: number) => void) {
+    const createdAtMin = sinceDate.toISOString();
+    // Use updated_at for orders query, as creating/updating a return updates the order
+    // AND filter by return_status to only get active returns (REQUESTED or IN_PROGRESS)
+    // This avoids fetching old completed/cancelled returns
+    // NOTE: We REMOVED updated_at filter to ensure we get ALL active returns regardless of when they were last updated
+    const searchQuery = `return_status:RETURN_REQUESTED OR return_status:IN_PROGRESS`;
+
+    console.log(`📦 Starting to fetch return IDs via orders updated since: ${createdAtMin}`);
+
+    // Step 1: Fetch all return IDs using lightweight query
+    const returnIds: string[] = [];
+    let hasMore = true;
+    let cursor: string | undefined = undefined;
+    let batchCount = 0;
+
+    while (hasMore) {
+      batchCount++;
+      console.log(`Fetching return IDs batch ${batchCount}${cursor ? ` (after cursor)` : ''}`);
+
+      // Lightweight query - only fetch IDs
+      const query = `
+        query getReturnIds($first: Int!, $after: String, $query: String) {
+          orders(first: $first, after: $after, query: $query) {
+            edges {
+              node {
+                id
+                returns(first: 20) {
+                  edges {
+                    node {
+                      id
+                      name
+                    }
+                  }
+                }
+              }
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+          }
+        }
+      `;
+
+      const variables = {
+        first: 50,
+        after: cursor,
+        query: searchQuery
+      };
+
+      const data = await this.makeGraphQLRequest(query, variables);
+
+      // Extract return IDs
+      const batchIds = data.orders.edges.flatMap((edge: any) =>
+        edge.node.returns.edges.map((returnEdge: any) => returnEdge.node.id)
+      );
+
+      returnIds.push(...batchIds);
+      console.log(`Batch ${batchCount}: Found ${batchIds.length} return IDs (total: ${returnIds.length})`);
+
+      if (!data.orders.pageInfo.hasNextPage) {
+        hasMore = false;
+      } else {
+        cursor = data.orders.pageInfo.endCursor;
+      }
+
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+
+    console.log(`✅ Found ${returnIds.length} return IDs, now fetching full data...`);
+
+    // Step 2: Fetch complete data for each return using getReturnById
+    const allReturns: any[] = [];
+
+    for (let i = 0; i < returnIds.length; i++) {
+      const returnId = returnIds[i];
+
+      try {
+        const fullReturn = await this.getReturnById(returnId);
+        allReturns.push(fullReturn);
+
+        if (onProgress) {
+          onProgress(allReturns.length);
+        }
+
+        console.log(`[${i + 1}/${returnIds.length}] Fetched: ${fullReturn.name}`);
+
+        // Rate limiting - be conservative with individual return queries
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`❌ Failed to fetch return ${returnId}:`, error);
+        // Continue with next return
+      }
+    }
+
+    console.log(`✅ Completed returns sync: ${allReturns.length}/${returnIds.length} returns retrieved`);
+    return allReturns;
+  }
+
+  /**
+   * Fetch a single return by ID with complete data
+   * This uses the return(id:) query which provides full return details
+   * unlike the limited data from orders.returns
+   */
+  async getReturnById(returnId: string): Promise<ShopifyReturn> {
+    console.log(`📦 Fetching return by ID: ${returnId}`);
+
+    // Ultra-minimal query - only fields that actually exist in the API
+    const query = `
+      query getReturn($id: ID!) {
+        return(id: $id) {
+          id
+          name
+          status
+          order {
+            id
+            name
+            createdAt
+            customer {
+              id
+              displayName
+              email
+            }
+          }
+          returnLineItems(first: 50) {
+            nodes {
+              ... on ReturnLineItem {
+                id
+                quantity
+                returnReason
+                returnReasonNote
+                customerNote
+                refundableQuantity
+                refundedQuantity
+                fulfillmentLineItem {
+                  lineItem {
+                    title
+                    sku
+                    variantTitle
+                    originalUnitPriceSet {
+                      shopMoney {
+                        amount
+                        currencyCode
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          totalQuantity
+        }
+      }
+    `;
+
+    const variables = {
+      id: returnId
+    };
+
+    const data = await this.makeGraphQLRequest(query, variables);
+
+    if (!data.return) {
+      throw new Error(`Return not found: ${returnId}`);
+    }
+
+    // Transform nodes to edges format to match ShopifyReturn interface
+    // Use order createdAt as fallback for return date
+    const returnData = {
+      ...data.return,
+      orderCreatedAt: data.return.order.createdAt, // Enrich with order date
+      returnLineItems: {
+        edges: data.return.returnLineItems.nodes.map((node: any) => ({ node }))
+      }
+    };
+
+    console.log(`✅ Retrieved return: ${returnData.name}`);
+    return returnData;
+  }
+}
+
+export interface ShopifyReturn {
+  id: string; // gid://shopify/Return/...
+  name: string; // #1001-R1
+  status: 'OPEN' | 'REQUESTED' | 'CLOSED' | 'CANCELLED' | 'COMPLETE' | 'DECLINED';
+  order: {
+    id: string;
+    name: string; // #1001
+    customer?: {
+      id: string;
+      displayName: string;
+      email: string;
+    };
+  };
+  orderCreatedAt?: string; // Enriched from order data
+  returnLineItems: {
+    edges: Array<{
+      node: {
+        id: string;
+        quantity: number;
+        returnReason: string | null;
+        returnReasonNote: string | null;
+        customerNote: string | null;
+        refundableQuantity: number;
+        refundedQuantity: number;
+        fulfillmentLineItem?: {
+          lineItem: {
+            title: string;
+            sku: string | null;
+            variantTitle: string | null;
+            originalUnitPriceSet?: {
+              shopMoney: {
+                amount: string;
+                currencyCode: string;
+              };
+            };
+          };
+        };
+      };
+    }>;
+  };
+  totalQuantity: number;
 }
 
 export const shopifyClient = new ShopifyClient();

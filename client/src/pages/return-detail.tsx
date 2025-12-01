@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
+import type { User } from "@shared/schema";
 import { Navigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,17 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  ArrowLeft, 
+import {
+  ArrowLeft,
   Package,
-  User,
+  User as UserIcon,
   Calendar,
   Clock,
   AlertTriangle,
@@ -31,12 +32,14 @@ import {
   ShoppingCart,
   Image,
   Trash2,
-  Upload
+  Upload,
+  StickyNote
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { NotesPanel } from "@/components/notes/NotesPanel";
 
 interface ReturnItem {
   id: string;
@@ -149,6 +152,16 @@ export default function ReturnDetail() {
     enabled: !!returnId,
   });
 
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/session"],
+    queryFn: async () => {
+      const response = await fetch("/api/auth/session");
+      if (!response.ok) throw new Error("Not authenticated");
+      const data = await response.json();
+      return data.user;
+    },
+  });
+
   const { data: users } = useQuery<any[]>({
     queryKey: ["/api/users/list"],
   });
@@ -163,7 +176,7 @@ export default function ReturnDetail() {
       toast({ title: "Status updated successfully" });
     },
     onError: () => {
-      toast({ 
+      toast({
         title: "Failed to update status",
         variant: "destructive"
       });
@@ -180,7 +193,7 @@ export default function ReturnDetail() {
       toast({ title: "Priority updated successfully" });
     },
     onError: () => {
-      toast({ 
+      toast({
         title: "Failed to update priority",
         variant: "destructive"
       });
@@ -199,7 +212,7 @@ export default function ReturnDetail() {
       setSelectedUserId("");
     },
     onError: () => {
-      toast({ 
+      toast({
         title: "Failed to assign user",
         variant: "destructive"
       });
@@ -226,7 +239,7 @@ export default function ReturnDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
       toast({ title: "Photo uploaded successfully" });
     } catch (error) {
-      toast({ 
+      toast({
         title: "Failed to upload photo",
         variant: "destructive"
       });
@@ -246,7 +259,7 @@ export default function ReturnDetail() {
       toast({ title: "Photo deleted successfully" });
     },
     onError: () => {
-      toast({ 
+      toast({
         title: "Failed to delete photo",
         variant: "destructive"
       });
@@ -291,7 +304,7 @@ export default function ReturnDetail() {
   return (
     <div className="flex flex-col h-screen bg-background">
       <Navigation />
-      
+
       <main className="flex-1 overflow-y-auto">
         <div className="container mx-auto p-6 max-w-7xl">
           <Button
@@ -424,6 +437,10 @@ export default function ReturnDetail() {
                 <TabsTrigger value="items" data-testid="tab-items">Items</TabsTrigger>
                 <TabsTrigger value="photos" data-testid="tab-photos">Photos</TabsTrigger>
                 <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="notes" data-testid="tab-notes">
+                  <StickyNote className="h-4 w-4 mr-2" />
+                  Notes
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6 mt-6">
@@ -502,14 +519,7 @@ export default function ReturnDetail() {
                       )}
                     </div>
 
-                    {returnData.internalNotes && (
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Internal Notes</label>
-                        <p className="mt-1 text-sm whitespace-pre-wrap" data-testid="text-internal-notes">
-                          {returnData.internalNotes}
-                        </p>
-                      </div>
-                    )}
+
 
                     {returnData.refundAmount != null && (
                       <div className="border-t border-border pt-6">
@@ -726,6 +736,12 @@ export default function ReturnDetail() {
                     </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="notes" className="mt-6">
+                {currentUser && returnId && (
+                  <NotesPanel entityType="return" entityId={returnId} currentUser={currentUser} />
+                )}
               </TabsContent>
             </Tabs>
           </div>

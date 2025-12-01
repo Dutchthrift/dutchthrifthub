@@ -100,11 +100,11 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
         page: "1",
         limit: "50",
       });
-      
+
       if (orderSearchQuery) {
         params.append("search", orderSearchQuery);
       }
-      
+
       const response = await fetch(`/api/orders?${params}`);
       if (!response.ok) {
         throw new Error("Failed to fetch orders");
@@ -139,8 +139,8 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('[data-testid="order-search-input"]') && 
-          !target.closest('[data-testid="order-search-dropdown"]')) {
+      if (!target.closest('[data-testid="order-search-input"]') &&
+        !target.closest('[data-testid="order-search-dropdown"]')) {
         setOrderSearchOpen(false);
       }
     };
@@ -163,11 +163,11 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
   // Combine selected order with search results to ensure it's always available
   const orders = useMemo(() => {
     const ordersList = ordersData?.orders || [];
-    
+
     if (selectedOrderData && !ordersList.find((o: any) => o.id === selectedOrderData.id)) {
       return [selectedOrderData, ...ordersList];
     }
-    
+
     return ordersList;
   }, [ordersData, selectedOrderData]);
 
@@ -203,7 +203,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
           return;
         }
       }
-      
+
       form.setValue("orderId", orderId);
       form.setValue("customerId", order.customerId || null);
       form.setValue("customerEmail", order.customerEmail || null);
@@ -214,24 +214,27 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
   const createCaseMutation = useMutation({
     mutationFn: async (data: CreateCaseFormValues & { items?: any[] }) => {
       const { items, ...caseFields } = data;
-      
+
       const caseData = {
         ...caseFields,
         orderId: (caseFields.orderId && caseFields.orderId !== "none") ? caseFields.orderId : null,
         assignedUserId: caseFields.assignedUserId || null,
         items: items || [],
       };
-      
+
       const response = await apiRequest("POST", "/api/cases", caseData);
       const newCase = await response.json();
-      
+
       return newCase;
     },
     onSuccess: async (newCase) => {
       // Link email thread if provided
       if (emailThread?.id) {
         try {
-          await apiRequest("PATCH", `/api/email-threads/${emailThread.id}`, { caseId: newCase.id });
+          await apiRequest("POST", `/api/mail/threads/${emailThread.id}/link`, {
+            type: 'case',
+            entityId: newCase.id
+          });
         } catch (error) {
           console.error("Failed to link email thread to case:", error);
         }
@@ -239,12 +242,12 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
 
       queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/email-threads"] });
-      
+
       toast({
         title: "Case aangemaakt",
         description: `Case "${newCase.title}" (${newCase.caseNumber}) is succesvol aangemaakt${selectedItems.size > 0 ? ` met ${selectedItems.size} artikel(en)` : ''}.`,
       });
-      
+
       onOpenChange(false);
       form.reset();
       setSelectedItems(new Map());
@@ -310,13 +313,13 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
             Maak een nieuwe case aan om dit klantverzoek gestructureerd te beheren.
           </DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Basic Information */}
             <div className="space-y-4">
               <h3 className="text-sm font-medium">Basis Informatie</h3>
-              
+
               <FormField
                 control={form.control}
                 name="title"
@@ -445,9 +448,9 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                         />
                       </FormControl>
                       <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      
+
                       {orderSearchOpen && (
-                        <div 
+                        <div
                           className="absolute z-[100] w-full mt-1 bg-popover border rounded-md shadow-md max-h-[300px] overflow-y-auto"
                           data-testid="order-search-dropdown"
                         >

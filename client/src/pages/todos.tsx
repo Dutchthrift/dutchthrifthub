@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  Search, 
-  Filter, 
+import {
+  Search,
+  Filter,
   Plus,
   CheckSquare,
   Calendar,
@@ -52,7 +52,7 @@ export default function Todos() {
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [selectedTask, setSelectedTask] = useState<Todo | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "kanban" | "calendar">("list");
+  const [viewMode, setViewMode] = useState<"list" | "kanban" | "calendar">("kanban");
   const { toast } = useToast();
   const { user } = useAuth();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -85,20 +85,45 @@ export default function Todos() {
       if (!response.ok) throw new Error("Failed to update todo");
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
-      toast({
-        title: "Todo updated",
-        description: "Todo status has been updated successfully",
-      });
+    onMutate: async ({ id, data }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["/api/todos"] });
+
+      // Snapshot previous value
+      const previousTodos = queryClient.getQueryData<Todo[]>(["/api/todos", { userId: (isTechnicus || (canSeeAllTasks && taskScope === "my")) && user?.id ? user.id : undefined }]);
+
+      // Optimistically update
+      queryClient.setQueryData<Todo[]>(
+        ["/api/todos", { userId: (isTechnicus || (canSeeAllTasks && taskScope === "my")) && user?.id ? user.id : undefined }],
+        (old) => old?.map((todo) => (todo.id === id ? { ...todo, ...data } : todo)) || []
+      );
+
+      return { previousTodos };
     },
-    onError: () => {
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousTodos) {
+        queryClient.setQueryData(
+          ["/api/todos", { userId: (isTechnicus || (canSeeAllTasks && taskScope === "my")) && user?.id ? user.id : undefined }],
+          context.previousTodos
+        );
+      }
       toast({
         title: "Update failed",
         description: "Failed to update todo",
         variant: "destructive",
       });
-    }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Todo updated",
+        description: "Todo status has been updated successfully",
+      });
+    },
+    onSettled: () => {
+      // Refetch after mutation settles
+      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+    },
   });
 
   const deleteTodoMutation = useMutation({
@@ -125,9 +150,9 @@ export default function Todos() {
   const filteredTodos = todos?.filter(todo => {
     if (statusFilter !== "all" && todo.status !== statusFilter) return false;
     if (priorityFilter !== "all" && todo.priority !== priorityFilter) return false;
-    if (searchQuery && 
-        !todo.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !todo.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (searchQuery &&
+      !todo.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !todo.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   }) || [];
 
@@ -146,7 +171,7 @@ export default function Todos() {
 
   const myTasks = todos?.filter(t => t.assignedUserId === user?.id).length || 0;
 
-  const highPriorityTasks = todos?.filter(t => 
+  const highPriorityTasks = todos?.filter(t =>
     t.priority === 'urgent' || t.priority === 'high'
   ).length || 0;
 
@@ -156,7 +181,7 @@ export default function Todos() {
     acc[category] = (acc[category] || 0) + 1;
     return acc;
   }, {} as Record<string, number>) || {};
-  
+
   const topCategory = Object.entries(categoryCount).sort((a, b) => b[1] - a[1])[0];
   const topCategoryName = topCategory ? topCategory[0].charAt(0).toUpperCase() + topCategory[0].slice(1) : 'Other';
   const topCategoryCount = topCategory ? topCategory[1] : 0;
@@ -205,7 +230,7 @@ export default function Todos() {
     const date = new Date(dueDate);
     const now = new Date();
     const diffInDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     if (diffInDays < 0) return "Overdue";
     if (diffInDays === 0) return "Due today";
     if (diffInDays === 1) return "Due tomorrow";
@@ -255,7 +280,7 @@ export default function Todos() {
   return (
     <div className="min-h-screen bg-background" data-testid="todos-page">
       <Navigation />
-      
+
       <main className="container mx-auto px-4 py-6">
         <div className="bg-card rounded-lg p-6 mb-6 border" data-testid="todos-header">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -264,7 +289,7 @@ export default function Todos() {
               <p className="text-muted-foreground">Manage personal and team tasks</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => setViewMode(viewMode === "list" ? "kanban" : viewMode === "kanban" ? "calendar" : "list")}
                 data-testid="toggle-view-mode"
@@ -293,7 +318,7 @@ export default function Todos() {
               <div className="text-2xl font-bold">{todoStatusCount.all}</div>
             </CardContent>
           </Card>
-          
+
           <Card data-testid="todos-stats-pending">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">To Do</CardTitle>
@@ -385,7 +410,7 @@ export default function Todos() {
                     data-testid="todos-search-input"
                   />
                 </div>
-                
+
                 {canSeeAllTasks && (
                   <Tabs value={taskScope} onValueChange={(value) => setTaskScope(value as "all" | "my")}>
                     <TabsList>
@@ -394,7 +419,7 @@ export default function Todos() {
                     </TabsList>
                   </Tabs>
                 )}
-                
+
                 <Tabs value={statusFilter} onValueChange={setStatusFilter}>
                   <TabsList>
                     <TabsTrigger value="all" data-testid="filter-all-status">All</TabsTrigger>
@@ -414,7 +439,7 @@ export default function Todos() {
                   </TabsList>
                 </Tabs>
               </div>
-              
+
               <Button variant="outline" size="icon" data-testid="advanced-filters-button">
                 <Filter className="h-4 w-4" />
               </Button>
@@ -424,7 +449,7 @@ export default function Todos() {
 
         {/* View Modes */}
         {viewMode === "calendar" ? (
-          <CalendarView 
+          <CalendarView
             todos={filteredTodos}
             onTaskClick={(todo) => {
               setSelectedTask(todo);
@@ -475,9 +500,8 @@ export default function Todos() {
                   {filteredTodos.map((todo) => (
                     <Card
                       key={todo.id}
-                      className={`transition-all hover:shadow-md cursor-pointer ${
-                        todo.status === 'done' ? 'opacity-60' : ''
-                      } ${isOverdue(todo.dueDate) && todo.status !== 'done' ? 'border-destructive' : ''}`}
+                      className={`transition-all hover:shadow-md cursor-pointer ${todo.status === 'done' ? 'opacity-60' : ''
+                        } ${isOverdue(todo.dueDate) && todo.status !== 'done' ? 'border-destructive' : ''}`}
                       data-testid={`todo-item-${todo.id}`}
                       onClick={() => {
                         setSelectedTask(todo);
@@ -486,7 +510,7 @@ export default function Todos() {
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start space-x-3">
-                          <Checkbox 
+                          <Checkbox
                             checked={todo.status === 'done'}
                             onCheckedChange={(e) => {
                               e.stopPropagation?.();
@@ -496,7 +520,7 @@ export default function Todos() {
                             disabled={updateTodoMutation.isPending}
                             data-testid={`todo-checkbox-${todo.id}`}
                           />
-                          
+
                           <div className="flex-1 space-y-2">
                             <div className="flex items-start justify-between">
                               <h3 className={`font-medium ${todo.status === 'done' ? 'line-through' : ''}`}>
@@ -504,9 +528,9 @@ export default function Todos() {
                               </h3>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
                                     data-testid={`todo-actions-${todo.id}`}
                                     onClick={(e) => e.stopPropagation()}
                                   >
@@ -524,7 +548,7 @@ export default function Todos() {
                                     <ExternalLink className="mr-2 h-4 w-4" />
                                     View Links
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem 
+                                  <DropdownMenuItem
                                     className="text-destructive"
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -537,29 +561,28 @@ export default function Todos() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
-                            
+
                             {todo.description && (
                               <p className="text-sm text-muted-foreground">{todo.description}</p>
                             )}
-                            
+
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
                                 <Badge variant={getPriorityVariant(todo.priority || 'medium')}>
                                   {todo.priority ? todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1) : 'Medium'}
                                 </Badge>
-                                
+
                                 {todo.status === 'in_progress' && (
                                   <Badge variant="outline" className="bg-primary/10 text-primary">
                                     In Progress
                                   </Badge>
                                 )}
                               </div>
-                              
+
                               <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                                 {todo.dueDate && (
-                                  <div className={`flex items-center space-x-1 ${
-                                    isOverdue(todo.dueDate) && todo.status !== 'done' ? 'text-destructive' : ''
-                                  }`}>
+                                  <div className={`flex items-center space-x-1 ${isOverdue(todo.dueDate) && todo.status !== 'done' ? 'text-destructive' : ''
+                                    }`}>
                                     <Calendar className="h-3 w-3" />
                                     <span data-testid={`todo-due-date-${todo.id}`}>
                                       {formatDueDate(todo.dueDate)}
@@ -580,13 +603,13 @@ export default function Todos() {
         )}
       </main>
 
-      <TodoForm 
-        open={showNewTodo} 
+      <TodoForm
+        open={showNewTodo}
         onOpenChange={setShowNewTodo}
       />
-      
-      <TodoForm 
-        open={!!editingTodo} 
+
+      <TodoForm
+        open={!!editingTodo}
         onOpenChange={(open) => !open && setEditingTodo(null)}
         todo={editingTodo}
       />

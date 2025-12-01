@@ -7,7 +7,7 @@ import {
   type EmailAttachment, type InsertEmailAttachment,
   type Repair, type InsertRepair,
   type Todo, type InsertTodo,
-  type InternalNote, type InsertInternalNote,
+
   type PurchaseOrder, type InsertPurchaseOrder,
   type Supplier, type InsertSupplier,
   type PurchaseOrderItem, type InsertPurchaseOrderItem,
@@ -17,7 +17,7 @@ import {
   type Case, type InsertCase,
   type CaseItem, type InsertCaseItem,
   type CaseLink, type InsertCaseLink,
-  type CaseNote, type InsertCaseNote,
+
   type CaseEvent, type InsertCaseEvent,
   type Activity, type InsertActivity,
   type AuditLog, type InsertAuditLog,
@@ -31,10 +31,12 @@ import {
   type NoteRevision, type InsertNoteRevision,
   type NoteTemplate, type InsertNoteTemplate,
   type NoteLink, type InsertNoteLink,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, repairs, todos, internalNotes, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseNotes, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks
+  type Email, type InsertEmail,
+  type EmailLink, type InsertEmailLink,
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
-import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns } from "drizzle-orm";
+import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns, lt } from "drizzle-orm";
 import { ObjectStorageService } from "./objectStorage";
 import type { Response } from "express";
 
@@ -67,12 +69,13 @@ export interface IStorage {
   // Email Threads
   getEmailThreads(filters?: {
     limit?: number;
+    offset?: number;
     folder?: string;
     starred?: boolean;
     archived?: boolean;
     isUnread?: boolean;
     hasOrder?: boolean;
-  }): Promise<EmailThread[]>;
+  }): Promise<{ threads: EmailThread[], total: number }>;
   getEmailThread(id: string): Promise<EmailThread | undefined>;
   getEmailThreadByThreadId(threadId: string): Promise<EmailThread | undefined>;
   createEmailThread(thread: InsertEmailThread): Promise<EmailThread>;
@@ -141,6 +144,7 @@ export interface IStorage {
   getReturns(filters?: { status?: string; customerId?: string; orderId?: string; assignedUserId?: string }): Promise<Return[]>;
   getReturn(id: string): Promise<Return | undefined>;
   getReturnByReturnNumber(returnNumber: string): Promise<Return | undefined>;
+  getReturnByShopifyId(shopifyId: string): Promise<Return | undefined>;
   createReturn(returnData: InsertReturn): Promise<Return>;
   createReturnWithItems(returnData: InsertReturn, items: Omit<InsertReturnItem, 'returnId'>[]): Promise<Return>;
   updateReturn(id: string, returnData: Partial<InsertReturn>): Promise<Return>;
@@ -163,10 +167,7 @@ export interface IStorage {
   updateTodo(id: string, todo: Partial<InsertTodo>): Promise<Todo>;
   deleteTodo(id: string): Promise<void>;
 
-  // Internal Notes
-  getInternalNotes(entityId: string, entityType: string): Promise<InternalNote[]>;
-  createInternalNote(note: InsertInternalNote): Promise<InternalNote>;
-  deleteInternalNote(noteId: string): Promise<void>;
+
 
   // Cases
   getCases(status?: string, search?: string): Promise<Case[]>;
@@ -184,7 +185,7 @@ export interface IStorage {
     orders: Order[];
     repairs: Repair[];
     todos: Todo[];
-    notes: InternalNote[];
+
   }>;
 
   // Case Links
@@ -192,9 +193,7 @@ export interface IStorage {
   createCaseLink(link: InsertCaseLink): Promise<CaseLink>;
   deleteCaseLink(linkId: string): Promise<void>;
 
-  // Case Notes
-  getCaseNotes(caseId: string): Promise<CaseNote[]>;
-  createCaseNote(note: InsertCaseNote): Promise<CaseNote>;
+
 
   // Case Events
   getCaseEvents(caseId: string): Promise<CaseEvent[]>;
@@ -229,7 +228,7 @@ export interface IStorage {
     emailThreads: EmailThread[];
     repairs: Repair[];
   }>;
-  
+
   // Customer relations
   getCustomers(): Promise<Customer[]>;
   getCustomerOrders(customerId: string): Promise<Order[]>;
@@ -284,6 +283,22 @@ export interface IStorage {
   // Note Links
   createNoteLink(link: InsertNoteLink): Promise<NoteLink>;
   getNoteLinks(noteId: string): Promise<NoteLink[]>;
+
+  // Mail System (New)
+  getEmails(options?: { limit?: number; orderBy?: string }): Promise<Email[]>;
+  getEmail(id: string): Promise<Email | undefined>;
+  getEmailByImapUid(imapUid: number): Promise<Email | undefined>;
+  createEmail(email: InsertEmail): Promise<Email>;
+  deleteOldEmails(keepLast: number): Promise<void>;
+
+  getEmailAttachmentsByEmailId(emailId: string): Promise<EmailAttachment[]>;
+  createEmailAttachmentBulk(attachments: InsertEmailAttachment[]): Promise<EmailAttachment[]>;
+
+  getEmailLinks(emailId: string): Promise<EmailLink[]>;
+  createEmailLink(link: InsertEmailLink): Promise<EmailLink>;
+
+  getSetting(key: string): Promise<string | undefined>;
+  setSetting(key: string, value: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -368,14 +383,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Orders
-  async getOrders(limit: number = 50): Promise<Order[]> {
+  async getOrders(limit: number = 1000): Promise<Order[]> {
     // Sort by order date descending (newest orders first), NULL dates go to end
     return await db.select().from(orders).orderBy(sql`${orders.orderDate} DESC NULLS LAST`).limit(limit);
   }
 
   async getOrdersPaginated(page: number = 1, limit: number = 20, searchQuery?: string): Promise<{ orders: Order[], total: number }> {
     const offset = (page - 1) * limit;
-    
+
     // Build search conditions
     let whereCondition;
     if (searchQuery) {
@@ -385,7 +400,7 @@ export class DatabaseStorage implements IStorage {
         ilike(orders.customerEmail, query)
       );
     }
-    
+
     // Get total count with search filter
     const countQuery = db.select({ count: sql<number>`count(*)` }).from(orders);
     if (whereCondition) {
@@ -393,22 +408,22 @@ export class DatabaseStorage implements IStorage {
     }
     const [countResult] = await countQuery;
     const total = Number(countResult.count);
-    
+
     // Get paginated orders with search filter, sorted by date (newest first)
-    // Use sql`` to add NULLS LAST to prevent NULL dates from appearing in middle of results
+    // Use COALESCE to fallback to createdAt if orderDate is null (for Shopify orders)
     const ordersQuery = db
       .select()
       .from(orders)
-      .orderBy(sql`${orders.orderDate} DESC NULLS LAST`)
+      .orderBy(sql`COALESCE(${orders.orderDate}, ${orders.createdAt}) DESC NULLS LAST`)
       .limit(limit)
       .offset(offset);
-    
+
     if (whereCondition) {
       ordersQuery.where(whereCondition);
     }
-    
+
     const ordersResult = await ordersQuery;
-    
+
     return {
       orders: ordersResult,
       total
@@ -447,17 +462,18 @@ export class DatabaseStorage implements IStorage {
   // Email Threads
   async getEmailThreads(filters?: {
     limit?: number;
+    offset?: number;
     folder?: string;
     starred?: boolean;
     archived?: boolean;
     isUnread?: boolean;
     hasOrder?: boolean;
-  }): Promise<EmailThread[]> {
-    const { limit = 50, folder, starred, archived, isUnread, hasOrder } = filters || {};
-    
+  }): Promise<{ threads: EmailThread[], total: number }> {
+    const { limit = 50, offset = 0, folder, starred, archived, isUnread, hasOrder } = filters || {};
+
     let query = db.select().from(emailThreads);
     const conditions = [];
-    
+
     // Handle virtual folders that map to combinations of flags
     if (folder === 'inbox') {
       conditions.push(eq(emailThreads.folder, 'inbox'));
@@ -473,7 +489,7 @@ export class DatabaseStorage implements IStorage {
     } else if (folder && ['inbox', 'sent'].includes(folder)) {
       conditions.push(eq(emailThreads.folder, folder as any));
     }
-    
+
     // Additional filters
     if (starred !== undefined) {
       conditions.push(eq(emailThreads.starred, starred));
@@ -491,13 +507,23 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${emailThreads.orderId} IS NULL`);
       }
     }
-    
+
     // Apply all conditions
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
     }
-    
-    return await query.orderBy(desc(emailThreads.lastActivity)).limit(limit);
+
+    // Get total count
+    const countQuery = db.select({ count: sql<number>`count(*)` }).from(emailThreads);
+    if (conditions.length > 0) {
+      countQuery.where(and(...conditions));
+    }
+    const [countResult] = await countQuery;
+    const total = Number(countResult.count);
+
+    const threads = await query.orderBy(desc(emailThreads.lastActivity)).limit(limit).offset(offset);
+
+    return { threads, total };
   }
 
   async getEmailThread(id: string): Promise<EmailThread | undefined> {
@@ -524,7 +550,7 @@ export class DatabaseStorage implements IStorage {
     if (updateData.caseId === '') {
       updateData.caseId = null;
     }
-    
+
     const result = await db.update(emailThreads).set(updateData).where(eq(emailThreads.id, id)).returning();
     return result[0];
   }
@@ -597,7 +623,7 @@ export class DatabaseStorage implements IStorage {
     priority?: string;
   }): Promise<Repair[]> {
     const conditions = [];
-    
+
     if (filters.status) {
       conditions.push(eq(repairs.status, filters.status as any));
     }
@@ -663,35 +689,16 @@ export class DatabaseStorage implements IStorage {
     await db.delete(todos).where(eq(todos.id, id));
   }
 
-  // Internal Notes
-  async getInternalNotes(entityType: string, entityId: string): Promise<InternalNote[]> {
-    const column = entityType === 'customer' ? internalNotes.customerId :
-                  entityType === 'order' ? internalNotes.orderId :
-                  entityType === 'repair' ? internalNotes.repairId :
-                  entityType === 'case' ? internalNotes.caseId :
-                  entityType === 'return' ? internalNotes.returnId :
-                  internalNotes.emailThreadId;
-    
-    return await db.select().from(internalNotes).where(eq(column, entityId)).orderBy(desc(internalNotes.createdAt));
-  }
 
-  async createInternalNote(note: InsertInternalNote): Promise<InternalNote> {
-    const result = await db.insert(internalNotes).values(note).returning();
-    return result[0];
-  }
-
-  async deleteInternalNote(noteId: string): Promise<void> {
-    await db.delete(internalNotes).where(eq(internalNotes.id, noteId));
-  }
 
   // Cases
   async getCases(status?: string, search?: string, emailThreadId?: string): Promise<any[]> {
     const conditions = [];
-    
+
     if (status) {
       conditions.push(eq(cases.status, status as any));
     }
-    
+
     if (search) {
       const searchTerm = `%${search}%`;
       conditions.push(or(
@@ -701,7 +708,7 @@ export class DatabaseStorage implements IStorage {
         ilike(cases.customerEmail, searchTerm)
       ));
     }
-    
+
     if (emailThreadId) {
       // Find cases linked to this email thread via the emailThreads.caseId field
       const linkedThreads = await db.select({ caseId: emailThreads.caseId })
@@ -710,11 +717,11 @@ export class DatabaseStorage implements IStorage {
           eq(emailThreads.id, emailThreadId),
           isNotNull(emailThreads.caseId)
         ));
-      
+
       const linkedCaseIds = linkedThreads
         .map(thread => thread.caseId)
         .filter(id => id !== null) as string[];
-        
+
       if (linkedCaseIds.length > 0) {
         conditions.push(inArray(cases.id, linkedCaseIds));
       } else {
@@ -722,10 +729,10 @@ export class DatabaseStorage implements IStorage {
         return [];
       }
     }
-    
+
     // Get cases with notes count and related data
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-    
+
     const casesData = await db
       .select({
         ...getTableColumns(cases),
@@ -740,7 +747,7 @@ export class DatabaseStorage implements IStorage {
       .from(cases)
       .where(whereClause)
       .orderBy(desc(cases.createdAt));
-    
+
     return casesData;
   }
 
@@ -756,9 +763,9 @@ export class DatabaseStorage implements IStorage {
       .map(c => parseInt(c.caseNumber.replace('CASE-', ''), 10))
       .filter(num => !isNaN(num))
       .reduce((max, num) => Math.max(max, num), 0);
-    
+
     const newCaseNumber = `CASE-${String(maxNumber + 1).padStart(3, '0')}`;
-    
+
     const createData = {
       ...caseData,
       caseNumber: newCaseNumber
@@ -798,28 +805,26 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCase(id: string): Promise<void> {
     // First delete all related records that have foreign key constraints
-    
+
     // Delete case events
     await db.delete(caseEvents).where(eq(caseEvents.caseId, id));
-    
-    // Delete case notes
-    await db.delete(caseNotes).where(eq(caseNotes.caseId, id));
-    
+
+
+
     // Delete case links
     await db.delete(caseLinks).where(eq(caseLinks.caseId, id));
-    
+
     // Unlink email threads
     await db.update(emailThreads).set({ caseId: null }).where(eq(emailThreads.caseId, id));
-    
+
     // Unlink repairs
     await db.update(repairs).set({ caseId: null }).where(eq(repairs.caseId, id));
-    
+
     // Unlink todos
     await db.update(todos).set({ caseId: null }).where(eq(todos.caseId, id));
-    
-    // Unlink internal notes
-    await db.update(internalNotes).set({ caseId: null }).where(eq(internalNotes.caseId, id));
-    
+
+
+
     // Now safe to delete the case
     await db.delete(cases).where(eq(cases.id, id));
   }
@@ -836,16 +841,16 @@ export class DatabaseStorage implements IStorage {
           // Generate case number within transaction to prevent duplicates
           // Fetch all case numbers and find max numerically to handle numbers beyond 3 digits
           const existingCases = await tx.select({ caseNumber: cases.caseNumber }).from(cases);
-          
+
           const maxNumber = existingCases
             .map(c => {
               const match = c.caseNumber.match(/^CASE-(\d+)$/);
               return match ? parseInt(match[1], 10) : 0;
             })
             .reduce((max, num) => Math.max(max, num), 0);
-          
+
           const newCaseNumber = `CASE-${String(maxNumber + 1).padStart(3, '0')}`;
-          
+
           // Normalize date fields
           const createData = {
             ...caseData,
@@ -865,20 +870,20 @@ export class DatabaseStorage implements IStorage {
           // Create case within transaction
           const caseResult = await tx.insert(cases).values(createData as any).returning();
           const createdCase = caseResult[0];
-          
+
           // Create case items within transaction if provided
           if (items && items.length > 0) {
             const itemsWithCaseId = items.map(item => ({
               ...item,
               caseId: createdCase.id,
             }));
-            
+
             await tx.insert(caseItems).values(itemsWithCaseId as any);
           }
-          
+
           return createdCase;
         });
-        
+
         // Success - return the created case
         return newCase;
       } catch (error: any) {
@@ -919,9 +924,7 @@ export class DatabaseStorage implements IStorage {
           await db.update(emailThreads).set({ caseId }).where(eq(emailThreads.orderId, entityId));
         }
         break;
-      case 'note':
-        await db.update(internalNotes).set({ caseId }).where(eq(internalNotes.id, entityId));
-        break;
+
     }
   }
 
@@ -939,9 +942,7 @@ export class DatabaseStorage implements IStorage {
       case 'order':
         await db.update(emailThreads).set({ caseId: null }).where(eq(emailThreads.orderId, entityId));
         break;
-      case 'note':
-        await db.update(internalNotes).set({ caseId: null }).where(eq(internalNotes.id, entityId));
-        break;
+
     }
   }
 
@@ -962,10 +963,10 @@ export class DatabaseStorage implements IStorage {
     };
 
     const newCase = await this.createCase(caseData);
-    
+
     // Link the email thread to the case
     await this.linkEntityToCase(newCase.id, 'email', threadId);
-    
+
     return newCase;
   }
 
@@ -974,18 +975,16 @@ export class DatabaseStorage implements IStorage {
     orders: Order[];
     repairs: Repair[];
     todos: Todo[];
-    notes: InternalNote[];
   }> {
-    const [caseEmails, caseRepairs, caseTodos, caseNotes] = await Promise.all([
+    const [caseEmails, caseRepairs, caseTodos] = await Promise.all([
       db.select().from(emailThreads).where(eq(emailThreads.caseId, caseId)),
       db.select().from(repairs).where(eq(repairs.caseId, caseId)),
-      db.select().from(todos).where(eq(todos.caseId, caseId)),
-      db.select().from(internalNotes).where(eq(internalNotes.caseId, caseId))
+      db.select().from(todos).where(eq(todos.caseId, caseId))
     ]);
 
     // Get orders that are linked via email threads
     const orderIds = caseEmails.filter(email => email.orderId).map(email => email.orderId!);
-    const caseOrders: Order[] = orderIds.length > 0 ? 
+    const caseOrders: Order[] = orderIds.length > 0 ?
       await db.select().from(orders).where(or(
         ...orderIds.map(orderId => eq(orders.id, orderId))
       )) : [];
@@ -994,8 +993,7 @@ export class DatabaseStorage implements IStorage {
       emails: caseEmails,
       orders: caseOrders,
       repairs: caseRepairs,
-      todos: caseTodos,
-      notes: caseNotes
+      todos: caseTodos
     };
   }
 
@@ -1013,15 +1011,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(caseLinks).where(eq(caseLinks.id, linkId));
   }
 
-  // Case Notes
-  async getCaseNotes(caseId: string): Promise<CaseNote[]> {
-    return await db.select().from(caseNotes).where(eq(caseNotes.caseId, caseId)).orderBy(desc(caseNotes.createdAt));
-  }
 
-  async createCaseNote(note: InsertCaseNote): Promise<CaseNote> {
-    const result = await db.insert(caseNotes).values(note).returning();
-    return result[0];
-  }
 
   // Case Events
   async getCaseEvents(caseId: string): Promise<CaseEvent[]> {
@@ -1115,9 +1105,9 @@ export class DatabaseStorage implements IStorage {
       unreadEmails: unreadEmailsResult.count,
       newRepairs: newRepairsResult.count,
       slaAlerts: slaAlertsResult.count,
-      todaysOrders: { 
-        count: todaysOrdersResult.count || 0, 
-        total: todaysOrdersResult.total || 0 
+      todaysOrders: {
+        count: todaysOrdersResult.count || 0,
+        total: todaysOrdersResult.total || 0
       }
     };
   }
@@ -1171,11 +1161,11 @@ export class DatabaseStorage implements IStorage {
   async generatePONumber(): Promise<string> {
     const year = new Date().getFullYear();
     const result = await db.select({ poNumber: purchaseOrders.poNumber }).from(purchaseOrders).where(sql`${purchaseOrders.poNumber} LIKE ${`PO-${year}-%`}`).orderBy(desc(purchaseOrders.poNumber)).limit(1);
-    
+
     if (result.length === 0) {
       return `PO-${year}-001`;
     }
-    
+
     const lastNumber = parseInt(result[0].poNumber!.split('-')[2]) || 0;
     const nextNumber = (lastNumber + 1).toString().padStart(3, '0');
     return `PO-${year}-${nextNumber}`;
@@ -1198,24 +1188,24 @@ export class DatabaseStorage implements IStorage {
       const existingOrders = await tx.select({ poNumber: purchaseOrders.poNumber }).from(purchaseOrders);
       const year = new Date().getFullYear();
       const yearPrefix = `PO-${year}-`;
-      
+
       const maxNumber = existingOrders
         .map(p => {
           const match = p.poNumber?.match(new RegExp(`^PO-${year}-(\\d+)$`));
           return match ? parseInt(match[1], 10) : 0;
         })
         .reduce((max, num) => Math.max(max, num), 0);
-      
+
       const poNumber = `${yearPrefix}${String(maxNumber + 1).padStart(4, '0')}`;
-      
+
       // Create purchase order within transaction
-      const result = await tx.insert(purchaseOrders).values({ 
-        ...purchaseOrder, 
-        poNumber 
+      const result = await tx.insert(purchaseOrders).values({
+        ...purchaseOrder,
+        poNumber
       } as any).returning();
-      
+
       const createdPurchaseOrder = result[0];
-      
+
       // Create purchase order items within transaction if provided
       if (items && items.length > 0) {
         // Validate and normalize items
@@ -1224,14 +1214,14 @@ export class DatabaseStorage implements IStorage {
           if (!item.productName || item.quantity == null || item.unitPrice == null) {
             throw new Error(`Invalid purchase order item: missing required fields (productName, quantity, or unitPrice)`);
           }
-          
+
           // Normalize price fields to cents if they're not already
           const unitPriceCents = typeof item.unitPrice === 'number' && item.unitPrice < 1000
             ? Math.round(item.unitPrice * 100)
             : Math.round(item.unitPrice);
-          
+
           const subtotalCents = Math.round(item.quantity * unitPriceCents);
-          
+
           return {
             ...item,
             purchaseOrderId: createdPurchaseOrder.id,
@@ -1240,13 +1230,13 @@ export class DatabaseStorage implements IStorage {
             sku: item.sku || '',
           };
         });
-        
+
         await tx.insert(purchaseOrderItems).values(normalizedItems as any);
       }
-      
+
       return createdPurchaseOrder;
     });
-    
+
     // Create activity log (outside transaction, non-critical)
     const itemCount = items?.length || 0;
     await this.createActivity({
@@ -1254,7 +1244,7 @@ export class DatabaseStorage implements IStorage {
       description: `Purchase order ${newPurchaseOrder.poNumber} created with ${itemCount} item(s)`,
       metadata: { purchaseOrderId: newPurchaseOrder.id, itemCount },
     });
-    
+
     return newPurchaseOrder;
   }
 
@@ -1312,19 +1302,19 @@ export class DatabaseStorage implements IStorage {
   // Returns
   async getReturns(filters?: { status?: string; customerId?: string; orderId?: string; assignedUserId?: string }): Promise<Return[]> {
     let query = db.select().from(returns);
-    
+
     if (filters) {
       const conditions = [];
       if (filters.status) conditions.push(eq(returns.status, filters.status as any));
       if (filters.customerId) conditions.push(eq(returns.customerId, filters.customerId));
       if (filters.orderId) conditions.push(eq(returns.orderId, filters.orderId));
       if (filters.assignedUserId) conditions.push(eq(returns.assignedUserId, filters.assignedUserId));
-      
+
       if (conditions.length > 0) {
         query = query.where(and(...conditions)) as any;
       }
     }
-    
+
     return await query.orderBy(desc(returns.createdAt));
   }
 
@@ -1338,6 +1328,11 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getReturnByShopifyId(shopifyId: string): Promise<Return | undefined> {
+    const result = await db.select().from(returns).where(eq(returns.shopifyReturnId, shopifyId)).limit(1);
+    return result[0];
+  }
+
   async generateReturnNumber(): Promise<string> {
     const year = new Date().getFullYear();
     const result = await db.select({ returnNumber: returns.returnNumber })
@@ -1345,11 +1340,11 @@ export class DatabaseStorage implements IStorage {
       .where(sql`${returns.returnNumber} LIKE ${`RET-${year}-%`}`)
       .orderBy(desc(returns.returnNumber))
       .limit(1);
-    
+
     if (result.length === 0) {
       return `RET-${year}-001`;
     }
-    
+
     const lastNumber = parseInt(result[0].returnNumber!.split('-')[2]) || 0;
     const nextNumber = (lastNumber + 1).toString().padStart(3, '0');
     return `RET-${year}-${nextNumber}`;
@@ -1357,54 +1352,54 @@ export class DatabaseStorage implements IStorage {
 
   async createReturn(returnData: InsertReturn): Promise<Return> {
     const returnNumber = await this.generateReturnNumber();
-    const result = await db.insert(returns).values({ 
-      ...returnData, 
-      returnNumber 
+    const result = await db.insert(returns).values({
+      ...returnData,
+      returnNumber
     } as any).returning();
-    
+
     // Create activity log
     await this.createActivity({
       type: 'return_created',
       description: `Return ${returnNumber} created`,
       metadata: { returnId: result[0].id },
     });
-    
+
     return result[0];
   }
 
   async createReturnWithItems(returnData: InsertReturn, items: Omit<InsertReturnItem, 'returnId'>[]): Promise<Return> {
     const returnNumber = await this.generateReturnNumber();
-    
+
     // Use transaction to ensure atomicity
     const newReturn = await db.transaction(async (tx) => {
       // Create return within transaction
-      const result = await tx.insert(returns).values({ 
-        ...returnData, 
-        returnNumber 
+      const result = await tx.insert(returns).values({
+        ...returnData,
+        returnNumber
       } as any).returning();
-      
+
       const createdReturn = result[0];
-      
+
       // Create return items within transaction if provided
       if (items && items.length > 0) {
         const itemsWithReturnId = items.map(item => ({
           ...item,
           returnId: createdReturn.id,
         }));
-        
+
         await tx.insert(returnItems).values(itemsWithReturnId as any);
       }
-      
+
       return createdReturn;
     });
-    
+
     // Create activity log (outside transaction, non-critical)
     await this.createActivity({
       type: 'return_created',
       description: `Return ${returnNumber} created with ${items.length} item(s)`,
       metadata: { returnId: newReturn.id, itemCount: items.length },
     });
-    
+
     return newReturn;
   }
 
@@ -1413,7 +1408,7 @@ export class DatabaseStorage implements IStorage {
       .set({ ...returnData, updatedAt: new Date() } as any)
       .where(eq(returns.id, id))
       .returning();
-    
+
     return result[0];
   }
 
@@ -1575,7 +1570,7 @@ export class DatabaseStorage implements IStorage {
         .select({ noteId: noteTagAssignments.noteId })
         .from(noteTagAssignments)
         .where(inArray(noteTagAssignments.tagId, filters.tagIds));
-      
+
       const noteIds = notesWithTags.map(nt => nt.noteId);
       if (noteIds.length > 0) {
         conditions.push(inArray(notes.id, noteIds));
@@ -1823,6 +1818,136 @@ export class DatabaseStorage implements IStorage {
 
   async getNoteLinks(noteId: string): Promise<NoteLink[]> {
     return await db.select().from(noteLinks).where(eq(noteLinks.noteId, noteId));
+  }
+
+  // ===== MAIL SYSTEM (NEW) =====
+
+  // Get emails
+  async getEmails(options?: {
+    limit?: number;
+    orderBy?: string;
+    beforeDate?: string;
+    beforeId?: string;
+  }): Promise<Email[]> {
+    const { limit = 50, orderBy = 'date DESC', beforeDate, beforeId } = options || {};
+
+    let query = db.select().from(emails);
+
+    // Cursor pagination: fetch emails before a certain date/id
+    if (beforeDate && beforeId) {
+      query = query.where(
+        or(
+          lt(emails.date, new Date(beforeDate)),
+          and(
+            eq(emails.date, new Date(beforeDate)),
+            lt(emails.id, beforeId)
+          )
+        )
+      ) as any;
+    }
+
+    return await query
+      .orderBy(orderBy === 'date DESC' ? desc(emails.date) : desc(emails.createdAt))
+      .limit(limit);
+  }
+
+  // Get single email by ID
+  async getEmail(id: string): Promise<Email | undefined> {
+    const result = await db.select().from(emails).where(eq(emails.id, id)).limit(1);
+    return result[0];
+  }
+
+  // Get email by IMAP UID (for deduplication)
+  async getEmailByImapUid(imapUid: number): Promise<Email | undefined> {
+    const result = await db.select().from(emails).where(eq(emails.imapUid, imapUid)).limit(1);
+    return result[0];
+  }
+
+  // Create email
+  async createEmail(email: InsertEmail): Promise<Email> {
+    const result = await db.insert(emails).values(email).returning();
+    return result[0];
+  }
+
+  // Delete old emails (keep only last N)
+  async deleteOldEmails(keepLast: number): Promise<void> {
+    // Get all email IDs ordered by date DESC
+    const allEmails = await db.select({ id: emails.id })
+      .from(emails)
+      .orderBy(desc(emails.date));
+
+    // If we have more than keepLast, delete the oldest ones
+    if (allEmails.length > keepLast) {
+      const emailsToDelete = allEmails.slice(keepLast);
+      const idsToDelete = emailsToDelete.map(e => e.id);
+
+      if (idsToDelete.length > 0) {
+        await db.delete(emails).where(inArray(emails.id, idsToDelete));
+      }
+    }
+  }
+
+  // Get email attachments by email ID
+  async getEmailAttachmentsByEmailId(emailId: string): Promise<EmailAttachment[]> {
+    return await db.select()
+      .from(emailAttachments)
+      .where(eq(emailAttachments.emailId, emailId));
+  }
+
+  // Create multiple email attachments
+  async createEmailAttachmentBulk(attachments: InsertEmailAttachment[]): Promise<EmailAttachment[]> {
+    if (attachments.length === 0) {
+      return [];
+    }
+
+    const result = await db.insert(emailAttachments).values(attachments).returning();
+    return result;
+  }
+
+  // Get email links (polymorphic links to orders/cases/returns/repairs)
+  async getEmailLinks(emailId: string): Promise<EmailLink[]> {
+    return await db.select()
+      .from(emailLinks)
+      .where(eq(emailLinks.emailId, emailId));
+  }
+
+  // Create email link
+  async createEmailLink(link: InsertEmailLink): Promise<EmailLink> {
+    const result = await db.insert(emailLinks).values(link).returning();
+    return result[0];
+  }
+
+  // Link email thread to entity
+  async linkEmailThread(threadId: string, type: 'order' | 'case', entityId: string): Promise<EmailThread> {
+    const updateData: Partial<EmailThread> = {};
+    if (type === 'order') updateData.orderId = entityId;
+    if (type === 'case') updateData.caseId = entityId;
+
+    const [updated] = await db.update(emailThreads)
+      .set(updateData)
+      .where(eq(emailThreads.id, threadId))
+      .returning();
+
+    return updated;
+  }
+
+  // Create case link
+  async createCaseLink(caseId: string, type: 'order' | 'email' | 'repair' | 'todo' | 'return', entityId: string): Promise<void> {
+    await db.insert(caseLinks).values({
+      caseId,
+      type,
+      entityId,
+    });
+  }
+
+  // Get setting (for mail system config like last_imap_uid)
+  async getSetting(key: string): Promise<string | undefined> {
+    return await this.getSystemSetting(key);
+  }
+
+  // Set setting
+  async setSetting(key: string, value: string): Promise<void> {
+    await this.setSystemSetting(key, value);
   }
 }
 

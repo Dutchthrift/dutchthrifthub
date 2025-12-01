@@ -17,15 +17,17 @@ interface EmailAttachment {
   filename: string;
   contentType: string | null;
   size: number | null;
-  storageUrl: string;
+  storageUrl: string | null;
+  partId: string | null;
   isInline: boolean;
 }
 
 interface EmailAttachmentsProps {
   messageId: string;
+  uid: number;
 }
 
-export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
+export function EmailAttachments({ messageId, uid }: EmailAttachmentsProps) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState<EmailAttachment | null>(null);
 
@@ -45,13 +47,28 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
     setIsPreviewOpen(true);
   };
 
-  const handleDownload = async (attachment: EmailAttachment) => {
-    try {
+  const getDownloadUrl = (attachment: EmailAttachment) => {
+    if (attachment.partId && uid) {
+      return `/api/emails/${uid}/attachments/${attachment.partId}`;
+    }
+    if (attachment.storageUrl) {
       // Remove the leading /attachments from storageUrl since the API endpoint expects /api/attachments/:path
-      const attachmentPath = attachment.storageUrl.startsWith('/attachments/') 
+      const attachmentPath = attachment.storageUrl.startsWith('/attachments/')
         ? attachment.storageUrl.substring('/attachments/'.length)
         : attachment.storageUrl;
-      const response = await fetch(`/api/attachments/${attachmentPath}`);
+      return `/api/attachments/${attachmentPath}`;
+    }
+    return '#';
+  };
+
+  const handleDownload = async (attachment: EmailAttachment) => {
+    try {
+      const downloadUrl = getDownloadUrl(attachment);
+      if (downloadUrl === '#') {
+        throw new Error('No download URL available');
+      }
+
+      const response = await fetch(downloadUrl);
       if (!response.ok) {
         throw new Error('Failed to download attachment');
       }
@@ -80,13 +97,13 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
 
   const getFileIcon = (contentType: string | null, filename: string) => {
     if (!contentType) return FileIcon;
-    
+
     if (contentType.startsWith('image/')) return FileIcon;
     if (contentType.includes('pdf')) return FileIcon;
     if (contentType.includes('word') || contentType.includes('document')) return FileIcon;
     if (contentType.includes('excel') || contentType.includes('spreadsheet')) return FileIcon;
     if (contentType.includes('powerpoint') || contentType.includes('presentation')) return FileIcon;
-    
+
     return FileIcon;
   };
 
@@ -100,12 +117,8 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
   const renderPreviewContent = () => {
     if (!selectedAttachment) return null;
 
-    const { contentType, storageUrl, filename, id } = selectedAttachment;
-    // Remove the leading /attachments from storageUrl since the API endpoint expects /api/attachments/:path
-    const attachmentPath = storageUrl.startsWith('/attachments/') 
-      ? storageUrl.substring('/attachments/'.length)
-      : storageUrl;
-    const attachmentUrl = `/api/attachments/${attachmentPath}`;
+    const { contentType, filename, id } = selectedAttachment;
+    const attachmentUrl = getDownloadUrl(selectedAttachment);
 
     // Check both contentType and filename extension for better file type detection
     const isImage = contentType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filename);
@@ -160,11 +173,11 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
           <Paperclip className="h-4 w-4" />
           <span>{attachments.length} attachment(s)</span>
         </div>
-        
+
         <div className="space-y-2">
           {attachments.map((attachment) => {
             const FileIconComponent = getFileIcon(attachment.contentType, attachment.filename);
-            
+
             return (
               <div
                 key={attachment.id}
@@ -193,7 +206,7 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-1">
                   <Button
                     variant="ghost"
@@ -237,11 +250,11 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
               )}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="mt-4">
             {renderPreviewContent()}
           </div>
-          
+
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
@@ -249,10 +262,7 @@ export function EmailAttachments({ messageId }: EmailAttachmentsProps) {
               data-testid="button-open-new-tab"
             >
               <a
-                href={selectedAttachment ? 
-                  `/api/attachments/${selectedAttachment.storageUrl.startsWith('/attachments/') 
-                    ? selectedAttachment.storageUrl.substring('/attachments/'.length)
-                    : selectedAttachment.storageUrl}` : '#'}
+                href={selectedAttachment ? getDownloadUrl(selectedAttachment) : '#'}
                 target="_blank"
                 rel="noopener noreferrer"
               >

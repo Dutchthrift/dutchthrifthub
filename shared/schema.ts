@@ -16,7 +16,18 @@ export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["aangeko
 export const caseStatusEnum = pgEnum("case_status", ["new", "in_progress", "waiting_customer", "resolved"]);
 export const caseEventTypeEnum = pgEnum("case_event_type", ["created", "status_change", "note_added", "link_added", "link_removed", "sla_set", "assigned", "email_sent", "email_received"]);
 export const caseLinkTypeEnum = pgEnum("case_link_type", ["order", "email", "repair", "todo", "return"]);
-export const returnStatusEnum = pgEnum("return_status", ["nieuw_onderweg", "ontvangen_controle", "akkoord_terugbetaling", "vermiste_pakketten", "wachten_klant", "opnieuw_versturen", "klaar", "niet_ontvangen"]);
+export const returnStatusEnum = pgEnum("return_status", [
+  "nieuw",                  // NEW: Pending approval (Shopify: REQUESTED)
+  "onderweg",               // NEW: Approved with label (Shopify: OPEN)
+  "nieuw_onderweg",         // DEPRECATED: Keep for migration compatibility
+  "ontvangen_controle",
+  "akkoord_terugbetaling",
+  "vermiste_pakketten",
+  "wachten_klant",
+  "opnieuw_versturen",
+  "klaar",
+  "niet_ontvangen"
+]);
 export const returnReasonEnum = pgEnum("return_reason", ["wrong_item", "damaged", "defective", "size_issue", "changed_mind", "other"]);
 export const refundStatusEnum = pgEnum("refund_status", ["pending", "processing", "completed", "failed"]);
 export const refundMethodEnum = pgEnum("refund_method", ["original_payment", "store_credit", "exchange"]);
@@ -91,16 +102,15 @@ export const emailThreads = pgTable("email_threads", {
 export const emailMessages = pgTable("email_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   messageId: text("message_id").notNull().unique(), // from email provider
+  uid: integer("uid"), // IMAP UID for on-demand fetching
   threadId: varchar("thread_id").references(() => emailThreads.id).notNull(),
   fromEmail: text("from_email").notNull(),
   toEmail: text("to_email").notNull(),
   subject: text("subject"),
-  body: text("body"),
   isHtml: boolean("is_html").default(false),
   isOutbound: boolean("is_outbound").default(false),
   folder: emailFolderEnum("folder").notNull().default("inbox"),
   attachments: jsonb("attachments"), // array of attachment metadata
-  rawData: jsonb("raw_data"), // raw email data
   sentAt: timestamp("sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -152,7 +162,6 @@ export const todos = pgTable("todos", {
   customerId: varchar("customer_id").references(() => customers.id),
   orderId: varchar("order_id").references(() => orders.id),
   repairId: varchar("repair_id").references(() => repairs.id),
-  emailThreadId: varchar("email_thread_id").references(() => emailThreads.id),
   caseId: varchar("case_id").references(() => cases.id), // Link todos to cases
   returnId: varchar("return_id").references(() => returns.id), // Link todos to returns
   completedAt: timestamp("completed_at"),
@@ -169,25 +178,11 @@ export const internalNotes = pgTable("internal_notes", {
   customerId: varchar("customer_id").references(() => customers.id),
   orderId: varchar("order_id").references(() => orders.id),
   repairId: varchar("repair_id").references(() => repairs.id),
-  emailThreadId: varchar("email_thread_id").references(() => emailThreads.id),
   caseId: varchar("case_id").references(() => cases.id), // Link notes to cases
   returnId: varchar("return_id").references(() => returns.id), // Link notes to returns
   mentions: text("mentions").array(), // user IDs mentioned in the note
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Email attachments table
-export const emailAttachments = pgTable("email_attachments", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  messageId: varchar("message_id").references(() => emailMessages.id).notNull(),
-  filename: text("filename").notNull(),
-  contentType: text("content_type"),
-  size: integer("size"), // in bytes
-  storageUrl: text("storage_url").notNull(), // path in object storage
-  contentId: text("content_id"), // for inline attachments
-  isInline: boolean("is_inline").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Cases table - Central overarching object for customer requests
@@ -247,14 +242,14 @@ export const caseEvents = pgTable("case_events", {
 export const caseItems = pgTable("case_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   caseId: varchar("case_id").references(() => cases.id, { onDelete: "cascade" }).notNull(),
-  
+
   sku: text("sku"),
   productName: text("product_name").notNull(),
   quantity: integer("quantity").notNull().default(1),
   unitPrice: integer("unit_price"), // in cents
   imageUrl: text("image_url"),
   notes: text("notes"), // User-entered notes like "camera broken", "didn't arrive"
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -352,37 +347,42 @@ export const purchaseOrderFiles = pgTable("purchase_order_files", {
 export const returns = pgTable("returns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   returnNumber: text("return_number").notNull().unique(), // Auto-generated (e.g., RET-2025-001)
-  
+
   // Relationships
   customerId: varchar("customer_id").references(() => customers.id),
   orderId: varchar("order_id").references(() => orders.id),
   caseId: varchar("case_id").references(() => cases.id),
   assignedUserId: varchar("assigned_user_id").references(() => users.id),
-  
+
   // Return details
-  status: returnStatusEnum("status").notNull().default("nieuw_onderweg"),
+  status: returnStatusEnum("status").notNull().default("nieuw"),
   returnReason: returnReasonEnum("return_reason"),
   otherReason: text("other_reason"), // Custom reason when returnReason is "other"
   trackingNumber: text("tracking_number"),
-  
+
   // Dates
   requestedAt: timestamp("requested_at").defaultNow(),
   receivedAt: timestamp("received_at"),
   expectedReturnDate: timestamp("expected_return_date"),
   completedAt: timestamp("completed_at"),
-  
+
   // Financial (amounts in cents)
   refundAmount: integer("refund_amount"),
   refundStatus: refundStatusEnum("refund_status").default("pending"),
   refundMethod: refundMethodEnum("refund_method"),
   shopifyRefundId: text("shopify_refund_id"),
-  
+
+  // Shopify Integration
+  shopifyReturnId: text("shopify_return_id").unique(), // Shopify's gid://shopify/Return/...
+  shopifyReturnName: text("shopify_return_name"), // e.g., #1001-R1
+  syncedAt: timestamp("synced_at"), // Last sync from Shopify
+
   // Notes & evidence
   customerNotes: text("customer_notes"),
   internalNotes: text("internal_notes"),
   conditionNotes: text("condition_notes"), // Notes after inspection
   photos: text("photos").array(), // Array of object storage URLs
-  
+
   // Metadata
   priority: priorityEnum("priority").default("medium"),
   tags: text("tags").array(),
@@ -395,17 +395,17 @@ export const returns = pgTable("returns", {
 export const returnItems = pgTable("return_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   returnId: varchar("return_id").references(() => returns.id).notNull(),
-  
+
   sku: text("sku"),
   productName: text("product_name").notNull(),
   quantity: integer("quantity").notNull().default(1),
   unitPrice: integer("unit_price"), // in cents
   condition: text("condition"), // unopened, opened_unused, used, damaged
   imageUrl: text("image_url"), // from Shopify or object storage
-  
+
   restockable: boolean("restockable").default(false),
   restockedAt: timestamp("restocked_at"),
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -415,49 +415,49 @@ export const returnItems = pgTable("return_items", {
 // ============================================
 
 export const noteVisibilityEnum = pgEnum("note_visibility", ["internal", "customer_visible", "system"]);
-export const noteEntityTypeEnum = pgEnum("note_entity_type", ["customer", "order", "repair", "emailThread", "case", "return"]);
+export const noteEntityTypeEnum = pgEnum("note_entity_type", ["customer", "order", "repair", "emailThread", "case", "return", "purchaseOrder", "todo"]);
 export const noteLinkTypeEnum = pgEnum("note_link_type", ["order", "tracking", "sku", "email", "url"]);
 export const followupStatusEnum = pgEnum("followup_status", ["pending", "in_progress", "completed", "cancelled"]);
 
 // Main polymorphic Notes table
 export const notes = pgTable("notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  
+
   // Polymorphic entity linking
   entityType: noteEntityTypeEnum("entity_type").notNull(),
   entityId: varchar("entity_id").notNull(),
-  
+
   // Note visibility (who can see it)
   visibility: noteVisibilityEnum("visibility").notNull().default("internal"),
-  
+
   // Content
   content: text("content").notNull(), // Rich text HTML
   renderedHtml: text("rendered_html"), // Sanitized HTML
   plainText: text("plain_text"), // For search
-  
+
   // Threading (enforced max depth via application logic)
   parentNoteId: varchar("parent_note_id").references((): any => notes.id),
   threadDepth: integer("thread_depth").default(0).$type<number>(),
-  
+
   // Author & timestamps
   authorId: varchar("author_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
   editedAt: timestamp("edited_at"),
-  
+
   // Pinning (max 3 enforced via application logic)
   isPinned: boolean("is_pinned").default(false),
   pinnedAt: timestamp("pinned_at"),
   pinnedBy: varchar("pinned_by").references(() => users.id),
-  
+
   // Soft delete
   deletedAt: timestamp("deleted_at"),
   deletedBy: varchar("deleted_by").references(() => users.id),
   deleteReason: text("delete_reason"),
-  
+
   // Status context
   statusPromptId: varchar("status_prompt_id"),
-  
+
   // Source tracking
   source: text("source").default("manual"), // manual, email, system
 });
@@ -647,10 +647,10 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   createdAt: true,
   updatedAt: true,
 }).extend({
-  orderDate: z.union([z.string(), z.date()]).transform(val => 
+  orderDate: z.union([z.string(), z.date()]).transform(val =>
     typeof val === 'string' ? new Date(val) : val
   ),
-  expectedDeliveryDate: z.union([z.string(), z.date()]).optional().transform(val => 
+  expectedDeliveryDate: z.union([z.string(), z.date()]).optional().transform(val =>
     val && typeof val === 'string' ? new Date(val) : val
   ),
   totalAmount: z.number().int().nonnegative(),
@@ -711,10 +711,7 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   createdAt: true,
 });
 
-export const insertEmailAttachmentSchema = createInsertSchema(emailAttachments).omit({
-  id: true,
-  createdAt: true,
-});
+
 
 export const insertReturnSchema = createInsertSchema(returns).omit({
   id: true,
@@ -722,16 +719,16 @@ export const insertReturnSchema = createInsertSchema(returns).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-  requestedAt: z.union([z.string(), z.date()]).optional().transform(val => 
+  requestedAt: z.union([z.string(), z.date()]).optional().transform(val =>
     val && typeof val === 'string' ? new Date(val) : val
   ),
-  receivedAt: z.union([z.string(), z.date()]).optional().nullable().transform(val => 
+  receivedAt: z.union([z.string(), z.date()]).optional().nullable().transform(val =>
     val && typeof val === 'string' ? new Date(val) : val
   ),
-  expectedReturnDate: z.union([z.string(), z.date()]).optional().nullable().transform(val => 
+  expectedReturnDate: z.union([z.string(), z.date()]).optional().nullable().transform(val =>
     val && typeof val === 'string' ? new Date(val) : val
   ),
-  completedAt: z.union([z.string(), z.date()]).optional().nullable().transform(val => 
+  completedAt: z.union([z.string(), z.date()]).optional().nullable().transform(val =>
     val && typeof val === 'string' ? new Date(val) : val
   ),
 });
@@ -783,7 +780,7 @@ export const insertNoteFollowupSchema = createInsertSchema(noteFollowups).omit({
   createdAt: true,
   completedAt: true,
 }).extend({
-  dueAt: z.union([z.string(), z.date()]).transform(val => 
+  dueAt: z.union([z.string(), z.date()]).transform(val =>
     typeof val === 'string' ? new Date(val) : val
   ),
 });
@@ -853,8 +850,7 @@ export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
-export type EmailAttachment = typeof emailAttachments.$inferSelect;
-export type InsertEmailAttachment = z.infer<typeof insertEmailAttachmentSchema>;
+
 
 export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
@@ -901,3 +897,139 @@ export type InsertNoteTemplate = z.infer<typeof insertNoteTemplateSchema>;
 
 export type NoteLink = typeof noteLinks.$inferSelect;
 export type InsertNoteLink = z.infer<typeof insertNoteLinkSchema>;
+
+// ============================================
+// TODO SUBTASKS & ATTACHMENTS
+// ============================================
+
+export const subtasks = pgTable("subtasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  todoId: varchar("todo_id").notNull(),
+  title: text("title").notNull(),
+  completed: boolean("completed").default(false),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const todoAttachments = pgTable("todo_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  todoId: varchar("todo_id").notNull(),
+  filename: text("filename").notNull(),
+  storageUrl: text("storage_url").notNull(),
+  contentType: text("content_type"),
+  size: integer("size"),
+  uploadedBy: varchar("uploaded_by"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+// Zod schemas
+export const insertSubtaskSchema = createInsertSchema(subtasks);
+export const insertTodoAttachmentSchema = createInsertSchema(todoAttachments);
+
+// TypeScript types
+export type Subtask = typeof subtasks.$inferSelect;
+export type InsertSubtask = z.infer<typeof insertSubtaskSchema>;
+
+export type TodoAttachment = typeof todoAttachments.$inferSelect;
+export type InsertTodoAttachment = z.infer<typeof insertTodoAttachmentSchema>;
+
+// ============================================
+// EMAIL METADATA (SnappyMail Integration)
+// ============================================
+
+// Email metadata table for linking emails to ThriftHub entities
+// Email content stays on Strato IMAP - only metadata is stored
+export const emailMetadata = pgTable("email_metadata", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  // IMAP identifiers (from SnappyMail)
+  messageId: varchar("message_id", { length: 255 }).notNull().unique(),
+  threadId: varchar("thread_id", { length: 255 }),
+
+  // ThriftHub entity links
+  caseId: varchar("case_id", { length: 50 }).references(() => cases.id, { onDelete: "set null" }),
+  orderId: varchar("order_id", { length: 50 }).references(() => orders.id, { onDelete: "set null" }),
+  returnId: varchar("return_id", { length: 50 }).references(() => returns.id, { onDelete: "set null" }),
+  repairId: varchar("repair_id", { length: 50 }).references(() => repairs.id, { onDelete: "set null" }),
+
+  // Metadata
+  linkedBy: varchar("linked_by", { length: 50 }).references(() => users.id, { onDelete: "set null" }),
+  linkedAt: timestamp("linked_at").defaultNow(),
+
+  // Optional: Subject for search (NOT full body)
+  subject: text("subject"),
+  fromEmail: varchar("from_email", { length: 255 }),
+  toEmail: varchar("to_email", { length: 255 }),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// Zod schema
+export const insertEmailMetadataSchema = createInsertSchema(emailMetadata);
+
+// TypeScript types
+export type EmailMetadata = typeof emailMetadata.$inferSelect;
+export type InsertEmailMetadata = z.infer<typeof insertEmailMetadataSchema>;
+
+// ====================================
+// MAIL SYSTEM (New Architecture)
+// ====================================
+
+// Entity type enum for polymorphic links
+export const emailEntityTypeEnum = pgEnum("email_entity_type", ["order", "case", "return", "repair"]);
+
+// Emails table - stores last 50 emails
+export const emails = pgTable("emails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subject: text("subject"),
+  fromName: text("from_name"),
+  fromEmail: text("from_email"),
+  html: text("html"),
+  text: text("text"),
+  date: timestamp("date"),
+  imapUid: integer("imap_uid").unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Zod schema
+export const insertEmailSchema = createInsertSchema(emails);
+
+// TypeScript types
+export type Email = typeof emails.$inferSelect;
+export type InsertEmail = z.infer<typeof insertEmailSchema>;
+
+// Email attachments table
+export const emailAttachments = pgTable("email_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  emailId: varchar("email_id").notNull().references(() => emails.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type"),
+  size: integer("size"),
+  storagePath: text("storage_path").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Zod schema
+export const insertEmailAttachmentSchema = createInsertSchema(emailAttachments);
+
+// TypeScript types
+export type EmailAttachment = typeof emailAttachments.$inferSelect;
+export type InsertEmailAttachment = z.infer<typeof insertEmailAttachmentSchema>;
+
+// Email links table - polymorphic links to entities
+export const emailLinks = pgTable("email_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  emailId: varchar("email_id").notNull().references(() => emails.id, { onDelete: "cascade" }),
+  entityType: emailEntityTypeEnum("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Zod schema
+export const insertEmailLinkSchema = createInsertSchema(emailLinks);
+
+// TypeScript types
+export type EmailLink = typeof emailLinks.$inferSelect;
+export type InsertEmailLink = z.infer<typeof insertEmailLinkSchema>;

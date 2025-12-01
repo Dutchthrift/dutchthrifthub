@@ -62,7 +62,7 @@ export function PurchaseOrdersTable({
             <TableHead>Titel</TableHead>
             <TableHead>Leverancier</TableHead>
             <TableHead>Datum</TableHead>
-            <TableHead>Verwachte Levering</TableHead>
+
             <TableHead>Bedrag</TableHead>
             <TableHead>Status</TableHead>
           </TableRow>
@@ -91,22 +91,12 @@ export function PurchaseOrdersTable({
                 <TableCell>{po.title || "-"}</TableCell>
                 <TableCell>{getSupplierName(po.supplierId)}</TableCell>
                 <TableCell>
-                  {po.orderDate 
+                  {po.orderDate
                     ? format(new Date(po.orderDate), "d MMM yyyy", { locale: nl })
                     : "-"
                   }
                 </TableCell>
-                <TableCell>
-                  {po.expectedDeliveryDate ? (
-                    <span className={
-                      new Date(po.expectedDeliveryDate) < new Date() && po.status !== 'verwerkt'
-                        ? "text-red-600 font-medium"
-                        : ""
-                    }>
-                      {format(new Date(po.expectedDeliveryDate), "d MMM yyyy", { locale: nl })}
-                    </span>
-                  ) : "-"}
-                </TableCell>
+
                 <TableCell>
                   <div className="flex items-center gap-2">
                     €{((po.totalAmount || 0) / 100).toLocaleString('nl-NL', { minimumFractionDigits: 2 })}
@@ -118,8 +108,8 @@ export function PurchaseOrdersTable({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge 
-                    variant="secondary" 
+                  <Badge
+                    variant="secondary"
                     className={getStatusColor(po.status)}
                     data-testid={`badge-status-${po.id}`}
                   >

@@ -6,10 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Search, 
-  Filter, 
-  Download, 
+import {
+  Search,
+  Filter,
+  Download,
   RefreshCw,
   Package,
   CreditCard,
@@ -22,20 +22,23 @@ import {
   ChevronsUpDown,
   ChevronLeft,
   ChevronRight,
-  Upload
+  Upload,
+  Clock,
+  User as UserIcon,
+  FileText
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Order } from "@/lib/types";
 import type { User } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import {
   DropdownMenu,
@@ -126,7 +129,7 @@ export default function Orders() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get('orderId');
-    
+
     if (orderId) {
       // First check if the order is already in the loaded orders
       const existingOrder = orders.find(o => o.id === orderId);
@@ -173,13 +176,13 @@ export default function Orders() {
         fetch("/api/customers/sync", { method: "POST" }),
         fetch("/api/orders/sync", { method: "POST" })
       ]);
-      
+
       if (!customersResponse.ok) throw new Error("Failed to sync customers");
       if (!ordersResponse.ok) throw new Error("Failed to sync orders");
-      
+
       const customersData = await customersResponse.json();
       const ordersData = await ordersResponse.json();
-      
+
       return { customersData, ordersData };
     },
     onSuccess: (data) => {
@@ -203,17 +206,17 @@ export default function Orders() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
-      
+
       const response = await fetch('/api/orders/import-csv', {
         method: 'POST',
         body: formData
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'CSV import failed');
       }
-      
+
       return response.json();
     },
     onSuccess: (data) => {
@@ -262,7 +265,7 @@ export default function Orders() {
     // Check if there's tracking information in the order data
     const trackingNumber = (order.orderData as any)?.fulfillments?.[0]?.tracking_number;
     const trackingUrl = (order.orderData as any)?.fulfillments?.[0]?.tracking_url;
-    
+
     if (trackingUrl) {
       window.open(trackingUrl, '_blank', 'noopener,noreferrer');
     } else if (trackingNumber) {
@@ -307,31 +310,31 @@ export default function Orders() {
     if (sortField !== field) {
       return <ChevronsUpDown className="ml-2 h-4 w-4" />;
     }
-    return sortDirection === 'asc' ? 
-      <ChevronUp className="ml-2 h-4 w-4" /> : 
+    return sortDirection === 'asc' ?
+      <ChevronUp className="ml-2 h-4 w-4" /> :
       <ChevronDown className="ml-2 h-4 w-4" />;
   };
 
   const filteredAndSortedOrders = orders?.filter(order => {
     if (statusFilter !== "all" && order.status !== statusFilter) return false;
-    if (searchQuery && 
-        !order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !order.customerEmail?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (searchQuery &&
+      !String(order.orderNumber).toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !order.customerEmail?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   }).sort((a, b) => {
     let aVal: any, bVal: any;
-    
+
     switch (sortField) {
       case 'orderNumber':
         aVal = parseInt(a.orderNumber.replace(/[^0-9]/g, '')) || 0;
         bVal = parseInt(b.orderNumber.replace(/[^0-9]/g, '')) || 0;
         break;
       case 'customer':
-        const aCustomer = (a.orderData as any)?.customer ? 
-          `${(a.orderData as any).customer.first_name} ${(a.orderData as any).customer.last_name}` : 
+        const aCustomer = (a.orderData as any)?.customer ?
+          `${(a.orderData as any).customer.first_name} ${(a.orderData as any).customer.last_name}` :
           'Guest';
-        const bCustomer = (b.orderData as any)?.customer ? 
-          `${(b.orderData as any).customer.first_name} ${(b.orderData as any).customer.last_name}` : 
+        const bCustomer = (b.orderData as any)?.customer ?
+          `${(b.orderData as any).customer.first_name} ${(b.orderData as any).customer.last_name}` :
           'Guest';
         aVal = aCustomer.toLowerCase();
         bVal = bCustomer.toLowerCase();
@@ -359,38 +362,39 @@ export default function Orders() {
       default:
         return 0;
     }
-    
+
     if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
     if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
     return 0;
   }) || [];
 
-  const getStatusVariant = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case "paid":
       case "delivered":
-        return "default";
+        return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30";
       case "processing":
+        return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30";
       case "shipped":
-        return "secondary";
+        return "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-500/20 dark:text-purple-400 dark:border-purple-500/30";
       case "pending":
-        return "outline";
+        return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30";
       case "cancelled":
       case "refunded":
-        return "destructive";
+        return "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/30";
       default:
-        return "secondary";
+        return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
     }
   };
 
   const getPaymentStatusIcon = (status: string) => {
     switch (status) {
       case "paid":
-        return <CreditCard className="h-4 w-4 text-chart-2" />;
+        return <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
       case "pending":
-        return <CreditCard className="h-4 w-4 text-chart-4" />;
+        return <CreditCard className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
       case "refunded":
-        return <CreditCard className="h-4 w-4 text-destructive" />;
+        return <CreditCard className="h-4 w-4 text-rose-600 dark:text-rose-400" />;
       default:
         return <CreditCard className="h-4 w-4 text-muted-foreground" />;
     }
@@ -405,23 +409,23 @@ export default function Orders() {
   };
 
   return (
-    <div className="min-h-screen bg-background" data-testid="orders-page">
+    <div className="min-h-screen bg-background animate-fade-in" data-testid="orders-page">
       <Navigation />
-      
+
       <main className="container mx-auto px-4 py-6">
         <div className="bg-card rounded-lg p-6 mb-6 border" data-testid="orders-header">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
-              <p className="text-muted-foreground">View and manage customer orders from Shopify</p>
+              <h1 className="text-3xl font-medium tracking-tight">Orders</h1>
+              <p className="text-muted-foreground font-light">View and manage customer orders from Shopify</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <Button variant="outline" data-testid="export-orders-button">
                 <Download className="mr-2 h-4 w-4" />
                 Export CSV
               </Button>
-              
-              <Button 
+
+              <Button
                 variant="outline"
                 onClick={() => setShowImportDialog(true)}
                 data-testid="import-csv-button"
@@ -429,8 +433,8 @@ export default function Orders() {
                 <Upload className="mr-2 h-4 w-4" />
                 Import CSV
               </Button>
-              
-              <Button 
+
+              <Button
                 onClick={() => syncAllMutation.mutate()}
                 disabled={syncAllMutation.isPending}
                 data-testid="sync-shopify-button"
@@ -443,65 +447,113 @@ export default function Orders() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
-          <Card data-testid="orders-stats-all">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
+          <Card
+            className={`relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-l-4 border-l-primary ${statusFilter === 'all' ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+            onClick={() => setStatusFilter('all')}
+            data-testid="orders-stats-all"
+          >
+            <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-primary/10 blur-2xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Package className="h-4 w-4 text-primary" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-semibold">
                 {orderStats?.total || 0}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                orders
+                All time orders
               </p>
             </CardContent>
           </Card>
-          
-          <Card data-testid="orders-stats-pending">
+
+          <Card
+            className={`relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-l-4 border-l-amber-500 ${statusFilter === 'pending' ? 'ring-2 ring-amber-500 ring-offset-2' : ''}`}
+            onClick={() => setStatusFilter('pending')}
+            data-testid="orders-stats-pending"
+          >
+            <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-amber-500/10 blur-2xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <Package className="h-4 w-4 text-chart-4" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+              <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <Package className="h-4 w-4 text-amber-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{statusCounts.pending}</div>
+              <div className="text-2xl font-semibold">{statusCounts.pending}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Awaiting processing
+              </p>
             </CardContent>
           </Card>
 
-          <Card data-testid="orders-stats-processing">
+          <Card
+            className={`relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-l-4 border-l-blue-500 ${statusFilter === 'processing' ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`}
+            onClick={() => setStatusFilter('processing')}
+            data-testid="orders-stats-processing"
+          >
+            <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-blue-500/10 blur-2xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Processing</CardTitle>
-              <Package className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Processing</CardTitle>
+              <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <Package className="h-4 w-4 text-blue-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{statusCounts.processing}</div>
+              <div className="text-2xl font-semibold">{statusCounts.processing}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Being prepared
+              </p>
             </CardContent>
           </Card>
 
-          <Card data-testid="orders-stats-shipped">
+          <Card
+            className={`relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-l-4 border-l-purple-500 ${statusFilter === 'shipped' ? 'ring-2 ring-purple-500 ring-offset-2' : ''}`}
+            onClick={() => setStatusFilter('shipped')}
+            data-testid="orders-stats-shipped"
+          >
+            <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-purple-500/10 blur-2xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Shipped</CardTitle>
-              <Truck className="h-4 w-4 text-chart-2" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Shipped</CardTitle>
+              <div className="h-8 w-8 rounded-full bg-purple-500/10 flex items-center justify-center">
+                <Truck className="h-4 w-4 text-purple-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{statusCounts.shipped}</div>
+              <div className="text-2xl font-semibold">{statusCounts.shipped}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                On the way
+              </p>
             </CardContent>
           </Card>
 
-          <Card data-testid="orders-stats-delivered">
+          <Card
+            className={`relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-l-4 border-l-emerald-500 ${statusFilter === 'delivered' ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}
+            onClick={() => setStatusFilter('delivered')}
+            data-testid="orders-stats-delivered"
+          >
+            <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-emerald-500/10 blur-2xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Delivered</CardTitle>
-              <Package className="h-4 w-4 text-chart-2" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Delivered</CardTitle>
+              <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <Package className="h-4 w-4 text-emerald-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{statusCounts.delivered}</div>
+              <div className="text-2xl font-semibold">{statusCounts.delivered}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Completed orders
+              </p>
             </CardContent>
           </Card>
         </div>
 
         {/* Filters and Search */}
-        <Card className="mb-6">
+        {/* Filters and Search */}
+        <Card className="mb-6 border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm bg-white/50 backdrop-blur-sm dark:bg-zinc-900/50">
           <CardContent className="p-4">
             <div className="space-y-4">
               {/* Search Bar */}
@@ -509,7 +561,7 @@ export default function Orders() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search orders, customers..."
-                  className="pl-10"
+                  className="pl-10 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 focus:ring-primary"
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -521,19 +573,19 @@ export default function Orders() {
 
               {/* Status Tabs */}
               <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-                <TabsList className="w-full grid grid-cols-5 h-auto">
-                  <TabsTrigger value="all" data-testid="filter-all-orders" className="text-xs sm:text-sm">All</TabsTrigger>
-                  <TabsTrigger value="pending" data-testid="filter-pending-orders" className="text-xs sm:text-sm">Pending</TabsTrigger>
-                  <TabsTrigger value="processing" data-testid="filter-processing-orders" className="text-xs sm:text-sm">Processing</TabsTrigger>
-                  <TabsTrigger value="shipped" data-testid="filter-shipped-orders" className="text-xs sm:text-sm">Shipped</TabsTrigger>
-                  <TabsTrigger value="delivered" data-testid="filter-delivered-orders" className="text-xs sm:text-sm">Delivered</TabsTrigger>
+                <TabsList className="w-full grid grid-cols-5 h-auto bg-zinc-100/50 dark:bg-zinc-800/50 p-1">
+                  <TabsTrigger value="all" data-testid="filter-all-orders" className="text-xs sm:text-sm data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-950 data-[state=active]:shadow-sm">All</TabsTrigger>
+                  <TabsTrigger value="pending" data-testid="filter-pending-orders" className="text-xs sm:text-sm data-[state=active]:bg-amber-100 dark:data-[state=active]:bg-amber-900/30 data-[state=active]:text-amber-700 dark:data-[state=active]:text-amber-400">Pending</TabsTrigger>
+                  <TabsTrigger value="processing" data-testid="filter-processing-orders" className="text-xs sm:text-sm data-[state=active]:bg-blue-100 dark:data-[state=active]:bg-blue-900/30 data-[state=active]:text-blue-700 dark:data-[state=active]:text-blue-400">Processing</TabsTrigger>
+                  <TabsTrigger value="shipped" data-testid="filter-shipped-orders" className="text-xs sm:text-sm data-[state=active]:bg-purple-100 dark:data-[state=active]:bg-purple-900/30 data-[state=active]:text-purple-700 dark:data-[state=active]:text-purple-400">Shipped</TabsTrigger>
+                  <TabsTrigger value="delivered" data-testid="filter-delivered-orders" className="text-xs sm:text-sm data-[state=active]:bg-emerald-100 dark:data-[state=active]:bg-emerald-900/30 data-[state=active]:text-emerald-700 dark:data-[state=active]:text-emerald-400">Delivered</TabsTrigger>
                 </TabsList>
               </Tabs>
-              
+
               {/* Page Size and Filters */}
               <div className="flex items-center justify-between gap-2">
                 <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
-                  <SelectTrigger className="w-full sm:w-40" data-testid="page-size-selector">
+                  <SelectTrigger className="w-full sm:w-40 bg-white dark:bg-zinc-950" data-testid="page-size-selector">
                     <SelectValue placeholder="Page size" />
                   </SelectTrigger>
                   <SelectContent>
@@ -542,8 +594,8 @@ export default function Orders() {
                     <SelectItem value="100">100 per page</SelectItem>
                   </SelectContent>
                 </Select>
-                
-                <Button variant="outline" size="icon" data-testid="advanced-filters-button">
+
+                <Button variant="outline" size="icon" data-testid="advanced-filters-button" className="bg-white dark:bg-zinc-950">
                   <Filter className="h-4 w-4" />
                 </Button>
               </div>
@@ -574,7 +626,7 @@ export default function Orders() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort('orderNumber')}
                       data-testid="sort-order-header"
@@ -584,7 +636,7 @@ export default function Orders() {
                         {getSortIcon('orderNumber')}
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort('customer')}
                       data-testid="sort-customer-header"
@@ -594,7 +646,7 @@ export default function Orders() {
                         {getSortIcon('customer')}
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort('totalAmount')}
                       data-testid="sort-total-header"
@@ -604,7 +656,7 @@ export default function Orders() {
                         {getSortIcon('totalAmount')}
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort('status')}
                       data-testid="sort-status-header"
@@ -614,7 +666,7 @@ export default function Orders() {
                         {getSortIcon('status')}
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort('paymentStatus')}
                       data-testid="sort-payment-header"
@@ -624,7 +676,7 @@ export default function Orders() {
                         {getSortIcon('paymentStatus')}
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort('orderDate')}
                       data-testid="sort-date-header"
@@ -639,10 +691,10 @@ export default function Orders() {
                 </TableHeader>
                 <TableBody>
                   {filteredAndSortedOrders.map((order) => (
-                    <TableRow 
-                      key={order.id} 
+                    <TableRow
+                      key={order.id}
                       data-testid={`order-row-${order.id}`}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="cursor-pointer hover:bg-muted/50 animate-slide-in"
                       onClick={() => handleViewDetails(order)}
                     >
                       <TableCell className="font-medium">
@@ -663,7 +715,7 @@ export default function Orders() {
                       <TableCell>
                         <div>
                           <div className="font-medium text-sm">
-                            {(order.orderData as any)?.customer ? 
+                            {(order.orderData as any)?.customer ?
                               `${(order.orderData as any).customer.first_name} ${(order.orderData as any).customer.last_name}` :
                               'Guest'
                             }
@@ -677,7 +729,7 @@ export default function Orders() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusVariant(order.status)}>
+                        <Badge className={`${getStatusColor(order.status)} hover:opacity-90 transition-opacity`}>
                           {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
                         </Badge>
                       </TableCell>
@@ -756,20 +808,20 @@ export default function Orders() {
             </Card>
           ) : (
             filteredAndSortedOrders.map((order) => (
-              <Card 
-                key={order.id} 
-                className="cursor-pointer hover:bg-muted/50 transition-colors"
+              <Card
+                key={order.id}
+                className="cursor-pointer hover:bg-muted/50 transition-colors animate-slide-in"
                 onClick={() => handleViewDetails(order)}
                 data-testid={`order-card-${order.id}`}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <div className="font-semibold text-primary mb-1" data-testid={`order-number-${order.id}`}>
+                      <div className="font-medium text-primary mb-1" data-testid={`order-number-${order.id}`}>
                         {order.orderNumber}
                       </div>
-                      <div className="text-sm font-medium">
-                        {(order.orderData as any)?.customer ? 
+                      <div className="text-sm font-normal">
+                        {(order.orderData as any)?.customer ?
                           `${(order.orderData as any).customer.first_name} ${(order.orderData as any).customer.last_name}` :
                           'Guest'
                         }
@@ -777,7 +829,7 @@ export default function Orders() {
                       <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-semibold">€{((order.totalAmount || 0) / 100).toFixed(2)}</div>
+                      <div className="font-medium">€{((order.totalAmount || 0) / 100).toFixed(2)}</div>
                       {(order.orderData as any)?.line_items?.length > 0 && (
                         <div className="text-xs text-muted-foreground mt-1">
                           {(order.orderData as any).line_items.length} {(order.orderData as any).line_items.length === 1 ? 'item' : 'items'}
@@ -787,7 +839,7 @@ export default function Orders() {
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant={getStatusVariant(order.status)}>
+                      <Badge className={`${getStatusColor(order.status)} hover:opacity-90 transition-opacity`}>
                         {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
                       </Badge>
                       <Badge variant="outline" className="text-xs">
@@ -821,7 +873,7 @@ export default function Orders() {
                 <ChevronLeft className="h-4 w-4" />
                 Previous
               </Button>
-              
+
               <div className="flex items-center space-x-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   const page = i + 1;
@@ -851,7 +903,7 @@ export default function Orders() {
                   </>
                 )}
               </div>
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -868,156 +920,249 @@ export default function Orders() {
 
         {/* Order Details Dialog */}
         <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Order Details {selectedOrder?.orderNumber}</DialogTitle>
-              <DialogDescription>
-                Complete order information and history
-              </DialogDescription>
-            </DialogHeader>
-            
-            {selectedOrder && (
-              <div className="space-y-6">
-                {/* Order Summary */}
-                <div className="grid grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Order Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Order Number:</span>
-                        <span className="font-medium">{selectedOrder.orderNumber}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total Amount:</span>
-                        <span className="font-medium">€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Status:</span>
-                        <Badge variant={getStatusVariant(selectedOrder.status)}>
-                          {selectedOrder.status?.charAt(0).toUpperCase() + selectedOrder.status?.slice(1)}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Payment Status:</span>
-                        <span className="font-medium">
-                          {selectedOrder.paymentStatus ? selectedOrder.paymentStatus.charAt(0).toUpperCase() + selectedOrder.paymentStatus.slice(1) : 'Pending'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Order Date:</span>
-                        <span className="font-medium">
-                          {new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleString('nl-NL', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false
-                          })}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Customer Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Name:</span>
-                        <span className="font-medium">
-                          {(selectedOrder.orderData as any)?.customer ? 
-                            `${(selectedOrder.orderData as any).customer.first_name} ${(selectedOrder.orderData as any).customer.last_name}` :
-                            'Guest'
-                          }
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Email:</span>
-                        <span className="font-medium">{selectedOrder.customerEmail}</span>
-                      </div>
-                      {(selectedOrder.orderData as any)?.customer?.phone && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Phone:</span>
-                          <span className="font-medium">{(selectedOrder.orderData as any).customer.phone}</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+          <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto bg-white/95 backdrop-blur-md dark:bg-zinc-900/95 border-zinc-200 dark:border-zinc-800 shadow-2xl">
+            <DialogHeader className="border-b pb-4 mb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle className="text-2xl font-medium tracking-tight flex items-center gap-3">
+                    Order {selectedOrder?.orderNumber}
+                    {selectedOrder && (
+                      <Badge className={`${getStatusColor(selectedOrder.status)} text-sm font-normal px-3 py-1`}>
+                        {selectedOrder.status?.charAt(0).toUpperCase() + selectedOrder.status?.slice(1)}
+                      </Badge>
+                    )}
+                  </DialogTitle>
+                  <DialogDescription className="mt-1 font-light">
+                    Placed on {selectedOrder && new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleString('nl-NL', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </DialogDescription>
                 </div>
+                <div className="text-right">
+                  <div className="text-2xl font-medium text-primary">
+                    €{((selectedOrder?.totalAmount || 0) / 100).toFixed(2)}
+                  </div>
+                  <div className="text-sm text-muted-foreground font-light">
+                    Total Amount
+                  </div>
+                </div>
+              </div>
+            </DialogHeader>
 
-                {/* Line Items */}
-                {(selectedOrder.orderData as any)?.line_items && (
-                  <Card>
+            {selectedOrder && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column - Order Items & History */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Order Items */}
+                  <Card className="bg-gradient-to-br from-blue-50/80 to-white/50 dark:from-blue-950/20 dark:to-zinc-900/50 border-2 border-blue-200/70 dark:border-blue-800/50 border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader>
-                      <CardTitle className="text-lg">Order Items</CardTitle>
+                      <CardTitle className="text-lg font-medium text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                        <span className="p-1.5 bg-blue-500/10 rounded-lg">
+                          <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </span>
+                        Order Items
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-3">
-                        {(selectedOrder.orderData as any).line_items.map((item: any, index: number) => (
-                          <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
-                            <div className="flex-1">
-                              <div className="font-medium">{item.title}</div>
-                              {item.variant_title && (
-                                <div className="text-sm text-muted-foreground">{item.variant_title}</div>
-                              )}
-                              <div className="text-sm text-muted-foreground">Quantity: {item.quantity}</div>
+                      <div className="space-y-4">
+                        {(selectedOrder.orderData as any)?.line_items?.map((item: any, index: number) => (
+                          <div key={index} className="flex items-start gap-4 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-zinc-700/50 transition-colors">
+                            <div className="h-16 w-16 bg-zinc-200 dark:bg-zinc-700 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden">
+                              <Package className="h-8 w-8 text-muted-foreground/50" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm truncate" title={item.title}>{item.title}</h4>
+                              <p className="text-sm text-muted-foreground font-light mt-1">
+                                {item.variant_title && <span className="mr-2">{item.variant_title}</span>}
+                                <span>Qty: {item.quantity}</span>
+                              </p>
                             </div>
                             <div className="text-right">
-                              <div className="font-medium">€{parseFloat(item.price).toFixed(2)}</div>
-                              <div className="text-sm text-muted-foreground">
-                                Total: €{(parseFloat(item.price) * item.quantity).toFixed(2)}
-                              </div>
+                              <div className="font-medium text-sm">€{item.price}</div>
+                              <div className="text-xs text-muted-foreground font-light">Total: €{(parseFloat(item.price) * item.quantity).toFixed(2)}</div>
                             </div>
                           </div>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
-                )}
 
-                {/* Shipping Address */}
-                {(selectedOrder.orderData as any)?.shipping_address && (
-                  <Card>
+                  {/* Timeline / History Placeholder */}
+                  <Card className="bg-gradient-to-br from-indigo-50/80 to-white/50 dark:from-indigo-950/20 dark:to-zinc-900/50 border-2 border-indigo-200/70 dark:border-indigo-800/50 border-l-4 border-l-indigo-500 shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader>
-                      <CardTitle className="text-lg">Shipping Address</CardTitle>
+                      <CardTitle className="text-lg font-medium text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
+                        <span className="p-1.5 bg-indigo-500/10 rounded-lg">
+                          <Clock className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                        </span>
+                        Order History
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-1">
-                        <div>{(selectedOrder.orderData as any).shipping_address.name}</div>
-                        <div>{(selectedOrder.orderData as any).shipping_address.address1}</div>
-                        {(selectedOrder.orderData as any).shipping_address.address2 && (
-                          <div>{(selectedOrder.orderData as any).shipping_address.address2}</div>
-                        )}
-                        <div>
-                          {(selectedOrder.orderData as any).shipping_address.city}, {(selectedOrder.orderData as any).shipping_address.zip}
+                      <div className="relative pl-4 border-l-2 border-zinc-200 dark:border-zinc-700 space-y-6 my-2">
+                        <div className="relative">
+                          <div className={`absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 ${selectedOrder.status === 'delivered' ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                          <div className="text-sm font-medium">Delivered</div>
+                          <div className="text-xs text-muted-foreground font-light">Expected delivery</div>
                         </div>
-                        <div>{(selectedOrder.orderData as any).shipping_address.country}</div>
+                        <div className="relative">
+                          <div className={`absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 ${['shipped', 'delivered'].includes(selectedOrder.status || '') ? 'bg-purple-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                          <div className="text-sm font-medium">Shipped</div>
+                          <div className="text-xs text-muted-foreground font-light">Order has been shipped</div>
+                        </div>
+                        <div className="relative">
+                          <div className={`absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 ${['processing', 'shipped', 'delivered'].includes(selectedOrder.status || '') ? 'bg-blue-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                          <div className="text-sm font-medium">Processing</div>
+                          <div className="text-xs text-muted-foreground font-light">Order is being prepared</div>
+                        </div>
+                        <div className="relative">
+                          <div className="absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 bg-amber-500" />
+                          <div className="text-sm font-medium">Order Placed</div>
+                          <div className="text-xs text-muted-foreground font-light">
+                            {new Date(selectedOrder.createdAt || '').toLocaleDateString()}
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
-                )}
 
-                {/* Team Notes */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Team Notes</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {currentUser && (
-                      <NotesPanel 
-                        entityType="order" 
-                        entityId={selectedOrder.id}
-                        currentUser={currentUser}
-                      />
-                    )}
-                  </CardContent>
-                </Card>
+                  {/* Team Notes */}
+                  <Card className="bg-gradient-to-br from-rose-50/80 to-white/50 dark:from-rose-950/20 dark:to-zinc-900/50 border-2 border-rose-200/70 dark:border-rose-800/50 border-l-4 border-l-rose-500 shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-medium text-rose-900 dark:text-rose-100 flex items-center gap-2">
+                        <span className="p-1.5 bg-rose-500/10 rounded-lg">
+                          <FileText className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                        </span>
+                        Team Notes
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {currentUser && (
+                        <NotesPanel
+                          entityType="order"
+                          entityId={selectedOrder.id}
+                          currentUser={currentUser}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Right Column - Customer & Payment Info */}
+                <div className="space-y-6">
+                  <Card className="bg-gradient-to-br from-purple-50/80 to-white/50 dark:from-purple-950/20 dark:to-zinc-900/50 border-2 border-purple-200/70 dark:border-purple-800/50 border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-medium text-purple-900 dark:text-purple-100 flex items-center gap-2">
+                        <span className="p-1.5 bg-purple-500/10 rounded-lg">
+                          <UserIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                        </span>
+                        Customer
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
+                          {(selectedOrder.orderData as any)?.customer?.first_name?.[0] || 'G'}
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm">
+                            {(selectedOrder.orderData as any)?.customer ?
+                              `${(selectedOrder.orderData as any).customer.first_name} ${(selectedOrder.orderData as any).customer.last_name}` :
+                              'Guest'
+                            }
+                          </div>
+                          <div className="text-xs text-muted-foreground font-light">Customer</div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-700">
+                        <div className="flex items-start gap-2 text-sm">
+                          <div className="min-w-[20px] text-muted-foreground"><MessageSquare className="h-4 w-4" /></div>
+                          <span className="font-light break-all">{selectedOrder.customerEmail}</span>
+                        </div>
+                        {(selectedOrder.orderData as any)?.customer?.phone && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <div className="min-w-[20px] text-muted-foreground"><Truck className="h-4 w-4" /></div>
+                            <span className="font-light">{(selectedOrder.orderData as any).customer.phone}</span>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {(selectedOrder.orderData as any)?.shipping_address && (
+                    <Card className="bg-gradient-to-br from-cyan-50/80 to-white/50 dark:from-cyan-950/20 dark:to-zinc-900/50 border-2 border-cyan-200/70 dark:border-cyan-800/50 border-l-4 border-l-cyan-500 shadow-sm hover:shadow-md transition-shadow">
+                      <CardHeader>
+                        <CardTitle className="text-lg font-medium text-cyan-900 dark:text-cyan-100 flex items-center gap-2">
+                          <span className="p-1.5 bg-cyan-500/10 rounded-lg">
+                            <Truck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                          </span>
+                          Shipping Address
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-1 text-sm font-light">
+                          <div>{(selectedOrder.orderData as any).shipping_address.name}</div>
+                          <div>{(selectedOrder.orderData as any).shipping_address.address1}</div>
+                          {(selectedOrder.orderData as any).shipping_address.address2 && (
+                            <div>{(selectedOrder.orderData as any).shipping_address.address2}</div>
+                          )}
+                          <div>
+                            {(selectedOrder.orderData as any).shipping_address.city}, {(selectedOrder.orderData as any).shipping_address.zip}
+                          </div>
+                          <div>{(selectedOrder.orderData as any).shipping_address.country}</div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <Card className="bg-gradient-to-br from-emerald-50/80 to-white/50 dark:from-emerald-950/20 dark:to-zinc-900/50 border-2 border-emerald-200/70 dark:border-emerald-800/50 border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-medium text-emerald-900 dark:text-emerald-100 flex items-center gap-2">
+                        <span className="p-1.5 bg-emerald-500/10 rounded-lg">
+                          <CreditCard className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        </span>
+                        Payment
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground font-light">Status</span>
+                        <Badge variant="outline" className="font-normal capitalize">
+                          {selectedOrder.paymentStatus || 'Pending'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground font-light">Method</span>
+                        <span className="text-sm font-medium flex items-center gap-1">
+                          <CreditCard className="h-3 w-3" />
+                          {(selectedOrder.orderData as any)?.payment_gateway_names?.[0] || 'Unknown'}
+                        </span>
+                      </div>
+                      <div className="pt-3 mt-3 border-t border-zinc-200 dark:border-zinc-700 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground font-light">Subtotal</span>
+                          <span>€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground font-light">Shipping</span>
+                          <span>€0.00</span>
+                        </div>
+                        <div className="flex justify-between text-sm font-medium pt-2">
+                          <span>Total</span>
+                          <span className="text-primary">€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             )}
+
+
           </DialogContent>
         </Dialog>
 
@@ -1079,6 +1224,6 @@ export default function Orders() {
           </DialogContent>
         </Dialog>
       </main>
-    </div>
+    </div >
   );
 }

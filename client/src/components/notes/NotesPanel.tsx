@@ -15,7 +15,7 @@ import type { Note, NoteTag, User } from "@shared/schema";
 interface NotesPanelProps {
   entityType: string;
   entityId: string;
-  currentUser: User;
+  currentUser: { id: string };
   className?: string;
 }
 
@@ -35,9 +35,14 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
       if (selectedTagFilters.length > 0) {
         selectedTagFilters.forEach(tagId => params.append("tagIds", tagId));
       }
-      
+
       const url = `/api/notes/${entityType}/${entityId}${params.toString() ? `?${params}` : ""}`;
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       if (!response.ok) throw new Error("Failed to fetch notes");
       return response.json();
     },
@@ -122,7 +127,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
         authorId: currentUser.id,
       });
       const newNote = await response.json();
-      
+
       if (noteData.tagIds.length > 0) {
         await Promise.all(
           noteData.tagIds.map((tagId) =>
@@ -130,7 +135,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
           )
         );
       }
-      
+
       return newNote;
     },
     onSuccess: async (newNote) => {
@@ -180,7 +185,7 @@ export function NotesPanel({ entityType, entityId, currentUser, className }: Not
     mutationFn: async (noteId: string) => {
       const reason = window.prompt("Why are you deleting this note?");
       if (!reason) throw new Error("Delete reason is required");
-      
+
       return apiRequest("DELETE", `/api/notes/${noteId}`, { deleteReason: reason });
     },
     onSuccess: () => {

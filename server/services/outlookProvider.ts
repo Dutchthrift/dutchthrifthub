@@ -5,7 +5,7 @@ export class OutlookProvider implements EmailProvider {
   async syncEmails(): Promise<RawEmail[]> {
     try {
       const client = await getUncachableOutlookClient();
-      
+
       // Get recent emails
       const emails = await client
         .api('/me/messages')
@@ -15,6 +15,7 @@ export class OutlookProvider implements EmailProvider {
 
       return emails.value.map((email: any): RawEmail => ({
         messageId: email.id,
+        uid: 0, // Outlook doesn't use integer UIDs like IMAP
         conversationId: email.conversationId,
         subject: email.subject || '',
         from: email.sender?.emailAddress?.address || '',
@@ -36,7 +37,7 @@ export class OutlookProvider implements EmailProvider {
   async sendEmail(to: string, subject: string, body: string, replyToMessageId?: string): Promise<{ success: boolean }> {
     try {
       const client = await getUncachableOutlookClient();
-      
+
       const message: any = {
         message: {
           subject: subject,
@@ -63,11 +64,26 @@ export class OutlookProvider implements EmailProvider {
       }
 
       await client.api('/me/sendMail').post(message);
-      
+
       return { success: true };
     } catch (error) {
       console.error('Error sending email via Outlook:', error);
       throw error;
     }
+  }
+  async fetchEmailBody(uid: number): Promise<{ body: string; isHtml: boolean }> {
+    throw new Error('Method not implemented for Outlook provider.');
+  }
+
+  async downloadAttachment(uid: number, partId: string): Promise<{ buffer: Buffer; contentType: string }> {
+    throw new Error('Method not implemented for Outlook provider.');
+  }
+
+  async getLatestUid(): Promise<number> {
+    throw new Error('Method not implemented for Outlook provider.');
+  }
+
+  async fetchEmails(range: string): Promise<RawEmail[]> {
+    throw new Error('Method not implemented for Outlook provider.');
   }
 }

@@ -64,7 +64,7 @@ import type { Case, CaseWithDetails, EmailThread, Order, Repair, Todo } from "@/
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { NotesPanel } from "@/components/notes/NotesPanel";
-import { EmailCompose } from "@/components/email/email-compose";
+
 
 const CASE_STATUS_OPTIONS = [
   { value: "new", label: "Nieuw" },
@@ -79,6 +79,26 @@ const PRIORITY_OPTIONS = [
   { value: "high", label: "High" },
   { value: "urgent", label: "Urgent" },
 ];
+
+const getPriorityColor = (priority: string | null) => {
+  switch (priority) {
+    case "urgent": return "bg-red-100 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30";
+    case "high": return "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-500/20 dark:text-orange-400 dark:border-orange-500/30";
+    case "medium": return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30";
+    case "low": return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-500/20 dark:text-slate-400 dark:border-slate-500/30";
+    default: return "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-500/20 dark:text-zinc-400 dark:border-zinc-500/30";
+  }
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "new": return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30";
+    case "in_progress": return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30";
+    case "waiting_customer": return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30";
+    case "resolved": return "bg-green-100 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30";
+    default: return "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-500/20 dark:text-zinc-400 dark:border-zinc-500/30";
+  }
+};
 
 interface CaseDetailModalProps {
   caseId: string;
@@ -125,6 +145,19 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
   const linkedRepairIds = caseLinksData.filter((link: any) => link.linkType === "repair").map((link: any) => link.linkedId);
   const linkedTodoIds = caseLinksData.filter((link: any) => link.linkType === "todo").map((link: any) => link.linkedId);
 
+  // Fetch linked emails using the dedicated endpoint
+  const { data: linkedEmails = [] } = useQuery<EmailThread[]>({
+    queryKey: ["/api/email-threads", "caseId", caseId],
+    queryFn: async () => {
+      const response = await fetch(`/api/email-threads?caseId=${caseId}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch related emails');
+      return response.json();
+    },
+    enabled: !!caseId && open,
+  });
+
   // Only fetch these lists when user is actively trying to link items
   const { data: allEmailsData = [] } = useQuery<EmailThread[]>({
     queryKey: ["/api/email-threads"],
@@ -167,7 +200,7 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
   });
 
   // Filter to get only linked items
-  const relatedEmails = allEmailsData.filter((email: EmailThread) => linkedEmailIds.includes(email.id));
+  const relatedEmails = linkedEmails; // Use the data from the dedicated endpoint
   const relatedOrders = (allOrdersData?.orders || []).filter((order: Order) => linkedOrderIds.includes(order.id));
   const relatedRepairs = (allRepairsData || []).filter((repair: Repair) => linkedRepairIds.includes(repair.id));
   const relatedTodos = (allTodosData || []).filter((todo: Todo) => linkedTodoIds.includes(todo.id));
@@ -232,6 +265,21 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
       toast({
         title: "Item unlinked",
         description: "Item has been unlinked from the case",
+      });
+    },
+  });
+
+  const unlinkEmailMutation = useMutation({
+    mutationFn: async (emailId: string) => {
+      const response = await apiRequest("DELETE", `/api/cases/${caseId}/emails/${emailId}`, undefined);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-threads", "caseId", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId] });
+      toast({
+        title: "Email unlinked",
+        description: "Email has been unlinked from the case",
       });
     },
   });
@@ -307,14 +355,14 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
   // Filter available items for linking
   const getFilteredSearchResults = () => {
     if (!linkSearchTerm.trim()) return [];
-    
+
     const search = linkSearchTerm.toLowerCase();
     const linkedIds = caseLinksData.map((link: any) => link.linkedId);
-    
+
     let results: any[] = [];
-    
+
     if (linkType === "email") {
-      results = allEmailsData.filter((email: any) => 
+      results = allEmailsData.filter((email: any) =>
         !linkedIds.includes(email.id) &&
         (email.subject?.toLowerCase().includes(search) || email.customerEmail?.toLowerCase().includes(search))
       ).slice(0, 5);
@@ -322,8 +370,8 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
       results = (allOrdersData?.orders || []).filter((order: any) =>
         !linkedIds.includes(order.id) &&
         (order.orderNumber?.toString().includes(search) ||
-         order.customerEmail?.toLowerCase().includes(search) ||
-         order.customerName?.toLowerCase().includes(search))
+          order.customerEmail?.toLowerCase().includes(search) ||
+          order.customerName?.toLowerCase().includes(search))
       ).slice(0, 5);
     } else if (linkType === "repair") {
       results = (allRepairsData || []).filter((repair: any) =>
@@ -336,7 +384,7 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
         (todo.title?.toLowerCase().includes(search) || todo.description?.toLowerCase().includes(search))
       ).slice(0, 5);
     }
-    
+
     return results;
   };
 
@@ -369,21 +417,21 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <DialogTitle className="text-lg font-medium">Case #{caseData.caseNumber}</DialogTitle>
-                  <Badge variant={getStatusVariant(caseData.status)} data-testid="case-status-badge" className="text-xs h-5">
+                  <DialogTitle className="text-xl font-medium tracking-tight">Case #{caseData.caseNumber}</DialogTitle>
+                  <Badge className={`text-xs font-semibold px-2.5 py-0.5 ${getStatusColor(caseData.status)}`} data-testid="case-status-badge">
                     {statusLabel}
                   </Badge>
-                  <Badge variant={getPriorityVariant(caseData.priority)} data-testid="case-priority-badge" className="text-xs h-5">
+                  <Badge className={`text-xs font-semibold px-2.5 py-0.5 ${getPriorityColor(caseData.priority)}`} data-testid="case-priority-badge">
                     {caseData.priority}
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm font-light text-muted-foreground">
                   Created {formatDateTime(caseData.createdAt)} • Customer: {caseData.customerEmail}
                 </p>
               </div>
               <div className="flex items-center gap-1.5">
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => setShowEmailDialog(true)}
                   data-testid="send-email-button"
@@ -392,8 +440,8 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                   <Mail className="mr-1.5 h-3.5 w-3.5" />
                   Email
                 </Button>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => setShowDeleteDialog(true)}
                   data-testid="delete-case-button"
@@ -412,9 +460,16 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
               {/* Left Column: Case Details & Linked Items */}
               <div className="space-y-2.5">
                 {/* Case Info Card */}
-                <div className="border rounded-lg p-3">
+                <div className="bg-gradient-to-br from-blue-50/80 to-white/50 dark:from-blue-950/20 dark:to-zinc-900/50 backdrop-blur-sm border border-blue-200/50 dark:border-blue-800/50 border-l-4 border-l-blue-500 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium">Case Details</h3>
+                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                      <span className="p-1.5 bg-blue-500/10 rounded-lg">
+                        <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </span>
+                      Case Details
+                    </h3>
                     {!isEditing && (
                       <Button variant="ghost" size="sm" onClick={handleStartEdit} data-testid="edit-case-button" className="h-6 text-xs">
                         <Edit className="h-3.5 w-3.5 mr-1" />
@@ -458,13 +513,13 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                     ) : (
                       <>
                         <div>
-                          <label className="text-xs text-muted-foreground">Title</label>
-                          <p className="text-sm mt-0.5" data-testid="case-title">{caseData.title}</p>
+                          <label className="text-xs font-light text-muted-foreground uppercase tracking-wider">Title</label>
+                          <p className="text-sm font-medium mt-1" data-testid="case-title">{caseData.title}</p>
                         </div>
                         {caseData.description && (
                           <div>
-                            <label className="text-xs text-muted-foreground">Description</label>
-                            <p className="text-sm mt-0.5 whitespace-pre-wrap" data-testid="case-description">{caseData.description}</p>
+                            <label className="text-xs font-light text-muted-foreground uppercase tracking-wider">Description</label>
+                            <p className="text-sm font-light mt-1 whitespace-pre-wrap leading-relaxed" data-testid="case-description">{caseData.description}</p>
                           </div>
                         )}
                         <div className="grid grid-cols-2 gap-2.5">
@@ -512,9 +567,11 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
 
                 {/* Order Information Card */}
                 {linkedOrder && (
-                  <div className="border rounded-lg p-3">
-                    <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                      <Package className="h-3.5 w-3.5" />
+                  <div className="bg-gradient-to-br from-purple-50/80 to-white/50 dark:from-purple-950/20 dark:to-zinc-900/50 backdrop-blur-sm border border-purple-200/50 dark:border-purple-800/50 border-l-4 border-l-purple-500 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                      <span className="p-1.5 bg-purple-500/10 rounded-lg">
+                        <Package className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      </span>
                       Order Information
                     </h3>
                     <div className="space-y-2.5">
@@ -564,15 +621,17 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
 
                 {/* Case Items Card */}
                 {caseItems.length > 0 && (
-                  <div className="border rounded-lg p-3">
-                    <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                      <Package className="h-3.5 w-3.5" />
+                  <div className="bg-gradient-to-br from-amber-50/80 to-white/50 dark:from-amber-950/20 dark:to-zinc-900/50 backdrop-blur-sm border border-amber-200/50 dark:border-amber-800/50 border-l-4 border-l-amber-500 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-2 flex items-center gap-2">
+                      <span className="p-1.5 bg-amber-500/10 rounded-lg">
+                        <Package className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      </span>
                       Case Items ({caseItems.length})
                     </h3>
                     <div className="space-y-1.5">
                       {caseItems.map((item: any, index: number) => (
-                        <div 
-                          key={item.id || index} 
+                        <div
+                          key={item.id || index}
                           className="p-2 border rounded space-y-1"
                           data-testid={`case-item-${index}`}
                         >
@@ -600,9 +659,11 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                 )}
 
                 {/* Linked Items Card */}
-                <div className="border rounded-lg p-3">
-                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                    <LinkIcon className="h-3.5 w-3.5" />
+                <div className="bg-gradient-to-br from-emerald-50/80 to-white/50 dark:from-emerald-950/20 dark:to-zinc-900/50 backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-800/50 border-l-4 border-l-emerald-500 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100 mb-2 flex items-center gap-2">
+                    <span className="p-1.5 bg-emerald-500/10 rounded-lg">
+                      <LinkIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    </span>
                     Related Items ({relatedEmails.length + relatedOrders.length + relatedRepairs.length + relatedTodos.length})
                   </h3>
                   <div className="space-y-2.5">
@@ -628,10 +689,10 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                           <Input
                             placeholder={
                               linkType === "order" ? "Search order number or customer..." :
-                              linkType === "email" ? "Search subject or email..." :
-                              linkType === "repair" ? "Search repair title..." :
-                              linkType === "todo" ? "Search todo title..." :
-                              "Select type first..."
+                                linkType === "email" ? "Search subject or email..." :
+                                  linkType === "repair" ? "Search repair title..." :
+                                    linkType === "todo" ? "Search todo title..." :
+                                      "Select type first..."
                             }
                             value={linkSearchTerm}
                             onChange={(e) => setLinkSearchTerm(e.target.value)}
@@ -704,7 +765,6 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-2 mt-2">
                           {relatedEmails.map((email) => {
-                            const link = caseLinksData.find((l: any) => l.linkedId === email.id && l.linkType === "email");
                             return (
                               <div key={email.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                                 <div className="flex-1 min-w-0">
@@ -714,7 +774,7 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => link && unlinkItemMutation.mutate(link.id)}
+                                  onClick={() => unlinkEmailMutation.mutate(email.id)}
                                   data-testid={`unlink-email-${email.id}`}
                                 >
                                   <X className="h-3 w-3" />
@@ -839,9 +899,11 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                 </div>
 
                 {/* Activity Timeline */}
-                <div className="border rounded-lg p-3">
-                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                    <ActivityIcon className="h-3.5 w-3.5" />
+                <div className="bg-gradient-to-br from-indigo-50/80 to-white/50 dark:from-indigo-950/20 dark:to-zinc-900/50 backdrop-blur-sm border border-indigo-200/50 dark:border-indigo-800/50 border-l-4 border-l-indigo-500 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-100 mb-3 flex items-center gap-2">
+                    <span className="p-1.5 bg-indigo-500/10 rounded-lg">
+                      <ActivityIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    </span>
                     Activity Timeline
                   </h3>
                   <div className="space-y-2">
@@ -871,9 +933,11 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
 
               {/* Right Column: Notes */}
               <div className="space-y-2.5">
-                <div className="border rounded-lg p-3 h-full">
-                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                    <MessageSquare className="h-3.5 w-3.5" />
+                <div className="bg-gradient-to-br from-rose-50/80 to-white/50 dark:from-rose-950/20 dark:to-zinc-900/50 backdrop-blur-sm border border-rose-200/50 dark:border-rose-800/50 border-l-4 border-l-rose-500 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow h-full">
+                  <h3 className="text-sm font-semibold text-rose-900 dark:text-rose-100 mb-3 flex items-center gap-2">
+                    <span className="p-1.5 bg-rose-500/10 rounded-lg">
+                      <MessageSquare className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                    </span>
                     Notes & Communication
                   </h3>
                   <div className="h-[600px]">
@@ -915,13 +979,15 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Send Email Dialog */}
-      <EmailCompose
-        open={showEmailDialog}
-        onOpenChange={setShowEmailDialog}
-        to={caseData?.customerEmail || ""}
-        subject={`Re: Case #${caseData?.caseNumber || caseId}`}
-      />
+      {/* Send Email Dialog - Temporarily disabled, email system removed */}
+      {/*
+        <EmailCompose
+          open={showEmailDialog}
+          onOpenChange={setShowEmailDialog}
+          defaultTo={caseData.customerEmail || ""}
+          defaultSubject={`Re: Case #${caseData.caseNumber}`}
+        />
+        */}
     </>
   );
 }

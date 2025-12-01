@@ -1,164 +1,204 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { 
-  Mail, 
-  Inbox, 
-  Send, 
-  Archive, 
-  Star, 
-  Circle,
-  Search,
-  Package,
-  PackageX
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import {
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Button,
+  Divider,
+  Typography,
+  Box,
+  Badge
+} from '@mui/material';
+import {
+  Inbox as InboxIcon,
+  Send as SendIcon,
+  Archive as ArchiveIcon,
+  Star as StarIcon,
+  Delete as DeleteIcon,
+  Mail as MailIcon,
+  ShoppingCart as ShoppingCartIcon,
+  Edit as EditIcon,
+  Sync as SyncIcon
+} from '@mui/icons-material';
 
 interface EmailSidebarProps {
-  selectedFolder: string;
-  selectedFilter?: 'with-order' | 'without-order' | null;
-  onFolderChange: (folder: string) => void;
-  onFilterChange: (filter: 'with-order' | 'without-order' | null) => void;
-  onCompose: () => void;
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
-  counts?: {
-    inbox?: number;
-    sent?: number;
-    archived?: number;
-    starred?: number;
-    unread?: number;
-    withOrder?: number;
-    withoutOrder?: number;
-  };
+  folder: string;
+  setFolder: (folder: string) => void;
+  unreadCounts?: Record<string, number>;
+  onCompose?: () => void;
+  onSync?: () => void;
+  isSyncing?: boolean;
 }
 
-export function EmailSidebar({
-  selectedFolder,
-  selectedFilter,
-  onFolderChange,
-  onFilterChange,
-  onCompose,
-  searchQuery,
-  onSearchChange,
-  counts = {},
-}: EmailSidebarProps) {
-  const folders = [
-    { id: 'inbox', label: 'Inbox', icon: Inbox, count: counts.inbox },
-    { id: 'starred', label: 'Starred', icon: Star, count: counts.starred },
-    { id: 'sent', label: 'Sent', icon: Send, count: counts.sent },
-    { id: 'archived', label: 'Archived', icon: Archive, count: counts.archived },
-    { id: 'unread', label: 'Unread', icon: Circle, count: counts.unread },
+export function EmailSidebar({ folder, setFolder, unreadCounts, onCompose, onSync, isSyncing }: EmailSidebarProps) {
+  const navItems = [
+    { id: "inbox", label: "Inbox", icon: InboxIcon },
+    { id: "sent", label: "Sent", icon: SendIcon },
+    { id: "starred", label: "Starred", icon: StarIcon },
+    { id: "archive", label: "Archive", icon: ArchiveIcon },
+    { id: "trash", label: "Trash", icon: DeleteIcon },
   ];
 
   const filters = [
-    { id: 'with-order', label: 'With Order', icon: Package, count: counts.withOrder },
-    { id: 'without-order', label: 'Without Order', icon: PackageX, count: counts.withoutOrder },
+    { id: "unread", label: "Unread", icon: MailIcon },
+    { id: "has-order", label: "Orders", icon: ShoppingCartIcon },
   ];
 
   return (
-    <div className="flex flex-col h-full bg-background border-r" data-testid="email-sidebar">
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        p: 2,
+        gap: 2,
+        bgcolor: 'background.paper',
+        borderRight: 1,
+        borderColor: 'divider',
+      }}
+    >
       {/* Compose Button */}
-      <div className="p-4 border-b">
+      <Box sx={{ px: 1 }}>
         <Button
           onClick={onCompose}
-          className="w-full bg-blue-600 hover:bg-blue-700"
-          data-testid="sidebar-compose-button"
+          variant="contained"
+          fullWidth
+          startIcon={<EditIcon />}
+          sx={{
+            height: 48,
+            borderRadius: 6,
+            textTransform: 'none',
+            fontSize: '1rem',
+            fontWeight: 600,
+            boxShadow: 2,
+            '&:hover': {
+              boxShadow: 4,
+            },
+          }}
         >
-          <Mail className="mr-2 h-4 w-4" />
           Compose
         </Button>
-      </div>
 
-      {/* Search */}
-      <div className="p-4 border-b">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search emails..."
-            className="pl-10"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            data-testid="sidebar-search-input"
-          />
-        </div>
-      </div>
+        <Button
+          onClick={onSync}
+          disabled={isSyncing}
+          variant="outlined"
+          fullWidth
+          startIcon={<SyncIcon sx={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />}
+          sx={{
+            mt: 1,
+            height: 40,
+            borderRadius: 6,
+            textTransform: 'none',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+          }}
+        >
+          {isSyncing ? 'Syncing...' : 'Sync Emails'}
+        </Button>
+      </Box>
 
-      {/* Folders */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-2">
-          <div className="mb-4">
-            {folders.map((folder) => (
-              <button
-                key={folder.id}
-                onClick={() => onFolderChange(folder.id)}
-                className={cn(
-                  "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors",
-                  selectedFolder === folder.id
-                    ? "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-medium"
-                    : "hover:bg-accent text-foreground"
-                )}
-                data-testid={`folder-${folder.id}`}
+      {/* Main Navigation */}
+      <List sx={{ flex: 1, pt: 0 }}>
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isSelected = folder === item.id;
+          const unreadCount = unreadCounts?.[item.id] || 0;
+
+          return (
+            <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
+              <ListItemButton
+                selected={isSelected}
+                onClick={() => setFolder(item.id)}
+                sx={{
+                  borderRadius: '0 100px 100px 0',
+                  mr: 1,
+                  '&.Mui-selected': {
+                    bgcolor: 'primary.light',
+                    color: 'primary.contrastText',
+                    fontWeight: 600,
+                    '&:hover': {
+                      bgcolor: 'primary.light',
+                    },
+                  },
+                }}
               >
-                <div className="flex items-center gap-3">
-                  <folder.icon className="h-5 w-5" />
-                  <span>{folder.label}</span>
-                </div>
-                {folder.count !== undefined && folder.count > 0 && (
-                  <span
-                    className={cn(
-                      "text-xs px-2 py-0.5 rounded-full",
-                      selectedFolder === folder.id
-                        ? "bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-200"
-                        : "bg-muted text-muted-foreground"
-                    )}
-                    data-testid={`count-${folder.id}`}
-                  >
-                    {folder.count}
-                  </span>
+                <ListItemIcon sx={{ minWidth: 40, color: isSelected ? 'inherit' : 'text.secondary' }}>
+                  <Icon />
+                </ListItemIcon>
+                <ListItemText
+                  primary={item.label}
+                  primaryTypographyProps={{
+                    fontWeight: isSelected ? 600 : 400,
+                  }}
+                />
+                {unreadCount > 0 && (
+                  <Badge
+                    badgeContent={unreadCount}
+                    color="primary"
+                    sx={{ ml: 1 }}
+                  />
                 )}
-              </button>
-            ))}
-          </div>
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
 
-          {/* Filters Section */}
-          <div className="border-t pt-4">
-            <div className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase">
-              Filters
-            </div>
-            {filters.map((filter) => (
-              <button
-                key={filter.id}
-                onClick={() => onFilterChange(filter.id as 'with-order' | 'without-order')}
-                className={cn(
-                  "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors",
-                  selectedFilter === filter.id
-                    ? "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-medium"
-                    : "hover:bg-accent text-foreground"
-                )}
-                data-testid={`filter-${filter.id}`}
+        <Divider sx={{ my: 2, mx: 2 }} />
+
+        {/* Filters Header */}
+        <Typography
+          variant="caption"
+          sx={{
+            px: 3,
+            py: 1,
+            fontWeight: 600,
+            color: 'text.secondary',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+          }}
+        >
+          Filters
+        </Typography>
+
+        {/* Filter Items */}
+        {filters.map((item) => {
+          const Icon = item.icon;
+          const isSelected = folder === item.id;
+
+          return (
+            <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
+              <ListItemButton
+                selected={isSelected}
+                onClick={() => setFolder(item.id)}
+                sx={{
+                  borderRadius: '0 100px 100px 0',
+                  mr: 1,
+                  '&.Mui-selected': {
+                    bgcolor: 'primary.light',
+                    color: 'primary.contrastText',
+                    fontWeight: 600,
+                    '&:hover': {
+                      bgcolor: 'primary.light',
+                    },
+                  },
+                }}
               >
-                <div className="flex items-center gap-3">
-                  <filter.icon className="h-5 w-5" />
-                  <span>{filter.label}</span>
-                </div>
-                {filter.count !== undefined && filter.count > 0 && (
-                  <span
-                    className={cn(
-                      "text-xs px-2 py-0.5 rounded-full",
-                      selectedFilter === filter.id
-                        ? "bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-200"
-                        : "bg-muted text-muted-foreground"
-                    )}
-                    data-testid={`count-${filter.id}`}
-                  >
-                    {filter.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+                <ListItemIcon sx={{ minWidth: 40, color: isSelected ? 'inherit' : 'text.secondary' }}>
+                  <Icon />
+                </ListItemIcon>
+                <ListItemText
+                  primary={item.label}
+                  primaryTypographyProps={{
+                    fontWeight: isSelected ? 600 : 400,
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
+      </List>
+    </Box>
   );
 }

@@ -97,18 +97,7 @@ export function PurchaseOrdersCards({
                 </span>
               </div>
 
-              {po.expectedDeliveryDate && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Truck className="h-4 w-4 text-muted-foreground" />
-                  <span className={
-                    new Date(po.expectedDeliveryDate) < new Date() && po.status !== 'verwerkt'
-                      ? "text-red-600 font-medium"
-                      : ""
-                  }>
-                    {format(new Date(po.expectedDeliveryDate), "d MMM yyyy", { locale: nl })}
-                  </span>
-                </div>
-              )}
+
 
               <div className="flex items-center justify-between mt-3 pt-3 border-t">
                 <div className="text-sm font-medium">

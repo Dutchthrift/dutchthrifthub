@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { 
-  Search, 
-  Filter, 
+import {
+  Search,
+  Filter,
   Plus,
   Briefcase,
   Clock,
@@ -61,13 +61,13 @@ export default function Cases() {
       // Update the query data with the server response instead of invalidating
       queryClient.setQueryData(["/api/cases"], (oldData: CaseWithDetails[] | undefined) => {
         if (!oldData) return oldData;
-        return oldData.map(caseItem => 
-          caseItem.id === id 
+        return oldData.map(caseItem =>
+          caseItem.id === id
             ? { ...caseItem, ...updatedCase }
             : caseItem
         );
       });
-      
+
       toast({
         title: "Case updated",
         description: "Case status has been updated successfully",
@@ -81,7 +81,7 @@ export default function Cases() {
         // Fallback: invalidate queries to refetch correct state
         queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
       }
-      
+
       toast({
         title: "Update failed",
         description: "Failed to update case status",
@@ -92,7 +92,7 @@ export default function Cases() {
 
   const filteredCases = useMemo(() => {
     if (!cases) return [];
-    
+
     return cases.filter(caseItem => {
       // Filter by archived status
       if (showArchived) {
@@ -100,12 +100,12 @@ export default function Cases() {
       } else {
         if (caseItem.archived) return false;
       }
-      
+
       if (priorityFilter !== "all" && caseItem.priority !== priorityFilter) return false;
-      if (searchQuery && 
-          !caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-          !caseItem.description?.toLowerCase().includes(searchQuery.toLowerCase()) &&
-          !caseItem.caseNumber.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (searchQuery &&
+        !caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !caseItem.description?.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !caseItem.caseNumber.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
   }, [cases, priorityFilter, searchQuery, showArchived]);
@@ -129,13 +129,13 @@ export default function Cases() {
   }, [filteredCases]);
 
   const totalActive = caseStatusCount.new + caseStatusCount.in_progress + caseStatusCount.waiting_customer;
-  
+
   // Calculate "New Today" - cases created today
   const newToday = useMemo(() => {
     if (!cases) return 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     return cases.filter(c => {
       if (!c.createdAt) return false;
       const createdDate = new Date(c.createdAt);
@@ -149,7 +149,7 @@ export default function Cases() {
     if (!cases) return 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     return cases.filter(c => {
       if (!c.updatedAt || c.status !== 'resolved') return false;
       const updatedDate = new Date(c.updatedAt);
@@ -162,7 +162,7 @@ export default function Cases() {
   const overdueSLA = useMemo(() => {
     if (!cases) return 0;
     const now = new Date();
-    
+
     return cases.filter(c => {
       if (!c.slaDeadline || c.status === 'resolved') return false;
       const deadline = new Date(c.slaDeadline);
@@ -184,20 +184,20 @@ export default function Cases() {
 
     // Store the previous state for potential rollback
     const previousData = queryClient.getQueryData(["/api/cases"]) as CaseWithDetails[] | undefined;
-    
+
     // Optimistic update
     queryClient.setQueryData(["/api/cases"], (oldData: CaseWithDetails[] | undefined) => {
       if (!oldData) return oldData;
-      return oldData.map(caseItem => 
-        caseItem.id === caseId 
+      return oldData.map(caseItem =>
+        caseItem.id === caseId
           ? { ...caseItem, status: newStatus as any }
           : caseItem
       );
     });
 
     // Update case status
-    updateCaseMutation.mutate({ 
-      id: caseId, 
+    updateCaseMutation.mutate({
+      id: caseId,
       data: { status: newStatus as any },
       previousData // Pass previous data for potential rollback
     });
@@ -298,10 +298,10 @@ export default function Cases() {
 
   const handleCaseStatusChange = (caseId: string, newStatus: string) => {
     const previousData = cases;
-    updateCaseMutation.mutate({ 
-      id: caseId, 
-      data: { status: newStatus as any }, 
-      previousData 
+    updateCaseMutation.mutate({
+      id: caseId,
+      data: { status: newStatus as any },
+      previousData
     });
   };
 
@@ -344,9 +344,8 @@ export default function Cases() {
             ref={provided.innerRef}
             {...provided.draggableProps}
             {...provided.dragHandleProps}
-            className={`mb-3 cursor-pointer hover:shadow-md transition-shadow ${
-              snapshot.isDragging ? "rotate-3 shadow-lg" : ""
-            } ${caseItem.archived ? "opacity-60" : ""}`}
+            className={`mb-3 cursor-pointer hover:shadow-md transition-shadow ${snapshot.isDragging ? "rotate-3 shadow-lg" : ""
+              } ${caseItem.archived ? "opacity-60" : ""}`}
             onClick={() => setSelectedCase(caseItem)}
             data-testid={`case-card-${caseItem.id}`}
           >
@@ -364,7 +363,7 @@ export default function Cases() {
                   {caseItem.priority}
                 </Badge>
               </div>
-              
+
               <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
                 {caseItem.description}
               </p>
@@ -391,7 +390,7 @@ export default function Cases() {
                       <span>{caseItem.customerEmail}</span>
                     )}
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     {caseItem.notesCount !== undefined && caseItem.notesCount > 0 && (
                       <Badge variant="outline" className="text-xs" data-testid={`case-notes-count-${caseItem.id}`}>
@@ -418,9 +417,9 @@ export default function Cases() {
   const Column = useCallback(({ status, cases: columnCases }: { status: string; cases: CaseWithDetails[] }) => {
     const config = CASE_STATUS_CONFIG[status as keyof typeof CASE_STATUS_CONFIG];
     const Icon = config.icon;
-    
+
     return (
-      <Card className="h-full" data-testid={`column-${status}`}>
+      <Card className="h-full bg-gradient-to-br from-indigo-50/60 to-white/40 dark:from-indigo-950/10 dark:to-zinc-900/40 border-2 border-indigo-200/60 dark:border-indigo-800/40 hover:shadow-md transition-shadow" data-testid={`column-${status}`}>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-2">
@@ -439,9 +438,8 @@ export default function Cases() {
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className={`min-h-[200px] rounded-lg transition-colors ${
-                  snapshot.isDraggingOver ? "bg-muted/50" : ""
-                }`}
+                className={`min-h-[200px] rounded-lg transition-colors ${snapshot.isDraggingOver ? "bg-muted/50" : ""
+                  }`}
               >
                 {columnCases.map((caseItem, index) => (
                   <CaseCard key={caseItem.id} caseItem={caseItem} index={index} />
@@ -458,7 +456,7 @@ export default function Cases() {
   return (
     <div className="min-h-screen bg-background" data-testid="cases-page">
       <Navigation />
-      
+
       <main className="container mx-auto px-4 py-6">
         <div className="bg-card rounded-lg p-6 mb-6 border" data-testid="cases-header">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -467,16 +465,16 @@ export default function Cases() {
               <p className="text-muted-foreground">Manage customer cases and track progress</p>
             </div>
             <div>
-              <Button 
-                data-testid="new-case-button" 
+              <Button
+                data-testid="new-case-button"
                 className="sm:flex-shrink-0"
                 onClick={() => setShowNewCase(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 New Case
               </Button>
-              <CreateCaseModal 
-                open={showNewCase} 
+              <CreateCaseModal
+                open={showNewCase}
                 onOpenChange={setShowNewCase}
               />
             </div>
@@ -485,52 +483,60 @@ export default function Cases() {
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <Card data-testid="cases-stats-total">
+          <Card className="bg-gradient-to-br from-blue-50/80 to-white/50 dark:from-blue-950/20 dark:to-zinc-900/50 border-2 border-blue-200/70 dark:border-blue-800/50 border-l-4 border-l-blue-500 hover:shadow-md transition-shadow" data-testid="cases-stats-total">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Active</CardTitle>
-              <Briefcase className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">Total Active</CardTitle>
+              <span className="p-1.5 bg-blue-500/10 rounded-lg">
+                <Briefcase className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </span>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalActive}</div>
+              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{totalActive}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Open cases
               </p>
             </CardContent>
           </Card>
-          
-          <Card data-testid="cases-stats-new-today">
+
+          <Card className="bg-gradient-to-br from-emerald-50/80 to-white/50 dark:from-emerald-950/20 dark:to-zinc-900/50 border-2 border-emerald-200/70 dark:border-emerald-800/50 border-l-4 border-l-emerald-500 hover:shadow-md transition-shadow" data-testid="cases-stats-new-today">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">New Today</CardTitle>
-              <Plus className="h-4 w-4 text-chart-4" />
+              <CardTitle className="text-sm font-medium text-emerald-900 dark:text-emerald-100">New Today</CardTitle>
+              <span className="p-1.5 bg-emerald-500/10 rounded-lg">
+                <Plus className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              </span>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{newToday}</div>
+              <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">{newToday}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Created today
               </p>
             </CardContent>
           </Card>
 
-          <Card data-testid="cases-stats-resolved-today">
+          <Card className="bg-gradient-to-br from-green-50/80 to-white/50 dark:from-green-950/20 dark:to-zinc-900/50 border-2 border-green-200/70 dark:border-green-800/50 border-l-4 border-l-green-500 hover:shadow-md transition-shadow" data-testid="cases-stats-resolved-today">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Resolved Today</CardTitle>
-              <CheckCircle className="h-4 w-4 text-chart-2" />
+              <CardTitle className="text-sm font-medium text-green-900 dark:text-green-100">Resolved Today</CardTitle>
+              <span className="p-1.5 bg-green-500/10 rounded-lg">
+                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+              </span>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{resolvedToday}</div>
+              <div className="text-2xl font-bold text-green-900 dark:text-green-100">{resolvedToday}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Closed today
               </p>
             </CardContent>
           </Card>
 
-          <Card data-testid="cases-stats-overdue">
+          <Card className="bg-gradient-to-br from-red-50/80 to-white/50 dark:from-red-950/20 dark:to-zinc-900/50 border-2 border-red-200/70 dark:border-red-800/50 border-l-4 border-l-red-500 hover:shadow-md transition-shadow" data-testid="cases-stats-overdue">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Overdue SLA</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <CardTitle className="text-sm font-medium text-red-900 dark:text-red-100">Overdue SLA</CardTitle>
+              <span className="p-1.5 bg-red-500/10 rounded-lg">
+                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+              </span>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">{overdueSLA}</div>
+              <div className="text-2xl font-bold text-red-900 dark:text-red-100">{overdueSLA}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Past deadline
               </p>
@@ -556,7 +562,7 @@ export default function Cases() {
                     data-testid="cases-search-input"
                   />
                 </div>
-                
+
                 <Tabs value={priorityFilter} onValueChange={setPriorityFilter}>
                   <TabsList>
                     <TabsTrigger value="all" data-testid="filter-all-priority">All</TabsTrigger>
@@ -566,7 +572,7 @@ export default function Cases() {
                     <TabsTrigger value="low" data-testid="filter-low-priority">Low</TabsTrigger>
                   </TabsList>
                 </Tabs>
-                
+
                 <Button
                   variant={showArchived ? "default" : "outline"}
                   size="sm"
@@ -577,7 +583,7 @@ export default function Cases() {
                   {showArchived ? "Show Active" : "Show Archive"}
                 </Button>
               </div>
-              
+
               <Button variant="outline" size="icon" data-testid="advanced-filters-button">
                 <Filter className="h-4 w-4" />
               </Button>

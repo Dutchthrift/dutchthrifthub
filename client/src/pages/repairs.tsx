@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Search, CalendarIcon, Plus, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Repair, User } from "@shared/schema";
-import { RepairForm } from "@/components/forms/repair-form";
+import { CreateRepairWizard } from "@/components/repairs/create-repair-wizard";
 import { RepairsTable } from "@/components/repairs/repairs-table";
 import { RepairDetailModal } from "@/components/repairs/repair-detail-modal";
 import { RepairAnalytics } from "@/components/repairs/repair-analytics";
@@ -43,11 +43,11 @@ export default function Repairs() {
   const filteredRepairs = repairs.filter(repair => {
     if (statusFilter && statusFilter !== "all" && repair.status !== statusFilter) return false;
     if (technicianFilter && technicianFilter !== "all" && repair.assignedUserId !== technicianFilter) return false;
-    if (searchQuery && 
-        !repair.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !repair.description?.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !repair.productSku?.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !repair.productName?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (searchQuery &&
+      !repair.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !repair.description?.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !repair.productSku?.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !repair.productName?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (dateFrom && repair.createdAt && new Date(repair.createdAt) < dateFrom) return false;
     if (dateTo && repair.createdAt && new Date(repair.createdAt) > dateTo) return false;
     return true;
@@ -66,7 +66,7 @@ export default function Repairs() {
   return (
     <div className="min-h-screen bg-background" data-testid="repairs-page">
       <Navigation />
-      
+
       <main className="container mx-auto px-4 py-6">
         <div className="bg-card rounded-lg p-6 mb-6 border" data-testid="repairs-header">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -185,9 +185,9 @@ export default function Repairs() {
                 </Popover>
 
                 {hasActiveFilters && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={clearFilters}
                     data-testid="button-clear-filters"
                   >
@@ -228,8 +228,8 @@ export default function Repairs() {
         )}
       </main>
 
-      <RepairForm 
-        open={showNewRepair} 
+      <CreateRepairWizard
+        open={showNewRepair}
         onOpenChange={setShowNewRepair}
         users={users}
       />

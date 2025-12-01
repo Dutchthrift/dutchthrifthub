@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Repair, User, Activity } from "@shared/schema";
+import { NotesPanel } from "@/components/notes/NotesPanel";
 import {
   Dialog,
   DialogContent,
@@ -65,13 +66,10 @@ interface RepairDetailModalProps {
 export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairDetailModalProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
-  const [note, setNote] = useState("");
   const [currentRepair, setCurrentRepair] = useState<Repair | null>(repair);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [editingNoteText, setEditingNoteText] = useState("");
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -96,15 +94,22 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     queryKey: ['/api/activities'],
     enabled: !!repair?.id,
   });
-  
+
   // Filter activities for this specific repair
   const activities = allActivities.filter(activity => {
     const metadata = activity.metadata as any;
     return metadata?.entityType === 'repair' && metadata?.entityId === repair?.id;
   });
-  
-  // Filter notes from activities
-  const notes = activities.filter(activity => activity.type === 'note_added');
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/session"],
+    queryFn: async () => {
+      const response = await fetch("/api/auth/session");
+      if (!response.ok) throw new Error("Not authenticated");
+      const data = await response.json();
+      return data.user;
+    },
+  });
 
   const updateStatusMutation = useMutation({
     mutationFn: async (data: { status: string }) => {
@@ -150,54 +155,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     },
   });
 
-  const addNoteMutation = useMutation({
-    mutationFn: async (noteText: string) => {
-      if (!repair || !currentRepair) return;
-      const res = await apiRequest('POST', '/api/activities', {
-        type: 'note_added',
-        description: noteText,
-        metadata: { entityType: 'repair', entityId: currentRepair.id },
-      });
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
-      setNote("");
-      toast({
-        title: "Notitie toegevoegd",
-        description: "De notitie is succesvol toegevoegd.",
-      });
-    },
-  });
 
-  const updateNoteMutation = useMutation({
-    mutationFn: async ({ noteId, description }: { noteId: string; description: string }) => {
-      const res = await apiRequest('PATCH', `/api/activities/${noteId}`, { description });
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
-      setEditingNoteId(null);
-      setEditingNoteText("");
-      toast({
-        title: "Notitie bijgewerkt",
-        description: "De notitie is succesvol bijgewerkt.",
-      });
-    },
-  });
-
-  const deleteNoteMutation = useMutation({
-    mutationFn: async (noteId: string) => {
-      await apiRequest('DELETE', `/api/activities/${noteId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
-      toast({
-        title: "Notitie verwijderd",
-        description: "De notitie is succesvol verwijderd.",
-      });
-    },
-  });
 
   const deleteRepairMutation = useMutation({
     mutationFn: async () => {
@@ -250,13 +208,13 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const deleteFileMutation = useMutation({
     mutationFn: async ({ fileType, fileUrl }: { fileType: 'photos' | 'attachments'; fileUrl: string }) => {
       if (!repair || !currentRepair) return;
-      
+
       // Get current files array
       const currentFiles = fileType === 'photos' ? (currentRepair.photos || []) : (currentRepair.attachments || []);
-      
+
       // Filter out the file to delete
       const updatedFiles = currentFiles.filter(f => f !== fileUrl);
-      
+
       // Update repair
       const res = await apiRequest('PATCH', `/api/repairs/${currentRepair.id}`, {
         [fileType]: updatedFiles
@@ -356,18 +314,14 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     }
   };
 
-  const handleAddNote = () => {
-    if (note.trim()) {
-      addNoteMutation.mutate(note);
-    }
-  };
+
 
   const partsUsed = Array.isArray(currentRepair.partsUsed) ? currentRepair.partsUsed : [];
   // Filter out broken/old files (those with 'undefined' in path or ending with '-')
-  const attachments = Array.isArray(currentRepair.attachments) 
+  const attachments = Array.isArray(currentRepair.attachments)
     ? currentRepair.attachments.filter(a => !a.includes('undefined') && !a.endsWith('-'))
     : [];
-  const photos = Array.isArray(currentRepair.photos) 
+  const photos = Array.isArray(currentRepair.photos)
     ? currentRepair.photos.filter(p => !p.includes('undefined') && !p.endsWith('-'))
     : [];
 
@@ -381,20 +335,20 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               <DialogTitle>Reparatie #{currentRepair.id.slice(0, 8)}</DialogTitle>
               <p className="text-sm text-foreground mt-1">{currentRepair.title}</p>
             </div>
-            
+
             {/* Status Badge and Warning */}
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="secondary" className={getStatusColor(currentRepair.status)}>
                 {getStatusLabel(currentRepair.status)}
               </Badge>
-              {currentRepair.slaDeadline && 
-               !['completed', 'returned', 'canceled'].includes(currentRepair.status) && 
-               isPast(new Date(currentRepair.slaDeadline)) && (
-                <div className="flex items-center gap-1 text-destructive" data-testid="indicator-overdue">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="text-xs font-medium">Te laat</span>
-                </div>
-              )}
+              {currentRepair.slaDeadline &&
+                !['completed', 'returned', 'canceled'].includes(currentRepair.status) &&
+                isPast(new Date(currentRepair.slaDeadline)) && (
+                  <div className="flex items-center gap-1 text-destructive" data-testid="indicator-overdue">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="text-xs font-medium">Te laat</span>
+                  </div>
+                )}
             </div>
 
             {/* Action Buttons */}
@@ -465,10 +419,12 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4 min-h-[400px]">
-            <Card>
+            <Card className="bg-gradient-to-br from-blue-50/80 to-white/50 dark:from-blue-950/20 dark:to-zinc-900/50 border-blue-200/50 dark:border-blue-800/50 border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Wrench className="h-4 w-4" />
+                <CardTitle className="text-base flex items-center gap-2 text-blue-900 dark:text-blue-100">
+                  <span className="p-1.5 bg-blue-500/10 rounded-lg">
+                    <Wrench className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </span>
                   Reparatie Details
                 </CardTitle>
               </CardHeader>
@@ -589,9 +545,9 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                         <div className="text-sm font-medium">Prioriteit</div>
                         <div className="text-sm">
                           <Badge variant="outline">
-                            {currentRepair.priority === 'urgent' ? 'Urgent' : 
-                             currentRepair.priority === 'high' ? 'Hoog' : 
-                             currentRepair.priority === 'medium' ? 'Gemiddeld' : 'Laag'}
+                            {currentRepair.priority === 'urgent' ? 'Urgent' :
+                              currentRepair.priority === 'high' ? 'Hoog' :
+                                currentRepair.priority === 'medium' ? 'Gemiddeld' : 'Laag'}
                           </Badge>
                         </div>
                       </div>
@@ -656,10 +612,12 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
             </Card>
 
             {(currentRepair.customerName || currentRepair.customerEmail || currentRepair.orderNumber) && (
-              <Card>
+              <Card className="bg-gradient-to-br from-purple-50/80 to-white/50 dark:from-purple-950/20 dark:to-zinc-900/50 border-purple-200/50 dark:border-purple-800/50 border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <UserIcon className="h-4 w-4" />
+                  <CardTitle className="text-base flex items-center gap-2 text-purple-900 dark:text-purple-100">
+                    <span className="p-1.5 bg-purple-500/10 rounded-lg">
+                      <UserIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    </span>
                     Klant & Order Informatie
                   </CardTitle>
                 </CardHeader>
@@ -687,123 +645,28 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               </Card>
             )}
 
-            <Card>
+            <Card className="bg-gradient-to-br from-rose-50/80 to-white/50 dark:from-rose-950/20 dark:to-zinc-900/50 border-rose-200/50 dark:border-rose-800/50 border-l-4 border-l-rose-500 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Notities ({notes.length})
+                <CardTitle className="text-base flex items-center gap-2 text-rose-900 dark:text-rose-100">
+                  <span className="p-1.5 bg-rose-500/10 rounded-lg">
+                    <FileText className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                  </span>
+                  Notities
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Existing notes list */}
-                {notes.length > 0 && (
-                  <div className="space-y-3 mb-4">
-                    {notes.map((noteItem) => (
-                      <div key={noteItem.id} className="border rounded-lg p-3 bg-muted/50">
-                        {editingNoteId === noteItem.id ? (
-                          <div className="space-y-2">
-                            <Textarea
-                              value={editingNoteText}
-                              onChange={(e) => setEditingNoteText(e.target.value)}
-                              className="min-h-[80px]"
-                              data-testid={`input-edit-note-${noteItem.id}`}
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  if (editingNoteText.trim()) {
-                                    updateNoteMutation.mutate({ 
-                                      noteId: noteItem.id, 
-                                      description: editingNoteText 
-                                    });
-                                  }
-                                }}
-                                disabled={!editingNoteText.trim() || updateNoteMutation.isPending}
-                                data-testid={`button-save-note-${noteItem.id}`}
-                              >
-                                <Save className="h-3 w-3 mr-1" />
-                                Opslaan
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setEditingNoteId(null);
-                                  setEditingNoteText("");
-                                }}
-                                data-testid={`button-cancel-note-${noteItem.id}`}
-                              >
-                                <X className="h-3 w-3 mr-1" />
-                                Annuleren
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="text-sm mb-2">{noteItem.description}</div>
-                            <div className="flex items-center justify-between">
-                              <div className="text-xs text-muted-foreground">
-                                {noteItem.createdAt && format(new Date(noteItem.createdAt), "d MMM yyyy HH:mm", { locale: nl })}
-                              </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    setEditingNoteId(noteItem.id);
-                                    setEditingNoteText(noteItem.description || "");
-                                  }}
-                                  data-testid={`button-edit-note-${noteItem.id}`}
-                                >
-                                  <Edit className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    if (confirm("Weet je zeker dat je deze notitie wilt verwijderen?")) {
-                                      deleteNoteMutation.mutate(noteItem.id);
-                                    }
-                                  }}
-                                  data-testid={`button-delete-note-${noteItem.id}`}
-                                >
-                                  <Trash2 className="h-3 w-3 text-destructive" />
-                                </Button>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              <CardContent>
+                {currentUser && currentRepair && (
+                  <NotesPanel entityType="repair" entityId={currentRepair.id} currentUser={currentUser} />
                 )}
-
-                {/* Add new note form */}
-                <div className="space-y-2 pt-3 border-t">
-                  <div className="text-sm font-medium">Nieuwe notitie</div>
-                  <Textarea
-                    placeholder="Voeg een notitie toe over deze reparatie..."
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    className="min-h-[100px]"
-                    data-testid="input-note-overview"
-                  />
-                  <Button
-                    onClick={handleAddNote}
-                    disabled={!note.trim() || addNoteMutation.isPending}
-                    data-testid="button-add-note-overview"
-                  >
-                    {addNoteMutation.isPending ? 'Opslaan...' : 'Notitie toevoegen'}
-                  </Button>
-                </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-gradient-to-br from-indigo-50/80 to-white/50 dark:from-indigo-950/20 dark:to-zinc-900/50 border-indigo-200/50 dark:border-indigo-800/50 border-l-4 border-l-indigo-500 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ActivityIcon className="h-4 w-4" />
+                <CardTitle className="text-base flex items-center gap-2 text-indigo-900 dark:text-indigo-100">
+                  <span className="p-1.5 bg-indigo-500/10 rounded-lg">
+                    <ActivityIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  </span>
                   Reparatie Voortgang
                 </CardTitle>
               </CardHeader>
@@ -813,11 +676,13 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
             </Card>
           </TabsContent>
 
-          <TabsContent value="parts" className="space-y-4 min-h-[400px]">
-            <Card>
+          : "          <TabsContent value="parts" className="space-y-4 min-h-[400px]">
+            <Card className="bg-gradient-to-br from-amber-50/80 to-white/50 dark:from-amber-950/20 dark:to-zinc-900/50 border-amber-200/50 dark:border-amber-800/50 border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="h-4 w-4" />
+                <CardTitle className="text-base flex items-center gap-2 text-amber-900 dark:text-amber-100">
+                  <span className="p-1.5 bg-amber-500/10 rounded-lg">
+                    <Package className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </span>
                   Gebruikte Onderdelen
                 </CardTitle>
               </CardHeader>
@@ -849,10 +714,12 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
             </Card>
 
             {currentRepair.estimatedCost && (
-              <Card>
+              <Card className="bg-gradient-to-br from-emerald-50/80 to-white/50 dark:from-emerald-950/20 dark:to-zinc-900/50 border-emerald-200/50 dark:border-emerald-800/50 border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
+                  <CardTitle className="text-base flex items-center gap-2 text-emerald-900 dark:text-emerald-100">
+                    <span className="p-1.5 bg-emerald-500/10 rounded-lg">
+                      <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    </span>
                     Kosten
                   </CardTitle>
                 </CardHeader>
@@ -867,10 +734,12 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
           </TabsContent>
 
           <TabsContent value="files" className="space-y-4 min-h-[400px]">
-            <Card>
+            <Card className="bg-gradient-to-br from-violet-50/80 to-white/50 dark:from-violet-950/20 dark:to-zinc-900/50 border-violet-200/50 dark:border-violet-800/50 border-l-4 border-l-violet-500 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" />
+                <CardTitle className="text-base flex items-center gap-2 text-violet-900 dark:text-violet-100">
+                  <span className="p-1.5 bg-violet-500/10 rounded-lg">
+                    <ImageIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                  </span>
                   Foto's
                 </CardTitle>
               </CardHeader>
@@ -879,11 +748,11 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {photos.map((photo, index) => {
                       // Extract the path after /attachments/ to construct the API URL
-                      const photoPath = photo.startsWith('/attachments/') 
+                      const photoPath = photo.startsWith('/attachments/')
                         ? photo.substring('/attachments/'.length)
                         : photo;
                       const photoUrl = `/api/attachments/${photoPath}`;
-                      
+
                       return (
                         <div key={index} className="relative aspect-square rounded-lg overflow-hidden border group">
                           <img
@@ -931,10 +800,12 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-gradient-to-br from-cyan-50/80 to-white/50 dark:from-cyan-950/20 dark:to-zinc-900/50 border-cyan-200/50 dark:border-cyan-800/50 border-l-4 border-l-cyan-500 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
+                <CardTitle className="text-base flex items-center gap-2 text-cyan-900 dark:text-cyan-100">
+                  <span className="p-1.5 bg-cyan-500/10 rounded-lg">
+                    <FileText className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                  </span>
                   Bijlagen
                 </CardTitle>
               </CardHeader>
@@ -943,12 +814,12 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                   <div className="space-y-2 w-full overflow-hidden">
                     {attachments.map((attachment, index) => {
                       // Extract the path after /attachments/ to construct the API URL
-                      const attachmentPath = attachment.startsWith('/attachments/') 
+                      const attachmentPath = attachment.startsWith('/attachments/')
                         ? attachment.substring('/attachments/'.length)
                         : attachment;
                       const downloadUrl = `/api/attachments/${attachmentPath}?download=1`;
                       const filename = decodeURIComponent(attachment.split('/').pop() || 'download');
-                      
+
                       // Create a shorter display name for mobile
                       const getDisplayName = (name: string) => {
                         if (name.length <= 30) return name;
@@ -956,19 +827,19 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                         if (parts.length > 1) {
                           const ext = parts.pop();
                           const basename = parts.join('.');
-                          return basename.length > 20 
-                            ? `${basename.substring(0, 20)}...${ext}` 
+                          return basename.length > 20
+                            ? `${basename.substring(0, 20)}...${ext}`
                             : `${basename}.${ext}`;
                         }
                         return `${name.substring(0, 25)}...`;
                       };
-                      
+
                       return (
                         <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-2 border p-3 rounded w-full">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                            <span 
-                              className="text-sm break-all sm:truncate block" 
+                            <span
+                              className="text-sm break-all sm:truncate block"
                               title={filename}
                             >
                               <span className="hidden sm:inline">{filename}</span>
@@ -976,8 +847,8 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                             </span>
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0 self-end sm:self-center">
-                            <a 
-                              href={downloadUrl} 
+                            <a
+                              href={downloadUrl}
                               download={filename}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -1071,26 +942,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Notitie toevoegen</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Textarea
-                  placeholder="Voeg een notitie toe..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  data-testid="input-note"
-                />
-                <Button
-                  onClick={handleAddNote}
-                  disabled={!note.trim() || addNoteMutation.isPending}
-                  data-testid="button-add-note"
-                >
-                  {addNoteMutation.isPending ? 'Opslaan...' : 'Notitie toevoegen'}
-                </Button>
-              </CardContent>
-            </Card>
+
           </TabsContent>
         </Tabs>
       </DialogContent>

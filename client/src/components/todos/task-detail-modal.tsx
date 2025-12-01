@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { NotesPanel } from "@/components/notes/NotesPanel";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +18,6 @@ import {
   Edit,
   Trash2,
   Calendar,
-  User,
   CheckCircle,
   Clock,
   AlertCircle,
@@ -29,12 +30,17 @@ import {
   Mail,
   UserCircle,
   Folder,
+  Check,
+  X,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Todo, User as UserType, Order, Case, Repair, Customer } from "@/lib/types";
+import type { Todo, User as UserType, Order, Case, Repair, Customer, User } from "@/lib/types";
 import { TodoForm } from "@/components/forms/todo-form";
+import { QuickActionsBar } from "@/components/todos/quick-actions-bar";
+import { SubtasksSection } from "@/components/todos/subtasks-section";
+import { AttachmentsTab } from "@/components/todos/attachments-tab";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,11 +62,25 @@ interface TaskDetailModalProps {
 export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDetailModalProps) {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedTitle, setEditedTitle] = useState("");
+  const [editedDescription, setEditedDescription] = useState("");
   const { toast } = useToast();
 
   const { data: users } = useQuery<UserType[]>({
     queryKey: ["/api/users/list"],
     enabled: !!todo,
+  });
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/session"],
+    queryFn: async () => {
+      const response = await fetch("/api/auth/session");
+      if (!response.ok) throw new Error("Not authenticated");
+      const data = await response.json();
+      return data.user;
+    },
   });
 
   const { data: linkedOrder } = useQuery<Order>({
@@ -81,6 +101,16 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
   const { data: linkedCustomer } = useQuery<Customer>({
     queryKey: ["/api/customers", todo?.customerId],
     enabled: !!todo?.customerId,
+  });
+
+  const { data: subtasks = [] } = useQuery({
+    queryKey: ["/api/todos", todo?.id, "subtasks"],
+    enabled: !!todo?.id,
+    queryFn: async () => {
+      const response = await fetch(`/api/todos/${todo!.id}/subtasks`);
+      if (!response.ok) throw new Error("Failed to fetch subtasks");
+      return response.json();
+    },
   });
 
   const deleteTodoMutation = useMutation({
@@ -106,10 +136,76 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
     }
   });
 
+  const updateTodoMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Todo> }) => {
+      const response = await fetch(`/api/todos/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update todo");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      toast({
+        title: "Task updated",
+        description: "Task has been updated successfully",
+      });
+      onUpdate?.();
+    },
+    onError: () => {
+      toast({
+        title: "Update failed",
+        description: "Failed to update task",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDelete = () => {
     if (todo) {
       deleteTodoMutation.mutate(todo.id);
     }
+  };
+
+  const handleStartEditTitle = () => {
+    if (todo) {
+      setEditedTitle(todo.title);
+      setIsEditingTitle(true);
+    }
+  };
+
+  const handleStartEditDescription = () => {
+    if (todo) {
+      setEditedDescription(todo.description || "");
+      setIsEditingDescription(true);
+    }
+  };
+
+  const handleSaveTitle = () => {
+    if (todo && editedTitle.trim()) {
+      updateTodoMutation.mutate({
+        id: todo.id,
+        data: { title: editedTitle },
+      });
+      setIsEditingTitle(false);
+    }
+  };
+
+  const handleSaveDescription = () => {
+    if (todo) {
+      updateTodoMutation.mutate({
+        id: todo.id,
+        data: { description: editedDescription },
+      });
+      setIsEditingDescription(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingTitle(false);
+    setIsEditingDescription(false);
   };
 
   const getAssignedUser = () => {
@@ -201,7 +297,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
     }
 
     // Sort by timestamp descending (most recent first)
-    return timeline.sort((a, b) => 
+    return timeline.sort((a, b) =>
       new Date(b.timestamp as unknown as string).getTime() - new Date(a.timestamp as unknown as string).getTime()
     );
   };
@@ -232,7 +328,38 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
                   {todo ? (
                     <>
                       {getStatusIcon(todo.status || 'todo')}
-                      {todo.title}
+                      {isEditingTitle ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <Input
+                            value={editedTitle}
+                            onChange={(e) => setEditedTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveTitle();
+                              if (e.key === 'Escape') handleCancelEdit();
+                            }}
+                            className="text-2xl font-semibold"
+                            autoFocus
+                          />
+                          <Button size="sm" variant="ghost" onClick={handleSaveTitle}>
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-1 group">
+                          <span>{todo.title}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleStartEditTitle}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </>
                   ) : (
                     "Loading..."
@@ -282,6 +409,44 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
             </div>
           </DialogHeader>
 
+          {/* Quick Actions Bar */}
+          {todo && users && (
+            <div className="mt-4">
+              <QuickActionsBar
+                todo={todo}
+                users={users}
+                onStatusChange={(status) => {
+                  updateTodoMutation.mutate({
+                    id: todo.id,
+                    data: {
+                      status: status as any,
+                      completedAt: status === 'done' ? new Date().toISOString() : null,
+                    },
+                  });
+                }}
+                onPriorityChange={(priority) => {
+                  updateTodoMutation.mutate({
+                    id: todo.id,
+                    data: { priority: priority as any },
+                  });
+                }}
+                onAssignUser={(userId) => {
+                  updateTodoMutation.mutate({
+                    id: todo.id,
+                    data: { assignedUserId: userId },
+                  });
+                }}
+                onDueDateChange={(date) => {
+                  updateTodoMutation.mutate({
+                    id: todo.id,
+                    data: { dueDate: date },
+                  });
+                }}
+                isUpdating={updateTodoMutation.isPending}
+              />
+            </div>
+          )}
+
           {!todo ? (
             <div className="flex items-center justify-center py-12" data-testid="task-loading">
               <div className="text-center">
@@ -296,9 +461,9 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
                   <FileText className="h-4 w-4 mr-2" />
                   Details
                 </TabsTrigger>
-                <TabsTrigger value="comments" data-testid="comments-tab">
+                <TabsTrigger value="notes" data-testid="notes-tab">
                   <MessageSquare className="h-4 w-4 mr-2" />
-                  Comments
+                  Notes
                 </TabsTrigger>
                 <TabsTrigger value="activity" data-testid="activity-tab">
                   <Activity className="h-4 w-4 mr-2" />
@@ -310,15 +475,49 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
                 </TabsTrigger>
               </TabsList>
 
+              <TabsContent value="attachments" className="mt-4" data-testid="attachments-content">
+                {todo && <AttachmentsTab todoId={todo.id} />}
+              </TabsContent>
               <TabsContent value="details" className="space-y-4 mt-4" data-testid="details-content">
                 <Card>
                   <CardContent className="pt-6 space-y-6">
                     {/* Description */}
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Description</label>
-                      <p className="mt-2 text-sm whitespace-pre-wrap" data-testid="task-description">
-                        {todo.description || "No description provided"}
-                      </p>
+                      {isEditingDescription ? (
+                        <div className="mt-2 space-y-2">
+                          <textarea
+                            value={editedDescription}
+                            onChange={(e) => setEditedDescription(e.target.value)}
+                            className="w-full min-h-[100px] p-2 text-sm border rounded-md"
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={handleSaveDescription}>
+                              <Check className="h-4 w-4 mr-2" />
+                              Save
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                              <X className="h-4 w-4 mr-2" />
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="group relative">
+                          <p className="mt-2 text-sm whitespace-pre-wrap" data-testid="task-description">
+                            {todo.description || "No description provided"}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleStartEditDescription}
+                            className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     <Separator />
@@ -327,7 +526,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
                     <div className="grid grid-cols-2 gap-6">
                       <div>
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                          <User className="h-4 w-4" />
+                          <UserCircle className="h-4 w-4" />
                           Assigned To
                         </label>
                         <p className="mt-2 text-sm" data-testid="task-assigned-user">
@@ -387,58 +586,59 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
                       </div>
                     </div>
 
+                    <Separator />
+
+                    {/* Subtasks Section */}
+                    {todo && (
+                      <SubtasksSection todoId={todo.id} subtasks={subtasks} />
+                    )}
+
                     {/* Linked Entities */}
                     {(linkedOrder || linkedCase || linkedRepair || linkedCustomer) && (
                       <>
                         <Separator />
                         <div>
-                          <label className="text-sm font-medium text-muted-foreground mb-3 block">
-                            Linked Entities
-                          </label>
-                          <div className="space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground">Linked Entities</label>
+                          <div className="mt-2 space-y-2">
                             {linkedOrder && (
-                              <div className="flex items-center gap-2 p-3 border rounded-lg" data-testid="linked-order">
-                                <Package className="h-4 w-4 text-muted-foreground" />
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">Order #{linkedOrder.orderNumber}</p>
-                                  <p className="text-xs text-muted-foreground">{linkedOrder.customerEmail}</p>
-                                </div>
-                                <Badge variant="outline">{linkedOrder.status}</Badge>
-                              </div>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start"
+                                onClick={() => window.location.href = `/orders/${linkedOrder.id}`}
+                              >
+                                <Package className="h-4 w-4 mr-2" />
+                                Order #{linkedOrder.orderNumber}
+                              </Button>
                             )}
-
                             {linkedCase && (
-                              <div className="flex items-center gap-2 p-3 border rounded-lg" data-testid="linked-case">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">{linkedCase.title}</p>
-                                  <p className="text-xs text-muted-foreground">Case #{linkedCase.caseNumber}</p>
-                                </div>
-                                <Badge variant="outline">{linkedCase.status}</Badge>
-                              </div>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start"
+                                onClick={() => window.location.href = `/cases/${linkedCase.id}`}
+                              >
+                                <Folder className="h-4 w-4 mr-2" />
+                                Case #{linkedCase.caseNumber}
+                              </Button>
                             )}
-
                             {linkedRepair && (
-                              <div className="flex items-center gap-2 p-3 border rounded-lg" data-testid="linked-repair">
-                                <Wrench className="h-4 w-4 text-muted-foreground" />
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">{linkedRepair.title}</p>
-                                  <p className="text-xs text-muted-foreground">Repair</p>
-                                </div>
-                                <Badge variant="outline">{linkedRepair.status}</Badge>
-                              </div>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start"
+                                onClick={() => window.location.href = `/repairs/${linkedRepair.id}`}
+                              >
+                                <Wrench className="h-4 w-4 mr-2" />
+                                Repair: {linkedRepair.deviceType}
+                              </Button>
                             )}
-
                             {linkedCustomer && (
-                              <div className="flex items-center gap-2 p-3 border rounded-lg" data-testid="linked-customer">
-                                <Mail className="h-4 w-4 text-muted-foreground" />
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">
-                                    {linkedCustomer.firstName} {linkedCustomer.lastName}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">{linkedCustomer.email}</p>
-                                </div>
-                              </div>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start"
+                                onClick={() => window.location.href = `/customers/${linkedCustomer.id}`}
+                              >
+                                <UserCircle className="h-4 w-4 mr-2" />
+                                {linkedCustomer.firstName} {linkedCustomer.lastName}
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -448,16 +648,18 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
                 </Card>
               </TabsContent>
 
-              <TabsContent value="comments" className="mt-4" data-testid="comments-content">
+              <TabsContent value="notes" className="mt-4" data-testid="notes-content">
                 <Card>
                   <CardContent className="pt-6">
-                    <div className="text-center py-12" data-testid="no-comments">
-                      <MessageSquare className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-                      <p className="text-sm text-muted-foreground">Comments not yet available for tasks</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Task comments feature coming soon
-                      </p>
-                    </div>
+                    {currentUser && todo && (
+                      <NotesPanel entityType="todo" entityId={todo.id} currentUser={currentUser} />
+                    )}
+                    {!currentUser && (
+                      <div className="text-center py-12">
+                        <MessageSquare className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                        <p className="text-sm text-muted-foreground">Loading...</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -508,10 +710,10 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
             </Tabs>
           )}
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      < AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} >
         <AlertDialogContent data-testid="delete-confirmation-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -531,7 +733,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </AlertDialog >
     </>
   );
 }

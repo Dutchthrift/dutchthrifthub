@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import type { User, Return, ReturnItem } from "@shared/schema";
 import { Navigation } from "@/components/layout/navigation";
 import { queryClient } from "@/lib/queryClient";
-import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText, Archive, ChevronLeft, ChevronRight } from "lucide-react";
+import { Package, Plus, Filter, Search, Calendar, ExternalLink, Truck, Image as ImageIcon, FileText, Archive, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -26,10 +27,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
-import { CreateReturnModal } from "@/components/forms/create-return-modal";
+import { CreateReturnWizard } from "@/components/returns/create-return-wizard";
 import { NotesPanel } from "@/components/notes/NotesPanel";
 import { ReturnsKanban } from "@/components/returns/returns-kanban";
-import { useToast } from "@/hooks/use-toast";
+import { EditReturnDialog } from "@/components/returns/edit-return-dialog";
+import { ReturnDetailModalContent } from "@/components/returns/return-detail-modal-content";
+
+// Extend Return type to include orderNumber which is sent by the backend
+type ReturnWithOrder = Return & { orderNumber?: string };
 
 type EnrichedReturnData = {
   return: Return;
@@ -63,7 +68,8 @@ type EnrichedReturnData = {
 
 const STATUS_TABS = [
   { value: "all", label: "Alle" },
-  { value: "nieuw_onderweg", label: "Nieuw / Onderweg" },
+  { value: "nieuw", label: "Nieuw (Te Beoordelen)" },
+  { value: "onderweg", label: "Onderweg (Met Label)" },
   { value: "ontvangen_controle", label: "Ontvangen (controle)" },
   { value: "akkoord_terugbetaling", label: "Akkoord / Terugbetaling" },
   { value: "vermiste_pakketten", label: "Vermiste Pakketten" },
@@ -74,7 +80,9 @@ const STATUS_TABS = [
 ];
 
 const STATUS_COLORS: Record<string, string> = {
-  nieuw_onderweg: "bg-chart-4/10 text-chart-4 border-chart-4/20",
+  nieuw: "bg-chart-4/10 text-chart-4 border-chart-4/20",
+  onderweg: "bg-primary/10 text-primary border-primary/20",
+  nieuw_onderweg: "bg-chart-4/10 text-chart-4 border-chart-4/20", // deprecated
   ontvangen_controle: "bg-primary/10 text-primary border-primary/20",
   akkoord_terugbetaling: "bg-chart-2/10 text-chart-2 border-chart-2/20",
   vermiste_pakketten: "bg-destructive/10 text-destructive border-destructive/20",
@@ -101,12 +109,12 @@ export default function Returns() {
   const [showArchived, setShowArchived] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
-  
+
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
 
   // Fetch all returns (filtering done client-side)
-  const { data: allReturns = [], isLoading } = useQuery<Return[]>({
+  const { data: allReturns = [], isLoading } = useQuery<ReturnWithOrder[]>({
     queryKey: ["/api/returns"],
   });
 
@@ -114,7 +122,6 @@ export default function Returns() {
   const { data: enrichedReturnData, isLoading: isLoadingDetails } = useQuery<EnrichedReturnData>({
     queryKey: ["/api/returns", selectedReturn?.id],
     enabled: !!selectedReturn?.id && showReturnDetails,
-    initialData: selectedReturn ? { return: selectedReturn } as EnrichedReturnData : undefined,
     staleTime: 0, // Always refetch in background
   });
 
@@ -132,7 +139,7 @@ export default function Returns() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const returnId = params.get('returnId');
-    
+
     if (returnId) {
       const existingReturn = allReturns.find(r => r.id === returnId);
       if (existingReturn) {
@@ -164,7 +171,7 @@ export default function Returns() {
   }, [location, allReturns, setLocation, toast]);
 
   // Filter by archived status
-  const returns = allReturns.filter(ret => 
+  const returns = allReturns.filter(ret =>
     showArchived ? ret.isArchived === true : ret.isArchived !== true
   );
 
@@ -182,7 +189,7 @@ export default function Returns() {
 
   // Pagination for archived view
   const totalPages = Math.ceil(filteredReturns.length / itemsPerPage);
-  const paginatedReturns = showArchived 
+  const paginatedReturns = showArchived
     ? filteredReturns.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
     : filteredReturns;
 
@@ -205,7 +212,45 @@ export default function Returns() {
     return tab?.label || status;
   };
 
+  // Helper function to get display identifier for return
+  const getReturnDisplayId = (returnItem: Return) => {
+    // Prefer Shopify return name (e.g. #9009-R1) over internal RET-2025-XXX
+    return returnItem.shopifyReturnName || returnItem.orderNumber || returnItem.returnNumber;
+  };
+
+  const syncShopifyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/shopify/sync-returns', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Sync failed');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Shopify Sync Voltooid",
+        description: data.message || `${data.created} nieuwe returns geïmporteerd`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/returns'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Mislukt",
+        description: error.message || "Er is een fout opgetreden bij het synchroniseren",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleViewDetails = (returnItem: Return) => {
+    console.log('Opening return details for:', returnItem);
     setSelectedReturn(returnItem);
     setShowReturnDetails(true);
   };
@@ -213,7 +258,7 @@ export default function Returns() {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+
       <main className="container mx-auto px-4 py-6">
         {/* Header Card */}
         <Card className="mb-6">
@@ -231,7 +276,16 @@ export default function Returns() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button 
+                <Button
+                  variant="outline"
+                  onClick={() => syncShopifyMutation.mutate()}
+                  disabled={syncShopifyMutation.isPending}
+                  data-testid="button-sync-shopify"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${syncShopifyMutation.isPending ? 'animate-spin' : ''}`} />
+                  {syncShopifyMutation.isPending ? 'Synchroniseren...' : 'Sync Shopify'}
+                </Button>
+                <Button
                   variant={showArchived ? "outline" : "ghost"}
                   onClick={() => {
                     setShowArchived(!showArchived);
@@ -242,7 +296,7 @@ export default function Returns() {
                   <Archive className="h-4 w-4 mr-2" />
                   {showArchived ? "Toon Actief" : "Toon Archief"}
                 </Button>
-                <Button 
+                <Button
                   onClick={() => setShowCreateModal(true)}
                   data-testid="button-create-return"
                 >
@@ -262,8 +316,14 @@ export default function Returns() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Nieuw:</span>
+                <span className="text-sm font-semibold text-chart-4">
+                  {statusCounts.nieuw || 0}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Onderweg:</span>
                 <span className="text-sm font-semibold text-primary">
-                  {statusCounts.nieuw_onderweg || 0}
+                  {statusCounts.onderweg || 0}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -330,7 +390,7 @@ export default function Returns() {
               <p className="text-sm text-muted-foreground mb-4">
                 {searchQuery || priorityFilter !== "all"
                   ? "Probeer een andere zoekopdracht of filter"
-                  : showArchived 
+                  : showArchived
                     ? "Er zijn nog geen gearchiveerde retouren"
                     : "Er zijn nog geen retouren in dit overzicht"}
               </p>
@@ -340,10 +400,10 @@ export default function Returns() {
           <>
             {/* Archived List View */}
             <div className="space-y-3">
-              {paginatedReturns.map((returnItem) => (
-                <Card 
-                  key={returnItem.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow"
+              {paginatedReturns.map((returnItem: ReturnWithOrder) => (
+                <Card
+                  key={returnItem.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => handleViewDetails(returnItem)}
                   data-testid={`archived-return-card-${returnItem.id}`}
                 >
@@ -351,14 +411,19 @@ export default function Returns() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold font-mono">{returnItem.returnNumber}</h3>
+                          <h3 className="font-semibold font-mono">{getReturnDisplayId(returnItem)}</h3>
+                          {returnItem.orderNumber && (
+                            <span className="text-xs text-muted-foreground font-mono">
+                              ({returnItem.returnNumber})
+                            </span>
+                          )}
                           <Badge variant="outline" className={STATUS_COLORS[returnItem.status] || ""}>
                             {getStatusLabel(returnItem.status)}
                           </Badge>
                           <Badge variant="outline" className={PRIORITY_COLORS[returnItem.priority || 'medium'] || ""}>
-                            {returnItem.priority === "low" ? "Laag" : 
-                             returnItem.priority === "high" ? "Hoog" : 
-                             returnItem.priority === "urgent" ? "Urgent" : "Normaal"}
+                            {returnItem.priority === "low" ? "Laag" :
+                              returnItem.priority === "high" ? "Hoog" :
+                                returnItem.priority === "urgent" ? "Urgent" : "Normaal"}
                           </Badge>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -384,12 +449,13 @@ export default function Returns() {
                             <div>
                               <span className="text-muted-foreground">Reden:</span>
                               <p className="font-medium">
-                                {returnItem.returnReason === "defect" ? "Defect" :
-                                 returnItem.returnReason === "wrong_item" ? "Verkeerd artikel" :
-                                 returnItem.returnReason === "not_as_described" ? "Niet zoals beschreven" :
-                                 returnItem.returnReason === "no_longer_needed" ? "Niet meer nodig" :
-                                 returnItem.returnReason === "other" ? returnItem.otherReason || "Anders" :
-                                 returnItem.returnReason}
+                                {returnItem.returnReason === "defective" ? "Defect" :
+                                  returnItem.returnReason === "wrong_item" ? "Verkeerd artikel" :
+                                    returnItem.returnReason === "damaged" ? "Beschadigd" :
+                                      returnItem.returnReason === "size_issue" ? "Maat probleem" :
+                                        returnItem.returnReason === "changed_mind" ? "Bedacht" :
+                                          returnItem.returnReason === "other" ? returnItem.otherReason || "Anders" :
+                                            returnItem.returnReason}
                               </p>
                             </div>
                           )}
@@ -437,21 +503,34 @@ export default function Returns() {
             )}
           </>
         ) : (
-          <ReturnsKanban 
-            returns={filteredReturns} 
+          <ReturnsKanban
+            returns={filteredReturns}
             isLoading={isLoading}
             onViewReturn={handleViewDetails}
-            onEditReturn={(returnItem) => {
-              setSelectedReturn(returnItem);
-              setIsEditing(true);
-            }}
-            onDeleteReturn={(returnItem) => {
+            onEditReturn={handleViewDetails}
+            onDeleteReturn={async (returnItem) => {
               if (confirm(`Weet je zeker dat je retour ${returnItem.returnNumber} wilt verwijderen?`)) {
-                toast({
-                  title: "Functie niet beschikbaar",
-                  description: "Verwijderen van retouren is nog niet geïmplementeerd.",
-                  variant: "destructive",
-                });
+                try {
+                  const response = await fetch(`/api/returns/${returnItem.id}`, {
+                    method: "DELETE",
+                    credentials: "include",
+                  });
+
+                  if (!response.ok) throw new Error("Failed to delete return");
+
+                  await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+
+                  toast({
+                    title: "Verwijderd",
+                    description: `Retour ${returnItem.returnNumber} is verwijderd.`,
+                  });
+                } catch (error) {
+                  toast({
+                    title: "Fout",
+                    description: "Er is een fout opgetreden bij het verwijderen.",
+                    variant: "destructive",
+                  });
+                }
               }
             }}
             onArchiveReturn={async (returnItem) => {
@@ -466,7 +545,7 @@ export default function Returns() {
                 if (!response.ok) throw new Error("Failed to archive return");
 
                 await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-                
+
                 toast({
                   title: "Gearchiveerd",
                   description: `Retour ${returnItem.returnNumber} is gearchiveerd.`,
@@ -483,13 +562,13 @@ export default function Returns() {
         )}
       </main>
 
-      <CreateReturnModal 
-        open={showCreateModal} 
+      <CreateReturnWizard
+        open={showCreateModal}
         onOpenChange={setShowCreateModal}
         onReturnCreated={async (returnId) => {
           // Refetch returns to get the newly created one
           await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-          
+
           // Wait a bit for the query to update, then find and open the return
           setTimeout(() => {
             const newReturn = allReturns.find(r => r.id === returnId);
@@ -501,357 +580,103 @@ export default function Returns() {
         }}
       />
 
-      <CreateReturnModal 
-        open={isEditing} 
-        onOpenChange={setIsEditing}
-        editReturn={selectedReturn}
-        onReturnCreated={async () => {
-          await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-          setShowReturnDetails(false);
-        }}
-      />
+      {/* Edit Return Dialog */}
+      {selectedReturn && enrichedReturnData && (
+        <EditReturnDialog
+          open={isEditing}
+          onOpenChange={setIsEditing}
+          returnData={enrichedReturnData.return}
+          onSave={async (data) => {
+            try {
+              const response = await fetch(`/api/returns/${selectedReturn.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+                credentials: "include",
+              });
+
+              if (!response.ok) throw new Error("Failed to update return");
+
+              await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+              await queryClient.invalidateQueries({ queryKey: ["/api/returns", selectedReturn.id] });
+
+              toast({
+                title: "Bijgewerkt",
+                description: "Retour is succesvol bijgewerkt.",
+              });
+
+              setIsEditing(false);
+            } catch (error) {
+              toast({
+                title: "Fout",
+                description: "Er is een fout opgetreden bij het bijwerken.",
+                variant: "destructive",
+              });
+            }
+          }}
+          isSaving={false}
+        />
+      )}
 
       {/* Return Details Dialog */}
       <Dialog open={showReturnDetails} onOpenChange={setShowReturnDetails}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <DialogTitle className="text-lg font-medium">Retour Details {selectedReturn?.returnNumber}</DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                  Volledige retourinformatie en order details
-                </DialogDescription>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsEditing(true)}
-                data-testid="button-edit-return"
-                className="h-8"
-              >
-                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                <span className="text-xs">Bewerken</span>
-              </Button>
-            </div>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl font-semibold">
+              {selectedReturn ? getReturnDisplayId(selectedReturn) : ''}
+              {selectedReturn?.orderNumber && (
+                <span className="text-sm text-muted-foreground font-normal ml-2">
+                  ({selectedReturn.returnNumber})
+                </span>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Volledige retourinformatie en order details
+            </DialogDescription>
           </DialogHeader>
-          
+
           {isLoadingDetails ? (
-            <div className="space-y-4">
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-32 w-full" />
+            <div className="space-y-4 py-4">
+              <Skeleton className="h-24 w-full" />
               <Skeleton className="h-48 w-full" />
+              <Skeleton className="h-32 w-full" />
             </div>
           ) : enrichedReturnData && (
-            <div className="space-y-2.5">
-              {/* Return Overview & Customer Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                {/* Return Information */}
-                <div className="border rounded-lg p-3">
-                  <h3 className="text-sm font-medium mb-2">Retour Informatie</h3>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-start gap-2">
-                      <span className="text-xs text-muted-foreground">Retournummer:</span>
-                      <span className="text-sm">{enrichedReturnData.return.returnNumber}</span>
-                    </div>
-                    <div className="flex justify-between items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Status:</span>
-                      <Badge variant="outline" className={`text-xs h-5 ${STATUS_COLORS[enrichedReturnData.return.status] || ""}`}>
-                        {getStatusLabel(enrichedReturnData.return.status)}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Prioriteit:</span>
-                      <Badge variant="outline" className={`text-xs h-5 ${PRIORITY_COLORS[enrichedReturnData.return.priority || 'medium'] || ""}`}>
-                        {enrichedReturnData.return.priority === "low" ? "Laag" : 
-                         enrichedReturnData.return.priority === "high" ? "Hoog" : 
-                         enrichedReturnData.return.priority === "urgent" ? "Urgent" : "Normaal"}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between items-start gap-2">
-                      <span className="text-xs text-muted-foreground">Reden:</span>
-                      <span className="text-sm text-right max-w-[180px]">
-                        {enrichedReturnData.return.returnReason === "defect" ? "Defect" :
-                         enrichedReturnData.return.returnReason === "wrong_item" ? "Verkeerd artikel" :
-                         enrichedReturnData.return.returnReason === "not_as_described" ? "Niet zoals beschreven" :
-                         enrichedReturnData.return.returnReason === "no_longer_needed" ? "Niet meer nodig" :
-                         enrichedReturnData.return.returnReason === "other" ? enrichedReturnData.return.otherReason || "Anders" :
-                         enrichedReturnData.return.returnReason || "-"}
-                      </span>
-                    </div>
-                    <Separator className="my-1.5" />
-                    <div className="flex justify-between items-start gap-2">
-                      <span className="text-xs text-muted-foreground">Aangevraagd:</span>
-                      <span className="text-sm">
-                        {format(new Date(enrichedReturnData.return.requestedAt), "dd MMM yyyy HH:mm")}
-                      </span>
-                    </div>
-                    {enrichedReturnData.return.receivedAt && (
-                      <div className="flex justify-between items-start gap-2">
-                        <span className="text-xs text-muted-foreground">Ontvangen:</span>
-                        <span className="text-sm">
-                          {format(new Date(enrichedReturnData.return.receivedAt), "dd MMM yyyy HH:mm")}
-                        </span>
-                      </div>
-                    )}
-                    {enrichedReturnData.assignedUser && (
-                      <div className="flex justify-between items-start gap-2">
-                        <span className="text-xs text-muted-foreground">Toegewezen aan:</span>
-                        <span className="text-sm">{enrichedReturnData.assignedUser.fullName}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+            <ReturnDetailModalContent
+              enrichedData={enrichedReturnData}
+              onUpdate={async (data) => {
+                try {
+                  const response = await fetch(`/api/returns/${selectedReturn!.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                    credentials: "include",
+                  });
 
-                {/* Customer Information */}
-                <div className="border rounded-lg p-3">
-                  <h3 className="text-sm font-medium mb-2">Klantinformatie</h3>
-                  <div className="space-y-1.5">
-                    {enrichedReturnData.customer ? (
-                      <>
-                        <div className="flex justify-between items-start gap-2">
-                          <span className="text-xs text-muted-foreground">Naam:</span>
-                          <span className="text-sm">
-                            {enrichedReturnData.customer.firstName} {enrichedReturnData.customer.lastName}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-start gap-2">
-                          <span className="text-xs text-muted-foreground">Email:</span>
-                          <span className="text-sm">{enrichedReturnData.customer.email}</span>
-                        </div>
-                        {enrichedReturnData.customer.phone && (
-                          <div className="flex justify-between items-start gap-2">
-                            <span className="text-xs text-muted-foreground">Telefoon:</span>
-                            <span className="text-sm">{enrichedReturnData.customer.phone}</span>
-                          </div>
-                        )}
-                      </>
-                    ) : enrichedReturnData.order?.orderData?.customer ? (
-                      <>
-                        <div className="flex justify-between items-start gap-2">
-                          <span className="text-xs text-muted-foreground">Naam:</span>
-                          <span className="text-sm">
-                            {enrichedReturnData.order.orderData.customer.first_name} {enrichedReturnData.order.orderData.customer.last_name}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-start gap-2">
-                          <span className="text-xs text-muted-foreground">Email:</span>
-                          <span className="text-sm">{enrichedReturnData.order.orderData.customer.email}</span>
-                        </div>
-                        {enrichedReturnData.order.orderData.customer.phone && (
-                          <div className="flex justify-between items-start gap-2">
-                            <span className="text-xs text-muted-foreground">Telefoon:</span>
-                            <span className="text-sm">{enrichedReturnData.order.orderData.customer.phone}</span>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">Geen klantinformatie beschikbaar</div>
-                    )}
-                    {enrichedReturnData.return.customerNotes && (
-                      <>
-                        <Separator className="my-1.5" />
-                        <div>
-                          <span className="text-xs text-muted-foreground block mb-0.5">Klant notities:</span>
-                          <p className="text-xs">{enrichedReturnData.return.customerNotes}</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
+                  if (!response.ok) throw new Error("Failed to update return");
 
-              {/* Order Information from Shopify */}
-              {enrichedReturnData.order && (
-                <div className="border rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium">Originele Order Informatie</h3>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      onClick={() => window.open(`/orders?orderId=${enrichedReturnData.order.id}`, '_blank')}
-                      data-testid="button-view-order"
-                      className="h-6 text-xs p-0"
-                    >
-                      <ExternalLink className="h-3 w-3 mr-1" />
-                      Bekijk Order
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <span className="text-xs text-muted-foreground block mb-0.5">Ordernummer</span>
-                      <p className="text-sm">#{enrichedReturnData.order.orderNumber}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground block mb-0.5">Orderdatum</span>
-                      <p className="text-sm">
-                        {enrichedReturnData.order.orderDate ? 
-                          format(new Date(enrichedReturnData.order.orderDate), "dd MMM yyyy") : 
-                          "-"}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground block mb-0.5">Status</span>
-                      <p className="text-sm capitalize">{enrichedReturnData.order.status}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground block mb-0.5">Totaal bedrag</span>
-                      <p className="text-sm">
-                        {formatCurrency(enrichedReturnData.order.totalAmount)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+                  await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+                  await queryClient.invalidateQueries({ queryKey: ["/api/returns", selectedReturn!.id] });
 
-              {/* Return Items */}
-              {enrichedReturnData.returnItems && enrichedReturnData.returnItems.length > 0 && (
-                <div className="border rounded-lg p-3">
-                  <h3 className="text-sm font-medium mb-2">Geretourneerde Artikelen</h3>
-                  <div className="space-y-1.5">
-                    {enrichedReturnData.returnItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-2 border rounded hover:bg-muted/30 transition-colors" data-testid={`return-item-${item.id}`}>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{item.productName}</div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {item.sku && (
-                              <span className="text-xs text-muted-foreground">SKU: {item.sku}</span>
-                            )}
-                            <span className="text-xs text-muted-foreground">Aantal: {item.quantity}</span>
-                            {item.condition && (
-                              <Badge variant="outline" className="text-xs h-4 px-1.5">
-                                {item.condition === "unopened" ? "Ongeopend" :
-                                 item.condition === "opened_unused" ? "Geopend" :
-                                 item.condition === "used" ? "Gebruikt" :
-                                 item.condition === "damaged" ? "Beschadigd" :
-                                 item.condition}
-                              </Badge>
-                            )}
-                            {item.restockable && (
-                              <Badge variant="outline" className="text-xs h-4 px-1.5 bg-chart-2/10 text-chart-2 border-chart-2/20">
-                                Herstelbaar
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        {item.unitPrice && (
-                          <div className="text-right ml-3">
-                            <div className="text-sm font-medium">{formatCurrency(item.unitPrice)}</div>
-                            <div className="text-xs text-muted-foreground">
-                              Totaal: {formatCurrency(item.unitPrice * item.quantity)}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Tracking Information */}
-              {enrichedReturnData.tracking && (
-                <div className="border rounded-lg p-3">
-                  <h3 className="text-sm font-medium mb-2">Tracking Informatie</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                    {/* Return Tracking */}
-                    <div className="p-2.5 bg-muted/30 rounded border">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-xs font-medium">Retour Tracking</span>
-                      </div>
-                      {enrichedReturnData.tracking.returnTracking?.trackingNumber ? (
-                        <>
-                          <p className="font-mono text-xs">{enrichedReturnData.tracking.returnTracking.trackingNumber}</p>
-                          {enrichedReturnData.tracking.returnTracking.expectedReturnDate && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Verwacht: {format(new Date(enrichedReturnData.tracking.returnTracking.expectedReturnDate), "dd MMM yyyy")}
-                            </p>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">Geen tracking beschikbaar</p>
-                      )}
-                    </div>
-
-                    {/* Order Tracking */}
-                    <div className="p-2.5 bg-muted/30 rounded border">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-xs font-medium">Originele Order Tracking</span>
-                      </div>
-                      {enrichedReturnData.tracking.orderTracking ? (
-                        <>
-                          <p className="font-mono text-xs">{enrichedReturnData.tracking.orderTracking.trackingNumber}</p>
-                          {enrichedReturnData.tracking.orderTracking.trackingCompany && (
-                            <p className="text-xs text-muted-foreground">{enrichedReturnData.tracking.orderTracking.trackingCompany}</p>
-                          )}
-                          {enrichedReturnData.tracking.orderTracking.trackingUrl && (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-0 h-auto mt-0.5 text-xs"
-                              onClick={() => window.open(enrichedReturnData.tracking.orderTracking!.trackingUrl, '_blank')}
-                              data-testid="button-track-shipment"
-                            >
-                              <ExternalLink className="h-3 w-3 mr-0.5" />
-                              Track verzending
-                            </Button>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">Geen tracking beschikbaar</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Photos & Evidence */}
-              {enrichedReturnData.photos && enrichedReturnData.photos.length > 0 && (
-                <div className="border rounded-lg p-3">
-                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                    <ImageIcon className="h-3.5 w-3.5" />
-                    Foto's & Bewijs
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    {enrichedReturnData.photos.map((photo, index) => (
-                      <div key={index} className="relative aspect-square rounded overflow-hidden border">
-                        <img 
-                          src={photo} 
-                          alt={`Return photo ${index + 1}`}
-                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => window.open(photo, '_blank')}
-                          data-testid={`return-photo-${index}`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  {enrichedReturnData.return.conditionNotes && (
-                    <div className="mt-2.5 p-2.5 bg-muted/30 rounded border">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-xs font-medium">Conditie Notities</span>
-                      </div>
-                      <p className="text-xs">{enrichedReturnData.return.conditionNotes}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Internal Notes */}
-              <div className="border rounded-lg p-3">
-                <h3 className="text-sm font-medium mb-2">Interne Notities</h3>
-                {currentUser && (
-                  <NotesPanel 
-                    entityType="return" 
-                    entityId={enrichedReturnData.return.id}
-                    currentUser={currentUser}
-                  />
-                )}
-              </div>
-            </div>
+                  toast({
+                    title: "Bijgewerkt",
+                    description: "Retour is succesvol bijgewerkt.",
+                  });
+                } catch (error) {
+                  toast({
+                    title: "Fout",
+                    description: "Er is een fout opgetreden bij het bijwerken.",
+                    variant: "destructive",
+                  });
+                  throw error;
+                }
+              }}
+              isUpdating={false}
+            />
           )}
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+

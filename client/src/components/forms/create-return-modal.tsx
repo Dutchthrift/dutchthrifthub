@@ -59,7 +59,6 @@ const createReturnFormSchema = insertReturnSchema.extend({
   otherReason: z.string().optional().nullable(),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
   trackingNumber: z.string().optional().nullable(),
-  internalNotes: z.string().optional().nullable(),
 }).refine((data) => {
   if (data.returnReason === "other" && !data.otherReason) {
     return false;
@@ -79,6 +78,8 @@ interface CreateReturnModalProps {
   orderId?: string;
   onReturnCreated?: (returnId: string) => void;
   editReturn?: any;
+  caseId?: string;
+  emailThreadId?: string;
 }
 
 interface SelectedItemData {
@@ -87,7 +88,7 @@ interface SelectedItemData {
   notes?: string;
 }
 
-export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onReturnCreated, editReturn }: CreateReturnModalProps) {
+export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onReturnCreated, editReturn, caseId, emailThreadId }: CreateReturnModalProps) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [orderSearchOpen, setOrderSearchOpen] = useState(false);
@@ -112,11 +113,11 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
         page: "1",
         limit: "50",
       });
-      
+
       if (orderSearchQuery) {
         params.append("search", orderSearchQuery);
       }
-      
+
       const response = await fetch(`/api/orders?${params.toString()}`);
       if (!response.ok) {
         throw new Error("Failed to fetch orders");
@@ -128,11 +129,11 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
   // Combine preset order with search results
   const orders = useMemo(() => {
     const ordersList = ordersData?.orders || [];
-    
+
     if (presetOrder && !ordersList.find(o => o.id === presetOrder.id)) {
       return [presetOrder, ...ordersList];
     }
-    
+
     return ordersList;
   }, [ordersData, presetOrder]);
 
@@ -146,7 +147,6 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
       priority: editReturn.priority || "medium" as const,
       status: editReturn.status || "nieuw_onderweg" as const,
       trackingNumber: editReturn.trackingNumber || null,
-      internalNotes: editReturn.internalNotes || null,
       customerNotes: editReturn.customerNotes || null,
       conditionNotes: editReturn.conditionNotes || null,
       refundAmount: editReturn.refundAmount || null,
@@ -168,7 +168,6 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
       priority: "medium" as const,
       status: "nieuw_onderweg" as const,
       trackingNumber: null,
-      internalNotes: null,
       customerNotes: null,
       conditionNotes: null,
       refundAmount: null,
@@ -177,7 +176,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
       shopifyRefundId: null,
       photos: null,
       assignedUserId: null,
-      caseId: null,
+      caseId: caseId || null,
       requestedAt: undefined,
       receivedAt: null,
       expectedReturnDate: null,
@@ -205,8 +204,8 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('[data-testid="order-search-input"]') && 
-          !target.closest('[data-testid="order-search-dropdown"]')) {
+      if (!target.closest('[data-testid="order-search-input"]') &&
+        !target.closest('[data-testid="order-search-dropdown"]')) {
         setOrderSearchOpen(false);
       }
     };
@@ -252,7 +251,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
           return;
         }
       }
-      
+
       form.setValue("orderId", orderId);
       form.setValue("customerId", order.customerId || "");
     }
@@ -262,16 +261,16 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
   const createReturnMutation = useMutation({
     mutationFn: async (data: CreateReturnFormValues & { items?: any[] }) => {
       const { items, ...returnFields } = data;
-      
+
       const returnData = {
         ...returnFields,
         orderId: (returnFields.orderId && returnFields.orderId !== "none") ? returnFields.orderId : null,
         otherReason: returnFields.returnReason === "other" ? returnFields.otherReason : null,
         trackingNumber: returnFields.trackingNumber || null,
-        internalNotes: returnFields.internalNotes || null,
         items: items || [],
+        emailThreadId: emailThreadId,
       };
-      
+
       if (editReturn) {
         const response = await apiRequest("PATCH", `/api/returns/${editReturn.id}`, returnData);
         const updatedReturn = await response.json();
@@ -284,18 +283,18 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
     },
     onSuccess: async (returnData) => {
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-      
+
       toast({
         title: editReturn ? "Retour bijgewerkt" : "Retour aangemaakt",
-        description: editReturn 
+        description: editReturn
           ? `Retour "${returnData.returnNumber}" is succesvol bijgewerkt.`
           : `Retour "${returnData.returnNumber}" is succesvol aangemaakt${selectedItems.size > 0 ? ` met ${selectedItems.size} artikel(en)` : ''}.`,
       });
-      
+
       onOpenChange(false);
       form.reset();
       setSelectedItems(new Map());
-      
+
       // Instead of navigating, call the callback or open modal
       if (onReturnCreated) {
         onReturnCreated(returnData.id);
@@ -381,14 +380,14 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
             {editReturn ? 'Wijzig de retourinformatie' : 'Selecteer een bestelling en vul de retourinformatie in'}
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="flex-1 overflow-y-auto px-6 pb-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               {/* Section 1: Order & Return Details */}
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bestelling & Details</h3>
-                
+
                 <FormField
                   control={form.control}
                   name="orderId"
@@ -416,9 +415,9 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                           />
                         </FormControl>
                         <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                        
+
                         {orderSearchOpen && (
-                          <div 
+                          <div
                             className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-[300px] overflow-y-auto"
                             data-testid="order-search-dropdown"
                           >
@@ -591,25 +590,7 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                   <div></div>
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="internalNotes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">Interne Notities</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Interne notities over deze retour..."
-                          className="resize-none h-16"
-                          {...field}
-                          value={field.value || ""}
-                          data-testid="return-notes-input"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
 
               </div>
 
@@ -764,11 +745,11 @@ export function CreateReturnModal({ open, onOpenChange, customerId, orderId, onR
                     disabled={createReturnMutation.isPending || (!editReturn && !selectedOrderId)}
                     data-testid="button-create-return"
                   >
-                    {createReturnMutation.isPending 
-                      ? (editReturn ? "Bijwerken..." : "Aanmaken...") 
+                    {createReturnMutation.isPending
+                      ? (editReturn ? "Bijwerken..." : "Aanmaken...")
                       : editReturn
                         ? "Retour Bijwerken"
-                        : selectedItems.size > 0 
+                        : selectedItems.size > 0
                           ? `Retour Aanmaken (${selectedItems.size} ${selectedItems.size === 1 ? 'artikel' : 'artikelen'})`
                           : "Retour Aanmaken"}
                   </Button>

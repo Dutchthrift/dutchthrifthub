@@ -9,15 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  ArrowLeft, 
+import {
+  ArrowLeft,
   Edit,
   Save,
   X,
@@ -38,7 +38,7 @@ import {
   FileText
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { Case, CaseWithDetails, EmailThread, Order, Repair, Todo, InternalNote } from "@/lib/types";
+import type { Case, CaseWithDetails, EmailThread, Order, Repair, Todo } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -55,7 +55,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NotesPanel } from "@/components/notes/NotesPanel";
-import { EmailCompose } from "@/components/email/email-compose";
 
 const CASE_STATUS_OPTIONS = [
   { value: "new", label: "New" },
@@ -81,8 +80,7 @@ export default function CaseDetail() {
   const [editDescription, setEditDescription] = useState("");
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
-  const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
-  const [newNoteContent, setNewNoteContent] = useState("");
+
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [showSlaDialog, setShowSlaDialog] = useState(false);
@@ -101,7 +99,9 @@ export default function CaseDetail() {
   const { data: relatedEmails } = useQuery<EmailThread[]>({
     queryKey: ["/api/email-threads", "caseId", caseId],
     queryFn: async () => {
-      const response = await fetch(`/api/email-threads?caseId=${caseId}`);
+      const response = await fetch(`/api/email-threads?caseId=${caseId}`, {
+        credentials: 'include'
+      });
       if (!response.ok) throw new Error('Failed to fetch related emails');
       return response.json();
     },
@@ -148,20 +148,7 @@ export default function CaseDetail() {
     },
   });
 
-  const { data: internalNotes } = useQuery<InternalNote[]>({
-    queryKey: ["/api/internal-notes", "caseId", caseId],
-    queryFn: async () => {
-      const response = await fetch(`/api/internal-notes?caseId=${caseId}`);
-      if (!response.ok) throw new Error('Failed to fetch internal notes');
-      return response.json();
-    },
-    enabled: !!caseId,
-  });
 
-  const { data: caseNotes = [] } = useQuery<any[]>({
-    queryKey: ["/api/cases", caseId, "notes"],
-    enabled: !!caseId,
-  });
 
   const { data: caseEvents = [] } = useQuery<any[]>({
     queryKey: ["/api/cases", caseId, "events"],
@@ -246,34 +233,7 @@ export default function CaseDetail() {
     }
   });
 
-  const addNoteMutation = useMutation({
-    mutationFn: async (content: string) => {
-      const response = await fetch(`/api/cases/${caseId}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-      if (!response.ok) throw new Error("Failed to add note");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "notes"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "events"] });
-      setNewNoteContent("");
-      setShowAddNoteDialog(false);
-      toast({
-        title: "Note added",
-        description: "Note has been added successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Failed to add note",
-        description: "Could not add note to case",
-        variant: "destructive",
-      });
-    }
-  });
+
 
   const assignCaseMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -409,9 +369,9 @@ export default function CaseDetail() {
     if (caseData && caseId) {
       updateCaseMutation.mutate({
         id: caseId,
-        data: { 
-          title: editTitle, 
-          description: editDescription || null 
+        data: {
+          title: editTitle,
+          description: editDescription || null
         }
       });
       setIsEditing(false);
@@ -442,25 +402,25 @@ export default function CaseDetail() {
     }
   };
 
-  const getPriorityVariant = (priority: string | null) => {
+  const getPriorityColor = (priority: string | null) => {
     switch (priority) {
-      case "urgent": return "destructive";
-      case "high": return "destructive";
-      case "medium": return "secondary";
-      case "low": return "outline";
-      default: return "secondary";
+      case "urgent": return "bg-red-100 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30";
+      case "high": return "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-500/20 dark:text-orange-400 dark:border-orange-500/30";
+      case "medium": return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30";
+      case "low": return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-500/20 dark:text-slate-400 dark:border-slate-500/30";
+      default: return "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-500/20 dark:text-zinc-400 dark:border-zinc-500/30";
     }
   };
 
-  const getStatusVariant = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "new": return "outline";
-      case "in_progress": return "default";
-      case "waiting_customer": return "secondary";
-      case "waiting_part": return "secondary";
-      case "resolved": return "default";
-      case "closed": return "outline";
-      default: return "secondary";
+      case "new": return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30";
+      case "in_progress": return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30";
+      case "waiting_customer": return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30";
+      case "waiting_part": return "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-500/20 dark:text-purple-400 dark:border-purple-500/30";
+      case "resolved": return "bg-green-100 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30";
+      case "closed": return "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-500/20 dark:text-zinc-400 dark:border-zinc-500/30";
+      default: return "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-500/20 dark:text-zinc-400 dark:border-zinc-500/30";
     }
   };
 
@@ -478,7 +438,7 @@ export default function CaseDetail() {
 
   const getAvailableItems = () => {
     const linkedIds = caseLinks.map((link: any) => link.linkedId);
-    
+
     switch (linkType) {
       case "email":
         return allEmails.filter((item: any) => !linkedIds.includes(item.id));
@@ -531,25 +491,25 @@ export default function CaseDetail() {
   return (
     <div className="min-h-screen bg-background" data-testid="case-detail-page">
       <Navigation />
-      
+
       <main className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6" data-testid="case-header">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => window.history.back()} data-testid="back-button">
-              <ArrowLeft className="h-4 w-4" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8" data-testid="case-header">
+          <div className="flex items-start space-x-4">
+            <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="back-button" className="mt-1">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-2xl font-bold">Case #{caseData.caseNumber}</h1>
-                <Badge variant={getStatusVariant(caseData.status)} data-testid="case-status-badge">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-3xl font-medium tracking-tight">Case #{caseData.caseNumber}</h1>
+                <Badge className={`${getStatusColor(caseData.status)} text-sm font-normal px-3 py-1`} data-testid="case-status-badge">
                   {CASE_STATUS_OPTIONS.find(s => s.value === caseData.status)?.label}
                 </Badge>
-                <Badge variant={getPriorityVariant(caseData.priority)} data-testid="case-priority-badge">
+                <Badge className={`${getPriorityColor(caseData.priority)} text-sm font-normal px-3 py-1`} data-testid="case-priority-badge">
                   {caseData.priority}
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground font-light mt-1">
                 Created {formatDateTime(caseData.createdAt)}
               </p>
             </div>
@@ -595,14 +555,14 @@ export default function CaseDetail() {
         </div>
 
         {/* Case Details */}
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* Main Content */}
-          <div className="md:col-span-2 space-y-6">
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Left Column - Main Content */}
+          <div className="lg:col-span-2 space-y-6">
             {/* Case Information */}
-            <Card data-testid="case-information">
+            <Card data-testid="case-information" className="border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm bg-white/50 backdrop-blur-sm dark:bg-zinc-900/50">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Case Information</CardTitle>
+                  <CardTitle className="text-lg font-medium">Case Information</CardTitle>
                   {isEditing ? (
                     <div className="flex items-center space-x-2">
                       <Button size="sm" onClick={handleSaveEdit} data-testid="save-edit-button">
@@ -624,10 +584,10 @@ export default function CaseDetail() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium">Title</label>
+                  <label className="text-sm font-medium text-muted-foreground">Title</label>
                   {isEditing ? (
-                    <Input 
-                      value={editTitle} 
+                    <Input
+                      value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
                       data-testid="edit-title-input"
                     />
@@ -635,18 +595,18 @@ export default function CaseDetail() {
                     <p className="mt-1" data-testid="case-title">{caseData.title}</p>
                   )}
                 </div>
-                
+
                 <div>
-                  <label className="text-sm font-medium">Description</label>
+                  <label className="text-sm font-medium text-muted-foreground">Description</label>
                   {isEditing ? (
-                    <Textarea 
-                      value={editDescription} 
+                    <Textarea
+                      value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
                       rows={4}
                       data-testid="edit-description-input"
                     />
                   ) : (
-                    <p className="mt-1 whitespace-pre-wrap" data-testid="case-description">
+                    <p className="mt-1 whitespace-pre-wrap font-light" data-testid="case-description">
                       {caseData.description || "No description provided"}
                     </p>
                   )}
@@ -654,8 +614,8 @@ export default function CaseDetail() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">Customer</label>
-                    <p className="mt-1" data-testid="case-customer">
+                    <label className="text-sm font-medium text-muted-foreground">Customer</label>
+                    <p className="mt-1 font-light" data-testid="case-customer">
                       {caseData.customer ? (
                         `${caseData.customer.firstName} ${caseData.customer.lastName}`
                       ) : (
@@ -664,8 +624,8 @@ export default function CaseDetail() {
                     </p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Assigned To</label>
-                    <p className="mt-1" data-testid="case-assignee">
+                    <label className="text-sm font-medium text-muted-foreground">Assigned To</label>
+                    <p className="mt-1 font-light" data-testid="case-assignee">
                       {caseData.assignedUser ? (
                         `${caseData.assignedUser.firstName} ${caseData.assignedUser.lastName}`
                       ) : (
@@ -677,21 +637,21 @@ export default function CaseDetail() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">SLA Deadline</label>
-                    <p className="mt-1" data-testid="case-sla-deadline">{formatDate(caseData.slaDeadline)}</p>
+                    <label className="text-sm font-medium text-muted-foreground">SLA Deadline</label>
+                    <p className="mt-1 font-light" data-testid="case-sla-deadline">{formatDate(caseData.slaDeadline)}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Last Updated</label>
-                    <p className="mt-1" data-testid="case-updated">{formatDateTime(caseData.updatedAt)}</p>
+                    <label className="text-sm font-medium text-muted-foreground">Last Updated</label>
+                    <p className="mt-1 font-light" data-testid="case-updated">{formatDateTime(caseData.updatedAt)}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Timeline */}
-            <Card data-testid="case-timeline">
+            <Card data-testid="case-timeline" className="border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm bg-white/50 backdrop-blur-sm dark:bg-zinc-900/50">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center text-lg font-medium">
                   <Activity className="mr-2 h-4 w-4" />
                   Timeline
                 </CardTitle>
@@ -700,15 +660,16 @@ export default function CaseDetail() {
                 {caseEvents && caseEvents.length > 0 ? (
                   <div className="space-y-4">
                     {caseEvents.map((event: any) => (
-                      <div key={event.id} className="flex items-start space-x-3 border-l-2 border-muted pl-4" data-testid={`timeline-event-${event.id}`}>
+                      <div key={event.id} className="relative pl-6 border-l-2 border-zinc-200 dark:border-zinc-700 pb-4 last:pb-0" data-testid={`timeline-event-${event.id}`}>
+                        <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full border-2 border-white dark:border-zinc-900 bg-primary/20 ring-4 ring-white dark:ring-zinc-900" />
                         <div className="flex-1">
                           <p className="text-sm font-medium">{event.message}</p>
                           {event.metadata && (
-                            <p className="text-xs text-muted-foreground mt-1">
+                            <p className="text-xs text-muted-foreground mt-1 font-light">
                               {JSON.stringify(event.metadata)}
                             </p>
                           )}
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-1 font-light">
                             {formatDateTime(event.createdAt)} • {event.createdByUser?.username || 'System'}
                           </p>
                         </div>
@@ -722,10 +683,10 @@ export default function CaseDetail() {
             </Card>
 
             {/* Related Items Tabs */}
-            <Card data-testid="related-items">
+            <Card data-testid="related-items" className="border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm bg-white/50 backdrop-blur-sm dark:bg-zinc-900/50">
               <Tabs defaultValue="emails" className="w-full">
                 <CardHeader>
-                  <CardTitle>Related Items</CardTitle>
+                  <CardTitle className="text-lg font-medium">Related Items</CardTitle>
                   <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="emails" data-testid="emails-tab">
                       <Mail className="mr-2 h-4 w-4" />
@@ -745,11 +706,11 @@ export default function CaseDetail() {
                     </TabsTrigger>
                     <TabsTrigger value="notes" data-testid="notes-tab">
                       <StickyNote className="mr-2 h-4 w-4" />
-                      Notes ({internalNotes?.length || 0})
+                      Notes
                     </TabsTrigger>
                   </TabsList>
                 </CardHeader>
-                
+
                 <CardContent>
                   <TabsContent value="emails" className="space-y-4" data-testid="emails-content">
                     {relatedEmails?.length ? (
@@ -838,28 +799,9 @@ export default function CaseDetail() {
                   </TabsContent>
 
                   <TabsContent value="notes" className="space-y-4" data-testid="notes-content">
-                    {/* Case Notes */}
-                    {caseNotes && caseNotes.length > 0 && (
-                      <div className="space-y-3 mb-6">
-                        <h4 className="font-medium text-sm">Case Notes</h4>
-                        {caseNotes.map((note: any) => (
-                          <div key={note.id} className="border rounded p-4" data-testid={`case-note-${note.id}`}>
-                            <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {formatDateTime(note.createdAt)} • {note.createdByUser?.username || 'Unknown'}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                    {currentUser && (
+                      <NotesPanel entityType="case" entityId={caseId!} currentUser={currentUser} />
                     )}
-                    
-                    {/* Internal Notes */}
-                    <div>
-                      <h4 className="font-medium text-sm mb-3">Internal Notes</h4>
-                      {currentUser && (
-                        <NotesPanel entityType="case" entityId={caseId!} currentUser={currentUser} />
-                      )}
-                    </div>
                   </TabsContent>
                 </CardContent>
               </Tabs>
@@ -869,9 +811,9 @@ export default function CaseDetail() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Quick Actions */}
-            <Card data-testid="quick-actions">
+            <Card data-testid="quick-actions" className="border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm bg-white/50 backdrop-blur-sm dark:bg-zinc-900/50">
               <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
+                <CardTitle className="text-lg font-medium">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <Button className="w-full justify-start" variant="outline" onClick={() => setShowEmailDialog(true)} data-testid="button-send-email-quick-action">
@@ -886,10 +828,7 @@ export default function CaseDetail() {
                   <LinkIcon className="mr-2 h-4 w-4" />
                   Link Items
                 </Button>
-                <Button className="w-full justify-start" variant="outline" onClick={() => setShowAddNoteDialog(true)} data-testid="add-note-button">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Add Note
-                </Button>
+
                 <Button className="w-full justify-start" variant="outline" onClick={() => setShowSlaDialog(true)} data-testid="set-sla-button">
                   <Clock className="mr-2 h-4 w-4" />
                   Set SLA
@@ -898,9 +837,9 @@ export default function CaseDetail() {
             </Card>
 
             {/* Case Statistics */}
-            <Card data-testid="case-stats">
+            <Card data-testid="case-stats" className="border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm bg-white/50 backdrop-blur-sm dark:bg-zinc-900/50">
               <CardHeader>
-                <CardTitle>Case Statistics</CardTitle>
+                <CardTitle className="text-lg font-medium">Case Statistics</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
@@ -919,52 +858,14 @@ export default function CaseDetail() {
                   <span className="text-sm">To-dos</span>
                   <span className="text-sm font-medium">{relatedTodos?.length || 0}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Notes</span>
-                  <span className="text-sm font-medium">{(caseNotes?.length || 0) + (internalNotes?.length || 0)}</span>
-                </div>
+
               </CardContent>
             </Card>
           </div>
         </div>
       </main>
 
-      {/* Add Note Dialog */}
-      <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
-        <DialogContent data-testid="add-note-dialog">
-          <DialogHeader>
-            <DialogTitle>Add Note to Case</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="Enter your note here..."
-              value={newNoteContent}
-              onChange={(e) => setNewNoteContent(e.target.value)}
-              rows={6}
-              data-testid="note-content-input"
-            />
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowAddNoteDialog(false);
-                  setNewNoteContent("");
-                }}
-                data-testid="cancel-note-button"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => addNoteMutation.mutate(newNoteContent)}
-                disabled={!newNoteContent.trim() || addNoteMutation.isPending}
-                data-testid="save-note-button"
-              >
-                {addNoteMutation.isPending ? "Saving..." : "Save Note"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+
 
       {/* Assign Case Dialog */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>

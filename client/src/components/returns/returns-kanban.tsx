@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
+import {
   Clock,
   AlertTriangle,
   Package,
@@ -51,21 +51,27 @@ interface ReturnsKanbanProps {
 
 const STATUS_COLUMNS = [
   {
-    id: 'nieuw_onderweg',
-    title: 'Nieuw / Onderweg',
+    id: 'nieuw',
+    title: 'Nieuw',
     color: 'bg-chart-4',
-    statuses: ['nieuw_onderweg']
+    statuses: ['nieuw']
+  },
+  {
+    id: 'onderweg',
+    title: 'Onderweg',
+    color: 'bg-primary',
+    statuses: ['onderweg']
   },
   {
     id: 'ontvangen_controle',
     title: 'Ontvangen',
-    color: 'bg-primary',
+    color: 'bg-chart-2',
     statuses: ['ontvangen_controle']
   },
   {
     id: 'akkoord_terugbetaling',
     title: 'Akkoord',
-    color: 'bg-chart-2',
+    color: 'bg-chart-3',
     statuses: ['akkoord_terugbetaling']
   },
   {
@@ -83,7 +89,7 @@ const STATUS_COLUMNS = [
   {
     id: 'opnieuw_versturen',
     title: 'Opnieuw',
-    color: 'bg-chart-3',
+    color: 'bg-chart-5',
     statuses: ['opnieuw_versturen']
   },
   {
@@ -171,7 +177,7 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
 
   const getPriorityBadge = (priority: string | null) => {
     if (!priority) return null;
-    
+
     const variants: Record<string, { label: string; className: string }> = {
       urgent: { label: "Urgent", className: "bg-destructive/10 text-destructive border-destructive/20" },
       high: { label: "Hoog", className: "bg-chart-1/10 text-chart-1 border-chart-1/20" },
@@ -258,24 +264,24 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3" data-testid="returns-kanban">
+      <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2" data-testid="returns-kanban">
         {columns.map((column) => (
           <Card key={column.id} className="flex flex-col h-[calc(100vh-240px)]" data-testid={`kanban-column-${column.id}`}>
-            <CardHeader className="pb-2 px-3 pt-3 flex-shrink-0">
+            <CardHeader className="pb-1.5 px-2 pt-2 flex-shrink-0">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className={`w-2 h-2 rounded-full ${column.color}`}></div>
-                  <CardTitle className="text-xs font-medium">{column.title}</CardTitle>
+                <div className="flex items-center space-x-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${column.color}`}></div>
+                  <CardTitle className="text-[10px] font-medium">{column.title}</CardTitle>
                 </div>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5">
                   {column.returns.length}
                 </Badge>
               </div>
             </CardHeader>
-            
+
             <Droppable droppableId={column.id}>
               {(provided, snapshot) => (
-                <ScrollArea className="flex-1 px-3 pb-3">
+                <ScrollArea className="flex-1 px-2 pb-2">
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
@@ -295,134 +301,126 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
-                                  className={`cursor-pointer hover:shadow-md transition-all ${
-                                    snapshot.isDragging ? 'shadow-lg rotate-2' : 'bg-card'
-                                  } ${getPriorityColor(returnItem.priority)}`}
+                                  className={`cursor-pointer hover:shadow-md transition-all ${snapshot.isDragging ? 'shadow-lg rotate-2' : 'bg-card'
+                                    } ${getPriorityColor(returnItem.priority)}`}
                                   onClick={() => handleViewReturn(returnItem)}
                                   data-testid={`return-card-${returnItem.id}`}
                                 >
-                                  <CardContent className="p-2.5">
-                      <div className="flex items-start justify-between mb-1.5">
-                        <h4 className="text-xs font-medium truncate flex-1 mr-1 font-mono">
-                          {returnItem.returnNumber}
-                        </h4>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1" data-testid={`return-actions-${returnItem.id}`}>
-                              <MoreHorizontal className="h-3 w-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewReturn(returnItem);
-                            }}>
-                              <ExternalLink className="h-3 w-3 mr-2" />
-                              Bekijk Details
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleStatusChange(returnItem, 'nieuw_onderweg');
-                            }}>
-                              <ArrowRight className="h-3 w-3 mr-2" />
-                              Nieuw / Onderweg
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleStatusChange(returnItem, 'ontvangen_controle');
-                            }}>
-                              <ArrowRight className="h-3 w-3 mr-2" />
-                              Ontvangen
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleStatusChange(returnItem, 'akkoord_terugbetaling');
-                            }}>
-                              <ArrowRight className="h-3 w-3 mr-2" />
-                              Akkoord
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleStatusChange(returnItem, 'vermiste_pakketten');
-                            }}>
-                              <ArrowRight className="h-3 w-3 mr-2" />
-                              Vermist
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleStatusChange(returnItem, 'wachten_klant');
-                            }}>
-                              <ArrowRight className="h-3 w-3 mr-2" />
-                              Wacht Klant
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleStatusChange(returnItem, 'opnieuw_versturen');
-                            }}>
-                              <ArrowRight className="h-3 w-3 mr-2" />
-                              Opnieuw Versturen
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleStatusChange(returnItem, 'klaar');
-                            }}>
-                              <ArrowRight className="h-3 w-3 mr-2" />
-                              Klaar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleStatusChange(returnItem, 'niet_ontvangen');
-                            }}>
-                              <ArrowRight className="h-3 w-3 mr-2" />
-                              Niet Ontvangen
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                      
-                      <div className="space-y-1.5">
-                        {returnItem.returnReason && (
-                          <div className="flex items-center gap-1">
-                            <Package className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                            <span className="text-[10px] text-muted-foreground truncate">
-                              {getReasonLabel(returnItem.returnReason)}
-                            </span>
-                          </div>
-                        )}
+                                  <CardContent className="p-2">
+                                    <div className="flex items-start justify-between mb-1.5">
+                                      <div className="flex-1 mr-1">
+                                        <h4 className="text-xs font-medium truncate font-mono">
+                                          {(returnItem as any).orderNumber || returnItem.returnNumber}
+                                        </h4>
+                                        {(returnItem as any).orderNumber && (
+                                          <p className="text-[10px] text-muted-foreground font-mono">
+                                            {returnItem.returnNumber}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                          <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1" data-testid={`return-actions-${returnItem.id}`}>
+                                            <MoreHorizontal className="h-3 w-3" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleViewReturn(returnItem);
+                                          }}>
+                                            <ExternalLink className="h-3 w-3 mr-2" />
+                                            Bekijk Details
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStatusChange(returnItem, 'nieuw');
+                                          }}>
+                                            <ArrowRight className="h-3 w-3 mr-2" />
+                                            Nieuw
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStatusChange(returnItem, 'onderweg');
+                                          }}>
+                                            <ArrowRight className="h-3 w-3 mr-2" />
+                                            Onderweg
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStatusChange(returnItem, 'ontvangen_controle');
+                                          }}>
+                                            <ArrowRight className="h-3 w-3 mr-2" />
+                                            Ontvangen
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStatusChange(returnItem, 'akkoord_terugbetaling');
+                                          }}>
+                                            <ArrowRight className="h-3 w-3 mr-2" />
+                                            Akkoord
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStatusChange(returnItem, 'wachten_klant');
+                                          }}>
+                                            <ArrowRight className="h-3 w-3 mr-2" />
+                                            Wacht Klant
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStatusChange(returnItem, 'klaar');
+                                          }}>
+                                            <ArrowRight className="h-3 w-3 mr-2" />
+                                            Klaar
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
 
-                        {returnItem.trackingNumber && (
-                          <div className="flex items-center gap-1">
-                            <Package className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                            <span className="text-[10px] text-muted-foreground font-mono truncate">
-                              {returnItem.trackingNumber}
-                            </span>
-                          </div>
-                        )}
+                                    <div className="space-y-1.5">
+                                      {returnItem.returnReason && (
+                                        <div className="flex items-center gap-1">
+                                          <Package className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                          <span className="text-[10px] text-muted-foreground truncate">
+                                            {getReasonLabel(returnItem.returnReason)}
+                                          </span>
+                                        </div>
+                                      )}
 
-                        {returnItem.expectedReturnDate && (
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                            <span className="text-[10px] text-muted-foreground">
-                              {format(new Date(returnItem.expectedReturnDate), "d MMM", { locale: nl })}
-                            </span>
-                          </div>
-                        )}
+                                      {returnItem.trackingNumber && (
+                                        <div className="flex items-center gap-1">
+                                          <Package className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                          <span className="text-[10px] text-muted-foreground font-mono truncate">
+                                            {returnItem.trackingNumber}
+                                          </span>
+                                        </div>
+                                      )}
 
-                        {returnItem.refundAmount && (
-                          <div className="flex items-center gap-1 pt-0.5">
-                            <span className="text-[11px] font-semibold text-primary">
-                              €{(returnItem.refundAmount / 100).toFixed(2)}
-                            </span>
-                          </div>
-                        )}
+                                      {returnItem.expectedReturnDate && (
+                                        <div className="flex items-center gap-1">
+                                          <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                          <span className="text-[10px] text-muted-foreground">
+                                            {format(new Date(returnItem.expectedReturnDate), "d MMM", { locale: nl })}
+                                          </span>
+                                        </div>
+                                      )}
 
-                        <div className="flex items-center gap-1 pt-0.5">
-                          {getPriorityBadge(returnItem.priority)}
-                        </div>
-                      </div>
-                              </CardContent>
-                            </Card>
+                                      {returnItem.refundAmount && (
+                                        <div className="flex items-center gap-1 pt-0.5">
+                                          <span className="text-[11px] font-semibold text-primary">
+                                            €{(returnItem.refundAmount / 100).toFixed(2)}
+                                          </span>
+                                        </div>
+                                      )}
+
+                                      <div className="flex items-center gap-1 pt-0.5">
+                                        {getPriorityBadge(returnItem.priority)}
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
                               </ContextMenuTrigger>
                               <ContextMenuContent>
                                 <ContextMenuItem onClick={() => handleViewReturn(returnItem)}>
@@ -440,8 +438,11 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
                                     Wijzig Status
                                   </ContextMenuSubTrigger>
                                   <ContextMenuSubContent>
-                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'nieuw_onderweg')}>
-                                      Nieuw / Onderweg
+                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'nieuw')}>
+                                      Nieuw
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'onderweg')}>
+                                      Onderweg
                                     </ContextMenuItem>
                                     <ContextMenuItem onClick={() => handleStatusChange(returnItem, 'ontvangen_controle')}>
                                       Ontvangen
