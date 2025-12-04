@@ -32,6 +32,8 @@ import {
   insertNoteTemplateSchema,
   insertNoteLinkSchema,
   insertPurchaseOrderSchema,
+  insertTodoSchema,
+  insertRepairSchema,
   notes,
   purchaseOrderItems,
   subtasks,
