@@ -408,6 +408,43 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {/* File Upload */}
+                        <div>
+                            <Label className="text-xs">Foto's / Bijlagen (optioneel)</Label>
+                            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-3 text-center mt-1">
+                                <Upload className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                                <p className="text-[10px] text-muted-foreground">
+                                    Max 10 bestanden
+                                </p>
+                                <Input
+                                    type="file"
+                                    multiple
+                                    onChange={handleFileSelect}
+                                    className="mt-2 h-7 text-xs"
+                                    accept="image/*"
+                                />
+                            </div>
+
+                            {selectedFiles.length > 0 && (
+                                <div className="space-y-1 mt-2">
+                                    {selectedFiles.map((file, index) => (
+                                        <div key={index} className="flex items-center justify-between border p-1.5 rounded text-xs">
+                                            <span className="truncate">{file.name}</span>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => removeFile(index)}
+                                                className="h-5 w-5 p-0"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -449,42 +486,7 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                             </div>
                         </div>
 
-                        {/* File Upload */}
-                        <div>
-                            <Label className="text-xs">Foto's (optioneel)</Label>
-                            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center mt-1">
-                                <Upload className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
-                                <p className="text-xs text-muted-foreground">
-                                    Max 10 bestanden
-                                </p>
-                                <Input
-                                    type="file"
-                                    multiple
-                                    onChange={handleFileSelect}
-                                    className="mt-2 h-8 text-xs"
-                                    accept="image/*,.pdf"
-                                />
-                            </div>
 
-                            {selectedFiles.length > 0 && (
-                                <div className="space-y-1 mt-2">
-                                    {selectedFiles.map((file, index) => (
-                                        <div key={index} className="flex items-center justify-between border p-1.5 rounded text-xs">
-                                            <span className="truncate">{file.name}</span>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => removeFile(index)}
-                                                className="h-6 w-6 p-0"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
                     </div>
                 )}
 

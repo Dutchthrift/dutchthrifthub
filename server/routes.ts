@@ -3815,8 +3815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const objectStorage = new ObjectStorageService();
-      const fileObj = await objectStorage.getAttachmentFile(file.filePath);
-      await objectStorage.downloadObject(fileObj, res, 3600, false);
+      await objectStorage.downloadAttachmentByPath(file.filePath, res, false);
     } catch (error) {
       console.error("Error downloading purchase order file:", error);
       if (!res.headersSent) {

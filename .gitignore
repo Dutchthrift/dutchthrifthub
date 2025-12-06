@@ -1,7 +1,9 @@
-node_modules
-dist
+node_modules/
+dist/
 .DS_Store
-server/public
-vite.config.ts.*
+server/public/
+vite.config.ts.timestamp*
 *.tar.gz
 .env
+uploads/
+server/uploads/

@@ -401,8 +401,9 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                                     return (
                                         <div
                                             key={itemKey}
-                                            className={`border rounded-lg p-2.5 transition-all ${isSelected ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : ''
+                                            className={`border rounded-lg p-2.5 transition-all cursor-pointer hover:bg-muted/30 ${isSelected ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : ''
                                                 }`}
+                                            onClick={() => toggleItem({ ...lineItem, id: itemKey }, !isSelected)}
                                         >
                                             <div className="flex items-start gap-2">
                                                 <Checkbox
@@ -410,6 +411,7 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                                                     onCheckedChange={(checked) =>
                                                         toggleItem({ ...lineItem, id: itemKey }, checked as boolean)
                                                     }
+                                                    onClick={(e) => e.stopPropagation()}
                                                     className="mt-1 flex-shrink-0 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
                                                 />
 
@@ -434,7 +436,7 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                                                     </p>
 
                                                     {isSelected && selectedItem && (
-                                                        <div className="mt-1.5">
+                                                        <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
                                                             <Input
                                                                 type="number"
                                                                 min="1"
@@ -535,6 +537,43 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {/* File Upload */}
+                        <div>
+                            <Label className="text-xs">Foto's / Bijlagen (optioneel)</Label>
+                            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-3 text-center mt-1">
+                                <Upload className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                                <p className="text-[10px] text-muted-foreground">
+                                    Max 10 bestanden (afbeeldingen, PDF)
+                                </p>
+                                <Input
+                                    type="file"
+                                    multiple
+                                    onChange={handleFileSelect}
+                                    className="mt-2 h-7 text-xs"
+                                    accept="image/*,.pdf"
+                                />
+                            </div>
+
+                            {selectedFiles.length > 0 && (
+                                <div className="space-y-1 mt-2">
+                                    {selectedFiles.map((file, index) => (
+                                        <div key={index} className="flex items-center justify-between border p-1.5 rounded text-xs">
+                                            <span className="truncate">{file.name}</span>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => removeFile(index)}
+                                                className="h-5 w-5 p-0"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -591,42 +630,7 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                             </div>
                         </div>
 
-                        {/* File Upload */}
-                        <div>
-                            <Label className="text-xs">Foto's (optioneel)</Label>
-                            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center mt-1">
-                                <Upload className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
-                                <p className="text-xs text-muted-foreground">
-                                    Max 10 bestanden
-                                </p>
-                                <Input
-                                    type="file"
-                                    multiple
-                                    onChange={handleFileSelect}
-                                    className="mt-2 h-8 text-xs"
-                                    accept="image/*,.pdf"
-                                />
-                            </div>
 
-                            {selectedFiles.length > 0 && (
-                                <div className="space-y-1 mt-2">
-                                    {selectedFiles.map((file, index) => (
-                                        <div key={index} className="flex items-center justify-between border p-1.5 rounded text-xs">
-                                            <span className="truncate">{file.name}</span>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => removeFile(index)}
-                                                className="h-6 w-6 p-0"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
                     </div>
                 )}
 

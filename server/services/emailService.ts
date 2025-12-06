@@ -1,21 +1,20 @@
 import type { EmailProvider } from './emailProvider';
 import { ImapSmtpProvider } from './imapSmtpProvider';
-import { OutlookProvider } from './outlookProvider';
 
-// Factory function to get the appropriate email provider
+// Factory function to get the email provider
+// Note: Only IMAP/SMTP provider is supported (Outlook via Replit was removed)
 export function getEmailProvider(): EmailProvider {
-  const provider = process.env.EMAIL_PROVIDER || 'outlook';
+  const provider = process.env.EMAIL_PROVIDER || 'imap';
 
   console.log(`Email provider configured as: ${provider}`);
 
   switch (provider.toLowerCase()) {
     case 'imap':
+    case 'smtp':
       return new ImapSmtpProvider();
-    case 'outlook':
-      return new OutlookProvider();
     default:
-      console.warn(`Unknown email provider: ${provider}, defaulting to Outlook`);
-      return new OutlookProvider();
+      console.warn(`Unknown email provider: ${provider}, defaulting to IMAP`);
+      return new ImapSmtpProvider();
   }
 }
 
