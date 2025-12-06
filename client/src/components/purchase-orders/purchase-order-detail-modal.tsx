@@ -142,10 +142,14 @@ export function PurchaseOrderDetailModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", purchaseOrder.id] });
       toast({ title: "Status bijgewerkt" });
+      // Close dialog so user sees the updated list
+      onClose();
     },
-    onError: () => {
-      toast({ title: "Fout bij bijwerken", variant: "destructive" });
+    onError: (error: any) => {
+      console.error("Status update failed:", error);
+      toast({ title: "Fout bij bijwerken", description: error?.message || "Er is een onbekende fout opgetreden", variant: "destructive" });
     },
   });
 
@@ -250,14 +254,14 @@ export function PurchaseOrderDetailModal({
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden !flex !flex-col p-0 gap-0">
           {/* Unified Header Section */}
-          <div className="px-6 py-4 border-b bg-gradient-to-r from-muted/50 to-background relative">
+          <div className="px-6 py-4 border-b bg-muted/20 relative">
             {/* Top Row: Title & Actions */}
             <div className="flex items-start justify-between mb-6">
               {/* Left: Title & PO */}
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
                   <DialogTitle className="text-2xl font-bold">{purchaseOrder.title}</DialogTitle>
-                  <Badge variant="outline" className="font-mono text-xs text-muted-foreground bg-background/50">
+                  <Badge className="font-mono text-xs bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
                     {purchaseOrder.poNumber || "Geen PO nummer"}
                   </Badge>
                 </div>
@@ -320,27 +324,37 @@ export function PurchaseOrderDetailModal({
             </div>
 
             {/* Status Progression */}
-            <div className="flex items-center gap-2 text-sm">
-              <div className={`flex items-center gap-2 ${purchaseOrder.status === 'aangekocht' ? 'text-blue-600 font-medium' : 'text-muted-foreground'
-                }`}>
-                <div className={`h-2 w-2 rounded-full ${purchaseOrder.status === 'aangekocht' ? 'bg-blue-600' : 'bg-muted-foreground/30'
-                  }`} />
+            <div className="flex items-center gap-3 text-sm bg-white dark:bg-zinc-900 rounded-lg p-3 border">
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-md ${purchaseOrder.status === 'aangekocht'
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium'
+                : 'text-muted-foreground'}`}>
+                <div className={`h-2.5 w-2.5 rounded-full ${purchaseOrder.status === 'aangekocht'
+                  ? 'bg-blue-600 dark:bg-blue-400'
+                  : 'bg-muted-foreground/30'}`} />
                 Aangekocht
               </div>
-              <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
+              <ArrowRight className={`h-4 w-4 ${['ontvangen', 'verwerkt'].includes(purchaseOrder.status || '')
+                ? 'text-orange-400'
+                : 'text-muted-foreground/30'}`} />
 
-              <div className={`flex items-center gap-2 ${purchaseOrder.status === 'ontvangen' ? 'text-orange-600 font-medium' : 'text-muted-foreground'
-                }`}>
-                <div className={`h-2 w-2 rounded-full ${purchaseOrder.status === 'ontvangen' ? 'bg-orange-600' : 'bg-muted-foreground/30'
-                  }`} />
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-md ${purchaseOrder.status === 'ontvangen'
+                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 font-medium'
+                : 'text-muted-foreground'}`}>
+                <div className={`h-2.5 w-2.5 rounded-full ${purchaseOrder.status === 'ontvangen'
+                  ? 'bg-orange-600 dark:bg-orange-400'
+                  : 'bg-muted-foreground/30'}`} />
                 Ontvangen
               </div>
-              <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
+              <ArrowRight className={`h-4 w-4 ${purchaseOrder.status === 'verwerkt'
+                ? 'text-green-400'
+                : 'text-muted-foreground/30'}`} />
 
-              <div className={`flex items-center gap-2 ${purchaseOrder.status === 'verwerkt' ? 'text-green-600 font-medium' : 'text-muted-foreground'
-                }`}>
-                <div className={`h-2 w-2 rounded-full ${purchaseOrder.status === 'verwerkt' ? 'bg-green-600' : 'bg-muted-foreground/30'
-                  }`} />
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-md ${purchaseOrder.status === 'verwerkt'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-medium'
+                : 'text-muted-foreground'}`}>
+                <div className={`h-2.5 w-2.5 rounded-full ${purchaseOrder.status === 'verwerkt'
+                  ? 'bg-green-600 dark:bg-green-400'
+                  : 'bg-muted-foreground/30'}`} />
                 Verwerkt
               </div>
             </div>
@@ -348,33 +362,32 @@ export function PurchaseOrderDetailModal({
 
           {/* Metrics Bar */}
           <div className="grid grid-cols-3 gap-4 px-6 py-4 border-b bg-background">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+            <div className="flex flex-col p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs mb-1">
                 <Euro className="h-3.5 w-3.5" />
-                <span>Totaal Bedrag</span>
+                <span className="font-medium">Totaal Bedrag</span>
               </div>
-              <div className="text-2xl font-bold">€{totalAmount.toFixed(2)}</div>
+              <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">€{totalAmount.toFixed(2)}</div>
             </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+            <div className="flex flex-col p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs mb-1">
                 <Package className="h-3.5 w-3.5" />
-                <span>Aantal Items</span>
+                <span className="font-medium">Aantal Items</span>
               </div>
-              <div className="text-2xl font-bold">{totalItems}</div>
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{totalItems}</div>
             </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+            <div className="flex flex-col p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+              <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 text-xs mb-1">
                 <Calendar className="h-3.5 w-3.5" />
-                <span>Besteldatum</span>
+                <span className="font-medium">Besteldatum</span>
               </div>
-              <div className="text-lg font-semibold">
+              <div className="text-lg font-bold text-purple-700 dark:text-purple-300">
                 {purchaseOrder.orderDate
                   ? format(new Date(purchaseOrder.orderDate), "d MMM yyyy", { locale: nl })
                   : "-"
                 }
               </div>
             </div>
-
           </div>
 
           {/* Main Content - Single Column */}
@@ -382,10 +395,12 @@ export function PurchaseOrderDetailModal({
             <div className="space-y-4 pb-4">
 
               {/* Order Details */}
-              <Card className="shadow-sm">
-                <CardHeader className="border-b bg-muted/30 p-4">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
+              <Card className="shadow-sm border-l-4 border-l-blue-500">
+                <CardHeader className="border-b bg-blue-50/50 dark:bg-blue-900/10 p-4">
+                  <CardTitle className="text-base flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                    <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-md">
+                      <Building2 className="h-4 w-4" />
+                    </div>
                     Bestelgegevens
                   </CardTitle>
                 </CardHeader>
@@ -427,10 +442,12 @@ export function PurchaseOrderDetailModal({
               </Card>
 
               {/* Line Items */}
-              <Card className="shadow-sm">
-                <CardHeader className="border-b bg-muted/30 p-4">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Package className="h-4 w-4" />
+              <Card className="shadow-sm border-l-4 border-l-indigo-500">
+                <CardHeader className="border-b bg-indigo-50/50 dark:bg-indigo-900/10 p-4">
+                  <CardTitle className="text-base flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+                    <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 rounded-md">
+                      <Package className="h-4 w-4" />
+                    </div>
                     Bestelde Items ({lineItems?.length || 0})
                   </CardTitle>
                 </CardHeader>
@@ -468,12 +485,12 @@ export function PurchaseOrderDetailModal({
                           </TableBody>
                         </Table>
                       </div>
-                      <div className="border-t bg-muted/30 px-4 py-3">
+                      <div className="border-t bg-indigo-50/50 dark:bg-indigo-900/10 px-4 py-3">
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium text-muted-foreground">
                             Totaal ({totalItems} items):
                           </span>
-                          <span className="text-2xl font-bold">€{totalAmount.toFixed(2)}</span>
+                          <span className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">€{totalAmount.toFixed(2)}</span>
                         </div>
                       </div>
                     </>
@@ -487,10 +504,12 @@ export function PurchaseOrderDetailModal({
               </Card>
 
               {/* Delivery Information */}
-              <Card className="shadow-sm">
-                <CardHeader className="border-b bg-muted/30 p-4">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Truck className="h-4 w-4" />
+              <Card className="shadow-sm border-l-4 border-l-cyan-500">
+                <CardHeader className="border-b bg-cyan-50/50 dark:bg-cyan-900/10 p-4">
+                  <CardTitle className="text-base flex items-center gap-2 text-cyan-700 dark:text-cyan-300">
+                    <div className="p-1.5 bg-cyan-100 dark:bg-cyan-900/30 rounded-md">
+                      <Truck className="h-4 w-4" />
+                    </div>
                     Leveringsinformatie
                   </CardTitle>
                 </CardHeader>
@@ -514,20 +533,21 @@ export function PurchaseOrderDetailModal({
                 </CardContent>
               </Card>
 
-              {/* Files Section - Collapsible */}
               <Collapsible open={showFiles} onOpenChange={setShowFiles}>
-                <Card className="shadow-sm">
+                <Card className="shadow-sm border-l-4 border-l-rose-500">
                   <CollapsibleTrigger asChild>
-                    <CardHeader className="border-b bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors p-4">
+                    <CardHeader className="border-b bg-rose-50/50 dark:bg-rose-900/10 cursor-pointer hover:bg-rose-100/50 dark:hover:bg-rose-900/20 transition-colors p-4">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
+                        <CardTitle className="text-base flex items-center gap-2 text-rose-700 dark:text-rose-300">
+                          <div className="p-1.5 bg-rose-100 dark:bg-rose-900/30 rounded-md">
+                            <FileText className="h-4 w-4" />
+                          </div>
                           Bestanden ({files?.length || 0})
                         </CardTitle>
                         {showFiles ? (
-                          <ChevronDown className="h-5 w-5" />
+                          <ChevronDown className="h-5 w-5 text-rose-600" />
                         ) : (
-                          <ChevronRight className="h-5 w-5" />
+                          <ChevronRight className="h-5 w-5 text-rose-600" />
                         )}
                       </div>
                     </CardHeader>
@@ -615,18 +635,20 @@ export function PurchaseOrderDetailModal({
 
               {/* Activity Section - Collapsible */}
               <Collapsible open={showActivity} onOpenChange={setShowActivity}>
-                <Card className="shadow-sm">
+                <Card className="shadow-sm border-l-4 border-l-orange-500">
                   <CollapsibleTrigger asChild>
-                    <CardHeader className="border-b bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors p-4">
+                    <CardHeader className="border-b bg-orange-50/50 dark:bg-orange-900/10 cursor-pointer hover:bg-orange-100/50 dark:hover:bg-orange-900/20 transition-colors p-4">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Activity className="h-4 w-4" />
+                        <CardTitle className="text-base flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                          <div className="p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-md">
+                            <Activity className="h-4 w-4" />
+                          </div>
                           Activiteit ({activities?.length || 0})
                         </CardTitle>
                         {showActivity ? (
-                          <ChevronDown className="h-5 w-5" />
+                          <ChevronDown className="h-5 w-5 text-orange-600" />
                         ) : (
-                          <ChevronRight className="h-5 w-5" />
+                          <ChevronRight className="h-5 w-5 text-orange-600" />
                         )}
                       </div>
                     </CardHeader>
@@ -646,8 +668,8 @@ export function PurchaseOrderDetailModal({
                               className="flex gap-3 pb-3 border-b last:border-b-0 last:pb-0"
                             >
                               <div className="flex-shrink-0 mt-1">
-                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <Activity className="h-4 w-4 text-primary" />
+                                <div className="h-8 w-8 rounded-full bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+                                  <Activity className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                                 </div>
                               </div>
                               <div className="flex-1 min-w-0">
@@ -668,18 +690,20 @@ export function PurchaseOrderDetailModal({
               {/* Notes Section - Collapsible */}
               {user && (
                 <Collapsible open={showNotes} onOpenChange={setShowNotes}>
-                  <Card className="shadow-sm">
+                  <Card className="shadow-sm border-l-4 border-l-amber-500">
                     <CollapsibleTrigger asChild>
-                      <CardHeader className="border-b bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors p-4">
+                      <CardHeader className="border-b bg-amber-50/50 dark:bg-amber-900/10 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors p-4">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
+                          <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                            <div className="p-1.5 bg-amber-100 dark:bg-amber-900/30 rounded-md">
+                              <FileText className="h-4 w-4" />
+                            </div>
                             Notities
                           </CardTitle>
                           {showNotes ? (
-                            <ChevronDown className="h-5 w-5" />
+                            <ChevronDown className="h-5 w-5 text-amber-600" />
                           ) : (
-                            <ChevronRight className="h-5 w-5" />
+                            <ChevronRight className="h-5 w-5 text-amber-600" />
                           )}
                         </div>
                       </CardHeader>

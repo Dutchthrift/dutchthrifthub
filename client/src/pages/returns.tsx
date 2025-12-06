@@ -266,86 +266,77 @@ export default function Returns() {
 
       <main className="container mx-auto px-4 py-6">
         {/* Header Card */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Package className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-semibold">Retouren</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Beheer alle productretouren
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => syncShopifyMutation.mutate()}
-                  disabled={syncShopifyMutation.isPending}
-                  data-testid="button-sync-shopify"
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${syncShopifyMutation.isPending ? 'animate-spin' : ''}`} />
-                  {syncShopifyMutation.isPending ? 'Synchroniseren...' : 'Sync Shopify'}
-                </Button>
-                <Button
-                  variant={showArchived ? "outline" : "ghost"}
-                  onClick={() => {
-                    setShowArchived(!showArchived);
-                    setCurrentPage(1);
-                  }}
-                  data-testid="button-toggle-archived"
-                >
-                  <Archive className="h-4 w-4 mr-2" />
-                  {showArchived ? "Toon Actief" : "Toon Archief"}
-                </Button>
-                <Button
-                  onClick={() => setShowCreateModal(true)}
-                  data-testid="button-create-return"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nieuw Retour
-                </Button>
-              </div>
+        <div className="bg-card rounded-lg p-6 mb-6 border">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Retouren</h1>
+              <p className="text-muted-foreground">Beheer alle productretouren</p>
             </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => syncShopifyMutation.mutate()}
+                disabled={syncShopifyMutation.isPending}
+                data-testid="button-sync-shopify"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${syncShopifyMutation.isPending ? 'animate-spin' : ''}`} />
+                {syncShopifyMutation.isPending ? 'Synchroniseren...' : 'Sync Shopify'}
+              </Button>
+              <Button
+                variant={showArchived ? "outline" : "ghost"}
+                onClick={() => {
+                  setShowArchived(!showArchived);
+                  setCurrentPage(1);
+                }}
+                data-testid="button-toggle-archived"
+              >
+                <Archive className="h-4 w-4 mr-2" />
+                {showArchived ? "Toon Actief" : "Toon Archief"}
+              </Button>
+              <Button
+                onClick={() => setShowCreateModal(true)}
+                data-testid="button-create-return"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nieuw Retour
+              </Button>
+            </div>
+          </div>
 
-            {/* Stats Bar */}
-            <div className="flex items-center gap-6 p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Totaal:</span>
-                <span className="text-sm font-semibold">
-                  {returns.length}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Nieuw:</span>
-                <span className="text-sm font-semibold text-chart-4">
-                  {statusCounts.nieuw || 0}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Onderweg:</span>
-                <span className="text-sm font-semibold text-primary">
-                  {statusCounts.onderweg || 0}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Wachten op klant:</span>
-                <span className="text-sm font-semibold text-chart-1">
-                  {statusCounts.wachten_klant || 0}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Klaar:</span>
-                <span className="text-sm font-semibold">
-                  {statusCounts.klaar || 0}
-                </span>
-              </div>
+          {/* Stats Bar */}
+          <div className="flex items-center gap-6 p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Totaal:</span>
+              <span className="text-sm font-semibold">
+                {returns.length}
+              </span>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Nieuw:</span>
+              <span className="text-sm font-semibold text-chart-4">
+                {statusCounts.nieuw || 0}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Onderweg:</span>
+              <span className="text-sm font-semibold text-primary">
+                {statusCounts.onderweg || 0}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Wachten op klant:</span>
+              <span className="text-sm font-semibold text-chart-1">
+                {statusCounts.wachten_klant || 0}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Klaar:</span>
+              <span className="text-sm font-semibold">
+                {statusCounts.klaar || 0}
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* Filters Card */}
         <Card className="mb-6">
@@ -586,42 +577,44 @@ export default function Returns() {
       />
 
       {/* Edit Return Dialog */}
-      {selectedReturn && enrichedReturnData && (
-        <EditReturnDialog
-          open={isEditing}
-          onOpenChange={setIsEditing}
-          returnData={enrichedReturnData.return}
-          onSave={async (data) => {
-            try {
-              const response = await fetch(`/api/returns/${selectedReturn.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-                credentials: "include",
-              });
+      {
+        selectedReturn && enrichedReturnData && (
+          <EditReturnDialog
+            open={isEditing}
+            onOpenChange={setIsEditing}
+            returnData={enrichedReturnData.return}
+            onSave={async (data) => {
+              try {
+                const response = await fetch(`/api/returns/${selectedReturn.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(data),
+                  credentials: "include",
+                });
 
-              if (!response.ok) throw new Error("Failed to update return");
+                if (!response.ok) throw new Error("Failed to update return");
 
-              await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-              await queryClient.invalidateQueries({ queryKey: ["/api/returns", selectedReturn.id] });
+                await queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+                await queryClient.invalidateQueries({ queryKey: ["/api/returns", selectedReturn.id] });
 
-              toast({
-                title: "Bijgewerkt",
-                description: "Retour is succesvol bijgewerkt.",
-              });
+                toast({
+                  title: "Bijgewerkt",
+                  description: "Retour is succesvol bijgewerkt.",
+                });
 
-              setIsEditing(false);
-            } catch (error) {
-              toast({
-                title: "Fout",
-                description: "Er is een fout opgetreden bij het bijwerken.",
-                variant: "destructive",
-              });
-            }
-          }}
-          isSaving={false}
-        />
-      )}
+                setIsEditing(false);
+              } catch (error) {
+                toast({
+                  title: "Fout",
+                  description: "Er is een fout opgetreden bij het bijwerken.",
+                  variant: "destructive",
+                });
+              }
+            }}
+            isSaving={false}
+          />
+        )
+      }
 
       {/* Return Details Dialog */}
       <Dialog open={showReturnDetails} onOpenChange={setShowReturnDetails}>

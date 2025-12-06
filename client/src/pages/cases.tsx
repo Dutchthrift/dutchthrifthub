@@ -69,8 +69,8 @@ export default function Cases() {
       });
 
       toast({
-        title: "Case updated",
-        description: "Case status has been updated successfully",
+        title: "Case bijgewerkt",
+        description: "Case status is succesvol bijgewerkt",
       });
     },
     onError: (error, { id, previousData }) => {
@@ -83,8 +83,8 @@ export default function Cases() {
       }
 
       toast({
-        title: "Update failed",
-        description: "Failed to update case status",
+        title: "Bijwerken mislukt",
+        description: "Kon case status niet bijwerken",
         variant: "destructive",
       });
     }
@@ -215,14 +215,14 @@ export default function Cases() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
       toast({
-        title: "Case archived",
-        description: "Case has been archived successfully",
+        title: "Case gearchiveerd",
+        description: "Case is succesvol gearchiveerd",
       });
     },
     onError: () => {
       toast({
-        title: "Archive failed",
-        description: "Failed to archive case",
+        title: "Archiveren mislukt",
+        description: "Kon case niet archiveren",
         variant: "destructive",
       });
     }
@@ -240,14 +240,14 @@ export default function Cases() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
       toast({
-        title: "Case unarchived",
-        description: "Case has been unarchived successfully",
+        title: "Case hersteld",
+        description: "Case is succesvol uit archief hersteld",
       });
     },
     onError: () => {
       toast({
-        title: "Unarchive failed",
-        description: "Failed to unarchive case",
+        title: "Herstellen mislukt",
+        description: "Kon case niet uit archief herstellen",
         variant: "destructive",
       });
     }
@@ -265,14 +265,14 @@ export default function Cases() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
       toast({
-        title: "Case deleted",
-        description: "Case has been deleted successfully",
+        title: "Case verwijderd",
+        description: "Case is succesvol verwijderd",
       });
     },
     onError: () => {
       toast({
-        title: "Delete failed",
-        description: "Failed to delete case",
+        title: "Verwijderen mislukt",
+        description: "Kon case niet verwijderen",
         variant: "destructive",
       });
     }
@@ -316,7 +316,7 @@ export default function Cases() {
   };
 
   const formatDate = (date: Date | string | null) => {
-    if (!date) return "No date set";
+    if (!date) return "Geen datum ingesteld";
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     return dateObj.toLocaleDateString();
   };
@@ -355,7 +355,7 @@ export default function Cases() {
                   {caseItem.title}
                   {caseItem.archived && (
                     <Badge variant="outline" className="ml-2 text-xs">
-                      Archived
+                      Gearchiveerd
                     </Badge>
                   )}
                 </h3>
@@ -375,7 +375,7 @@ export default function Cases() {
                   </span>
                   {caseItem.slaDeadline && (
                     <span className={`font-medium ${isOverdue(caseItem.slaDeadline) ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {isOverdue(caseItem.slaDeadline) ? 'Overdue' : formatDate(caseItem.slaDeadline)}
+                      {isOverdue(caseItem.slaDeadline) ? 'Verlopen' : formatDate(caseItem.slaDeadline)}
                     </span>
                   )}
                 </div>
@@ -462,7 +462,7 @@ export default function Cases() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Cases</h1>
-              <p className="text-muted-foreground">Manage customer cases and track progress</p>
+              <p className="text-muted-foreground">Beheer klantzaken en volg de voortgang</p>
             </div>
             <div>
               <Button
@@ -471,7 +471,7 @@ export default function Cases() {
                 onClick={() => setShowNewCase(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                New Case
+                Nieuwe Case
               </Button>
               <CreateCaseModal
                 open={showNewCase}
@@ -485,7 +485,7 @@ export default function Cases() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50/80 to-white/50 dark:from-blue-950/20 dark:to-zinc-900/50 border-2 border-blue-200/70 dark:border-blue-800/50 border-l-4 border-l-blue-500 hover:shadow-md transition-shadow" data-testid="cases-stats-total">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">Total Active</CardTitle>
+              <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">Totaal Actief</CardTitle>
               <span className="p-1.5 bg-blue-500/10 rounded-lg">
                 <Briefcase className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               </span>
@@ -493,14 +493,14 @@ export default function Cases() {
             <CardContent>
               <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{totalActive}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Open cases
+                Open zaken
               </p>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-emerald-50/80 to-white/50 dark:from-emerald-950/20 dark:to-zinc-900/50 border-2 border-emerald-200/70 dark:border-emerald-800/50 border-l-4 border-l-emerald-500 hover:shadow-md transition-shadow" data-testid="cases-stats-new-today">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-emerald-900 dark:text-emerald-100">New Today</CardTitle>
+              <CardTitle className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Nieuw Vandaag</CardTitle>
               <span className="p-1.5 bg-emerald-500/10 rounded-lg">
                 <Plus className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               </span>
@@ -508,14 +508,14 @@ export default function Cases() {
             <CardContent>
               <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">{newToday}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Created today
+                Vandaag aangemaakt
               </p>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-green-50/80 to-white/50 dark:from-green-950/20 dark:to-zinc-900/50 border-2 border-green-200/70 dark:border-green-800/50 border-l-4 border-l-green-500 hover:shadow-md transition-shadow" data-testid="cases-stats-resolved-today">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-green-900 dark:text-green-100">Resolved Today</CardTitle>
+              <CardTitle className="text-sm font-medium text-green-900 dark:text-green-100">Opgelost Vandaag</CardTitle>
               <span className="p-1.5 bg-green-500/10 rounded-lg">
                 <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
               </span>
@@ -523,14 +523,14 @@ export default function Cases() {
             <CardContent>
               <div className="text-2xl font-bold text-green-900 dark:text-green-100">{resolvedToday}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Closed today
+                Vandaag afgesloten
               </p>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-red-50/80 to-white/50 dark:from-red-950/20 dark:to-zinc-900/50 border-2 border-red-200/70 dark:border-red-800/50 border-l-4 border-l-red-500 hover:shadow-md transition-shadow" data-testid="cases-stats-overdue">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-red-900 dark:text-red-100">Overdue SLA</CardTitle>
+              <CardTitle className="text-sm font-medium text-red-900 dark:text-red-100">Verlopen SLA</CardTitle>
               <span className="p-1.5 bg-red-500/10 rounded-lg">
                 <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
               </span>
@@ -538,7 +538,7 @@ export default function Cases() {
             <CardContent>
               <div className="text-2xl font-bold text-red-900 dark:text-red-100">{overdueSLA}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Past deadline
+                Deadline verstreken
               </p>
             </CardContent>
           </Card>
@@ -552,7 +552,7 @@ export default function Cases() {
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Search cases..."
+                    placeholder="Cases zoeken..."
                     className="pl-10"
                     value={searchQuery}
                     onChange={(e) => {
@@ -565,11 +565,11 @@ export default function Cases() {
 
                 <Tabs value={priorityFilter} onValueChange={setPriorityFilter}>
                   <TabsList>
-                    <TabsTrigger value="all" data-testid="filter-all-priority">All</TabsTrigger>
+                    <TabsTrigger value="all" data-testid="filter-all-priority">Alle</TabsTrigger>
                     <TabsTrigger value="urgent" data-testid="filter-urgent-priority">Urgent</TabsTrigger>
-                    <TabsTrigger value="high" data-testid="filter-high-priority">High</TabsTrigger>
-                    <TabsTrigger value="medium" data-testid="filter-medium-priority">Medium</TabsTrigger>
-                    <TabsTrigger value="low" data-testid="filter-low-priority">Low</TabsTrigger>
+                    <TabsTrigger value="high" data-testid="filter-high-priority">Hoog</TabsTrigger>
+                    <TabsTrigger value="medium" data-testid="filter-medium-priority">Gemiddeld</TabsTrigger>
+                    <TabsTrigger value="low" data-testid="filter-low-priority">Laag</TabsTrigger>
                   </TabsList>
                 </Tabs>
 
@@ -580,7 +580,7 @@ export default function Cases() {
                   data-testid="archive-toggle-button"
                 >
                   <Archive className="mr-2 h-4 w-4" />
-                  {showArchived ? "Show Active" : "Show Archive"}
+                  {showArchived ? "Toon Actief" : "Toon Archief"}
                 </Button>
               </div>
 

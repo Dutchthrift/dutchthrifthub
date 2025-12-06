@@ -152,8 +152,8 @@ export default function Orders() {
           .catch(error => {
             console.error('Failed to fetch order:', error);
             toast({
-              title: "Order not found",
-              description: "The requested order could not be found.",
+              title: "Order niet gevonden",
+              description: "De gevraagde order kon niet worden gevonden.",
               variant: "destructive",
             });
             setLocation('/orders');
@@ -225,14 +225,14 @@ export default function Orders() {
       setShowImportDialog(false);
       setSelectedFile(null);
       toast({
-        title: "CSV Import Successful",
-        description: `Imported: ${data.created} created, ${data.updated} updated, ${data.skipped} skipped`,
+        title: "CSV Import Succesvol",
+        description: `Geïmporteerd: ${data.created} aangemaakt, ${data.updated} bijgewerkt, ${data.skipped} overgeslagen`,
       });
     },
     onError: (error) => {
       toast({
-        title: "CSV Import Failed",
-        description: error instanceof Error ? error.message : "Failed to import CSV",
+        title: "CSV Import Mislukt",
+        description: error instanceof Error ? error.message : "CSV import is mislukt",
         variant: "destructive",
       });
     }
@@ -270,13 +270,13 @@ export default function Orders() {
       window.open(trackingUrl, '_blank', 'noopener,noreferrer');
     } else if (trackingNumber) {
       toast({
-        title: "Tracking Number",
-        description: `Tracking number: ${trackingNumber}`,
+        title: "Trackingnummer",
+        description: `Trackingnummer: ${trackingNumber}`,
       });
     } else {
       toast({
-        title: "No tracking information",
-        description: "This order doesn't have tracking information yet.",
+        title: "Geen trackinginformatie",
+        description: "Deze order heeft nog geen trackinginformatie.",
         variant: "destructive",
       });
     }
@@ -287,13 +287,13 @@ export default function Orders() {
     const shopifyOrderId = order.shopifyOrderId;
     if (shopifyOrderId) {
       toast({
-        title: "Invoice Download",
-        description: "Invoice download functionality will be implemented soon.",
+        title: "Factuur Downloaden",
+        description: "Factuur download functionaliteit wordt binnenkort toegevoegd.",
       });
     } else {
       toast({
-        title: "No invoice available",
-        description: "This order doesn't have an associated invoice.",
+        title: "Geen factuur beschikbaar",
+        description: "Deze order heeft geen gekoppelde factuur.",
         variant: "destructive",
       });
     }
@@ -416,13 +416,13 @@ export default function Orders() {
         <div className="bg-card rounded-lg p-6 mb-6 border" data-testid="orders-header">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-medium tracking-tight">Orders</h1>
-              <p className="text-muted-foreground font-light">View and manage customer orders from Shopify</p>
+              <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
+              <p className="text-muted-foreground">Bekijk en beheer klantorders van Shopify</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <Button variant="outline" data-testid="export-orders-button">
                 <Download className="mr-2 h-4 w-4" />
-                Export CSV
+                Exporteer CSV
               </Button>
 
               <Button
@@ -431,7 +431,7 @@ export default function Orders() {
                 data-testid="import-csv-button"
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Import CSV
+                Importeer CSV
               </Button>
 
               <Button
@@ -440,7 +440,7 @@ export default function Orders() {
                 data-testid="sync-shopify-button"
               >
                 <RefreshCw className={`mr-2 h-4 w-4 ${syncAllMutation.isPending ? 'animate-spin' : ''}`} />
-                {syncAllMutation.isPending ? "Syncing..." : "Sync Shopify"}
+                {syncAllMutation.isPending ? "Synchroniseren..." : "Synchroniseer Shopify"}
               </Button>
             </div>
           </div>
@@ -455,7 +455,7 @@ export default function Orders() {
           >
             <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-primary/10 blur-2xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Totaal Orders</CardTitle>
               <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                 <Package className="h-4 w-4 text-primary" />
               </div>
@@ -465,7 +465,7 @@ export default function Orders() {
                 {orderStats?.total || 0}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                All time orders
+                Alle orders
               </p>
             </CardContent>
           </Card>
@@ -477,7 +477,7 @@ export default function Orders() {
           >
             <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-amber-500/10 blur-2xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">In afwachting</CardTitle>
               <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center">
                 <Package className="h-4 w-4 text-amber-600" />
               </div>
@@ -485,7 +485,7 @@ export default function Orders() {
             <CardContent>
               <div className="text-2xl font-semibold">{statusCounts.pending}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Awaiting processing
+                Wacht op verwerking
               </p>
             </CardContent>
           </Card>
@@ -497,7 +497,7 @@ export default function Orders() {
           >
             <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-blue-500/10 blur-2xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Processing</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">In behandeling</CardTitle>
               <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
                 <Package className="h-4 w-4 text-blue-600" />
               </div>
@@ -505,7 +505,7 @@ export default function Orders() {
             <CardContent>
               <div className="text-2xl font-semibold">{statusCounts.processing}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Being prepared
+                Wordt voorbereid
               </p>
             </CardContent>
           </Card>
@@ -517,7 +517,7 @@ export default function Orders() {
           >
             <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-purple-500/10 blur-2xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Shipped</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Verzonden</CardTitle>
               <div className="h-8 w-8 rounded-full bg-purple-500/10 flex items-center justify-center">
                 <Truck className="h-4 w-4 text-purple-600" />
               </div>
@@ -525,7 +525,7 @@ export default function Orders() {
             <CardContent>
               <div className="text-2xl font-semibold">{statusCounts.shipped}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                On the way
+                Onderweg
               </p>
             </CardContent>
           </Card>
@@ -537,7 +537,7 @@ export default function Orders() {
           >
             <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-emerald-500/10 blur-2xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Delivered</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Afgeleverd</CardTitle>
               <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
                 <Package className="h-4 w-4 text-emerald-600" />
               </div>
@@ -545,7 +545,7 @@ export default function Orders() {
             <CardContent>
               <div className="text-2xl font-semibold">{statusCounts.delivered}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Completed orders
+                Voltooide orders
               </p>
             </CardContent>
           </Card>
@@ -560,7 +560,7 @@ export default function Orders() {
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search orders, customers..."
+                  placeholder="Zoek orders, klanten..."
                   className="pl-10 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 focus:ring-primary"
                   value={searchQuery}
                   onChange={(e) => {
@@ -574,11 +574,11 @@ export default function Orders() {
               {/* Status Tabs */}
               <Tabs value={statusFilter} onValueChange={setStatusFilter}>
                 <TabsList className="w-full grid grid-cols-5 h-auto bg-zinc-100/50 dark:bg-zinc-800/50 p-1">
-                  <TabsTrigger value="all" data-testid="filter-all-orders" className="text-xs sm:text-sm data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-950 data-[state=active]:shadow-sm">All</TabsTrigger>
-                  <TabsTrigger value="pending" data-testid="filter-pending-orders" className="text-xs sm:text-sm data-[state=active]:bg-amber-100 dark:data-[state=active]:bg-amber-900/30 data-[state=active]:text-amber-700 dark:data-[state=active]:text-amber-400">Pending</TabsTrigger>
-                  <TabsTrigger value="processing" data-testid="filter-processing-orders" className="text-xs sm:text-sm data-[state=active]:bg-blue-100 dark:data-[state=active]:bg-blue-900/30 data-[state=active]:text-blue-700 dark:data-[state=active]:text-blue-400">Processing</TabsTrigger>
-                  <TabsTrigger value="shipped" data-testid="filter-shipped-orders" className="text-xs sm:text-sm data-[state=active]:bg-purple-100 dark:data-[state=active]:bg-purple-900/30 data-[state=active]:text-purple-700 dark:data-[state=active]:text-purple-400">Shipped</TabsTrigger>
-                  <TabsTrigger value="delivered" data-testid="filter-delivered-orders" className="text-xs sm:text-sm data-[state=active]:bg-emerald-100 dark:data-[state=active]:bg-emerald-900/30 data-[state=active]:text-emerald-700 dark:data-[state=active]:text-emerald-400">Delivered</TabsTrigger>
+                  <TabsTrigger value="all" data-testid="filter-all-orders" className="text-xs sm:text-sm data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-950 data-[state=active]:shadow-sm">Alle</TabsTrigger>
+                  <TabsTrigger value="pending" data-testid="filter-pending-orders" className="text-xs sm:text-sm data-[state=active]:bg-amber-100 dark:data-[state=active]:bg-amber-900/30 data-[state=active]:text-amber-700 dark:data-[state=active]:text-amber-400">In afwachting</TabsTrigger>
+                  <TabsTrigger value="processing" data-testid="filter-processing-orders" className="text-xs sm:text-sm data-[state=active]:bg-blue-100 dark:data-[state=active]:bg-blue-900/30 data-[state=active]:text-blue-700 dark:data-[state=active]:text-blue-400">In behandeling</TabsTrigger>
+                  <TabsTrigger value="shipped" data-testid="filter-shipped-orders" className="text-xs sm:text-sm data-[state=active]:bg-purple-100 dark:data-[state=active]:bg-purple-900/30 data-[state=active]:text-purple-700 dark:data-[state=active]:text-purple-400">Verzonden</TabsTrigger>
+                  <TabsTrigger value="delivered" data-testid="filter-delivered-orders" className="text-xs sm:text-sm data-[state=active]:bg-emerald-100 dark:data-[state=active]:bg-emerald-900/30 data-[state=active]:text-emerald-700 dark:data-[state=active]:text-emerald-400">Afgeleverd</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -586,12 +586,12 @@ export default function Orders() {
               <div className="flex items-center justify-between gap-2">
                 <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
                   <SelectTrigger className="w-full sm:w-40 bg-white dark:bg-zinc-950" data-testid="page-size-selector">
-                    <SelectValue placeholder="Page size" />
+                    <SelectValue placeholder="Paginagrootte" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="20">20 per page</SelectItem>
-                    <SelectItem value="50">50 per page</SelectItem>
-                    <SelectItem value="100">100 per page</SelectItem>
+                    <SelectItem value="20">20 per pagina</SelectItem>
+                    <SelectItem value="50">50 per pagina</SelectItem>
+                    <SelectItem value="100">100 per pagina</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -620,7 +620,7 @@ export default function Orders() {
               </div>
             ) : filteredAndSortedOrders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No orders found
+                Geen orders gevonden
               </div>
             ) : (
               <Table>
@@ -642,7 +642,7 @@ export default function Orders() {
                       data-testid="sort-customer-header"
                     >
                       <div className="flex items-center">
-                        Customer
+                        Klant
                         {getSortIcon('customer')}
                       </div>
                     </TableHead>
@@ -652,7 +652,7 @@ export default function Orders() {
                       data-testid="sort-total-header"
                     >
                       <div className="flex items-center">
-                        Total
+                        Totaal
                         {getSortIcon('totalAmount')}
                       </div>
                     </TableHead>
@@ -672,7 +672,7 @@ export default function Orders() {
                       data-testid="sort-payment-header"
                     >
                       <div className="flex items-center">
-                        Payment
+                        Betaling
                         {getSortIcon('paymentStatus')}
                       </div>
                     </TableHead>
@@ -682,7 +682,7 @@ export default function Orders() {
                       data-testid="sort-date-header"
                     >
                       <div className="flex items-center">
-                        Date
+                        Datum
                         {getSortIcon('orderDate')}
                       </div>
                     </TableHead>
@@ -707,7 +707,7 @@ export default function Orders() {
                           </span>
                           {(order.orderData as any)?.line_items?.length > 0 && (
                             <Badge variant="outline" className="text-xs">
-                              {(order.orderData as any).line_items.length} {(order.orderData as any).line_items.length === 1 ? 'item' : 'items'}
+                              {(order.orderData as any).line_items.length} {(order.orderData as any).line_items.length === 1 ? 'artikel' : 'artikelen'}
                             </Badge>
                           )}
                         </div>
@@ -717,7 +717,7 @@ export default function Orders() {
                           <div className="font-medium text-sm">
                             {(order.orderData as any)?.customer ?
                               `${(order.orderData as any).customer.first_name} ${(order.orderData as any).customer.last_name}` :
-                              'Guest'
+                              'Gast'
                             }
                           </div>
                           <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
@@ -763,19 +763,19 @@ export default function Orders() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleViewDetails(order)} data-testid={`view-details-${order.id}`}>
                               <Eye className="mr-2 h-4 w-4" />
-                              View Details
+                              Bekijk Details
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleTrackShipment(order)} data-testid={`track-shipment-${order.id}`}>
                               <Truck className="mr-2 h-4 w-4" />
-                              Track Shipment
+                              Volg Verzending
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleDownloadInvoice(order)} data-testid={`download-invoice-${order.id}`}>
                               <Download className="mr-2 h-4 w-4" />
-                              Download Invoice
+                              Download Factuur
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleTeamNotes(order)} data-testid={`team-notes-${order.id}`}>
                               <MessageSquare className="mr-2 h-4 w-4" />
-                              Team Notes
+                              Team Notities
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -803,7 +803,7 @@ export default function Orders() {
           ) : filteredAndSortedOrders.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
-                No orders found
+                Geen orders gevonden
               </CardContent>
             </Card>
           ) : (
@@ -823,7 +823,7 @@ export default function Orders() {
                       <div className="text-sm font-normal">
                         {(order.orderData as any)?.customer ?
                           `${(order.orderData as any).customer.first_name} ${(order.orderData as any).customer.last_name}` :
-                          'Guest'
+                          'Gast'
                         }
                       </div>
                       <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
@@ -832,7 +832,7 @@ export default function Orders() {
                       <div className="font-medium">€{((order.totalAmount || 0) / 100).toFixed(2)}</div>
                       {(order.orderData as any)?.line_items?.length > 0 && (
                         <div className="text-xs text-muted-foreground mt-1">
-                          {(order.orderData as any).line_items.length} {(order.orderData as any).line_items.length === 1 ? 'item' : 'items'}
+                          {(order.orderData as any).line_items.length} {(order.orderData as any).line_items.length === 1 ? 'artikel' : 'artikelen'}
                         </div>
                       )}
                     </div>
@@ -860,7 +860,7 @@ export default function Orders() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-6">
             <div className="text-sm text-muted-foreground">
-              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalOrders)} of {totalOrders} orders
+              Toont {((currentPage - 1) * pageSize) + 1} tot {Math.min(currentPage * pageSize, totalOrders)} van {totalOrders} orders
             </div>
             <div className="flex items-center space-x-2">
               <Button
@@ -871,7 +871,7 @@ export default function Orders() {
                 data-testid="prev-page-button"
               >
                 <ChevronLeft className="h-4 w-4" />
-                Previous
+                Vorige
               </Button>
 
               <div className="flex items-center space-x-1">
@@ -911,7 +911,7 @@ export default function Orders() {
                 disabled={currentPage === totalPages}
                 data-testid="next-page-button"
               >
-                Next
+                Volgende
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -932,8 +932,8 @@ export default function Orders() {
                       </Badge>
                     )}
                   </DialogTitle>
-                  <DialogDescription className="mt-1 font-light">
-                    Placed on {selectedOrder && new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleString('nl-NL', {
+                  <DialogDescription className="mt-1">
+                    Geplaatst op {selectedOrder && new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleString('nl-NL', {
                       day: 'numeric',
                       month: 'long',
                       year: 'numeric',
@@ -946,8 +946,8 @@ export default function Orders() {
                   <div className="text-2xl font-medium text-primary">
                     €{((selectedOrder?.totalAmount || 0) / 100).toFixed(2)}
                   </div>
-                  <div className="text-sm text-muted-foreground font-light">
-                    Total Amount
+                  <div className="text-sm text-muted-foreground">
+                    Totaalbedrag
                   </div>
                 </div>
               </div>
@@ -964,7 +964,7 @@ export default function Orders() {
                         <span className="p-1.5 bg-blue-500/10 rounded-lg">
                           <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </span>
-                        Order Items
+                        Orderartikelen
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -976,14 +976,14 @@ export default function Orders() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium text-sm truncate" title={item.title}>{item.title}</h4>
-                              <p className="text-sm text-muted-foreground font-light mt-1">
+                              <p className="text-sm text-muted-foreground mt-1">
                                 {item.variant_title && <span className="mr-2">{item.variant_title}</span>}
-                                <span>Qty: {item.quantity}</span>
+                                <span>Aantal: {item.quantity}</span>
                               </p>
                             </div>
                             <div className="text-right">
                               <div className="font-medium text-sm">€{item.price}</div>
-                              <div className="text-xs text-muted-foreground font-light">Total: €{(parseFloat(item.price) * item.quantity).toFixed(2)}</div>
+                              <div className="text-xs text-muted-foreground">Totaal: €{(parseFloat(item.price) * item.quantity).toFixed(2)}</div>
                             </div>
                           </div>
                         ))}
@@ -998,30 +998,30 @@ export default function Orders() {
                         <span className="p-1.5 bg-indigo-500/10 rounded-lg">
                           <Clock className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                         </span>
-                        Order History
+                        Ordergeschiedenis
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="relative pl-4 border-l-2 border-zinc-200 dark:border-zinc-700 space-y-6 my-2">
                         <div className="relative">
                           <div className={`absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 ${selectedOrder.status === 'delivered' ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
-                          <div className="text-sm font-medium">Delivered</div>
-                          <div className="text-xs text-muted-foreground font-light">Expected delivery</div>
+                          <div className="text-sm font-medium">Afgeleverd</div>
+                          <div className="text-xs text-muted-foreground">Verwachte levering</div>
                         </div>
                         <div className="relative">
                           <div className={`absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 ${['shipped', 'delivered'].includes(selectedOrder.status || '') ? 'bg-purple-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
-                          <div className="text-sm font-medium">Shipped</div>
-                          <div className="text-xs text-muted-foreground font-light">Order has been shipped</div>
+                          <div className="text-sm font-medium">Verzonden</div>
+                          <div className="text-xs text-muted-foreground">Order is verzonden</div>
                         </div>
                         <div className="relative">
                           <div className={`absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 ${['processing', 'shipped', 'delivered'].includes(selectedOrder.status || '') ? 'bg-blue-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
-                          <div className="text-sm font-medium">Processing</div>
-                          <div className="text-xs text-muted-foreground font-light">Order is being prepared</div>
+                          <div className="text-sm font-medium">In behandeling</div>
+                          <div className="text-xs text-muted-foreground">Order wordt voorbereid</div>
                         </div>
                         <div className="relative">
                           <div className="absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 bg-amber-500" />
-                          <div className="text-sm font-medium">Order Placed</div>
-                          <div className="text-xs text-muted-foreground font-light">
+                          <div className="text-sm font-medium">Order Geplaatst</div>
+                          <div className="text-xs text-muted-foreground">
                             {new Date(selectedOrder.createdAt || '').toLocaleDateString()}
                           </div>
                         </div>
@@ -1036,7 +1036,7 @@ export default function Orders() {
                         <span className="p-1.5 bg-rose-500/10 rounded-lg">
                           <FileText className="h-5 w-5 text-rose-600 dark:text-rose-400" />
                         </span>
-                        Team Notes
+                        Team Notities
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -1059,7 +1059,7 @@ export default function Orders() {
                         <span className="p-1.5 bg-purple-500/10 rounded-lg">
                           <UserIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                         </span>
-                        Customer
+                        Klant
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -1074,19 +1074,19 @@ export default function Orders() {
                               'Guest'
                             }
                           </div>
-                          <div className="text-xs text-muted-foreground font-light">Customer</div>
+                          <div className="text-xs text-muted-foreground">Klant</div>
                         </div>
                       </div>
 
                       <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-700">
                         <div className="flex items-start gap-2 text-sm">
                           <div className="min-w-[20px] text-muted-foreground"><MessageSquare className="h-4 w-4" /></div>
-                          <span className="font-light break-all">{selectedOrder.customerEmail}</span>
+                          <span className="break-all">{selectedOrder.customerEmail}</span>
                         </div>
                         {(selectedOrder.orderData as any)?.customer?.phone && (
                           <div className="flex items-start gap-2 text-sm">
                             <div className="min-w-[20px] text-muted-foreground"><Truck className="h-4 w-4" /></div>
-                            <span className="font-light">{(selectedOrder.orderData as any).customer.phone}</span>
+                            <span>{(selectedOrder.orderData as any).customer.phone}</span>
                           </div>
                         )}
                       </div>
@@ -1100,11 +1100,11 @@ export default function Orders() {
                           <span className="p-1.5 bg-cyan-500/10 rounded-lg">
                             <Truck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                           </span>
-                          Shipping Address
+                          Verzendadres
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="space-y-1 text-sm font-light">
+                        <div className="space-y-1 text-sm">
                           <div>{(selectedOrder.orderData as any).shipping_address.name}</div>
                           <div>{(selectedOrder.orderData as any).shipping_address.address1}</div>
                           {(selectedOrder.orderData as any).shipping_address.address2 && (
@@ -1125,30 +1125,30 @@ export default function Orders() {
                         <span className="p-1.5 bg-emerald-500/10 rounded-lg">
                           <CreditCard className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                         </span>
-                        Payment
+                        Betaling
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground font-light">Status</span>
+                        <span className="text-sm text-muted-foreground">Status</span>
                         <Badge variant="outline" className="font-normal capitalize">
                           {selectedOrder.paymentStatus || 'Pending'}
                         </Badge>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground font-light">Method</span>
+                        <span className="text-sm text-muted-foreground">Methode</span>
                         <span className="text-sm font-medium flex items-center gap-1">
                           <CreditCard className="h-3 w-3" />
-                          {(selectedOrder.orderData as any)?.payment_gateway_names?.[0] || 'Unknown'}
+                          {(selectedOrder.orderData as any)?.payment_gateway_names?.[0] || 'Onbekend'}
                         </span>
                       </div>
                       <div className="pt-3 mt-3 border-t border-zinc-200 dark:border-zinc-700 space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground font-light">Subtotal</span>
+                          <span className="text-muted-foreground">Subtotaal</span>
                           <span>€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground font-light">Shipping</span>
+                          <span className="text-muted-foreground">Verzending</span>
                           <span>€0.00</span>
                         </div>
                         <div className="flex justify-between text-sm font-medium pt-2">
@@ -1170,9 +1170,9 @@ export default function Orders() {
         <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Import Orders from CSV</DialogTitle>
+              <DialogTitle>Orders Importeren uit CSV</DialogTitle>
               <DialogDescription>
-                Upload a Shopify order export CSV file to import orders into the system. The system will automatically create or update orders and customers.
+                Upload een Shopify order export CSV-bestand om orders in het systeem te importeren. Het systeem maakt automatisch orders en klanten aan of werkt ze bij.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -1186,7 +1186,7 @@ export default function Orders() {
                 />
                 {selectedFile && (
                   <p className="text-sm text-muted-foreground">
-                    Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
+                    Geselecteerd: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
                   </p>
                 )}
               </div>
@@ -1200,7 +1200,7 @@ export default function Orders() {
                   disabled={importCSVMutation.isPending}
                   data-testid="cancel-import-button"
                 >
-                  Cancel
+                  Annuleren
                 </Button>
                 <Button
                   onClick={() => selectedFile && importCSVMutation.mutate(selectedFile)}
@@ -1210,12 +1210,12 @@ export default function Orders() {
                   {importCSVMutation.isPending ? (
                     <>
                       <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Importing...
+                      Importeren...
                     </>
                   ) : (
                     <>
                       <Upload className="mr-2 h-4 w-4" />
-                      Import Orders
+                      Importeer Orders
                     </>
                   )}
                 </Button>
