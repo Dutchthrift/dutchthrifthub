@@ -118,10 +118,10 @@ export function ReturnsStatsWidget() {
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                         <div className="space-y-1">
-                            <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Orders Today</p>
+                            <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Bestellingen Vandaag</p>
                             <h3 className="text-3xl font-bold text-blue-900 dark:text-blue-100">{ordersTodayCount}</h3>
                             <p className="text-xs text-blue-600 dark:text-blue-400">
-                                {formatChange(ordersChange)} vs yesterday
+                                {formatChange(ordersChange)} t.o.v. gisteren
                             </p>
                         </div>
                         <Package className="h-12 w-12 text-blue-500 dark:text-blue-400 opacity-20" />
@@ -134,10 +134,10 @@ export function ReturnsStatsWidget() {
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                         <div className="space-y-1">
-                            <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Active Returns</p>
+                            <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Actieve Retouren</p>
                             <h3 className="text-3xl font-bold text-orange-900 dark:text-orange-100">{activeReturns}</h3>
                             <p className="text-xs text-orange-600 dark:text-orange-400">
-                                {oldestAge > 0 ? `Oldest: ${oldestAge} days` : 'All up to date'}
+                                {oldestAge > 0 ? `Oudste: ${oldestAge} dagen` : 'Alles bijgewerkt'}
                             </p>
                         </div>
                         <AlertCircle className="h-12 w-12 text-orange-500 dark:text-orange-400 opacity-20" />
@@ -150,10 +150,10 @@ export function ReturnsStatsWidget() {
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                         <div className="space-y-1">
-                            <p className="text-sm font-medium text-green-600 dark:text-green-400">Today's Revenue</p>
+                            <p className="text-sm font-medium text-green-600 dark:text-green-400">Omzet Vandaag</p>
                             <h3 className="text-3xl font-bold text-green-900 dark:text-green-100">{formatCurrency(todayRevenue)}</h3>
                             <p className="text-xs text-green-600 dark:text-green-400">
-                                {formatChange(revenueChange)} vs yesterday
+                                {formatChange(revenueChange)} t.o.v. gisteren
                             </p>
                         </div>
                         <DollarSign className="h-12 w-12 text-green-500 dark:text-green-400 opacity-20" />
@@ -166,10 +166,10 @@ export function ReturnsStatsWidget() {
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                         <div className="space-y-1">
-                            <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Weekly Growth</p>
+                            <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Wekelijkse Groei</p>
                             <h3 className="text-3xl font-bold text-purple-900 dark:text-purple-100">{formatChange(weeklyGrowth)}</h3>
                             <p className="text-xs text-purple-600 dark:text-purple-400">
-                                {formatCurrency(thisWeekRevenue)} this week
+                                {formatCurrency(thisWeekRevenue)} deze week
                             </p>
                         </div>
                         <TrendingUp className="h-12 w-12 text-purple-500 dark:text-purple-400 opacity-20" />

@@ -109,15 +109,15 @@ export default function Todos() {
         );
       }
       toast({
-        title: "Update failed",
-        description: "Failed to update todo",
+        title: "Bijwerken mislukt",
+        description: "Kon taak niet bijwerken",
         variant: "destructive",
       });
     },
     onSuccess: () => {
       toast({
-        title: "Todo updated",
-        description: "Todo status has been updated successfully",
+        title: "Taak bijgewerkt",
+        description: "Taakstatus is succesvol bijgewerkt",
       });
     },
     onSettled: () => {
@@ -134,14 +134,14 @@ export default function Todos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
       toast({
-        title: "Todo deleted",
-        description: "Todo has been deleted successfully",
+        title: "Taak verwijderd",
+        description: "Taak is succesvol verwijderd",
       });
     },
     onError: () => {
       toast({
-        title: "Delete failed",
-        description: "Failed to delete todo",
+        title: "Verwijderen mislukt",
+        description: "Kon taak niet verwijderen",
         variant: "destructive",
       });
     }
@@ -226,15 +226,15 @@ export default function Todos() {
   };
 
   const formatDueDate = (dueDate: string | null) => {
-    if (!dueDate) return "No due date";
+    if (!dueDate) return "Geen deadline";
     const date = new Date(dueDate);
     const now = new Date();
     const diffInDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (diffInDays < 0) return "Overdue";
-    if (diffInDays === 0) return "Due today";
-    if (diffInDays === 1) return "Due tomorrow";
-    return `Due in ${diffInDays} days`;
+    if (diffInDays < 0) return "Verlopen";
+    if (diffInDays === 0) return "Vandaag";
+    if (diffInDays === 1) return "Morgen";
+    return `Over ${diffInDays} dagen`;
   };
 
   const isOverdue = (dueDate: string | null) => {
@@ -286,7 +286,7 @@ export default function Todos() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">To-do's</h1>
-              <p className="text-muted-foreground">Manage personal and team tasks</p>
+              <p className="text-muted-foreground">Beheer persoonlijke en teamtaken</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <Button
@@ -297,11 +297,11 @@ export default function Todos() {
                 {viewMode === "list" && <CheckSquare className="mr-2 h-4 w-4" />}
                 {viewMode === "kanban" && <Calendar className="mr-2 h-4 w-4" />}
                 {viewMode === "calendar" && <CheckSquare className="mr-2 h-4 w-4" />}
-                {viewMode === "list" ? "Kanban View" : viewMode === "kanban" ? "Calendar View" : "List View"}
+                {viewMode === "list" ? "Kanban Weergave" : viewMode === "kanban" ? "Kalender Weergave" : "Lijst Weergave"}
               </Button>
               <Button onClick={() => setShowNewTodo(true)} data-testid="new-todo-button">
                 <Plus className="mr-2 h-4 w-4" />
-                New To-do
+                Nieuwe Taak
               </Button>
             </div>
           </div>
@@ -311,7 +311,7 @@ export default function Todos() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
           <Card data-testid="todos-stats-total">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+              <CardTitle className="text-sm font-medium">Totaal Taken</CardTitle>
               <CheckSquare className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -321,7 +321,7 @@ export default function Todos() {
 
           <Card data-testid="todos-stats-pending">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">To Do</CardTitle>
+              <CardTitle className="text-sm font-medium">Te Doen</CardTitle>
               <Clock className="h-4 w-4 text-chart-4" />
             </CardHeader>
             <CardContent>
@@ -331,7 +331,7 @@ export default function Todos() {
 
           <Card data-testid="todos-stats-progress">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+              <CardTitle className="text-sm font-medium">Bezig</CardTitle>
               <Clock className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
@@ -341,7 +341,7 @@ export default function Todos() {
 
           <Card data-testid="todos-stats-done">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
+              <CardTitle className="text-sm font-medium">Afgerond</CardTitle>
               <CheckSquare className="h-4 w-4 text-chart-2" />
             </CardHeader>
             <CardContent>
@@ -354,7 +354,7 @@ export default function Todos() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
           <Card data-testid="todos-stats-overdue">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Overdue Tasks</CardTitle>
+              <CardTitle className="text-sm font-medium">Verlopen Taken</CardTitle>
               <AlertCircle className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
@@ -364,7 +364,7 @@ export default function Todos() {
 
           <Card data-testid="todos-stats-category">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Top Category</CardTitle>
+              <CardTitle className="text-sm font-medium">Top Categorie</CardTitle>
               <FolderKanban className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -375,7 +375,7 @@ export default function Todos() {
 
           <Card data-testid="todos-stats-mine">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">My Tasks</CardTitle>
+              <CardTitle className="text-sm font-medium">Mijn Taken</CardTitle>
               <UserCheck className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
@@ -385,7 +385,7 @@ export default function Todos() {
 
           <Card data-testid="todos-stats-high-priority">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">High Priority</CardTitle>
+              <CardTitle className="text-sm font-medium">Hoge Prioriteit</CardTitle>
               <Zap className="h-4 w-4 text-chart-1" />
             </CardHeader>
             <CardContent>
@@ -403,7 +403,7 @@ export default function Todos() {
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     ref={searchInputRef}
-                    placeholder="Search todos... (Press / to focus)"
+                    placeholder="Zoek taken... (Druk / om te focussen)"
                     className="pl-10"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -414,28 +414,28 @@ export default function Todos() {
                 {canSeeAllTasks && (
                   <Tabs value={taskScope} onValueChange={(value) => setTaskScope(value as "all" | "my")}>
                     <TabsList>
-                      <TabsTrigger value="all" data-testid="filter-all-tasks">All Tasks</TabsTrigger>
-                      <TabsTrigger value="my" data-testid="filter-my-tasks">My Tasks</TabsTrigger>
+                      <TabsTrigger value="all" data-testid="filter-all-tasks">Alle Taken</TabsTrigger>
+                      <TabsTrigger value="my" data-testid="filter-my-tasks">Mijn Taken</TabsTrigger>
                     </TabsList>
                   </Tabs>
                 )}
 
                 <Tabs value={statusFilter} onValueChange={setStatusFilter}>
                   <TabsList>
-                    <TabsTrigger value="all" data-testid="filter-all-status">All</TabsTrigger>
-                    <TabsTrigger value="todo" data-testid="filter-todo-status">To Do</TabsTrigger>
-                    <TabsTrigger value="in_progress" data-testid="filter-progress-status">In Progress</TabsTrigger>
-                    <TabsTrigger value="done" data-testid="filter-done-status">Done</TabsTrigger>
+                    <TabsTrigger value="all" data-testid="filter-all-status">Alle</TabsTrigger>
+                    <TabsTrigger value="todo" data-testid="filter-todo-status">Te Doen</TabsTrigger>
+                    <TabsTrigger value="in_progress" data-testid="filter-progress-status">Bezig</TabsTrigger>
+                    <TabsTrigger value="done" data-testid="filter-done-status">Afgerond</TabsTrigger>
                   </TabsList>
                 </Tabs>
 
                 <Tabs value={priorityFilter} onValueChange={setPriorityFilter}>
                   <TabsList>
-                    <TabsTrigger value="all" data-testid="filter-all-priority">All Priority</TabsTrigger>
+                    <TabsTrigger value="all" data-testid="filter-all-priority">Alle Prioriteit</TabsTrigger>
                     <TabsTrigger value="urgent" data-testid="filter-urgent-priority">Urgent</TabsTrigger>
-                    <TabsTrigger value="high" data-testid="filter-high-priority">High</TabsTrigger>
-                    <TabsTrigger value="medium" data-testid="filter-medium-priority">Medium</TabsTrigger>
-                    <TabsTrigger value="low" data-testid="filter-low-priority">Low</TabsTrigger>
+                    <TabsTrigger value="high" data-testid="filter-high-priority">Hoog</TabsTrigger>
+                    <TabsTrigger value="medium" data-testid="filter-medium-priority">Normaal</TabsTrigger>
+                    <TabsTrigger value="low" data-testid="filter-low-priority">Laag</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
@@ -493,7 +493,7 @@ export default function Todos() {
                 </div>
               ) : filteredTodos.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No todos found. Create one to get started!
+                  Geen taken gevonden. Maak er een aan om te beginnen!
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -542,11 +542,11 @@ export default function Todos() {
                                     e.stopPropagation();
                                     setEditingTodo(todo);
                                   }}>
-                                    Edit
+                                    Bewerken
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                                     <ExternalLink className="mr-2 h-4 w-4" />
-                                    View Links
+                                    Bekijk Links
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     className="text-destructive"
@@ -556,7 +556,7 @@ export default function Todos() {
                                     }}
                                     disabled={deleteTodoMutation.isPending}
                                   >
-                                    Delete
+                                    Verwijderen
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -574,7 +574,7 @@ export default function Todos() {
 
                                 {todo.status === 'in_progress' && (
                                   <Badge variant="outline" className="bg-primary/10 text-primary">
-                                    In Progress
+                                    Bezig
                                   </Badge>
                                 )}
                               </div>

@@ -37,10 +37,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signIn = async (email: string, password: string) => {
     const { user, error } = await authApi.signIn(email, password);
-    
+
     if (error) {
       toast({
-        title: "Sign in failed",
+        title: "Inloggen mislukt",
         description: error,
         variant: "destructive",
       });
@@ -50,10 +50,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (user) {
       setUser(user);
       toast({
-        title: "Welcome back!",
-        description: `Signed in as ${user.firstName || user.email}`,
+        title: "Welkom terug!",
+        description: `Ingelogd als ${user.firstName || user.email}`,
       });
-      
+
       // Redirect based on role
       if (user.role === "TECHNICUS") {
         setLocation("/repairs");
@@ -67,18 +67,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = async () => {
     const { error } = await authApi.signOut();
-    
+
     if (error) {
       toast({
-        title: "Sign out failed",
+        title: "Uitloggen mislukt",
         description: error,
         variant: "destructive",
       });
     } else {
       setUser(null);
       toast({
-        title: "Signed out",
-        description: "You have been signed out successfully",
+        title: "Uitgelogd",
+        description: "Je bent succesvol uitgelogd",
       });
     }
   };

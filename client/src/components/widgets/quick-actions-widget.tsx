@@ -12,19 +12,19 @@ export function QuickActionsWidget({ onOpenReturn }: QuickActionsWidgetProps) {
 
   const actions = [
     {
-      label: "Create Return",
+      label: "Nieuwe Retour",
       icon: Package,
       color: "bg-blue-500 hover:bg-blue-600",
       onClick: () => setLocation('/returns'),
     },
     {
-      label: "View All Returns",
+      label: "Alle Retouren",
       icon: FileText,
       color: "bg-purple-500 hover:bg-purple-600",
       onClick: () => setLocation('/returns'),
     },
     {
-      label: "View Orders",
+      label: "Bestellingen",
       icon: ShoppingCart,
       color: "bg-green-500 hover:bg-green-600",
       onClick: () => setLocation('/orders'),
@@ -36,7 +36,7 @@ export function QuickActionsWidget({ onOpenReturn }: QuickActionsWidgetProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Plus className="h-5 w-5" />
-          Quick Actions
+          Snelle Acties
         </CardTitle>
       </CardHeader>
       <CardContent>

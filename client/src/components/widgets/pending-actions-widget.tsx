@@ -17,7 +17,7 @@ export function PendingActionsWidget() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <AlertCircle className="h-5 w-5" />
-                        Pending Actions
+                        Openstaande Acties
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -46,7 +46,7 @@ export function PendingActionsWidget() {
 
     const actions = [
         {
-            label: "Returns to Inspect",
+            label: "Te Inspecteren",
             count: toInspect,
             icon: AlertCircle,
             color: "text-orange-600 dark:text-orange-400",
@@ -54,7 +54,7 @@ export function PendingActionsWidget() {
             status: "ontvangen_controle",
         },
         {
-            label: "Refunds to Process",
+            label: "Terugbetalingen",
             count: toRefund,
             icon: CheckCircle,
             color: "text-green-600 dark:text-green-400",
@@ -62,7 +62,7 @@ export function PendingActionsWidget() {
             status: "akkoord_terugbetaling",
         },
         {
-            label: "Awaiting Customer",
+            label: "Wachten op Klant",
             count: awaitingCustomer,
             icon: UserX,
             color: "text-yellow-600 dark:text-yellow-400",
@@ -70,7 +70,7 @@ export function PendingActionsWidget() {
             status: "wachten_klant",
         },
         {
-            label: "Overdue Returns",
+            label: "Verlopen Retouren",
             count: overdue,
             icon: Clock,
             color: "text-red-600 dark:text-red-400",
@@ -87,7 +87,7 @@ export function PendingActionsWidget() {
                 <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                         <AlertCircle className="h-5 w-5" />
-                        Pending Actions
+                        Openstaande Acties
                     </CardTitle>
                     {totalActions > 0 && (
                         <Badge variant="destructive">{totalActions}</Badge>
@@ -98,7 +98,7 @@ export function PendingActionsWidget() {
                 {totalActions === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                         <CheckCircle className="h-12 w-12 mx-auto mb-2 text-green-500" />
-                        <p className="text-sm">All caught up! 🎉</p>
+                        <p className="text-sm">Alles bijgewerkt! 🎉</p>
                     </div>
                 ) : (
                     <div className="space-y-2">

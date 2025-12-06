@@ -19,7 +19,7 @@ export default function Home() {
     queryKey: ["/api/auth/session"],
   });
 
-  const userName = session?.user?.firstName || session?.user?.username || "there";
+  const userName = session?.user?.firstName || session?.user?.username || "daar";
 
   return (
     <div className="min-h-screen bg-background" data-testid="home-page">
@@ -30,10 +30,10 @@ export default function Home() {
         <div className="flex items-center justify-between" data-testid="page-header">
           <div>
             <h2 className="text-4xl font-bold tracking-tight bg-gradient-primary bg-clip-text text-transparent">
-              Welcome back, {userName}! 👋
+              Welkom terug, {userName}! 👋
             </h2>
             <p className="text-muted-foreground mt-1 text-lg">
-              Here's your business overview for today.
+              Hier is je bedrijfsoverzicht voor vandaag.
             </p>
           </div>
         </div>

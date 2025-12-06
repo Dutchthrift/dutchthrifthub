@@ -40,7 +40,7 @@ export function RecentReturnsWidget() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Package className="h-5 w-5" />
-                        Recent Returns
+                        Recente Retouren
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -69,13 +69,13 @@ export function RecentReturnsWidget() {
                 <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                         <Package className="h-5 w-5" />
-                        Recent Returns
+                        Recente Retouren
                     </CardTitle>
                     <button
                         onClick={() => setLocation('/returns')}
                         className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
-                        View all →
+                        Alles bekijken →
                     </button>
                 </div>
             </CardHeader>
@@ -83,7 +83,7 @@ export function RecentReturnsWidget() {
                 {recentReturns.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                         <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                        <p className="text-sm">No returns yet</p>
+                        <p className="text-sm">Nog geen retouren</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -108,7 +108,7 @@ export function RecentReturnsWidget() {
                                     <p className="text-xs text-muted-foreground">
                                         {returnItem.requestedAt
                                             ? format(new Date(returnItem.requestedAt), "dd MMM yyyy")
-                                            : "No date"}
+                                            : "Geen datum"}
                                     </p>
                                 </div>
                             </button>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
     Dialog,
     DialogContent,
@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
     Select,
     SelectContent,
@@ -23,17 +22,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ChevronLeft, ChevronRight, Search, CalendarIcon, Upload, X, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Upload, X, CheckCircle, Package } from "lucide-react";
 import { format } from "date-fns";
-import type { User, Customer, Order } from "@shared/schema";
+import type { User } from "@shared/schema";
 
-interface CreateRepairWizardProps {
+interface InventoryRepairWizardProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     users: User[];
-    caseId?: string;
-    emailThreadId?: string;
-    repairType?: 'customer' | 'inventory';
 }
 
 interface FormData {
@@ -41,12 +37,10 @@ interface FormData {
     description: string;
     priority: "low" | "medium" | "high" | "urgent";
     estimatedCost: number;
-    productSku: string;
     productName: string;
+    brandModel: string;
     issueCategory: string;
     assignedUserId: string;
-    customerId: string;
-    orderId: string;
 }
 
 const ISSUE_CATEGORIES = [
@@ -62,27 +56,16 @@ const ISSUE_CATEGORIES = [
     "Camera - knoppen/draaiknoppen defect",
     "Mechanische schade",
     "Water/vochtschade",
+    "Algemene inspectie",
     "Overig",
 ];
 
-export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThreadId, repairType = 'customer' }: CreateRepairWizardProps) {
+export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRepairWizardProps) {
     const [step, setStep] = useState(1);
-    const [orderSearch, setOrderSearch] = useState("");
-    const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [slaDeadline, setSlaDeadline] = useState<Date | null>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [otherCategoryDetails, setOtherCategoryDetails] = useState("");
     const { toast } = useToast();
-
-    const { data: customers = [] } = useQuery<Customer[]>({
-        queryKey: ['/api/customers'],
-        enabled: open,
-    });
-
-    const { data: orders = [] } = useQuery<Order[]>({
-        queryKey: ['/api/orders'],
-        enabled: open,
-    });
 
     const {
         register,
@@ -97,12 +80,10 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
             description: "",
             priority: "medium",
             estimatedCost: 0,
-            productSku: "",
             productName: "",
+            brandModel: "",
             issueCategory: "",
             assignedUserId: "none",
-            customerId: "none",
-            orderId: "none",
         },
     });
 
@@ -130,8 +111,8 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
             queryClient.invalidateQueries({ queryKey: ["/api/repairs"] });
             queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
             toast({
-                title: "Reparatie aangemaakt",
-                description: "De reparatie is succesvol aangemaakt.",
+                title: "Inkoopreparatie aangemaakt",
+                description: "De inkoopreparatie is succesvol aangemaakt.",
             });
             handleClose();
         },
@@ -147,8 +128,6 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
 
     const handleClose = () => {
         setStep(1);
-        setSelectedOrder(null);
-        setOrderSearch("");
         setSlaDeadline(null);
         setSelectedFiles([]);
         setOtherCategoryDetails("");
@@ -157,7 +136,11 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
     };
 
     const handleNext = () => {
-        if (step === 2 && !watch("title")) {
+        if (step === 1 && !watch("productName") && !watch("brandModel")) {
+            toast({ title: "Vul product/model in", variant: "destructive" });
+            return;
+        }
+        if (step === 1 && !watch("title")) {
             toast({ title: "Titel is verplicht", variant: "destructive" });
             return;
         }
@@ -169,10 +152,6 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
     };
 
     const onSubmit = (data: FormData) => {
-        const selectedCustomer = selectedOrder
-            ? customers.find(c => c.id === selectedOrder.customerId)
-            : null;
-
         const repairData = {
             title: data.title,
             description: data.description || undefined,
@@ -180,20 +159,12 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
             estimatedCost: data.estimatedCost ? Math.round(data.estimatedCost * 100) : undefined,
             assignedUserId: (data.assignedUserId && data.assignedUserId !== "none") ? data.assignedUserId : undefined,
             slaDeadline: slaDeadline ? slaDeadline.toISOString() : undefined,
-            productSku: data.productSku || undefined,
-            productName: data.productName || undefined,
+            productName: data.productName || data.brandModel || undefined,
             issueCategory: data.issueCategory === "Overig" && otherCategoryDetails
                 ? `Overig: ${otherCategoryDetails}`
                 : data.issueCategory || undefined,
-            customerId: selectedOrder?.customerId || undefined,
-            orderId: selectedOrder?.id || undefined,
-            customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}`.trim() : undefined,
-            customerEmail: selectedCustomer?.email || selectedOrder?.customerEmail || undefined,
-            orderNumber: selectedOrder?.orderNumber || undefined,
             status: "new",
-            repairType: repairType,
-            caseId: caseId,
-            emailThreadId: emailThreadId,
+            repairType: "inventory",
         };
 
         createRepairMutation.mutate(repairData);
@@ -216,96 +187,43 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
         setSelectedFiles(selectedFiles.filter((_, i) => i !== index));
     };
 
-    const filteredOrders = orders.filter((order) =>
-        orderSearch
-            ? order.orderNumber?.toLowerCase().includes(orderSearch.toLowerCase()) ||
-            order.customerEmail?.toLowerCase().includes(orderSearch.toLowerCase())
-            : true
-    );
-
     const technicians = users.filter(u => u.role === 'TECHNICUS' || u.role === 'ADMIN');
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Nieuwe Reparatie - Stap {step} van 4</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Package className="h-5 w-5 text-amber-600" />
+                        Nieuwe Inkoopreparatie - Stap {step} van 3
+                    </DialogTitle>
                 </DialogHeader>
 
                 {/* Progress Indicator */}
                 <div className="flex items-center gap-2 mb-6">
-                    {[1, 2, 3, 4].map((s) => (
+                    {[1, 2, 3].map((s) => (
                         <div key={s} className="flex items-center flex-1">
                             <div
-                                className={`h-2 flex-1 rounded ${s <= step ? "bg-primary" : "bg-muted"}`}
+                                className={`h-2 flex-1 rounded ${s <= step ? "bg-amber-500" : "bg-muted"}`}
                             />
                         </div>
                     ))}
                 </div>
 
-                {/* Step 1: Order Search */}
+                {/* Step 1: Product Details */}
                 {step === 1 && (
                     <div className="space-y-4">
-                        <div>
-                            <Label className="text-sm font-medium mb-2 block">Zoek Bestelling (Optioneel)</Label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Zoek op bestelnummer of email..."
-                                    value={orderSearch}
-                                    onChange={(e) => setOrderSearch(e.target.value)}
-                                    className="pl-9"
-                                />
-                            </div>
+                        <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg mb-4">
+                            <p className="text-sm text-amber-700 dark:text-amber-300">
+                                <strong>Inkoopreparatie:</strong> Voor tweedehands ingekochte camera's en lenzen die gerepareerd moeten worden voor doorverkoop.
+                            </p>
                         </div>
 
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                            {filteredOrders.slice(0, 10).map((order) => (
-                                <div
-                                    key={order.id}
-                                    className={`p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${selectedOrder?.id === order.id ? "border-primary bg-primary/5" : ""
-                                        }`}
-                                    onClick={() => {
-                                        setSelectedOrder(order);
-                                        setValue("orderId", order.id);
-                                        setValue("customerId", order.customerId || "none");
-                                    }}
-                                >
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <h4 className="font-medium">Order {order.orderNumber}</h4>
-                                            <p className="text-sm text-muted-foreground">{order.customerEmail}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {order.orderDate ? format(new Date(order.orderDate), "PPP") : ""}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="font-medium">€{((order.totalAmount || 0) / 100).toFixed(2)}</p>
-                                            <Badge variant="outline" className="text-xs mt-1">
-                                                {order.status}
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {selectedOrder && (
-                            <div className="p-3 bg-primary/10 border border-primary/20 rounded-md">
-                                <p className="text-sm font-medium">Geselecteerd: Order {selectedOrder.orderNumber}</p>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Step 2: Product & Issue Details */}
-                {step === 2 && (
-                    <div className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="title">Titel *</Label>
                             <Input
                                 id="title"
-                                placeholder="bijv. iPhone 12 scherm reparatie"
+                                placeholder="bijv. Canon 5D Mark III - Sluiter vervangen"
                                 {...register("title", { required: "Titel is verplicht" })}
                             />
                             {errors.title && (
@@ -315,19 +233,19 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="productSku">Artikelnummer</Label>
+                                <Label htmlFor="brandModel">Merk & Model *</Label>
                                 <Input
-                                    id="productSku"
-                                    placeholder="Artikelnummer"
-                                    {...register("productSku")}
+                                    id="brandModel"
+                                    placeholder="bijv. Canon EOS 5D Mark III"
+                                    {...register("brandModel")}
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="productName">Product Naam</Label>
+                                <Label htmlFor="productName">Productnaam</Label>
                                 <Input
                                     id="productName"
-                                    placeholder="Product naam"
+                                    placeholder="bijv. Full-frame DSLR"
                                     {...register("productName")}
                                 />
                             </div>
@@ -373,15 +291,15 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                             <Label htmlFor="description">Beschrijving</Label>
                             <Textarea
                                 id="description"
-                                placeholder="Beschrijf het probleem en de vereisten..."
+                                placeholder="Beschrijf het probleem en wat er gerepareerd moet worden..."
                                 {...register("description")}
                             />
                         </div>
                     </div>
                 )}
 
-                {/* Step 3: Priority & Assignment */}
-                {step === 3 && (
+                {/* Step 2: Priority & Assignment */}
+                {step === 2 && (
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -441,7 +359,7 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                         </div>
 
                         <div className="space-y-2">
-                            <Label>SLA Deadline</Label>
+                            <Label>Deadline (optioneel)</Label>
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button
@@ -466,8 +384,8 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                     </div>
                 )}
 
-                {/* Step 4: Photos & Review */}
-                {step === 4 && (
+                {/* Step 3: Photos & Review */}
+                {step === 3 && (
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-green-600 mb-4">
                             <CheckCircle className="h-5 w-5" />
@@ -476,19 +394,14 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
 
                         {/* Review Summary */}
                         <div className="space-y-3">
-                            {selectedOrder && (
-                                <div className="p-4 bg-muted/50 rounded-lg">
-                                    <h4 className="font-medium mb-2">Bestelling</h4>
-                                    <p className="text-sm">Order {selectedOrder.orderNumber}</p>
-                                    <p className="text-sm text-muted-foreground">{selectedOrder.customerEmail}</p>
-                                </div>
-                            )}
-
-                            <div className="p-4 bg-muted/50 rounded-lg">
-                                <h4 className="font-medium mb-2">Product Details</h4>
+                            <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                                <h4 className="font-medium mb-2 flex items-center gap-2">
+                                    <Package className="h-4 w-4" />
+                                    Product Details
+                                </h4>
                                 <div className="text-sm space-y-1">
                                     <p><span className="font-medium">Titel:</span> {watch("title") || "Niet ingevuld"}</p>
-                                    {watch("productSku") && <p><span className="font-medium">SKU:</span> {watch("productSku")}</p>}
+                                    {watch("brandModel") && <p><span className="font-medium">Merk/Model:</span> {watch("brandModel")}</p>}
                                     {watch("productName") && <p><span className="font-medium">Product:</span> {watch("productName")}</p>}
                                     {watch("issueCategory") && (
                                         <p><span className="font-medium">Categorie:</span> {watch("issueCategory")}</p>
@@ -562,8 +475,8 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                         {step === 1 ? "Annuleren" : "Terug"}
                     </Button>
 
-                    {step < 4 ? (
-                        <Button onClick={handleNext}>
+                    {step < 3 ? (
+                        <Button onClick={handleNext} className="bg-amber-600 hover:bg-amber-700">
                             Volgende
                             <ChevronRight className="h-4 w-4 ml-2" />
                         </Button>
@@ -572,8 +485,9 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                             type="button"
                             onClick={handleSubmit(onSubmit)}
                             disabled={createRepairMutation.isPending}
+                            className="bg-amber-600 hover:bg-amber-700"
                         >
-                            {createRepairMutation.isPending ? "Aanmaken..." : "Reparatie Aanmaken"}
+                            {createRepairMutation.isPending ? "Aanmaken..." : "Inkoopreparatie Aanmaken"}
                         </Button>
                     )}
                 </div>

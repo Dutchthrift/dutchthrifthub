@@ -92,17 +92,17 @@ const STATUS_OPTIONS = [
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
+  { value: "low", label: "Laag" },
+  { value: "medium", label: "Normaal" },
+  { value: "high", label: "Hoog" },
   { value: "urgent", label: "Urgent" },
 ];
 
 const REFUND_STATUS_OPTIONS = [
-  { value: "pending", label: "Pending" },
-  { value: "processing", label: "Processing" },
-  { value: "completed", label: "Completed" },
-  { value: "failed", label: "Failed" },
+  { value: "pending", label: "In afwachting" },
+  { value: "processing", label: "Verwerken" },
+  { value: "completed", label: "Voltooid" },
+  { value: "failed", label: "Mislukt" },
 ];
 
 function getStatusColor(status: string) {
@@ -173,11 +173,11 @@ export default function ReturnDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/returns", returnId] });
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-      toast({ title: "Status updated successfully" });
+      toast({ title: "Status succesvol bijgewerkt" });
     },
     onError: () => {
       toast({
-        title: "Failed to update status",
+        title: "Status bijwerken mislukt",
         variant: "destructive"
       });
     },
@@ -190,11 +190,11 @@ export default function ReturnDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/returns", returnId] });
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-      toast({ title: "Priority updated successfully" });
+      toast({ title: "Prioriteit succesvol bijgewerkt" });
     },
     onError: () => {
       toast({
-        title: "Failed to update priority",
+        title: "Prioriteit bijwerken mislukt",
         variant: "destructive"
       });
     },
@@ -207,13 +207,13 @@ export default function ReturnDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/returns", returnId] });
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-      toast({ title: "User assigned successfully" });
+      toast({ title: "Gebruiker succesvol toegewezen" });
       setShowAssignDialog(false);
       setSelectedUserId("");
     },
     onError: () => {
       toast({
-        title: "Failed to assign user",
+        title: "Toewijzen mislukt",
         variant: "destructive"
       });
     },
@@ -237,10 +237,10 @@ export default function ReturnDetail() {
 
       queryClient.invalidateQueries({ queryKey: ["/api/returns", returnId] });
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-      toast({ title: "Photo uploaded successfully" });
+      toast({ title: "Foto succesvol geüpload" });
     } catch (error) {
       toast({
-        title: "Failed to upload photo",
+        title: "Foto uploaden mislukt",
         variant: "destructive"
       });
     } finally {
@@ -256,11 +256,11 @@ export default function ReturnDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/returns", returnId] });
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-      toast({ title: "Photo deleted successfully" });
+      toast({ title: "Foto succesvol verwijderd" });
     },
     onError: () => {
       toast({
-        title: "Failed to delete photo",
+        title: "Foto verwijderen mislukt",
         variant: "destructive"
       });
     },
@@ -271,7 +271,7 @@ export default function ReturnDetail() {
       <div className="flex flex-col h-screen bg-background">
         <Navigation />
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-muted-foreground">Loading...</div>
+          <div className="text-muted-foreground">Laden...</div>
         </div>
       </div>
     );
@@ -314,7 +314,7 @@ export default function ReturnDetail() {
             data-testid="button-back"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Returns
+            Terug naar Retouren
           </Button>
 
           <div className="space-y-6">
@@ -325,9 +325,9 @@ export default function ReturnDetail() {
                 </h1>
                 <p className="text-muted-foreground mt-1">
                   {returnData.createdAt ? (
-                    <>Created {format(new Date(returnData.createdAt), "PPP")}</>
+                    <>Aangemaakt {format(new Date(returnData.createdAt), "d MMMM yyyy")}</>
                   ) : (
-                    "No creation date"
+                    "Geen aanmaakdatum"
                   )}
                 </p>
               </div>
@@ -346,7 +346,7 @@ export default function ReturnDetail() {
                 <CardHeader className="bg-card-header border-b border-border">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    Customer
+                    Klant
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -356,7 +356,7 @@ export default function ReturnDetail() {
                         {returnData.customerName || "Unknown"}
                       </p>
                       <p className="text-sm text-muted-foreground" data-testid="text-customer-email">
-                        {returnData.customerEmail || "No email"}
+                        {returnData.customerEmail || "Geen e-mail"}
                       </p>
                     </div>
                   </div>
@@ -367,7 +367,7 @@ export default function ReturnDetail() {
                 <CardHeader className="bg-card-header border-b border-border">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <ShoppingCart className="h-4 w-4" />
-                    Order
+                    Bestelling
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -383,11 +383,11 @@ export default function ReturnDetail() {
                         onClick={() => setLocation(`/orders`)}
                         data-testid="link-view-order"
                       >
-                        View Order
+                        Bekijk Bestelling
                       </Button>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No order linked</p>
+                    <p className="text-sm text-muted-foreground">Geen bestelling gekoppeld</p>
                   )}
                 </CardContent>
               </Card>
@@ -396,14 +396,14 @@ export default function ReturnDetail() {
                 <CardHeader className="bg-card-header border-b border-border">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    Assigned To
+                    Toegewezen aan
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
                   {returnData.assignedUserId ? (
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium" data-testid="text-assigned-user">
-                        {returnData.assignedUserName || "Unknown"}
+                        {returnData.assignedUserName || "Onbekend"}
                       </p>
                       <Button
                         variant="ghost"
@@ -414,7 +414,7 @@ export default function ReturnDetail() {
                         }}
                         data-testid="button-change-assignee"
                       >
-                        Change
+                        Wijzigen
                       </Button>
                     </div>
                   ) : (
@@ -424,7 +424,7 @@ export default function ReturnDetail() {
                       onClick={() => setShowAssignDialog(true)}
                       data-testid="button-assign-user"
                     >
-                      Assign User
+                      Toewijzen
                     </Button>
                   )}
                 </CardContent>
@@ -433,20 +433,20 @@ export default function ReturnDetail() {
 
             <Tabs defaultValue="overview" className="w-full">
               <TabsList>
-                <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
-                <TabsTrigger value="items" data-testid="tab-items">Items</TabsTrigger>
-                <TabsTrigger value="photos" data-testid="tab-photos">Photos</TabsTrigger>
-                <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="overview" data-testid="tab-overview">Overzicht</TabsTrigger>
+                <TabsTrigger value="items" data-testid="tab-items">Artikelen</TabsTrigger>
+                <TabsTrigger value="photos" data-testid="tab-photos">Foto's</TabsTrigger>
+                <TabsTrigger value="timeline" data-testid="tab-timeline">Tijdlijn</TabsTrigger>
                 <TabsTrigger value="notes" data-testid="tab-notes">
                   <StickyNote className="h-4 w-4 mr-2" />
-                  Notes
+                  Notities
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6 mt-6">
                 <Card>
                   <CardHeader className="bg-card-header border-b border-border">
-                    <CardTitle>Return Details</CardTitle>
+                    <CardTitle>Retourgegevens</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -470,7 +470,7 @@ export default function ReturnDetail() {
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-muted-foreground">Priority</label>
+                        <label className="text-sm font-medium text-muted-foreground">Prioriteit</label>
                         <Select
                           value={returnData.priority}
                           onValueChange={(value) => updatePriorityMutation.mutate({ priority: value })}
@@ -489,12 +489,12 @@ export default function ReturnDetail() {
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-muted-foreground">Reason</label>
+                        <label className="text-sm font-medium text-muted-foreground">Reden</label>
                         <p className="mt-1 text-sm" data-testid="text-reason">{returnData.reason}</p>
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-muted-foreground">Tracking Number</label>
+                        <label className="text-sm font-medium text-muted-foreground">Track & Trace</label>
                         <p className="mt-1 text-sm" data-testid="text-tracking-number">
                           {returnData.trackingNumber || "N/A"}
                         </p>
@@ -502,7 +502,7 @@ export default function ReturnDetail() {
 
                       {returnData.receivedDate && (
                         <div>
-                          <label className="text-sm font-medium text-muted-foreground">Received Date</label>
+                          <label className="text-sm font-medium text-muted-foreground">Ontvangstdatum</label>
                           <p className="mt-1 text-sm" data-testid="text-received-date">
                             {format(new Date(returnData.receivedDate), "PPP")}
                           </p>
@@ -511,7 +511,7 @@ export default function ReturnDetail() {
 
                       {returnData.completedDate && (
                         <div>
-                          <label className="text-sm font-medium text-muted-foreground">Completed Date</label>
+                          <label className="text-sm font-medium text-muted-foreground">Afgerond op</label>
                           <p className="mt-1 text-sm" data-testid="text-completed-date">
                             {format(new Date(returnData.completedDate), "PPP")}
                           </p>
@@ -523,17 +523,17 @@ export default function ReturnDetail() {
 
                     {returnData.refundAmount != null && (
                       <div className="border-t border-border pt-6">
-                        <h3 className="text-lg font-semibold mb-4">Refund Information</h3>
+                        <h3 className="text-lg font-semibold mb-4">Terugbetaling Informatie</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           <div>
-                            <label className="text-sm font-medium text-muted-foreground">Refund Amount</label>
+                            <label className="text-sm font-medium text-muted-foreground">Terugbetaling Bedrag</label>
                             <p className="mt-1 text-lg font-medium" data-testid="text-refund-amount">
                               €{returnData.refundAmount.toFixed(2)}
                             </p>
                           </div>
                           {returnData.refundMethod && (
                             <div>
-                              <label className="text-sm font-medium text-muted-foreground">Refund Method</label>
+                              <label className="text-sm font-medium text-muted-foreground">Terugbetaling Methode</label>
                               <p className="mt-1 text-sm" data-testid="text-refund-method">
                                 {returnData.refundMethod}
                               </p>
@@ -541,7 +541,7 @@ export default function ReturnDetail() {
                           )}
                           {returnData.refundStatus && (
                             <div>
-                              <label className="text-sm font-medium text-muted-foreground">Refund Status</label>
+                              <label className="text-sm font-medium text-muted-foreground">Terugbetaling Status</label>
                               <p className="mt-1 text-sm" data-testid="text-refund-status">
                                 {returnData.refundStatus}
                               </p>
@@ -557,7 +557,7 @@ export default function ReturnDetail() {
               <TabsContent value="items" className="mt-6">
                 <Card>
                   <CardHeader className="bg-card-header border-b border-border">
-                    <CardTitle>Return Items</CardTitle>
+                    <CardTitle>Retour Artikelen</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
                     {returnData.returnItems && returnData.returnItems.length > 0 ? (
@@ -580,23 +580,23 @@ export default function ReturnDetail() {
                                 )}
                                 <div className="flex gap-4 mt-2">
                                   <div>
-                                    <span className="text-sm font-medium">Quantity:</span>{" "}
+                                    <span className="text-sm font-medium">Aantal:</span>{" "}
                                     <span className="text-sm" data-testid={`text-item-quantity-${item.id}`}>{item.quantity}</span>
                                   </div>
                                   <div>
-                                    <span className="text-sm font-medium">Reason:</span>{" "}
+                                    <span className="text-sm font-medium">Reden:</span>{" "}
                                     <span className="text-sm" data-testid={`text-item-reason-${item.id}`}>{item.reason}</span>
                                   </div>
                                 </div>
                                 {item.condition && (
                                   <p className="text-sm mt-2">
-                                    <span className="font-medium">Condition:</span>{" "}
+                                    <span className="font-medium">Conditie:</span>{" "}
                                     <span data-testid={`text-item-condition-${item.id}`}>{item.condition}</span>
                                   </p>
                                 )}
                                 {item.notes && (
                                   <p className="text-sm mt-2">
-                                    <span className="font-medium">Notes:</span>{" "}
+                                    <span className="font-medium">Notities:</span>{" "}
                                     <span data-testid={`text-item-notes-${item.id}`}>{item.notes}</span>
                                   </p>
                                 )}
@@ -613,7 +613,7 @@ export default function ReturnDetail() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-muted-foreground text-center py-8">No items found</p>
+                      <p className="text-muted-foreground text-center py-8">Geen artikelen gevonden</p>
                     )}
                   </CardContent>
                 </Card>
@@ -625,7 +625,7 @@ export default function ReturnDetail() {
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <Camera className="h-5 w-5" />
-                        Return Photos
+                        Retour Foto's
                       </CardTitle>
                       <div>
                         <input
@@ -643,7 +643,7 @@ export default function ReturnDetail() {
                           data-testid="button-upload-photo"
                         >
                           <Upload className="mr-2 h-4 w-4" />
-                          {isUploadingPhoto ? "Uploading..." : "Upload Photo"}
+                          {isUploadingPhoto ? "Uploaden..." : "Foto Uploaden"}
                         </Button>
                       </div>
                     </div>
@@ -652,9 +652,9 @@ export default function ReturnDetail() {
                     {!returnData.photoUrls || returnData.photoUrls.length === 0 ? (
                       <div className="text-center py-12">
                         <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <p className="text-muted-foreground">No photos uploaded yet</p>
+                        <p className="text-muted-foreground">Nog geen foto's geüpload</p>
                         <p className="text-sm text-muted-foreground mt-2">
-                          Upload photos to document the condition of returned items
+                          Upload foto's om de conditie van geretourneerde artikelen te documenteren
                         </p>
                       </div>
                     ) : (
@@ -688,7 +688,7 @@ export default function ReturnDetail() {
               <TabsContent value="timeline" className="mt-6">
                 <Card>
                   <CardHeader className="bg-card-header border-b border-border">
-                    <CardTitle>Timeline</CardTitle>
+                    <CardTitle>Tijdlijn</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="space-y-4">
@@ -699,7 +699,7 @@ export default function ReturnDetail() {
                             <div className="w-0.5 h-full bg-border" />
                           </div>
                           <div className="flex-1 pb-8">
-                            <p className="text-sm font-medium">Return Created</p>
+                            <p className="text-sm font-medium">Retour Aangemaakt</p>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(returnData.createdAt), "PPP 'at' p")}
                             </p>
@@ -713,7 +713,7 @@ export default function ReturnDetail() {
                             <div className="w-0.5 h-full bg-border" />
                           </div>
                           <div className="flex-1 pb-8">
-                            <p className="text-sm font-medium">Package Received</p>
+                            <p className="text-sm font-medium">Pakket Ontvangen</p>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(returnData.receivedDate), "PPP 'at' p")}
                             </p>
@@ -726,7 +726,7 @@ export default function ReturnDetail() {
                             <div className="w-2 h-2 rounded-full bg-green-500" />
                           </div>
                           <div className="flex-1">
-                            <p className="text-sm font-medium">Return Completed</p>
+                            <p className="text-sm font-medium">Retour Afgerond</p>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(returnData.completedDate), "PPP 'at' p")}
                             </p>
@@ -752,14 +752,14 @@ export default function ReturnDetail() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md m-4">
             <CardHeader className="bg-card-header border-b border-border">
-              <CardTitle>Assign User</CardTitle>
+              <CardTitle>Gebruiker Toewijzen</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
               <div>
-                <label className="text-sm font-medium">Select User</label>
+                <label className="text-sm font-medium">Selecteer Gebruiker</label>
                 <Select value={selectedUserId} onValueChange={setSelectedUserId}>
                   <SelectTrigger className="mt-1" data-testid="select-assign-user">
-                    <SelectValue placeholder="Select a user..." />
+                    <SelectValue placeholder="Selecteer een gebruiker..." />
                   </SelectTrigger>
                   <SelectContent>
                     {users?.map((user) => (
@@ -779,14 +779,14 @@ export default function ReturnDetail() {
                   }}
                   data-testid="button-cancel-assign"
                 >
-                  Cancel
+                  Annuleren
                 </Button>
                 <Button
                   onClick={() => assignUserMutation.mutate({ userId: selectedUserId })}
                   disabled={!selectedUserId || assignUserMutation.isPending}
                   data-testid="button-confirm-assign"
                 >
-                  {assignUserMutation.isPending ? "Assigning..." : "Assign"}
+                  {assignUserMutation.isPending ? "Toewijzen..." : "Toewijzen"}
                 </Button>
               </div>
             </CardContent>

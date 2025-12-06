@@ -54,6 +54,11 @@ npm run dev
 ### Stap 2: Push naar GitHub (Backup)
 
 ```powershell
+# ⚠️ CHECK EERST WELKE BRANCH JE OP ZIT!
+git branch
+# Moet tonen: * update/versie0.1
+# Als je op main zit, schakel eerst: git checkout update/versie0.1
+
 # Check wat er gewijzigd is
 git status
 
@@ -66,6 +71,8 @@ git commit -m "Feature: Beschrijving van je wijziging"
 # Push naar GitHub (update/versie0.1 branch)
 git push origin update/versie0.1
 ```
+
+> ⚠️ **LET OP:** Push NOOIT direct naar `main`! Altijd naar `update/versie0.1` pushen en later mergen.
 
 ✅ **Code staat nu veilig op GitHub!**
 

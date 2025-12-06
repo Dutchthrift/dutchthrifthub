@@ -183,7 +183,7 @@ export function BusinessMetricsWidget() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Target className="h-5 w-5" />
-          Business Performance
+          Bedrijfsprestaties
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -192,7 +192,7 @@ export function BusinessMetricsWidget() {
           <div className="space-y-2" data-testid="weekly-revenue-metric">
             <div className="flex items-center gap-1">
               <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Weekly Revenue</span>
+              <span className="text-xs text-muted-foreground">Wekelijkse Omzet</span>
             </div>
             <div className="text-xl font-bold">
               {formatCurrency(metrics.weeklyRevenue)}
@@ -204,7 +204,7 @@ export function BusinessMetricsWidget() {
               <span className={getTrendColor(metrics.weeklyRevenueChange)}>
                 {formatPercentage(metrics.weeklyRevenueChange)}
               </span>
-              <span className="text-muted-foreground">vs last week</span>
+              <span className="text-muted-foreground">t.o.v. vorige week</span>
             </div>
           </div>
 
@@ -212,7 +212,7 @@ export function BusinessMetricsWidget() {
           <div className="space-y-2" data-testid="weekly-orders-metric">
             <div className="flex items-center gap-1">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Weekly Orders</span>
+              <span className="text-xs text-muted-foreground">Wekelijkse Bestellingen</span>
             </div>
             <div className="text-xl font-bold">
               {metrics.weeklyOrders}
@@ -224,7 +224,7 @@ export function BusinessMetricsWidget() {
               <span className={getTrendColor(metrics.weeklyOrdersChange)}>
                 {formatPercentage(metrics.weeklyOrdersChange)}
               </span>
-              <span className="text-muted-foreground">vs last week</span>
+              <span className="text-muted-foreground">t.o.v. vorige week</span>
             </div>
           </div>
 
@@ -232,10 +232,10 @@ export function BusinessMetricsWidget() {
           <div className="space-y-2" data-testid="repair-time-metric">
             <div className="flex items-center gap-1">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Avg Repair Time</span>
+              <span className="text-xs text-muted-foreground">Gem. Reparatietijd</span>
             </div>
             <div className="text-xl font-bold">
-              {metrics.avgRepairTime.toFixed(1)} days
+              {metrics.avgRepairTime.toFixed(1)} dagen
             </div>
             <div className="flex items-center gap-1 text-xs">
               {createElement(getTrendIcon(metrics.repairTimeChange), {
@@ -244,7 +244,7 @@ export function BusinessMetricsWidget() {
               <span className={getTrendColor(metrics.repairTimeChange, true)}>
                 {formatPercentage(metrics.repairTimeChange)}
               </span>
-              <span className="text-muted-foreground">improvement</span>
+              <span className="text-muted-foreground">verbetering</span>
             </div>
           </div>
 
@@ -252,7 +252,7 @@ export function BusinessMetricsWidget() {
           <div className="space-y-2" data-testid="satisfaction-metric">
             <div className="flex items-center gap-1">
               <Target className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Satisfaction</span>
+              <span className="text-xs text-muted-foreground">Tevredenheid</span>
             </div>
             <div className="text-xl font-bold">
               {metrics.customerSatisfaction.toFixed(0)}%
@@ -264,7 +264,7 @@ export function BusinessMetricsWidget() {
               <span className={getTrendColor(metrics.satisfactionChange)}>
                 {formatPercentage(metrics.satisfactionChange)}
               </span>
-              <span className="text-muted-foreground">rating</span>
+              <span className="text-muted-foreground">score</span>
             </div>
           </div>
         </div>
@@ -273,22 +273,22 @@ export function BusinessMetricsWidget() {
         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
           {metrics.weeklyRevenueChange > 0 && (
             <Badge variant="default" className="text-xs">
-              Revenue Growing
+              Omzet Stijgt
             </Badge>
           )}
           {metrics.weeklyOrders > 5 && (
             <Badge variant="secondary" className="text-xs">
-              Strong Sales
+              Sterke Verkoop
             </Badge>
           )}
           {metrics.avgRepairTime < 5 && (
             <Badge variant="outline" className="text-xs">
-              Fast Turnaround
+              Snelle Doorlooptijd
             </Badge>
           )}
           {metrics.customerSatisfaction > 90 && (
             <Badge variant="default" className="text-xs">
-              High Satisfaction
+              Hoge Tevredenheid
             </Badge>
           )}
         </div>

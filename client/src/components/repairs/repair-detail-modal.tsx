@@ -263,13 +263,9 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'new': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'diagnosing': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'waiting_parts': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      case 'repair_in_progress': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-      case 'quality_check': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
+      case 'in_repair': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
       case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'returned': return 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200';
-      case 'canceled': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+      case 'returned': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -277,13 +273,9 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'new': return 'Nieuw';
-      case 'diagnosing': return 'Diagnose';
-      case 'waiting_parts': return 'Wacht op onderdelen';
-      case 'repair_in_progress': return 'In reparatie';
-      case 'quality_check': return 'Kwaliteitscontrole';
-      case 'completed': return 'Voltooid';
-      case 'returned': return 'Geretourneerd';
-      case 'canceled': return 'Geannuleerd';
+      case 'in_repair': return 'In Reparatie';
+      case 'completed': return 'Klaar';
+      case 'returned': return 'Teruggestuurd';
       default: return status;
     }
   };
@@ -586,13 +578,9 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                   <div className="flex flex-wrap gap-1.5">
                     {[
                       { value: 'new', label: 'Nieuw' },
-                      { value: 'diagnosing', label: 'Diagnose' },
-                      { value: 'waiting_parts', label: 'Wacht op onderdelen' },
-                      { value: 'repair_in_progress', label: 'In reparatie' },
-                      { value: 'quality_check', label: 'Kwaliteitscontrole' },
-                      { value: 'completed', label: 'Voltooid' },
-                      { value: 'returned', label: 'Geretourneerd' },
-                      { value: 'canceled', label: 'Geannuleerd' },
+                      { value: 'in_repair', label: 'In Reparatie' },
+                      { value: 'completed', label: 'Klaar' },
+                      { value: 'returned', label: 'Teruggestuurd' },
                     ].map((status) => (
                       <Button
                         key={status.value}
