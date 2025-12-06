@@ -1,34 +1,50 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { ShoppingBag } from "lucide-react";
+import { format } from "date-fns";
 import type { Order } from "@/lib/types";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400",
+  processing: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400",
+  shipped: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-400",
+  delivered: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400",
+  paid: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400",
+  cancelled: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400",
+  refunded: "bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "In afwachting",
+  processing: "In behandeling",
+  shipped: "Verzonden",
+  delivered: "Bezorgd",
+  paid: "Betaald",
+  cancelled: "Geannuleerd",
+  refunded: "Terugbetaald",
+};
 
 export function RecentOrdersWidget() {
-  const { data: orders, isLoading } = useQuery<Order[]>({
+  const [, setLocation] = useLocation();
+  const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
   });
 
   if (isLoading) {
     return (
-      <Card data-testid="recent-orders-widget">
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="flex items-center justify-between p-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-muted rounded-md"></div>
-                  <div className="space-y-1">
-                    <div className="h-4 bg-muted rounded w-32"></div>
-                    <div className="h-3 bg-muted rounded w-24"></div>
-                  </div>
-                </div>
-                <div className="text-right space-y-1">
-                  <div className="h-4 bg-muted rounded w-16"></div>
-                  <div className="h-3 bg-muted rounded w-12"></div>
-                </div>
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShoppingBag className="h-5 w-5" />
+            Recente Bestellingen
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3 animate-pulse">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-16 bg-muted rounded"></div>
             ))}
           </div>
         </CardContent>
@@ -36,90 +52,79 @@ export function RecentOrdersWidget() {
     );
   }
 
-  const recentOrders = orders?.slice(0, 3) || [];
-
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case "paid":
-      case "delivered":
-        return "default";
-      case "processing":
-      case "shipped":
-        return "secondary";
-      case "pending":
-        return "outline";
-      case "cancelled":
-      case "refunded":
-        return "destructive";
-      default:
-        return "secondary";
-    }
-  };
-
-  const getProductImage = (orderData: any) => {
-    // Fallback camera image from Unsplash
-    return "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?ixlib=rb-4.0.3&auto=format&fit=crop&w=48&h=48";
-  };
+  // Get last 5 orders, sorted by order date
+  const recentOrders = [...orders]
+    .sort((a, b) => {
+      const dateA = a.orderDate ? new Date(a.orderDate).getTime() : 0;
+      const dateB = b.orderDate ? new Date(b.orderDate).getTime() : 0;
+      return dateB - dateA;
+    })
+    .slice(0, 5);
 
   const getProductName = (orderData: any) => {
     if (orderData?.line_items?.[0]) {
       return orderData.line_items[0].title;
     }
-    return "Camera Equipment";
+    return "Bestelling";
   };
 
   return (
-    <Card data-testid="recent-orders-widget">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg font-medium">Recent Orders</CardTitle>
-        <Link href="/orders">
-          <Button variant="link" className="text-sm text-primary hover:text-primary/80" data-testid="view-all-orders">
-            View all orders
-          </Button>
-        </Link>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <ShoppingBag className="h-5 w-5" />
+            Recente Bestellingen
+          </CardTitle>
+          <button
+            onClick={() => setLocation('/orders')}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Alles bekijken →
+          </button>
+        </div>
       </CardHeader>
       <CardContent>
         {recentOrders.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            No recent orders found
+            <ShoppingBag className="h-12 w-12 mx-auto mb-2 opacity-20" />
+            <p className="text-sm">Nog geen bestellingen</p>
           </div>
         ) : (
           <div className="space-y-3">
             {recentOrders.map((order) => (
-              <div
+              <button
                 key={order.id}
-                className="flex items-center justify-between p-3 rounded-md border border-border hover:bg-accent transition-colors"
-                data-testid={`order-item-${order.id}`}
+                onClick={() => setLocation('/orders')}
+                className="w-full h-[72px] flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer text-left"
               >
-                <div className="flex items-center space-x-3">
-                  <img 
-                    src={getProductImage(order.orderData)} 
-                    alt={getProductName(order.orderData)}
-                    className="w-12 h-12 rounded-md object-cover"
-                    data-testid={`order-image-${order.id}`}
-                  />
-                  <div>
-                    <p className="text-sm font-medium" data-testid={`order-product-${order.id}`}>
-                      {getProductName(order.orderData)}
-                    </p>
-                    <p className="text-xs text-muted-foreground" data-testid={`order-customer-${order.id}`}>
-                      {order.customerEmail}
-                    </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-sm font-medium truncate text-primary">
+                      {order.orderNumber || order.id.slice(0, 8)}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`${STATUS_COLORS[order.status] || ''} text-xs px-2 py-0`}
+                    >
+                      {STATUS_LABELS[order.status] || order.status}
+                    </Badge>
                   </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {getProductName(order.orderData)}
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-500">
+                    {order.orderDate
+                      ? format(new Date(order.orderDate), "dd MMM yyyy")
+                      : "Geen datum"}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium" data-testid={`order-amount-${order.id}`}>
+                <div className="text-right ml-2">
+                  <p className="text-sm font-medium text-green-600 dark:text-green-500">
                     €{((order.totalAmount || 0) / 100).toFixed(2)}
                   </p>
-                  <Badge 
-                    variant={getStatusVariant(order.status)} 
-                    className="text-xs"
-                    data-testid={`order-status-${order.id}`}
-                  >
-                    {order.status?.charAt(0).toUpperCase() + order.status?.slice(1) || 'Pending'}
-                  </Badge>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

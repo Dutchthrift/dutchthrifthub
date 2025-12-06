@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Package, AlertCircle, DollarSign, TrendingUp } from "lucide-react";
+import { Package, AlertCircle, DollarSign, Wrench } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Return, Order } from "@shared/schema";
+import type { Return, Order, Repair } from "@shared/schema";
 
 export function ReturnsStatsWidget() {
     const { data: returns = [], isLoading: returnsLoading } = useQuery<Return[]>({
@@ -12,7 +12,11 @@ export function ReturnsStatsWidget() {
         queryKey: ["/api/orders"],
     });
 
-    const isLoading = returnsLoading || ordersLoading;
+    const { data: repairs = [], isLoading: repairsLoading } = useQuery<Repair[]>({
+        queryKey: ["/api/repairs"],
+    });
+
+    const isLoading = returnsLoading || ordersLoading || repairsLoading;
 
     if (isLoading) {
         return (
@@ -98,6 +102,10 @@ export function ReturnsStatsWidget() {
         ? ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100
         : 0;
 
+    // 5. Active Repairs
+    const activeRepairStatuses = ['new', 'pending', 'in_progress', 'waiting_parts'];
+    const activeRepairs = repairs.filter(r => activeRepairStatuses.includes(r.status) && !r.isArchived).length;
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('nl-NL', {
             style: 'currency',
@@ -145,7 +153,23 @@ export function ReturnsStatsWidget() {
                 </CardContent>
             </Card>
 
-            {/* Today's Revenue */}
+            {/* Active Repairs - NEW 3rd card */}
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/50 dark:to-purple-900/50 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Actieve Reparaties</p>
+                            <h3 className="text-3xl font-bold text-purple-900 dark:text-purple-100">{activeRepairs}</h3>
+                            <p className="text-xs text-purple-600 dark:text-purple-400">
+                                {repairs.length} totaal
+                            </p>
+                        </div>
+                        <Wrench className="h-12 w-12 text-purple-500 dark:text-purple-400 opacity-20" />
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Today's Revenue - Now 4th card */}
             <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/50 dark:to-green-900/50 border-green-200 dark:border-green-800 hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -157,22 +181,6 @@ export function ReturnsStatsWidget() {
                             </p>
                         </div>
                         <DollarSign className="h-12 w-12 text-green-500 dark:text-green-400 opacity-20" />
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Weekly Growth */}
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/50 dark:to-purple-900/50 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Wekelijkse Groei</p>
-                            <h3 className="text-3xl font-bold text-purple-900 dark:text-purple-100">{formatChange(weeklyGrowth)}</h3>
-                            <p className="text-xs text-purple-600 dark:text-purple-400">
-                                {formatCurrency(thisWeekRevenue)} deze week
-                            </p>
-                        </div>
-                        <TrendingUp className="h-12 w-12 text-purple-500 dark:text-purple-400 opacity-20" />
                     </div>
                 </CardContent>
             </Card>

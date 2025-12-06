@@ -1,30 +1,50 @@
-import { ExternalLink } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { CheckSquare, Plus } from "lucide-react";
+import { format } from "date-fns";
 import type { Todo } from "@/lib/types";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
+
+const PRIORITY_COLORS: Record<string, string> = {
+  urgent: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400",
+  high: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-400",
+  medium: "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400",
+  low: "bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300",
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  urgent: "Urgent",
+  high: "Hoog",
+  medium: "Gemiddeld",
+  low: "Laag",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Te doen",
+  in_progress: "Bezig",
+  done: "Klaar",
+};
 
 export function PersonalTodosWidget() {
-  const { data: todos, isLoading } = useQuery<Todo[]>({
+  const [, setLocation] = useLocation();
+  const { data: todos = [], isLoading } = useQuery<Todo[]>({
     queryKey: ["/api/todos"],
   });
 
   if (isLoading) {
     return (
-      <Card data-testid="personal-todos-widget">
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="flex items-center space-x-3 p-3">
-                <div className="h-4 w-4 bg-muted rounded"></div>
-                <div className="flex-1 space-y-1">
-                  <div className="h-4 bg-muted rounded"></div>
-                  <div className="h-3 bg-muted rounded w-3/4"></div>
-                </div>
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckSquare className="h-5 w-5" />
+            Mijn Taken
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3 animate-pulse">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-16 bg-muted rounded"></div>
             ))}
           </div>
         </CardContent>
@@ -32,83 +52,79 @@ export function PersonalTodosWidget() {
     );
   }
 
-  const topTodos = todos?.slice(0, 5) || [];
-
-  const getPriorityVariant = (priority: string) => {
-    switch (priority) {
-      case "high":
-      case "urgent":
-        return "destructive";
-      case "medium":
-        return "secondary";
-      case "low":
-        return "outline";
-      default:
-        return "secondary";
-    }
-  };
-
-  const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "High Priority";
-      case "urgent":
-        return "Urgent";
-      case "medium":
-        return "Medium";
-      case "low":
-        return "Low";
-      default:
-        return "Medium";
-    }
-  };
+  // Get top 5 todos, prioritizing incomplete ones first, then by priority
+  const topTodos = [...todos]
+    .filter(t => t.status !== 'done')
+    .sort((a, b) => {
+      const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+      return (priorityOrder[a.priority || 'medium'] || 2) - (priorityOrder[b.priority || 'medium'] || 2);
+    })
+    .slice(0, 5);
 
   return (
-    <Card data-testid="personal-todos-widget">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg font-medium">Personal To-do's</CardTitle>
-        <Link href="/todos">
-          <Button variant="link" className="text-sm text-primary hover:text-primary/80" data-testid="view-all-todos">
-            View all
-          </Button>
-        </Link>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <CheckSquare className="h-5 w-5" />
+            Mijn Taken
+          </CardTitle>
+          <button
+            onClick={() => setLocation('/todos')}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Alles bekijken →
+          </button>
+        </div>
       </CardHeader>
       <CardContent>
+        {/* Action Card */}
+        <button
+          onClick={() => setLocation('/todos')}
+          className="w-full mb-3 p-3 rounded-lg bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950/50 dark:to-green-900/50 border border-green-200 dark:border-green-800 hover:shadow-md transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
+              <Plus className="h-4 w-4 text-green-600 dark:text-green-400" />
+            </div>
+            <span className="text-sm font-medium text-green-700 dark:text-green-300 group-hover:text-green-800 dark:group-hover:text-green-200">
+              Nieuwe Taak
+            </span>
+          </div>
+        </button>
+
         {topTodos.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            No todos found. Create one to get started!
+            <CheckSquare className="h-12 w-12 mx-auto mb-2 opacity-20" />
+            <p className="text-sm">Geen openstaande taken</p>
           </div>
         ) : (
           <div className="space-y-3">
             {topTodos.map((todo) => (
-              <div
+              <button
                 key={todo.id}
-                className="flex items-center space-x-3 p-3 rounded-md border border-border hover:bg-accent transition-colors"
-                data-testid={`todo-item-${todo.id}`}
+                onClick={() => setLocation('/todos')}
+                className="w-full h-[72px] flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer text-left"
               >
-                <Checkbox 
-                  checked={todo.status === 'done'}
-                  data-testid={`todo-checkbox-${todo.id}`}
-                />
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium">{todo.title}</p>
-                  <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                    <span data-testid={`todo-due-date-${todo.id}`}>
-                      Due: {todo.dueDate ? new Date(todo.dueDate).toLocaleDateString() : 'No due date'}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium truncate">
+                      {todo.title}
                     </span>
-                    <Badge 
-                      variant={getPriorityVariant(todo.priority || 'medium')}
-                      className="text-xs"
-                      data-testid={`todo-priority-${todo.id}`}
+                    <Badge
+                      variant="outline"
+                      className={`${PRIORITY_COLORS[todo.priority || 'medium'] || ''} text-xs px-2 py-0`}
                     >
-                      {getPriorityLabel(todo.priority || 'medium')}
+                      {PRIORITY_LABELS[todo.priority || 'medium'] || todo.priority}
                     </Badge>
                   </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-500">
+                    {todo.dueDate
+                      ? `Deadline: ${format(new Date(todo.dueDate), "dd MMM yyyy")}`
+                      : "Geen deadline"}
+                  </p>
                 </div>
-                <Button variant="ghost" size="icon" data-testid={`todo-link-${todo.id}`}>
-                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </div>
+              </button>
             ))}
           </div>
         )}

@@ -1,7 +1,9 @@
 import { Navigation } from "@/components/layout/navigation";
 import { ReturnsStatsWidget } from "@/components/widgets/returns-stats-widget";
-import { PendingActionsWidget } from "@/components/widgets/pending-actions-widget";
 import { RecentReturnsWidget } from "@/components/widgets/recent-returns-widget";
+import { RecentOrdersWidget } from "@/components/widgets/recent-orders-widget";
+import { RecentRepairsWidget } from "@/components/widgets/recent-repairs-widget";
+import { PersonalTodosWidget } from "@/components/widgets/personal-todos-widget";
 import { QuickActionsWidget } from "@/components/widgets/quick-actions-widget";
 import { BusinessMetricsWidget } from "@/components/widgets/business-metrics-widget";
 import { useQuery } from "@tanstack/react-query";
@@ -41,13 +43,19 @@ export default function Home() {
         {/* Stats Grid - 4 Colored Cards */}
         <ReturnsStatsWidget />
 
-        {/* Main Content Grid */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Pending Actions */}
-          <PendingActionsWidget />
-
+        {/* Main Content Grid - 4 Info Blocks */}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {/* Recent Returns */}
           <RecentReturnsWidget />
+
+          {/* Recent Orders */}
+          <RecentOrdersWidget />
+
+          {/* Recent Repairs */}
+          <RecentRepairsWidget />
+
+          {/* Personal Todos */}
+          <PersonalTodosWidget />
         </div>
 
         {/* Quick Actions */}

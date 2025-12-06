@@ -1,8 +1,9 @@
 import { Navigation } from "@/components/layout/navigation";
 import { ReturnsStatsWidget } from "@/components/widgets/returns-stats-widget";
-import { PendingActionsWidget } from "@/components/widgets/pending-actions-widget";
 import { RecentReturnsWidget } from "@/components/widgets/recent-returns-widget";
-import { QuickActionsWidget } from "@/components/widgets/quick-actions-widget";
+import { RecentOrdersWidget } from "@/components/widgets/recent-orders-widget";
+import { RecentRepairsWidget } from "@/components/widgets/recent-repairs-widget";
+import { PersonalTodosWidget } from "@/components/widgets/personal-todos-widget";
 import { BusinessMetricsWidget } from "@/components/widgets/business-metrics-widget";
 import { useQuery } from "@tanstack/react-query";
 
@@ -19,7 +20,7 @@ export default function Dashboard() {
     queryKey: ["/api/auth/session"],
   });
 
-  const userName = session?.user?.firstName || session?.user?.username || "there";
+  const userName = session?.user?.firstName || session?.user?.username || "daar";
 
   return (
     <div className="min-h-screen bg-background" data-testid="dashboard-page">
@@ -29,11 +30,11 @@ export default function Dashboard() {
         {/* Page Header */}
         <div className="flex items-center justify-between" data-testid="dashboard-header">
           <div>
-            <h2 className="text-4xl font-bold tracking-tight text-foreground">
-              Welcome back, {userName}! 👋
+            <h2 className="text-4xl font-bold tracking-tight bg-gradient-primary bg-clip-text text-transparent">
+              Welkom terug, {userName}! 👋
             </h2>
             <p className="text-muted-foreground mt-1 text-lg">
-              Here's your business overview for today.
+              Hier is je bedrijfsoverzicht voor vandaag.
             </p>
           </div>
         </div>
@@ -41,17 +42,20 @@ export default function Dashboard() {
         {/* Stats Grid - 4 Colored Cards */}
         <ReturnsStatsWidget />
 
-        {/* Main Content Grid */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Pending Actions */}
-          <PendingActionsWidget />
+        {/* Main Content Grid - 4 Info Blocks */}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {/* Recent Orders */}
+          <RecentOrdersWidget />
 
           {/* Recent Returns */}
           <RecentReturnsWidget />
-        </div>
 
-        {/* Quick Actions */}
-        <QuickActionsWidget />
+          {/* Recent Repairs */}
+          <RecentRepairsWidget />
+
+          {/* Personal Todos */}
+          <PersonalTodosWidget />
+        </div>
 
         {/* Business Performance Metrics */}
         <BusinessMetricsWidget />
