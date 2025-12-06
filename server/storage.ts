@@ -1182,16 +1182,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async generatePONumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const result = await db.select({ poNumber: purchaseOrders.poNumber }).from(purchaseOrders).where(sql`${purchaseOrders.poNumber} LIKE ${`PO-${year}-%`}`).orderBy(desc(purchaseOrders.poNumber)).limit(1);
+    // Simple sequential PO number: PO-1, PO-2, etc.
+    const result = await db.select({ poNumber: purchaseOrders.poNumber }).from(purchaseOrders).orderBy(desc(purchaseOrders.poNumber)).limit(100);
 
     if (result.length === 0) {
-      return `PO-${year}-001`;
+      return `PO-1`;
     }
 
-    const lastNumber = parseInt(result[0].poNumber!.split('-')[2]) || 0;
-    const nextNumber = (lastNumber + 1).toString().padStart(3, '0');
-    return `PO-${year}-${nextNumber}`;
+    // Find the highest number from any PO-X or PO-YYYY-XXXX format
+    let maxNumber = 0;
+    for (const po of result) {
+      if (!po.poNumber) continue;
+      // Match PO-X format
+      const simpleMatch = po.poNumber.match(/^PO-(\d+)$/);
+      if (simpleMatch) {
+        maxNumber = Math.max(maxNumber, parseInt(simpleMatch[1], 10));
+      }
+      // Also match old PO-YYYY-XXXX format to not conflict
+      const oldMatch = po.poNumber.match(/^PO-\d{4}-(\d+)$/);
+      if (oldMatch) {
+        maxNumber = Math.max(maxNumber, parseInt(oldMatch[1], 10));
+      }
+    }
+
+    return `PO-${maxNumber + 1}`;
   }
 
   async getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined> {
@@ -1209,17 +1223,21 @@ export class DatabaseStorage implements IStorage {
     const newPurchaseOrder = await db.transaction(async (tx) => {
       // Generate PO number within transaction to prevent conflicts
       const existingOrders = await tx.select({ poNumber: purchaseOrders.poNumber }).from(purchaseOrders);
-      const year = new Date().getFullYear();
-      const yearPrefix = `PO-${year}-`;
+      // Simple sequential PO number: PO-1, PO-2, etc.
+      let maxNumber = 0;
+      for (const po of existingOrders) {
+        if (!po.poNumber) continue;
+        const simpleMatch = po.poNumber.match(/^PO-(\d+)$/);
+        if (simpleMatch) {
+          maxNumber = Math.max(maxNumber, parseInt(simpleMatch[1], 10));
+        }
+        const oldMatch = po.poNumber.match(/^PO-\d{4}-(\d+)$/);
+        if (oldMatch) {
+          maxNumber = Math.max(maxNumber, parseInt(oldMatch[1], 10));
+        }
+      }
 
-      const maxNumber = existingOrders
-        .map(p => {
-          const match = p.poNumber?.match(new RegExp(`^PO-${year}-(\\d+)$`));
-          return match ? parseInt(match[1], 10) : 0;
-        })
-        .reduce((max, num) => Math.max(max, num), 0);
-
-      const poNumber = `${yearPrefix}${String(maxNumber + 1).padStart(4, '0')}`;
+      const poNumber = `PO-${maxNumber + 1}`;
 
       // Create purchase order within transaction
       const result = await tx.insert(purchaseOrders).values({
