@@ -33,7 +33,7 @@ import {
   type NoteLink, type InsertNoteLink,
   type Email, type InsertEmail,
   type EmailLink, type InsertEmailLink,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks, repairCounters
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns, lt } from "drizzle-orm";
@@ -585,7 +585,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createRepair(repair: InsertRepair): Promise<Repair> {
-    const result = await db.insert(repairs).values(repair).returning();
+    // Auto-generate repair number based on type using atomic counter
+    const prefix = repair.repairType === 'inventory' ? 'IN' : 'KL';
+    const counterId = repair.repairType || 'customer';
+
+    // Get and increment the counter atomically using upsert
+    const counterResult = await db
+      .insert(repairCounters)
+      .values({ id: counterId, lastNumber: 1 })
+      .onConflictDoUpdate({
+        target: repairCounters.id,
+        set: {
+          lastNumber: sql`${repairCounters.lastNumber} + 1`,
+          updatedAt: new Date()
+        }
+      })
+      .returning();
+
+    const nextNumber = counterResult[0].lastNumber;
+    const repairNumber = `${prefix}-${nextNumber}`;
+
+    const result = await db.insert(repairs).values({
+      ...repair,
+      repairNumber,
+    }).returning();
     return result[0];
   }
 

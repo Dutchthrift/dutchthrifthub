@@ -1,10 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { 
-  Home, 
-  Inbox, 
-  ShoppingCart, 
-  Wrench, 
-  CheckSquare, 
+import {
+  Home,
+  Inbox,
+  ShoppingCart,
+  Wrench,
+  CheckSquare,
   BarChart3,
   Camera,
   Settings,
@@ -29,7 +29,7 @@ const navigationItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/inbox", label: "Inbox", icon: Inbox, badge: 3 },
   { href: "/orders", label: "Orders", icon: ShoppingCart },
-  { href: "/repairs", label: "Repairs", icon: Wrench },
+  { href: "/repairs", label: "Reparaties", icon: Wrench },
   { href: "/returns", label: "Retouren", icon: Package },
   { href: "/todos", label: "To-do's", icon: CheckSquare },
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
@@ -45,7 +45,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const smallLogoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/extra-files/dutchthrift-logo-small.jpg`;
 
   return (
-    <div 
+    <div
       className={cn(
         "flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300",
         collapsed ? "w-16" : "w-64"
@@ -56,9 +56,9 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
       <div className="p-4">
         <Link href="/" className="flex items-center space-x-2" data-testid="sidebar-logo">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
-            <img 
-              src={smallLogoUrl} 
-              alt="DutchThrift" 
+            <img
+              src={smallLogoUrl}
+              alt="DutchThrift"
               className="h-full w-full object-cover"
             />
           </div>
@@ -75,7 +75,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
         <div className="space-y-1">
           {navigationItems.map((item) => {
             const isActive = location === item.href;
-            
+
             const content = (
               <Link
                 key={item.href}
@@ -93,8 +93,8 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                   <>
                     <span className="flex-1">{item.label}</span>
                     {item.badge && (
-                      <Badge 
-                        variant="default" 
+                      <Badge
+                        variant="default"
                         className="ml-auto h-5 w-5 justify-center p-0 text-xs"
                       >
                         {item.badge}
@@ -166,7 +166,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                 </p>
               </div>
             </div>
-            
+
             <div className="space-y-1">
               <Button
                 variant="ghost"
@@ -176,7 +176,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                 <Settings className="mr-3 h-4 w-4" />
                 Settings
               </Button>
-              
+
               <Button
                 variant="ghost"
                 className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"

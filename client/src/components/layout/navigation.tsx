@@ -33,7 +33,7 @@ const navigationItems = [
   { href: "/returns", label: "Retouren", icon: Package, roles: ["ADMIN", "SUPPORT"] },
   { href: "/orders", label: "Orders", icon: ShoppingCart, roles: ["ADMIN", "SUPPORT"] },
   { href: "/purchase-orders", label: "Inkoop Orders", icon: Package2, roles: ["ADMIN", "SUPPORT"] },
-  { href: "/repairs", label: "Repairs", icon: Wrench, roles: ["ADMIN", "SUPPORT", "TECHNICUS"] },
+  { href: "/repairs", label: "Reparaties", icon: Wrench, roles: ["ADMIN", "SUPPORT", "TECHNICUS"] },
   { href: "/todos", label: "To-do's", icon: CheckSquare, roles: ["ADMIN", "SUPPORT"] },
 ];
 
@@ -85,9 +85,9 @@ export function Navigation() {
                 <div className="p-4 border-b border-border/50">
                   <div className="flex items-center space-x-2">
                     <div className="h-8 w-8 rounded-lg overflow-hidden">
-                      <img 
-                        src={smallLogoUrl} 
-                        alt="DutchThrift" 
+                      <img
+                        src={smallLogoUrl}
+                        alt="DutchThrift"
                         className="h-full w-full object-cover"
                       />
                     </div>
@@ -124,7 +124,7 @@ export function Navigation() {
                         </Link>
                       );
                     })}
-                  
+
                   {/* Admin Links */}
                   {user?.role === "ADMIN" && (
                     <>
@@ -191,7 +191,7 @@ export function Navigation() {
                     <Monitor className="h-4 w-4 mr-2" />
                     System
                   </Button>
-                  
+
                   <div className="pt-2">
                     <Button
                       variant="ghost"
@@ -215,9 +215,9 @@ export function Navigation() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2" data-testid="logo-link">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
-                <img 
-                  src={smallLogoUrl} 
-                  alt="DutchThrift" 
+                <img
+                  src={smallLogoUrl}
+                  alt="DutchThrift"
                   className="h-full w-full object-cover"
                 />
               </div>
@@ -314,7 +314,7 @@ export function Navigation() {
                     <DropdownMenuSeparator />
                   </>
                 )}
-                
+
                 {/* Theme Selector */}
                 <div className="px-2 py-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
@@ -353,7 +353,7 @@ export function Navigation() {
                     </Button>
                   </div>
                 </div>
-                
+
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleLogout}

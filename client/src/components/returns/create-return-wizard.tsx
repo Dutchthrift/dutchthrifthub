@@ -444,7 +444,7 @@ export function CreateReturnWizard({ open, onOpenChange, onReturnCreated }: Crea
                             </div>
                             <Button
                                 type="button"
-                                variant="outline"
+                                variant="secondary"
                                 size="sm"
                                 onClick={allSelected ? deselectAllItems : selectAllItems}
                                 className="h-7 text-xs"
@@ -470,7 +470,7 @@ export function CreateReturnWizard({ open, onOpenChange, onReturnCreated }: Crea
                                                 onCheckedChange={(checked) =>
                                                     toggleItem({ ...lineItem, id: itemKey }, checked as boolean)
                                                 }
-                                                className="mt-1 flex-shrink-0 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                                                className="mt-1 flex-shrink-0 bg-white dark:bg-gray-700 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
                                             />
 
                                             {/* Product Image */}

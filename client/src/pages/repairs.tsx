@@ -70,6 +70,7 @@ export default function Repairs() {
   const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null);
   const [customerSectionOpen, setCustomerSectionOpen] = useState(true);
   const [inventorySectionOpen, setInventorySectionOpen] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
 
   const { data: repairs = [], isLoading } = useQuery<Repair[]>({
     queryKey: ["/api/repairs"],
@@ -180,11 +181,16 @@ export default function Repairs() {
     archiveRepairMutation.mutate(repair.id);
   };
 
-  // Filter repairs by type
+  // Filter repairs by type and archive status
+  const filterByArchive = (repair: Repair) => {
+    const isArchived = (repair as any).isArchived === true;
+    return showArchived ? isArchived : !isArchived;
+  };
+
   const customerRepairs = repairs.filter(r =>
-    (r as any).repairType === 'customer' || !(r as any).repairType // Default old repairs to customer
+    ((r as any).repairType === 'customer' || !(r as any).repairType) && filterByArchive(r)
   );
-  const inventoryRepairs = repairs.filter(r => (r as any).repairType === 'inventory');
+  const inventoryRepairs = repairs.filter(r => (r as any).repairType === 'inventory' && filterByArchive(r));
 
   // Apply search filter
   const filterBySearch = (repair: Repair) => {
@@ -255,11 +261,26 @@ export default function Repairs() {
                 style={{ touchAction: 'none' }}
               />
               <CardContent className="p-3 relative pointer-events-none">
-                <h4 className="font-medium text-sm truncate mb-1">{repair.title}</h4>
-                {repair.productName && (
-                  <p className="text-xs text-muted-foreground truncate mb-2">{repair.productName}</p>
+                {repair.repairType === 'customer' ? (
+                  <>
+                    {/* Customer repair: Order number as title */}
+                    <h4 className="font-medium text-sm truncate">{repair.orderNumber || 'Geen order'}</h4>
+                    <p className="text-xs text-muted-foreground truncate">{repair.productName || repair.title}</p>
+                    <p className="text-xs text-blue-500">{repair.repairNumber || `#${repair.id.slice(0, 6)}`}</p>
+                    {repair.customerName && (
+                      <p className="text-xs text-blue-600 truncate">👤 {repair.customerName}</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {/* Inventory repair: Product title as title */}
+                    <h4 className="font-medium text-sm truncate">{repair.title}</h4>
+                    <p className="text-xs text-amber-600 truncate">
+                      {repair.repairNumber || `#${repair.id.slice(0, 6)}`}
+                    </p>
+                  </>
                 )}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mt-1.5">
                   {assignedUser && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <User className="h-3 w-3" />
@@ -405,10 +426,12 @@ export default function Repairs() {
                 {activeRepair && (
                   <Card className="shadow-xl border-l-4 cursor-grabbing rotate-2 scale-105" style={{ borderLeftColor: STATUS_CONFIG[activeRepair.status as keyof typeof STATUS_CONFIG]?.color.replace('bg-', '') }}>
                     <CardContent className="p-3">
-                      <h4 className="font-medium text-sm truncate mb-1">{activeRepair.title}</h4>
-                      {activeRepair.productName && (
-                        <p className="text-xs text-muted-foreground truncate">{activeRepair.productName}</p>
-                      )}
+                      <h4 className="font-medium text-sm truncate">
+                        {activeRepair.repairType === 'customer' ? (activeRepair.orderNumber || 'Geen order') : activeRepair.title}
+                      </h4>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {activeRepair.repairNumber || `#${activeRepair.id.slice(0, 6)}`}
+                      </p>
                     </CardContent>
                   </Card>
                 )}
@@ -432,15 +455,26 @@ export default function Repairs() {
               <h1 className="text-3xl font-bold tracking-tight">Reparaties</h1>
               <p className="text-muted-foreground">Beheer klant- en inkoopreparaties</p>
             </div>
-            <div className="relative w-full sm:w-[300px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Zoek reparaties..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="input-search"
-              />
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showArchived ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowArchived(!showArchived)}
+                className="whitespace-nowrap"
+              >
+                <Archive className="h-4 w-4 mr-2" />
+                {showArchived ? "Archief" : "Actief"}
+              </Button>
+              <div className="relative w-full sm:w-[300px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Zoek reparaties..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-testid="input-search"
+                />
+              </div>
             </div>
           </div>
         </div>

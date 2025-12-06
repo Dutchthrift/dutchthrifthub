@@ -17,6 +17,14 @@ export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["aangeko
 export const caseStatusEnum = pgEnum("case_status", ["new", "in_progress", "waiting_customer", "resolved"]);
 export const caseEventTypeEnum = pgEnum("case_event_type", ["created", "status_change", "note_added", "link_added", "link_removed", "sla_set", "assigned", "email_sent", "email_received"]);
 export const caseLinkTypeEnum = pgEnum("case_link_type", ["order", "email", "repair", "todo", "return"]);
+
+// Repair number counters - never decreases, ensures unique sequential numbers
+export const repairCounters = pgTable("repair_counters", {
+  id: varchar("id").primaryKey(), // 'customer' or 'inventory'
+  lastNumber: integer("last_number").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const returnStatusEnum = pgEnum("return_status", [
   "nieuw",                  // NEW: Pending approval (Shopify: REQUESTED)
   "onderweg",               // NEW: Approved with label (Shopify: OPEN)
@@ -119,6 +127,7 @@ export const emailMessages = pgTable("email_messages", {
 // Repairs table
 export const repairs = pgTable("repairs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  repairNumber: text("repair_number"), // Auto-generated: KL-1, KL-2... or IN-1, IN-2...
   title: text("title").notNull(),
   description: text("description"),
   productSku: text("product_sku"),
@@ -144,6 +153,7 @@ export const repairs = pgTable("repairs", {
   completedAt: timestamp("completed_at"),
   returnedAt: timestamp("returned_at"),
   repairType: repairTypeEnum("repair_type").notNull().default("customer"), // customer or inventory
+  isArchived: boolean("is_archived").default(false), // Archive completed/returned repairs
   caseId: varchar("case_id").references(() => cases.id), // Link repairs to cases
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
