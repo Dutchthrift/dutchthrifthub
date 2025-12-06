@@ -740,7 +740,7 @@ export default function CaseDetail() {
                       relatedOrders.map(order => (
                         <div key={order.id} className="border rounded p-4">
                           <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium">Order #{order.orderNumber}</h4>
+                            <h4 className="font-medium">Order {order.orderNumber}</h4>
                             <Badge>{order.status}</Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">
@@ -997,7 +997,7 @@ export default function CaseDetail() {
                         ))}
                         {linkType === "order" && getAvailableItems().map((order: any) => (
                           <SelectItem key={order.id} value={order.id} data-testid={`link-order-${order.id}`}>
-                            Order #{order.orderNumber}
+                            Order {order.orderNumber}
                           </SelectItem>
                         ))}
                         {linkType === "repair" && getAvailableItems().map((repair: any) => (

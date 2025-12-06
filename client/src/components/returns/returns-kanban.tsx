@@ -53,55 +53,91 @@ const STATUS_COLUMNS = [
   {
     id: 'nieuw',
     title: 'Nieuw',
-    color: 'bg-chart-4',
+    color: 'bg-amber-500',
+    headerBg: 'bg-amber-50 dark:bg-amber-950/30',
+    headerBorder: 'border-amber-200 dark:border-amber-800',
+    cardBorder: 'border-l-4 border-l-amber-500',
+    countBg: 'bg-amber-500 text-white',
     statuses: ['nieuw']
   },
   {
     id: 'onderweg',
     title: 'Onderweg',
-    color: 'bg-primary',
+    color: 'bg-blue-500',
+    headerBg: 'bg-blue-50 dark:bg-blue-950/30',
+    headerBorder: 'border-blue-200 dark:border-blue-800',
+    cardBorder: 'border-l-4 border-l-blue-500',
+    countBg: 'bg-blue-500 text-white',
     statuses: ['onderweg']
   },
   {
     id: 'ontvangen_controle',
     title: 'Ontvangen',
-    color: 'bg-chart-2',
+    color: 'bg-purple-500',
+    headerBg: 'bg-purple-50 dark:bg-purple-950/30',
+    headerBorder: 'border-purple-200 dark:border-purple-800',
+    cardBorder: 'border-l-4 border-l-purple-500',
+    countBg: 'bg-purple-500 text-white',
     statuses: ['ontvangen_controle']
   },
   {
     id: 'akkoord_terugbetaling',
     title: 'Akkoord',
-    color: 'bg-chart-3',
+    color: 'bg-emerald-500',
+    headerBg: 'bg-emerald-50 dark:bg-emerald-950/30',
+    headerBorder: 'border-emerald-200 dark:border-emerald-800',
+    cardBorder: 'border-l-4 border-l-emerald-500',
+    countBg: 'bg-emerald-500 text-white',
     statuses: ['akkoord_terugbetaling']
   },
   {
     id: 'vermiste_pakketten',
     title: 'Vermist',
-    color: 'bg-destructive',
+    color: 'bg-red-500',
+    headerBg: 'bg-red-50 dark:bg-red-950/30',
+    headerBorder: 'border-red-200 dark:border-red-800',
+    cardBorder: 'border-l-4 border-l-red-500',
+    countBg: 'bg-red-500 text-white',
     statuses: ['vermiste_pakketten']
   },
   {
     id: 'wachten_klant',
     title: 'Wacht Klant',
-    color: 'bg-chart-1',
+    color: 'bg-orange-500',
+    headerBg: 'bg-orange-50 dark:bg-orange-950/30',
+    headerBorder: 'border-orange-200 dark:border-orange-800',
+    cardBorder: 'border-l-4 border-l-orange-500',
+    countBg: 'bg-orange-500 text-white',
     statuses: ['wachten_klant']
   },
   {
     id: 'opnieuw_versturen',
     title: 'Opnieuw',
-    color: 'bg-chart-5',
+    color: 'bg-cyan-500',
+    headerBg: 'bg-cyan-50 dark:bg-cyan-950/30',
+    headerBorder: 'border-cyan-200 dark:border-cyan-800',
+    cardBorder: 'border-l-4 border-l-cyan-500',
+    countBg: 'bg-cyan-500 text-white',
     statuses: ['opnieuw_versturen']
   },
   {
     id: 'klaar',
     title: 'Klaar',
-    color: 'bg-muted-foreground',
+    color: 'bg-gray-500',
+    headerBg: 'bg-gray-100 dark:bg-gray-800/50',
+    headerBorder: 'border-gray-200 dark:border-gray-700',
+    cardBorder: 'border-l-4 border-l-gray-400',
+    countBg: 'bg-gray-500 text-white',
     statuses: ['klaar']
   },
   {
     id: 'niet_ontvangen',
     title: 'Niet Ontvangen',
-    color: 'bg-muted',
+    color: 'bg-pink-500',
+    headerBg: 'bg-pink-50 dark:bg-pink-950/30',
+    headerBorder: 'border-pink-200 dark:border-pink-800',
+    cardBorder: 'border-l-4 border-l-pink-500',
+    countBg: 'bg-pink-500 text-white',
     statuses: ['niet_ontvangen']
   },
 ];
@@ -161,15 +197,13 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
   }));
 
   const getPriorityColor = (priority: string | null) => {
+    // No border-left styles here - status color handles that via cardBorder
+    // Instead use subtle ring/glow for urgent items
     switch (priority) {
       case "urgent":
-        return "border-l-4 border-l-destructive";
+        return "ring-2 ring-red-500/50 shadow-red-100 dark:shadow-red-900/20";
       case "high":
-        return "border-l-4 border-l-chart-1";
-      case "medium":
-        return "border-l-4 border-l-chart-4";
-      case "low":
-        return "border-l-4 border-l-chart-2";
+        return "ring-1 ring-orange-400/50";
       default:
         return "";
     }
@@ -179,17 +213,17 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
     if (!priority) return null;
 
     const variants: Record<string, { label: string; className: string }> = {
-      urgent: { label: "Urgent", className: "bg-destructive/10 text-destructive border-destructive/20" },
-      high: { label: "Hoog", className: "bg-chart-1/10 text-chart-1 border-chart-1/20" },
-      medium: { label: "Medium", className: "bg-chart-4/10 text-chart-4 border-chart-4/20" },
-      low: { label: "Laag", className: "bg-chart-2/10 text-chart-2 border-chart-2/20" },
+      urgent: { label: "Urgent", className: "bg-red-500 text-white border-0 animate-pulse" },
+      high: { label: "Hoog", className: "bg-orange-500 text-white border-0" },
+      medium: { label: "Medium", className: "bg-muted text-muted-foreground border" },
+      low: { label: "Laag", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0" },
     };
 
     const variant = variants[priority];
     if (!variant) return null;
 
     return (
-      <Badge variant="outline" className={`text-[10px] px-1 py-0 h-4 ${variant.className}`}>
+      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 font-medium ${variant.className}`}>
         {variant.label}
       </Badge>
     );
@@ -266,14 +300,14 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
     <DragDropContext onDragEnd={handleDragEnd}>
       <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2" data-testid="returns-kanban">
         {columns.map((column) => (
-          <Card key={column.id} className="flex flex-col h-[calc(100vh-240px)]" data-testid={`kanban-column-${column.id}`}>
-            <CardHeader className="pb-1.5 px-2 pt-2 flex-shrink-0">
+          <Card key={column.id} className={`flex flex-col h-[calc(100vh-240px)] overflow-hidden`} data-testid={`kanban-column-${column.id}`}>
+            <CardHeader className={`pb-1.5 px-2 pt-2 flex-shrink-0 ${column.headerBg} border-b ${column.headerBorder}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${column.color}`}></div>
-                  <CardTitle className="text-[10px] font-medium">{column.title}</CardTitle>
+                  <div className={`w-2 h-2 rounded-full ${column.color}`}></div>
+                  <CardTitle className="text-[11px] font-semibold">{column.title}</CardTitle>
                 </div>
-                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5">
+                <Badge className={`text-[9px] px-1.5 py-0 h-4 ${column.countBg} border-0`}>
                   {column.returns.length}
                 </Badge>
               </div>
@@ -301,7 +335,7 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
-                                  className={`cursor-pointer hover:shadow-md transition-all ${snapshot.isDragging ? 'shadow-lg rotate-2' : 'bg-card'
+                                  className={`cursor-pointer hover:shadow-md transition-all ${column.cardBorder} ${snapshot.isDragging ? 'shadow-lg rotate-2' : 'bg-card'
                                     } ${getPriorityColor(returnItem.priority)}`}
                                   onClick={() => handleViewReturn(returnItem)}
                                   data-testid={`return-card-${returnItem.id}`}
@@ -310,11 +344,11 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
                                     <div className="flex items-start justify-between mb-1.5">
                                       <div className="flex-1 mr-1">
                                         <h4 className="text-xs font-medium truncate font-mono">
-                                          {(returnItem as any).orderNumber || returnItem.returnNumber}
+                                          {(returnItem.shopifyReturnName || (returnItem as any).orderNumber || returnItem.returnNumber)?.replace(/^#/, '').replace(/-R\d+$/, '')}
                                         </h4>
-                                        {(returnItem as any).orderNumber && (
-                                          <p className="text-[10px] text-muted-foreground font-mono">
-                                            {returnItem.returnNumber}
+                                        {(returnItem as any).customerName && (
+                                          <p className="text-[10px] text-muted-foreground truncate">
+                                            {(returnItem as any).customerName}
                                           </p>
                                         )}
                                       </div>

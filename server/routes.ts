@@ -3962,21 +3962,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const returns = await storage.getReturns(filters);
 
-      // Enhance returns with order numbers
+      // Enhance returns with order numbers and customer names
       const enhancedReturns = await Promise.all(
         returns.map(async (returnItem) => {
+          let orderNumber = null;
+          let customerName = null;
+
           if (returnItem.orderId) {
             try {
               const order = await storage.getOrder(returnItem.orderId);
-              return {
-                ...returnItem,
-                orderNumber: order?.orderNumber || null,
-              };
+              orderNumber = order?.orderNumber || null;
+
+              // Extract customer name from order data
+              if (order?.orderData) {
+                const orderData = order.orderData as any;
+                const customer = orderData.customer;
+                if (customer) {
+                  customerName = [customer.first_name, customer.last_name]
+                    .filter(Boolean)
+                    .join(' ') || customer.email || null;
+                }
+              }
             } catch (error) {
-              return { ...returnItem, orderNumber: null };
+              // Keep nulls on error
             }
           }
-          return { ...returnItem, orderNumber: null };
+
+          return {
+            ...returnItem,
+            orderNumber,
+            customerName,
+          };
         })
       );
 

@@ -334,7 +334,7 @@ export default function ReturnDetailPage() {
                                 <CardContent className="space-y-3">
                                     <div>
                                         <span className="text-sm text-muted-foreground">Order Number</span>
-                                        <p className="font-medium">#{enrichedData.order.orderNumber}</p>
+                                        <p className="font-medium">{enrichedData.order.orderNumber}</p>
                                     </div>
                                     <div>
                                         <span className="text-sm text-muted-foreground">Order Date</span>

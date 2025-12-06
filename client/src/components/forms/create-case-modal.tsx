@@ -480,7 +480,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                                     )}
                                   />
                                   <div className="flex flex-col flex-1">
-                                    <span className="font-medium">#{order.orderNumber}</span>
+                                    <span className="font-medium">{order.orderNumber}</span>
                                     <span className="text-xs text-muted-foreground">
                                       {order.customerEmail} • €{(order.totalAmount / 100).toFixed(2)}
                                     </span>
@@ -494,7 +494,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                     </div>
                     {selectedOrder && (
                       <div className="text-sm text-muted-foreground mt-1">
-                        Geselecteerd: #{selectedOrder.orderNumber} - €{(selectedOrder.totalAmount / 100).toFixed(2)}
+                        Geselecteerd: {selectedOrder.orderNumber} - €{(selectedOrder.totalAmount / 100).toFixed(2)}
                       </div>
                     )}
                     <FormMessage />
@@ -506,7 +506,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                 <div className="rounded-lg border bg-card p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
-                      <p className="text-sm font-medium">Bestelling #{selectedOrder.orderNumber}</p>
+                      <p className="text-sm font-medium">Bestelling {selectedOrder.orderNumber}</p>
                       <p className="text-xs text-muted-foreground">
                         {selectedOrder.customerEmail}
                       </p>

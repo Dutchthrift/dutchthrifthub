@@ -191,7 +191,7 @@ export default function CustomerDetail() {
                         data-testid={`order-${order.id}`}
                       >
                         <div>
-                          <p className="font-medium">Order #{order.orderNumber}</p>
+                          <p className="font-medium">Order {order.orderNumber}</p>
                           <p className="text-sm text-muted-foreground">
                             {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "Unknown"}
                           </p>
@@ -309,7 +309,7 @@ export default function CustomerDetail() {
 
           <TabsContent value="notes" className="space-y-4">
             {currentUser && (
-              <NotesPanel 
+              <NotesPanel
                 entityType="customer"
                 entityId={customerId!}
                 currentUser={currentUser}

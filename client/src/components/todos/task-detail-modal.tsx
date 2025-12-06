@@ -607,7 +607,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
                                 onClick={() => window.location.href = `/orders/${linkedOrder.id}`}
                               >
                                 <Package className="h-4 w-4 mr-2" />
-                                Order #{linkedOrder.orderNumber}
+                                Order {linkedOrder.orderNumber}
                               </Button>
                             )}
                             {linkedCase && (

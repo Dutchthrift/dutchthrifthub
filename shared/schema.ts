@@ -6,7 +6,8 @@ import { z } from "zod";
 // Enums
 export const userRoleEnum = pgEnum("user_role", ["ADMIN", "SUPPORT", "TECHNICUS"]);
 export const priorityEnum = pgEnum("priority", ["low", "medium", "high", "urgent"]);
-export const repairStatusEnum = pgEnum("repair_status", ["new", "diagnosing", "waiting_parts", "repair_in_progress", "quality_check", "completed", "returned", "canceled"]);
+export const repairStatusEnum = pgEnum("repair_status", ["new", "in_repair", "completed", "returned"]);
+export const repairTypeEnum = pgEnum("repair_type", ["customer", "inventory"]);
 export const todoStatusEnum = pgEnum("todo_status", ["todo", "in_progress", "done"]);
 export const todoCategoryEnum = pgEnum("todo_category", ["orders", "purchasing", "marketing", "admin", "other"]);
 export const emailStatusEnum = pgEnum("email_status", ["open", "closed"]);
@@ -142,6 +143,7 @@ export const repairs = pgTable("repairs", {
   slaDeadline: timestamp("sla_deadline"),
   completedAt: timestamp("completed_at"),
   returnedAt: timestamp("returned_at"),
+  repairType: repairTypeEnum("repair_type").notNull().default("customer"), // customer or inventory
   caseId: varchar("case_id").references(() => cases.id), // Link repairs to cases
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

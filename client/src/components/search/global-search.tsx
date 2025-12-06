@@ -114,7 +114,7 @@ export function GlobalSearch() {
                       onClick={() => handleNavigate('order', order.id, order.orderNumber)}
                       data-testid={`search-result-order-${order.id}`}
                     >
-                      <div className="font-medium">Order #{order.orderNumber}</div>
+                      <div className="font-medium">Order {order.orderNumber}</div>
                       <div className="text-sm text-muted-foreground">{order.customerEmail}</div>
                     </div>
                   ))}
@@ -166,12 +166,12 @@ export function GlobalSearch() {
                 </div>
               )}
 
-              {searchResults.customers.length === 0 && 
-               searchResults.orders.length === 0 && 
-               searchResults.emailThreads.length === 0 && 
-               searchResults.repairs.length === 0 && (
-                <div className="p-4 text-sm text-muted-foreground">No results found</div>
-              )}
+              {searchResults.customers.length === 0 &&
+                searchResults.orders.length === 0 &&
+                searchResults.emailThreads.length === 0 &&
+                searchResults.repairs.length === 0 && (
+                  <div className="p-4 text-sm text-muted-foreground">No results found</div>
+                )}
             </div>
           ) : null}
         </div>

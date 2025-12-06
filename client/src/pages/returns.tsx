@@ -177,10 +177,13 @@ export default function Returns() {
 
   // Filter returns by search query and priority
   const filteredReturns = returns.filter((ret) => {
+    const query = searchQuery.toLowerCase();
     const matchesSearch =
       !searchQuery ||
-      ret.returnNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ret.trackingNumber?.toLowerCase().includes(searchQuery.toLowerCase());
+      ret.returnNumber.toLowerCase().includes(query) ||
+      ret.trackingNumber?.toLowerCase().includes(query) ||
+      ret.shopifyReturnName?.toLowerCase().includes(query) ||
+      (ret as ReturnWithOrder).orderNumber?.toLowerCase().includes(query);
 
     const matchesPriority = priorityFilter === "all" || ret.priority === priorityFilter;
 
@@ -212,10 +215,12 @@ export default function Returns() {
     return tab?.label || status;
   };
 
-  // Helper function to get display identifier for return
+  // Helper function to get display identifier for return (strip # prefix and -R1/-R2 suffix)
   const getReturnDisplayId = (returnItem: Return) => {
-    // Prefer Shopify return name (e.g. #9009-R1) over internal RET-2025-XXX
-    return returnItem.shopifyReturnName || returnItem.orderNumber || returnItem.returnNumber;
+    // Prefer Shopify return name, strip # and -R1/-R2 to show just order number
+    const displayId = returnItem.shopifyReturnName || returnItem.orderNumber || returnItem.returnNumber;
+    // Remove # prefix and -R1, -R2, etc. suffix
+    return displayId?.replace(/^#/, '').replace(/-R\d+$/, '') || displayId;
   };
 
   const syncShopifyMutation = useMutation({

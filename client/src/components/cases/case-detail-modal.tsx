@@ -578,7 +578,7 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                       <div className="grid grid-cols-2 gap-2.5">
                         <div>
                           <label className="text-xs text-muted-foreground block mb-0.5">Order Number</label>
-                          <p className="text-sm" data-testid="order-number">#{linkedOrder.orderNumber}</p>
+                          <p className="text-sm" data-testid="order-number">{linkedOrder.orderNumber}</p>
                         </div>
                         <div>
                           <label className="text-xs text-muted-foreground block mb-0.5">Order Date</label>
@@ -719,7 +719,7 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                                   className="w-full p-3 text-left hover:bg-muted transition-colors border-b last:border-0"
                                   data-testid={`link-result-${order.id}`}
                                 >
-                                  <div className="font-medium text-sm">Order #{order.orderNumber}</div>
+                                  <div className="font-medium text-sm">Order {order.orderNumber}</div>
                                   <div className="text-xs text-muted-foreground">
                                     {order.customerEmail || order.customerName} • €{((order.totalAmount || 0) / 100).toFixed(2)}
                                   </div>
@@ -802,7 +802,7 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                             return (
                               <div key={order.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-sm font-medium">Order #{order.orderNumber}</div>
+                                  <div className="text-sm font-medium">Order {order.orderNumber}</div>
                                   <div className="text-xs text-muted-foreground">
                                     {order.customerEmail} • €{((order.totalAmount || 0) / 100).toFixed(2)}
                                   </div>

@@ -193,7 +193,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
     // Use stored order data if available (from search), otherwise try to find in orders array
     const selectedOrder = selectedOrderData?.order || orders.find(o => o.id === data.orderId);
     const selectedCustomer = selectedOrderData?.customer || (selectedOrder ? customers.find(c => c.id === selectedOrder.customerId) : null);
-    
+
     const repairData = {
       title: data.title,
       description: data.description || undefined,
@@ -203,8 +203,8 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
       slaDeadline: slaDeadline ? slaDeadline.toISOString() : undefined,
       productSku: data.productSku || undefined,
       productName: data.productName || undefined,
-      issueCategory: data.issueCategory === "Overig" && otherCategoryDetails 
-        ? `Overig: ${otherCategoryDetails}` 
+      issueCategory: data.issueCategory === "Overig" && otherCategoryDetails
+        ? `Overig: ${otherCategoryDetails}`
         : data.issueCategory || undefined,
       customerId: (data.customerId && data.customerId !== "none") ? data.customerId : undefined,
       orderId: (data.orderId && data.orderId !== "none") ? data.orderId : undefined,
@@ -253,8 +253,8 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
   const selectedOrderCustomer = selectedOrder ? customers.find(c => c.id === selectedOrder.customerId) : null;
 
   // Get search results or latest 10 orders
-  const displayOrders = orderSearchQuery.length > 2 && orderSearchResults?.orders 
-    ? orderSearchResults.orders 
+  const displayOrders = orderSearchQuery.length > 2 && orderSearchResults?.orders
+    ? orderSearchResults.orders
     : orders.slice(0, 10);
 
   return (
@@ -266,7 +266,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
             {repair ? "Bewerk de reparatiegegevens hieronder." : "Maak een nieuwe reparatie aan."}
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="title">Titel *</Label>
@@ -389,14 +389,14 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                   ×
                 </button>
               )}
-              
+
               {showOrderResults && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
                   {displayOrders.length > 0 ? (
                     <div className="p-1">
                       {displayOrders.map((order: any) => {
                         const customer = customers.find(c => c.id === order.customerId);
-                        const customerName = customer 
+                        const customerName = customer
                           ? `${customer.firstName} ${customer.lastName}`
                           : order.customerEmail || 'Onbekende klant';
                         return (
@@ -406,14 +406,14 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                             onClick={() => {
                               setValue("orderId", order.id);
                               setValue("customerId", order.customerId || "none");
-                              setSelectedOrderDisplay(`Order #${order.orderNumber} - ${customerName}`);
+                              setSelectedOrderDisplay(`Order ${order.orderNumber} - ${customerName}`);
                               setSelectedOrderData({ order, customer });
                               setOrderSearchQuery("");
                               setShowOrderResults(false);
                             }}
                             data-testid={`order-result-${order.id}`}
                           >
-                            <div className="font-medium">Order #{order.orderNumber}</div>
+                            <div className="font-medium">Order {order.orderNumber}</div>
                             <div className="text-sm text-muted-foreground">{customerName}</div>
                           </div>
                         );
@@ -455,7 +455,7 @@ export function RepairForm({ open, onOpenChange, repair, users }: RepairFormProp
                 type="number"
                 step="0.01"
                 placeholder="0.00"
-                {...register("estimatedCost", { 
+                {...register("estimatedCost", {
                   valueAsNumber: true,
                   min: { value: 0, message: "Kosten moeten positief zijn" }
                 })}

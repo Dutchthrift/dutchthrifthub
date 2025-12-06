@@ -271,7 +271,7 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                                 >
                                     <div className="flex items-start justify-between">
                                         <div>
-                                            <h4 className="font-medium">Order #{order.orderNumber}</h4>
+                                            <h4 className="font-medium">Order {order.orderNumber}</h4>
                                             <p className="text-sm text-muted-foreground">{order.customerEmail}</p>
                                             <p className="text-xs text-muted-foreground mt-1">
                                                 {order.orderDate ? format(new Date(order.orderDate), "PPP") : ""}
@@ -290,7 +290,7 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
 
                         {selectedOrder && (
                             <div className="p-3 bg-primary/10 border border-primary/20 rounded-md">
-                                <p className="text-sm font-medium">Geselecteerd: Order #{selectedOrder.orderNumber}</p>
+                                <p className="text-sm font-medium">Geselecteerd: Order {selectedOrder.orderNumber}</p>
                             </div>
                         )}
                     </div>
@@ -477,7 +477,7 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                             {selectedOrder && (
                                 <div className="p-4 bg-muted/50 rounded-lg">
                                     <h4 className="font-medium mb-2">Bestelling</h4>
-                                    <p className="text-sm">Order #{selectedOrder.orderNumber}</p>
+                                    <p className="text-sm">Order {selectedOrder.orderNumber}</p>
                                     <p className="text-sm text-muted-foreground">{selectedOrder.customerEmail}</p>
                                 </div>
                             )}

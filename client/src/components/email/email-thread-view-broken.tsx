@@ -218,20 +218,20 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
   const formatMessageTime = (date: string | Date | null) => {
     if (!date) return "Unknown time";
     const messageDate = typeof date === 'string' ? new Date(date) : date;
-    
+
     // Format as "HH:MM DD-MM-YYYY"
     const time = messageDate.toLocaleTimeString('nl-NL', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     });
-    
+
     const dateStr = messageDate.toLocaleDateString('nl-NL', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     });
-    
+
     return `${time} ${dateStr}`;
   };
 
@@ -314,7 +314,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                   )}
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 {thread.isUnread && (
                   <Button variant="outline" size="sm" onClick={markAsRead}>
@@ -366,7 +366,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="prose prose-sm max-w-none">
                     {message.isHtml ? (
                       <div dangerouslySetInnerHTML={{ __html: message.body || "" }} />
@@ -374,7 +374,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                       <div className="whitespace-pre-wrap">{message.body}</div>
                     )}
                   </div>
-                  
+
                   {message.attachments && (message.attachments as any[]).length > 0 && (
                     <div className="mt-3 pt-3 border-t">
                       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
@@ -421,14 +421,14 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                   </Button>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setShowReply(false)}
                     data-testid="cancel-reply-button"
                   >
                     Cancel
                   </Button>
-                  <Button 
+                  <Button
                     onClick={handleSendReply}
                     disabled={!replyText.trim() || sendReplyMutation.isPending}
                     data-testid="send-reply-button"
@@ -458,7 +458,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
               <div className="text-sm font-medium text-muted-foreground">Email</div>
               <div className="text-sm">{thread.customerEmail}</div>
             </div>
-            
+
             {thread.orderId && (
               <div>
                 <div className="text-sm font-medium text-muted-foreground">Gekoppelde Order</div>
@@ -500,8 +500,8 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                             Bekijken
                           </a>
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="destructive"
                           onClick={() => linkToCaseMutation.mutate('')}
                           disabled={linkToCaseMutation.isPending}
@@ -516,17 +516,17 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
               ) : (
                 <div className="space-y-3">
                   <div className="text-sm font-medium text-muted-foreground mb-2">Case Beheer</div>
-                  
+
                   {/* Create new case */}
-                  <Button 
-                    className="w-full" 
+                  <Button
+                    className="w-full"
                     onClick={() => setShowCreateCase(true)}
                     data-testid="create-case-button"
                   >
                     <Briefcase className="h-4 w-4 mr-2" />
                     Maak Case
                   </Button>
-                  
+
                   {/* Link to existing case */}
                   {allCases && allCases.length > 0 && (
                     <div className="space-y-2">
@@ -544,8 +544,8 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                             ))}
                           </SelectContent>
                         </Select>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           onClick={handleLinkToCase}
                           disabled={!selectedCaseId || linkToCaseMutation.isPending}
                           data-testid="link-case-button"
@@ -555,7 +555,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                       </div>
                     </div>
                   )}
-                  
+
                   <p className="text-xs text-muted-foreground">
                     Maak een case aan of koppel aan een bestaande case om dit verzoek te beheren.
                   </p>
@@ -568,7 +568,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
             {/* Order Linking */}
             <div className="space-y-3">
               <div className="text-sm font-medium text-muted-foreground mb-2">Order Koppeling</div>
-              
+
               {thread.orderId ? (
                 <div className="p-2 bg-muted rounded">
                   <div className="flex items-center justify-between">
@@ -579,8 +579,8 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                         Order ID: {thread.orderId}
                       </div>
                     </div>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="destructive"
                       onClick={() => linkToOrderMutation.mutate('')}
                       disabled={linkToOrderMutation.isPending}
@@ -611,7 +611,7 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                               <>
                                 {filteredOrders.map((order) => (
                                   <SelectItem key={order.id} value={order.id} data-testid={`order-option-${order.id}`}>
-                                    #{order.orderNumber} - €{((order.totalAmount || 0) / 100).toFixed(2)}
+                                    {order.orderNumber} - €{((order.totalAmount || 0) / 100).toFixed(2)}
                                   </SelectItem>
                                 ))}
                                 {!showAllOrders && allOrders && allOrders.length > 20 && filteredOrders.length >= 20 && (
@@ -635,8 +635,8 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                             )}
                           </SelectContent>
                         </Select>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           onClick={handleLinkToOrder}
                           disabled={!selectedOrderId || linkToOrderMutation.isPending}
                           data-testid="link-order-button"
@@ -644,13 +644,13 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
                           <Package className="h-4 w-4" />
                         </Button>
                       </div>
-                    <p className="text-xs text-muted-foreground">
-                      Koppel een order aan deze email thread voor betere organisatie.
-                    </p>
-                  </div>
-                )
+                      <p className="text-xs text-muted-foreground">
+                        Koppel een order aan deze email thread voor betere organisatie.
+                      </p>
+                    </div>
+                    )
               )}
-            </div>
+                  </div>
           </CardContent>
         </Card>
 
@@ -682,8 +682,8 @@ export function EmailThreadView({ threadId }: EmailThreadViewProps) {
       </div>
 
       {/* Create Case Modal */}
-      <CreateCaseModal 
-        open={showCreateCase} 
+      <CreateCaseModal
+        open={showCreateCase}
         onOpenChange={setShowCreateCase}
         emailThread={thread}
       />

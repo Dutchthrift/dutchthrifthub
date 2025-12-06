@@ -314,7 +314,7 @@ export function ReturnDetailModalContent({
                         <div className="space-y-1.5 text-xs">
                             <div className="flex justify-between">
                                 <span className="text-purple-600/70 dark:text-purple-400/70">Nummer:</span>
-                                <span className="font-mono text-purple-900 dark:text-purple-100">#{order.orderNumber}</span>
+                                <span className="font-mono text-purple-900 dark:text-purple-100">{order.orderNumber}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-purple-600/70 dark:text-purple-400/70">Bedrag:</span>
