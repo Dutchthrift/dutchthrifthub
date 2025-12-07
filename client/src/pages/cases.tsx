@@ -481,65 +481,33 @@ export default function Cases() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <Card className="bg-gradient-to-br from-blue-50/80 to-white/50 dark:from-blue-950/20 dark:to-zinc-900/50 border-2 border-blue-200/70 dark:border-blue-800/50 border-l-4 border-l-blue-500 hover:shadow-md transition-shadow" data-testid="cases-stats-total">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">Totaal Actief</CardTitle>
-              <span className="p-1.5 bg-blue-500/10 rounded-lg">
-                <Briefcase className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{totalActive}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Open zaken
-              </p>
+        {/* Stats Cards - Repairs page gradient style */}
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4 mb-6">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 border-blue-200 dark:border-blue-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{totalActive}</div>
+              <div className="text-sm text-blue-600 dark:text-blue-400">Totaal Actief</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-emerald-50/80 to-white/50 dark:from-emerald-950/20 dark:to-zinc-900/50 border-2 border-emerald-200/70 dark:border-emerald-800/50 border-l-4 border-l-emerald-500 hover:shadow-md transition-shadow" data-testid="cases-stats-new-today">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Nieuw Vandaag</CardTitle>
-              <span className="p-1.5 bg-emerald-500/10 rounded-lg">
-                <Plus className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">{newToday}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Vandaag aangemaakt
-              </p>
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/50 dark:to-emerald-900/30 border-emerald-200 dark:border-emerald-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{newToday}</div>
+              <div className="text-sm text-emerald-600 dark:text-emerald-400">Nieuw Vandaag</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-green-50/80 to-white/50 dark:from-green-950/20 dark:to-zinc-900/50 border-2 border-green-200/70 dark:border-green-800/50 border-l-4 border-l-green-500 hover:shadow-md transition-shadow" data-testid="cases-stats-resolved-today">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-green-900 dark:text-green-100">Opgelost Vandaag</CardTitle>
-              <span className="p-1.5 bg-green-500/10 rounded-lg">
-                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-900 dark:text-green-100">{resolvedToday}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Vandaag afgesloten
-              </p>
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/50 dark:to-green-900/30 border-green-200 dark:border-green-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-green-700 dark:text-green-300">{resolvedToday}</div>
+              <div className="text-sm text-green-600 dark:text-green-400">Opgelost Vandaag</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-red-50/80 to-white/50 dark:from-red-950/20 dark:to-zinc-900/50 border-2 border-red-200/70 dark:border-red-800/50 border-l-4 border-l-red-500 hover:shadow-md transition-shadow" data-testid="cases-stats-overdue">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-red-900 dark:text-red-100">Verlopen SLA</CardTitle>
-              <span className="p-1.5 bg-red-500/10 rounded-lg">
-                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-900 dark:text-red-100">{overdueSLA}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Deadline verstreken
-              </p>
+          <Card className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/50 dark:to-red-900/30 border-red-200 dark:border-red-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-red-700 dark:text-red-300">{overdueSLA}</div>
+              <div className="text-sm text-red-600 dark:text-red-400">Verlopen SLA</div>
             </CardContent>
           </Card>
         </div>

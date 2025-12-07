@@ -22,18 +22,18 @@ export function SupplierImportDialog() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      
+
       const response = await fetch("/api/suppliers/import-excel", {
         method: "POST",
         body: formData,
         credentials: "include",
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || "Import failed");
       }
-      
+
       return response.json();
     },
     onSuccess: (data) => {
@@ -78,9 +78,10 @@ export function SupplierImportDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" data-testid="button-import-suppliers">
-          <Upload className="h-4 w-4 mr-2" />
-          Importeer Leveranciers
+        <Button variant="outline" size="sm" className="flex-1 sm:flex-none text-sm" data-testid="button-import-suppliers">
+          <Upload className="h-4 w-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Importeer Leveranciers</span>
+          <span className="sm:hidden">Import</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
@@ -90,7 +91,7 @@ export function SupplierImportDialog() {
             Importeer leveranciers vanuit een Excel bestand
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           <div className="border-2 border-dashed rounded-lg p-8 text-center">
             {!selectedFile ? (

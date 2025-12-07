@@ -419,134 +419,76 @@ export default function Orders() {
               <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
               <p className="text-muted-foreground">Bekijk en beheer klantorders van Shopify</p>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="outline" data-testid="export-orders-button">
-                <Download className="mr-2 h-4 w-4" />
-                Exporteer CSV
-              </Button>
-
-              <Button
-                variant="outline"
-                onClick={() => setShowImportDialog(true)}
-                data-testid="import-csv-button"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Importeer CSV
-              </Button>
-
+            <div className="flex items-center gap-2">
               <Button
                 onClick={() => syncAllMutation.mutate()}
                 disabled={syncAllMutation.isPending}
                 data-testid="sync-shopify-button"
               >
-                <RefreshCw className={`mr-2 h-4 w-4 ${syncAllMutation.isPending ? 'animate-spin' : ''}`} />
-                {syncAllMutation.isPending ? "Synchroniseren..." : "Synchroniseer Shopify"}
+                <RefreshCw className={`h-4 w-4 mr-1 sm:mr-2 ${syncAllMutation.isPending ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{syncAllMutation.isPending ? "Synchroniseren..." : "Synchroniseer Shopify"}</span>
+                <span className="sm:hidden">{syncAllMutation.isPending ? "Sync..." : "Sync"}</span>
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
+        {/* Stats Cards - Repairs page gradient style */}
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5 mb-6 sm:mb-8">
           <Card
-            className={`relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-l-4 border-l-primary ${statusFilter === 'all' ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+            className={`bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950/50 dark:to-slate-900/30 border-slate-200 dark:border-slate-800 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer ${statusFilter === 'all' ? 'ring-2 ring-primary ring-offset-2' : ''}`}
             onClick={() => setStatusFilter('all')}
             data-testid="orders-stats-all"
           >
-            <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-primary/10 blur-2xl" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Totaal Orders</CardTitle>
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Package className="h-4 w-4 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">
                 {orderStats?.total || 0}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Alle orders
-              </p>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Totaal Orders</div>
             </CardContent>
           </Card>
 
           <Card
-            className={`relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-l-4 border-l-amber-500 ${statusFilter === 'pending' ? 'ring-2 ring-amber-500 ring-offset-2' : ''}`}
+            className={`bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/50 dark:to-amber-900/30 border-amber-200 dark:border-amber-800 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer ${statusFilter === 'pending' ? 'ring-2 ring-amber-500 ring-offset-2' : ''}`}
             onClick={() => setStatusFilter('pending')}
             data-testid="orders-stats-pending"
           >
-            <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-amber-500/10 blur-2xl" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">In afwachting</CardTitle>
-              <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center">
-                <Package className="h-4 w-4 text-amber-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">{statusCounts.pending}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Wacht op verwerking
-              </p>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{statusCounts.pending}</div>
+              <div className="text-sm text-amber-600 dark:text-amber-400">In afwachting</div>
             </CardContent>
           </Card>
 
           <Card
-            className={`relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-l-4 border-l-blue-500 ${statusFilter === 'processing' ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`}
+            className={`bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 border-blue-200 dark:border-blue-800 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer ${statusFilter === 'processing' ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`}
             onClick={() => setStatusFilter('processing')}
             data-testid="orders-stats-processing"
           >
-            <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-blue-500/10 blur-2xl" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">In behandeling</CardTitle>
-              <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Package className="h-4 w-4 text-blue-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">{statusCounts.processing}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Wordt voorbereid
-              </p>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{statusCounts.processing}</div>
+              <div className="text-sm text-blue-600 dark:text-blue-400">In behandeling</div>
             </CardContent>
           </Card>
 
           <Card
-            className={`relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-l-4 border-l-purple-500 ${statusFilter === 'shipped' ? 'ring-2 ring-purple-500 ring-offset-2' : ''}`}
+            className={`bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/50 dark:to-purple-900/30 border-purple-200 dark:border-purple-800 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer ${statusFilter === 'shipped' ? 'ring-2 ring-purple-500 ring-offset-2' : ''}`}
             onClick={() => setStatusFilter('shipped')}
             data-testid="orders-stats-shipped"
           >
-            <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-purple-500/10 blur-2xl" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Verzonden</CardTitle>
-              <div className="h-8 w-8 rounded-full bg-purple-500/10 flex items-center justify-center">
-                <Truck className="h-4 w-4 text-purple-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">{statusCounts.shipped}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Onderweg
-              </p>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{statusCounts.shipped}</div>
+              <div className="text-sm text-purple-600 dark:text-purple-400">Verzonden</div>
             </CardContent>
           </Card>
 
           <Card
-            className={`relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-l-4 border-l-emerald-500 ${statusFilter === 'delivered' ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}
+            className={`bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/50 dark:to-green-900/30 border-green-200 dark:border-green-800 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer ${statusFilter === 'delivered' ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}
             onClick={() => setStatusFilter('delivered')}
             data-testid="orders-stats-delivered"
           >
-            <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 translate-y-[-8px] rounded-full bg-emerald-500/10 blur-2xl" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Afgeleverd</CardTitle>
-              <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <Package className="h-4 w-4 text-emerald-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">{statusCounts.delivered}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Voltooide orders
-              </p>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-green-700 dark:text-green-300">{statusCounts.delivered}</div>
+              <div className="text-sm text-green-600 dark:text-green-400">Afgeleverd</div>
             </CardContent>
           </Card>
         </div>
@@ -573,7 +515,7 @@ export default function Orders() {
 
               {/* Status Tabs */}
               <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-                <TabsList className="w-full grid grid-cols-5 h-auto bg-zinc-100/50 dark:bg-zinc-800/50 p-1">
+                <TabsList className="w-full flex overflow-x-auto scrollbar-hide h-auto bg-zinc-100/50 dark:bg-zinc-800/50 p-1">
                   <TabsTrigger value="all" data-testid="filter-all-orders" className="text-xs sm:text-sm data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-950 data-[state=active]:shadow-sm">Alle</TabsTrigger>
                   <TabsTrigger value="pending" data-testid="filter-pending-orders" className="text-xs sm:text-sm data-[state=active]:bg-amber-100 dark:data-[state=active]:bg-amber-900/30 data-[state=active]:text-amber-700 dark:data-[state=active]:text-amber-400">In afwachting</TabsTrigger>
                   <TabsTrigger value="processing" data-testid="filter-processing-orders" className="text-xs sm:text-sm data-[state=active]:bg-blue-100 dark:data-[state=active]:bg-blue-900/30 data-[state=active]:text-blue-700 dark:data-[state=active]:text-blue-400">In behandeling</TabsTrigger>

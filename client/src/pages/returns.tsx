@@ -272,15 +272,17 @@ export default function Returns() {
               <h1 className="text-3xl font-bold tracking-tight">Retouren</h1>
               <p className="text-muted-foreground">Beheer alle productretouren</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <Button
                 variant="outline"
                 onClick={() => syncShopifyMutation.mutate()}
                 disabled={syncShopifyMutation.isPending}
+                className="flex-1 sm:flex-none text-sm"
                 data-testid="button-sync-shopify"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${syncShopifyMutation.isPending ? 'animate-spin' : ''}`} />
-                {syncShopifyMutation.isPending ? 'Synchroniseren...' : 'Sync Shopify'}
+                <RefreshCw className={`h-4 w-4 mr-1 sm:mr-2 ${syncShopifyMutation.isPending ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{syncShopifyMutation.isPending ? 'Synchroniseren...' : 'Sync Shopify'}</span>
+                <span className="sm:hidden">{syncShopifyMutation.isPending ? 'Sync...' : 'Sync'}</span>
               </Button>
               <Button
                 variant={showArchived ? "outline" : "ghost"}
@@ -288,60 +290,64 @@ export default function Returns() {
                   setShowArchived(!showArchived);
                   setCurrentPage(1);
                 }}
+                className="flex-1 sm:flex-none text-sm"
                 data-testid="button-toggle-archived"
               >
-                <Archive className="h-4 w-4 mr-2" />
-                {showArchived ? "Toon Actief" : "Toon Archief"}
+                <Archive className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">{showArchived ? "Toon Actief" : "Toon Archief"}</span>
+                <span className="sm:hidden">{showArchived ? "Actief" : "Archief"}</span>
               </Button>
               <Button
                 onClick={() => setShowCreateModal(true)}
+                className="flex-1 sm:flex-none text-sm"
                 data-testid="button-create-return"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Nieuw Retour
+                <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Nieuw Retour</span>
+                <span className="sm:hidden">Nieuw</span>
               </Button>
             </div>
           </div>
+        </div>
 
-          {/* Stats Bar */}
-          <div className="flex items-center gap-6 p-4 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Totaal:</span>
-              <span className="text-sm font-semibold">
-                {returns.length}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Nieuw:</span>
-              <span className="text-sm font-semibold text-chart-4">
-                {statusCounts.nieuw || 0}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Onderweg:</span>
-              <span className="text-sm font-semibold text-primary">
-                {statusCounts.onderweg || 0}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Wachten op klant:</span>
-              <span className="text-sm font-semibold text-chart-1">
-                {statusCounts.wachten_klant || 0}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Klaar:</span>
-              <span className="text-sm font-semibold">
-                {statusCounts.klaar || 0}
-              </span>
-            </div>
-          </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950/50 dark:to-slate-900/30 border-slate-200 dark:border-slate-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">{returns.length}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Totaal</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/50 dark:to-amber-900/30 border-amber-200 dark:border-amber-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{statusCounts.nieuw || 0}</div>
+              <div className="text-sm text-amber-600 dark:text-amber-400">Nieuw</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 border-blue-200 dark:border-blue-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{statusCounts.onderweg || 0}</div>
+              <div className="text-sm text-blue-600 dark:text-blue-400">Onderweg</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/50 dark:to-orange-900/30 border-orange-200 dark:border-orange-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">{statusCounts.wachten_klant || 0}</div>
+              <div className="text-sm text-orange-600 dark:text-orange-400">Wacht op klant</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/50 dark:to-green-900/30 border-green-200 dark:border-green-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-green-700 dark:text-green-300">{statusCounts.klaar || 0}</div>
+              <div className="text-sm text-green-600 dark:text-green-400">Klaar</div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filters Card */}
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -353,7 +359,7 @@ export default function Returns() {
                 />
               </div>
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-[180px]" data-testid="select-priority-filter">
+                <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-priority-filter">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Prioriteit" />
                 </SelectTrigger>
@@ -618,7 +624,7 @@ export default function Returns() {
 
       {/* Return Details Dialog */}
       <Dialog open={showReturnDetails} onOpenChange={setShowReturnDetails}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-[calc(100vw-1rem)] sm:max-w-4xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-xl font-semibold">
               {selectedReturn ? getReturnDisplayId(selectedReturn) : ''}

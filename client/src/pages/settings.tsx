@@ -144,7 +144,7 @@ export default function Settings() {
 
         <div>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full max-w-2xl grid-cols-4">
+            <TabsList className="flex overflow-x-auto scrollbar-hide w-full max-w-full sm:max-w-2xl sm:grid sm:grid-cols-4">
               <TabsTrigger value="general" data-testid="tab-general">
                 <SettingsIcon className="h-4 w-4 mr-2" />
                 Algemeen

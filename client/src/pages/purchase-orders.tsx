@@ -3,6 +3,7 @@ import { Navigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Search,
   Plus,
@@ -16,7 +17,6 @@ import { PurchaseOrderForm } from "@/components/purchase-orders/purchase-order-f
 import { PurchaseOrderDetailModal } from "@/components/purchase-orders/purchase-order-detail-modal";
 import { PurchaseOrdersKanban } from "@/components/purchase-orders/purchase-orders-kanban";
 import { PurchaseOrdersTable } from "@/components/purchase-orders/purchase-orders-table";
-import { SupplierImportDialog } from "@/components/purchase-orders/supplier-import-dialog";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -202,63 +202,65 @@ export default function PurchaseOrders() {
               </h1>
               <p className="text-muted-foreground">Beheer inkoop orders en leveranciers</p>
             </div>
-            <div className="flex items-center gap-2">
-              {canCreate && <SupplierImportDialog />}
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <Button
                 variant={showArchived ? "outline" : "ghost"}
                 onClick={() => setShowArchived(!showArchived)}
+                className="flex-1 sm:flex-none text-sm"
                 data-testid="button-toggle-archived"
               >
-                <Archive className="h-4 w-4 mr-2" />
-                {showArchived ? "Toon Actief" : "Toon Archief"}
+                <Archive className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">{showArchived ? "Toon Actief" : "Toon Archief"}</span>
+                <span className="sm:hidden">{showArchived ? "Actief" : "Archief"}</span>
               </Button>
               {canCreate && (
-                <Button onClick={() => setShowNewPO(true)} data-testid="button-new-po">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nieuwe Order
+                <Button onClick={() => setShowNewPO(true)} className="flex-1 sm:flex-none text-sm" data-testid="button-new-po">
+                  <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Nieuwe Order</span>
+                  <span className="sm:hidden">Nieuw</span>
                 </Button>
               )}
             </div>
           </div>
+        </div>
 
-          {/* Stats Bar - Same style as Returns page */}
-          <div className="flex flex-wrap items-center gap-6 p-4 bg-muted/50 rounded-lg mt-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Totaal:</span>
-              <span className="text-sm font-semibold">
-                {statusCounts.all}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Aangekocht:</span>
-              <span className="text-sm font-semibold text-blue-600">
-                {statusCounts.aangekocht}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Ontvangen:</span>
-              <span className="text-sm font-semibold text-emerald-600">
-                {statusCounts.ontvangen}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Verwerkt:</span>
-              <span className="text-sm font-semibold text-muted-foreground">
-                {statusCounts.verwerkt}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 ml-auto">
-              <span className="text-sm text-muted-foreground">Totale Waarde:</span>
-              <span className="text-sm font-semibold text-green-600">
-                €{totalAmount.toLocaleString('nl-NL', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950/50 dark:to-slate-900/30 border-slate-200 dark:border-slate-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">{statusCounts.all}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Totaal</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 border-blue-200 dark:border-blue-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{statusCounts.aangekocht}</div>
+              <div className="text-sm text-blue-600 dark:text-blue-400">Aangekocht</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/50 dark:to-emerald-900/30 border-emerald-200 dark:border-emerald-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{statusCounts.ontvangen}</div>
+              <div className="text-sm text-emerald-600 dark:text-emerald-400">Ontvangen</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950/50 dark:to-gray-900/30 border-gray-200 dark:border-gray-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">{statusCounts.verwerkt}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Verwerkt</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/50 dark:to-green-900/30 border-green-200 dark:border-green-800 col-span-2 sm:col-span-1">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-green-700 dark:text-green-300">€{totalAmount.toLocaleString('nl-NL', { minimumFractionDigits: 0 })}</div>
+              <div className="text-sm text-green-600 dark:text-green-400">Totale Waarde</div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Search Bar */}
         <div className="flex gap-3 mb-6">
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               ref={searchInputRef}

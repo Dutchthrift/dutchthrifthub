@@ -239,6 +239,7 @@ export default function Todos() {
                   variant={viewMode === "kanban" ? "secondary" : "ghost"}
                   size="sm"
                   onClick={() => setViewMode("kanban")}
+                  className="h-8 w-8 p-0"
                 >
                   <LayoutGrid className="h-4 w-4" />
                 </Button>
@@ -246,6 +247,7 @@ export default function Todos() {
                   variant={viewMode === "list" ? "secondary" : "ghost"}
                   size="sm"
                   onClick={() => setViewMode("list")}
+                  className="h-8 w-8 p-0"
                 >
                   <List className="h-4 w-4" />
                 </Button>
@@ -253,48 +255,59 @@ export default function Todos() {
                   variant={viewMode === "calendar" ? "secondary" : "ghost"}
                   size="sm"
                   onClick={() => setViewMode("calendar")}
+                  className="h-8 w-8 p-0"
                 >
                   <CalendarDays className="h-4 w-4" />
                 </Button>
               </div>
-              <Button onClick={() => setShowNewTodo(true)} data-testid="new-todo-button">
-                <Plus className="mr-2 h-4 w-4" />
-                Nieuwe Taak
+              <Button onClick={() => setShowNewTodo(true)} size="sm" data-testid="new-todo-button">
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Nieuwe Taak</span>
               </Button>
             </div>
           </div>
+        </div>
 
-          {/* Inline Stats Bar - Same style as Returns/Purchase Orders */}
-          <div className="flex flex-wrap items-center gap-6 p-4 bg-muted/50 rounded-lg mt-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Totaal:</span>
-              <span className="text-sm font-semibold">{statusCounts.all}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Te Doen:</span>
-              <span className="text-sm font-semibold text-chart-4">{statusCounts.todo}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Bezig:</span>
-              <span className="text-sm font-semibold text-primary">{statusCounts.in_progress}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Afgerond:</span>
-              <span className="text-sm font-semibold text-chart-2">{statusCounts.done}</span>
-            </div>
-            {overdueTasks > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Verlopen:</span>
-                <span className="text-sm font-semibold text-destructive">{overdueTasks}</span>
-              </div>
-            )}
-          </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950/50 dark:to-slate-900/30 border-slate-200 dark:border-slate-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">{statusCounts.all}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Totaal</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/50 dark:to-amber-900/30 border-amber-200 dark:border-amber-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{statusCounts.todo}</div>
+              <div className="text-sm text-amber-600 dark:text-amber-400">Te Doen</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 border-blue-200 dark:border-blue-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{statusCounts.in_progress}</div>
+              <div className="text-sm text-blue-600 dark:text-blue-400">Bezig</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/50 dark:to-green-900/30 border-green-200 dark:border-green-800">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-green-700 dark:text-green-300">{statusCounts.done}</div>
+              <div className="text-sm text-green-600 dark:text-green-400">Afgerond</div>
+            </CardContent>
+          </Card>
+          {overdueTasks > 0 && (
+            <Card className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/50 dark:to-red-900/30 border-red-200 dark:border-red-800">
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-red-700 dark:text-red-300">{overdueTasks}</div>
+                <div className="text-sm text-red-600 dark:text-red-400">Verlopen</div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Simplified Filters - No card wrapper */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          {/* Search */}
-          <div className="relative flex-1 max-w-md">
+        <div className="flex flex-col gap-3 mb-6">
+          {/* Search - Full width on mobile */}
+          <div className="relative w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               ref={searchInputRef}
@@ -316,42 +329,45 @@ export default function Todos() {
             )}
           </div>
 
-          {/* Task Scope Toggle (for Admin/Support) */}
-          {canSeeAllTasks && (
-            <Tabs value={taskScope} onValueChange={(value) => setTaskScope(value as "all" | "my")}>
-              <TabsList>
-                <TabsTrigger value="all" data-testid="filter-all-tasks">Alle Taken</TabsTrigger>
-                <TabsTrigger value="my" data-testid="filter-my-tasks">Mijn Taken</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          )}
+          {/* Status & Priority Filters - inline on mobile */}
+          <div className="flex flex-wrap gap-2">
+            {/* Task Scope Toggle (for Admin/Support) */}
+            {canSeeAllTasks && (
+              <Tabs value={taskScope} onValueChange={(value) => setTaskScope(value as "all" | "my")} className="flex-shrink-0">
+                <TabsList>
+                  <TabsTrigger value="all" data-testid="filter-all-tasks">Alle Taken</TabsTrigger>
+                  <TabsTrigger value="my" data-testid="filter-my-tasks">Mijn Taken</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
 
-          {/* Status Filter */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle Status</SelectItem>
-              <SelectItem value="todo">Te Doen</SelectItem>
-              <SelectItem value="in_progress">Bezig</SelectItem>
-              <SelectItem value="done">Afgerond</SelectItem>
-            </SelectContent>
-          </Select>
+            {/* Status Filter */}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[120px] sm:w-[140px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle Status</SelectItem>
+                <SelectItem value="todo">Te Doen</SelectItem>
+                <SelectItem value="in_progress">Bezig</SelectItem>
+                <SelectItem value="done">Afgerond</SelectItem>
+              </SelectContent>
+            </Select>
 
-          {/* Priority Filter */}
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Prioriteit" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle Prioriteit</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-              <SelectItem value="high">Hoog</SelectItem>
-              <SelectItem value="medium">Normaal</SelectItem>
-              <SelectItem value="low">Laag</SelectItem>
-            </SelectContent>
-          </Select>
+            {/* Priority Filter */}
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-[120px] sm:w-[140px]">
+                <SelectValue placeholder="Prioriteit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle Prioriteit</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="high">Hoog</SelectItem>
+                <SelectItem value="medium">Normaal</SelectItem>
+                <SelectItem value="low">Laag</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* View Modes */}

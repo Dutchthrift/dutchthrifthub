@@ -92,7 +92,7 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
       setValue("caseId", todo.caseId || "");
       setValue("customerId", todo.customerId || "");
       setValue("repairId", todo.repairId || "");
-      
+
       // Set due date
       if (todo.dueDate) {
         const date = typeof todo.dueDate === 'string' ? new Date(todo.dueDate) : todo.dueDate;
@@ -221,7 +221,7 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
             {todo ? "Update your todo details below." : "Add a new task to your todo list."}
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Title */}
           <div className="space-y-2">
@@ -249,10 +249,10 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
           </div>
 
           {/* Category and Priority */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select 
+              <Select
                 onValueChange={(value) => setValue("category", value as any)}
                 value={watch("category")}
               >
@@ -271,7 +271,7 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
 
             <div className="space-y-2">
               <Label>Priority</Label>
-              <Select 
+              <Select
                 onValueChange={(value) => setValue("priority", value as any)}
                 value={watch("priority")}
               >
@@ -289,10 +289,10 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
           </div>
 
           {/* Assigned User and Due Date */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Assigned To *</Label>
-              <Select 
+              <Select
                 onValueChange={(value) => setValue("assignedUserId", value)}
                 value={watch("assignedUserId")}
                 disabled={usersLoading}
@@ -303,8 +303,8 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
                 <SelectContent>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
-                      {user.firstName && user.lastName 
-                        ? `${user.firstName} ${user.lastName}` 
+                      {user.firstName && user.lastName
+                        ? `${user.firstName} ${user.lastName}`
                         : user.email}
                     </SelectItem>
                   ))}
@@ -341,8 +341,8 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
           {/* Entity Linking Section */}
           <div className="space-y-4 border-t pt-4">
             <Label className="text-base font-semibold">Entity Linking (Optional)</Label>
-            
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="orderId">Order ID</Label>
                 <Input
@@ -399,8 +399,8 @@ export function TodoForm({ open, onOpenChange, todo }: TodoFormProps) {
               disabled={createTodoMutation.isPending || updateTodoMutation.isPending}
               data-testid="todo-submit-button"
             >
-              {(createTodoMutation.isPending || updateTodoMutation.isPending) 
-                ? (todo ? "Updating..." : "Creating...") 
+              {(createTodoMutation.isPending || updateTodoMutation.isPending)
+                ? (todo ? "Updating..." : "Creating...")
                 : (todo ? "Save Changes" : "Create Todo")}
             </Button>
           </DialogFooter>

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     Select,
     SelectContent,
@@ -87,8 +88,17 @@ export default function MailPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFolder, setActiveFolder] = useState<'inbox' | 'sent' | 'drafts' | 'trash'>('inbox');
     const [linkFilter, setLinkFilter] = useState<'all' | 'linked' | 'unlinked' | 'order' | 'case' | 'return' | 'repair'>('all');
+    const [isMobile, setIsMobile] = useState(false);
     const queryClient = useQueryClient();
     const { toast } = useToast();
+
+    // Detect mobile viewport
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // Dialog states
     const [showCreateCase, setShowCreateCase] = useState(false);
@@ -396,11 +406,11 @@ export default function MailPage() {
                     </div>
                 </div>
 
-                {/* Mail Layout */}
-                <div className="flex gap-4">
-                    {/* Sidebar - Mail List */}
-                    <Card className="w-80 flex-shrink-0">
-                        <CardContent className="p-4 flex flex-col gap-3 h-[calc(100vh-280px)]">
+                {/* Mail Layout - Responsive: stacked on mobile, side-by-side on desktop */}
+                <div className="flex flex-col md:flex-row gap-4">
+                    {/* Mail List - Full width on mobile, sidebar on desktop */}
+                    <Card className="w-full md:w-80 md:flex-shrink-0">
+                        <CardContent className="p-4 flex flex-col gap-3 h-[60vh] md:h-[calc(100vh-280px)]">
                             {/* Folder Tabs */}
                             <Tabs value={activeFolder} onValueChange={(value) => setActiveFolder(value as any)}>
                                 <TabsList className="grid w-full grid-cols-2 mb-2">
@@ -592,8 +602,8 @@ export default function MailPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Email Viewer */}
-                    <Card className="flex-1">
+                    {/* Email Viewer - Hidden on mobile, shown on desktop */}
+                    <Card className="hidden md:block flex-1">
                         <CardContent className="p-0">
                             {!selectedEmailId ? (
                                 <div className="flex items-center justify-center h-[calc(100vh-280px)] text-muted-foreground">
@@ -800,6 +810,116 @@ export default function MailPage() {
                     </Card>
                 </div >
             </main >
+
+            {/* Mobile Email Viewer Dialog - Only shown on mobile */}
+            <Dialog open={isMobile && !!selectedEmailId} onOpenChange={(open) => !open && setSelectedEmailId(null)}>
+                <DialogContent className="max-w-full h-[85vh] p-0 flex flex-col">
+                    {isLoadingDetails ? (
+                        <div className="flex justify-center items-center h-full">
+                            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : emailDetails ? (
+                        <>
+                            {/* Email Header */}
+                            <DialogHeader className="p-4 border-b bg-muted/30 flex-shrink-0">
+                                <DialogTitle className="text-lg font-bold line-clamp-2">
+                                    {emailDetails.subject || '(Geen onderwerp)'}
+                                </DialogTitle>
+                                <div className="space-y-1 mt-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-semibold text-sm">{emailDetails.fromName || 'Onbekend'}</span>
+                                        <Badge variant="outline" className="text-xs">
+                                            {emailDetails.fromEmail}
+                                        </Badge>
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                        {new Date(emailDetails.date).toLocaleString('nl-NL')}
+                                    </div>
+                                </div>
+                            </DialogHeader>
+
+                            {/* Email Body - Scrollable */}
+                            <div className="flex-1 overflow-auto p-4">
+                                {emailDetails.html ? (
+                                    <div
+                                        className="prose prose-sm max-w-none dark:prose-invert"
+                                        dangerouslySetInnerHTML={{
+                                            __html: DOMPurify.sanitize(emailDetails.html, {
+                                                ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'img', 'div', 'span', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th'],
+                                                ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'style']
+                                            })
+                                        }}
+                                    />
+                                ) : (
+                                    <pre className="whitespace-pre-wrap font-sans text-sm">
+                                        {emailDetails.text || '(Geen inhoud)'}
+                                    </pre>
+                                )}
+
+                                {/* Attachments */}
+                                {emailDetails.attachments && emailDetails.attachments.length > 0 && (
+                                    <div className="mt-4 pt-4 border-t">
+                                        <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                                            <Paperclip className="h-4 w-4" />
+                                            Bijlagen ({emailDetails.attachments.length})
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {emailDetails.attachments.map(att => (
+                                                <div key={att.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <Paperclip className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                                        <span className="text-sm truncate">{att.filename}</span>
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                                                        {(att.size / 1024).toFixed(1)} KB
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Linked Entities */}
+                                {emailDetails.links && emailDetails.links.length > 0 && (
+                                    <div className="mt-4 pt-4 border-t">
+                                        <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                                            <LinkIcon className="h-4 w-4" />
+                                            Gekoppeld aan ({emailDetails.links.length})
+                                        </h3>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {emailDetails.links.map(link => (
+                                                <Badge key={link.id} variant="secondary" className="text-xs">
+                                                    {link.entityType.toUpperCase()}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Action Buttons - Fixed at bottom */}
+                            <div className="p-4 border-t bg-background flex-shrink-0">
+                                <div className="flex gap-2 flex-wrap">
+                                    <Button onClick={handleReply} size="sm" className="flex-1">
+                                        <Reply className="h-4 w-4 mr-1" />
+                                        Antwoord
+                                    </Button>
+                                    <Button onClick={handleForward} size="sm" variant="outline" className="flex-1">
+                                        <Forward className="h-4 w-4 mr-1" />
+                                        Doorsturen
+                                    </Button>
+                                    <Button onClick={handleArchive} size="sm" variant="outline">
+                                        <Archive className="h-4 w-4" />
+                                    </Button>
+                                    <Button onClick={handleDelete} size="sm" variant="outline">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
 
             {/* Dialogs */}
             < CreateCaseModal

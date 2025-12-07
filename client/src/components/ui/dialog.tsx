@@ -38,15 +38,29 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border p-6 duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-xl",
+        // Base styles
+        "fixed z-50 grid w-full gap-4 border p-6 duration-300",
+        // Mobile: bottom-sheet style (slide up from bottom)
+        "inset-x-0 bottom-0 max-w-full rounded-t-2xl max-h-[90vh] overflow-y-auto",
+        // Desktop: centered modal
+        "sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:rounded-xl sm:max-h-[85vh]",
+        // Animations
+        "data-[state=open]:animate-in data-[state=closed]:animate-out",
+        // Mobile animations (slide up/down)
+        "data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
+        // Desktop animations (fade + zoom)
+        "sm:data-[state=closed]:fade-out-0 sm:data-[state=open]:fade-in-0 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%] sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
+        // Colors
         "bg-white border-border shadow-[0_8px_32px_rgba(0,0,0,0.08)]",
-        "dark:bg-[rgba(30,30,30,0.9)] dark:backdrop-blur-xl dark:border-border/50 dark:shadow-modal",
+        "dark:bg-[rgba(30,30,30,0.95)] dark:backdrop-blur-xl dark:border-border/50 dark:shadow-modal",
         className
       )}
       {...props}
     >
+      {/* Mobile drag handle indicator */}
+      <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted mb-2 sm:hidden" />
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent/50 p-1">
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent/50 p-1 touch-target">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>

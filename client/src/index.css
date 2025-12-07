@@ -71,6 +71,18 @@
   /* ========== DESIGN TOKENS ========== */
   --radius: 0.75rem;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+
+  /* ========== CHART COLORS ========== */
+  --chart-1: hsl(24 100% 50%);
+  /* Orange - primary */
+  --chart-2: hsl(142 71% 45%);
+  /* Green - success */
+  --chart-3: hsl(280 60% 55%);
+  /* Purple */
+  --chart-4: hsl(38 92% 50%);
+  /* Amber/Yellow */
+  --chart-5: hsl(200 90% 50%);
+  /* Blue */
 }
 
 .dark {
@@ -132,6 +144,18 @@
   --sidebar-accent: hsl(24 100% 55%);
   --sidebar-accent-foreground: hsl(0 0% 100%);
   --sidebar-border: hsl(0 0% 18%);
+
+  /* ========== CHART COLORS - DARK MODE ========== */
+  --chart-1: hsl(24 100% 55%);
+  /* Orange - primary */
+  --chart-2: hsl(142 71% 50%);
+  /* Green - success */
+  --chart-3: hsl(280 60% 60%);
+  /* Purple */
+  --chart-4: hsl(38 92% 55%);
+  /* Amber/Yellow */
+  --chart-5: hsl(200 90% 55%);
+  /* Blue */
 }
 
 @layer base {
@@ -321,6 +345,87 @@
 
     .mobile-drawer {
       @apply fixed inset-y-0 left-0 w-64 z-50 animate-slide-in;
+    }
+  }
+
+  /* ========== MOBILE TOUCH & TAP TARGETS ========== */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* ========== MOBILE SCROLLABLE CONTAINERS ========== */
+  .scroll-x-mobile {
+    @apply overflow-x-auto scrollbar-hide;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .scroll-y-mobile {
+    @apply overflow-y-auto scrollbar-hide;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ========== MOBILE BOTTOM SHEET ========== */
+  .bottom-sheet {
+    @apply fixed inset-x-0 bottom-0 z-50 rounded-t-2xl;
+    max-height: 90vh;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  /* ========== MOBILE STAT GRID ========== */
+  .mobile-stat-grid {
+    @apply grid grid-cols-2 gap-3;
+  }
+
+  @media (min-width: 640px) {
+    .mobile-stat-grid {
+      @apply flex flex-wrap items-center gap-6;
+    }
+  }
+
+  /* ========== MOBILE RESPONSIVE FORM GRID ========== */
+  .form-grid-responsive {
+    @apply grid grid-cols-1 gap-4;
+  }
+
+  @media (min-width: 640px) {
+    .form-grid-responsive {
+      @apply grid-cols-2;
+    }
+  }
+
+  /* ========== MOBILE FILTER ROW ========== */
+  .mobile-filter-row {
+    @apply flex flex-col gap-3;
+  }
+
+  @media (min-width: 640px) {
+    .mobile-filter-row {
+      @apply flex-row flex-wrap items-center;
+    }
+  }
+
+  /* ========== MOBILE HEADER BUTTONS ========== */
+  .mobile-header-buttons {
+    @apply flex flex-wrap gap-2;
+  }
+
+  @media (max-width: 640px) {
+    .mobile-header-buttons {
+      @apply w-full flex-col;
+    }
+
+    .mobile-header-buttons>* {
+      @apply w-full;
     }
   }
 }

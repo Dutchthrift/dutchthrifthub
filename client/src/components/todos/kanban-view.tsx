@@ -175,10 +175,10 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
                                   {/* Priority indicator dot */}
                                   <div
                                     className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${todo.priority === "urgent" || todo.priority === "high"
-                                        ? "bg-destructive"
-                                        : todo.priority === "medium"
-                                          ? "bg-chart-4"
-                                          : "bg-chart-2"
+                                      ? "bg-destructive"
+                                      : todo.priority === "medium"
+                                        ? "bg-chart-4"
+                                        : "bg-chart-2"
                                       }`}
                                     title={`Priority: ${todo.priority || "medium"}`}
                                   />
@@ -215,8 +215,8 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
                                 {todo.dueDate && (
                                   <div
                                     className={`flex items-center space-x-1.5 text-xs ${isOverdue(todo.dueDate) && todo.status !== "done"
-                                        ? "text-destructive font-medium"
-                                        : "text-muted-foreground"
+                                      ? "text-destructive font-medium"
+                                      : "text-muted-foreground"
                                       }`}
                                     data-testid={`kanban-todo-due-date-${todo.id}`}
                                   >

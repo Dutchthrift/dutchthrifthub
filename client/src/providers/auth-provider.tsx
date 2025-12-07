@@ -49,10 +49,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     if (user) {
       setUser(user);
-      toast({
-        title: "Welkom terug!",
-        description: `Ingelogd als ${user.firstName || user.email}`,
-      });
 
       // Redirect based on role
       if (user.role === "TECHNICUS") {
