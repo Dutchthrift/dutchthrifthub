@@ -69,7 +69,7 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
     const date = typeof dueDate === 'string' ? new Date(dueDate) : dueDate;
     const now = new Date();
     const diffInDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     if (diffInDays < 0) return "Overdue";
     if (diffInDays === 0) return "Due today";
     if (diffInDays === 1) return "Due tomorrow";
@@ -117,18 +117,19 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
         {columns.map((column) => (
           <Card
             key={column.id}
-            className="flex flex-col h-[calc(100vh-300px)]"
+            className="flex flex-col h-[calc(100vh-300px)] overflow-hidden"
             data-testid={`kanban-column-${column.id}`}
           >
-            <CardHeader className="pb-3">
+            {/* Colored accent bar at top */}
+            <div className={`h-1.5 ${column.color} w-full`} />
+            <CardHeader className="pb-3 pt-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className={`w-3 h-3 rounded-full ${column.color}`}></div>
-                  <CardTitle className="text-sm font-medium">{column.title}</CardTitle>
-                  <Badge variant="secondary" className="text-xs">
-                    {column.todos.length}
-                  </Badge>
+                  <CardTitle className="text-sm font-semibold tracking-wide">{column.title}</CardTitle>
                 </div>
+                <Badge variant="secondary" className="text-xs font-medium px-2.5 py-0.5 rounded-full">
+                  {column.todos.length}
+                </Badge>
               </div>
             </CardHeader>
 
@@ -137,9 +138,8 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
                 <CardContent
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`flex-1 overflow-y-auto space-y-3 pb-3 ${
-                    snapshot.isDraggingOver ? "bg-muted/50" : ""
-                  }`}
+                  className={`flex-1 overflow-y-auto space-y-3 pb-3 ${snapshot.isDraggingOver ? "bg-muted/50" : ""
+                    }`}
                 >
                   {column.todos.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground text-sm">
@@ -153,27 +153,35 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
-                            className={`cursor-pointer hover:shadow-md transition-all ${
-                              snapshot.isDragging ? "shadow-lg" : ""
-                            } ${
-                              isOverdue(todo.dueDate) && todo.status !== "done"
-                                ? "border-destructive"
+                            className={`cursor-pointer transition-all duration-200 ease-in-out hover:shadow-lg hover:-translate-y-0.5 ${snapshot.isDragging ? "shadow-xl rotate-1" : ""
+                              } ${isOverdue(todo.dueDate) && todo.status !== "done"
+                                ? "border-l-4 border-l-destructive"
                                 : ""
-                            }`}
+                              } ${todo.status === "done" ? "opacity-60" : ""
+                              }`}
                             onClick={() => onTaskClick(todo)}
                             data-testid={`kanban-todo-card-${todo.id}`}
                           >
-                            <CardContent className="p-3">
-                              <div className="space-y-2">
-                                <div className="flex items-start justify-between">
+                            <CardContent className="p-3.5">
+                              <div className="space-y-2.5">
+                                <div className="flex items-start justify-between gap-2">
                                   <h4
-                                    className={`text-sm font-medium flex-1 ${
-                                      todo.status === "done" ? "line-through opacity-60" : ""
-                                    }`}
+                                    className={`text-sm font-medium flex-1 leading-snug ${todo.status === "done" ? "line-through text-muted-foreground" : ""
+                                      }`}
                                     data-testid={`kanban-todo-title-${todo.id}`}
                                   >
                                     {todo.title}
                                   </h4>
+                                  {/* Priority indicator dot */}
+                                  <div
+                                    className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${todo.priority === "urgent" || todo.priority === "high"
+                                        ? "bg-destructive"
+                                        : todo.priority === "medium"
+                                          ? "bg-chart-4"
+                                          : "bg-chart-2"
+                                      }`}
+                                    title={`Priority: ${todo.priority || "medium"}`}
+                                  />
                                 </div>
 
                                 {todo.description && (
@@ -185,24 +193,31 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
                                   </p>
                                 )}
 
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between pt-1">
                                   <Badge
                                     variant={getPriorityVariant(todo.priority || "medium")}
-                                    className={getPriorityColor(todo.priority || "medium")}
+                                    className="text-[10px] font-medium px-1.5 py-0"
                                     data-testid={`kanban-todo-priority-${todo.id}`}
                                   >
                                     {(todo.priority || "medium").charAt(0).toUpperCase() +
                                       (todo.priority || "medium").slice(1)}
                                   </Badge>
+
+                                  {todo.assignedUserId && (
+                                    <Avatar className="h-5 w-5 border border-border">
+                                      <AvatarFallback className="text-[9px] font-medium bg-muted">
+                                        {todo.assignedUserId.substring(0, 2).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  )}
                                 </div>
 
                                 {todo.dueDate && (
                                   <div
-                                    className={`flex items-center space-x-1 text-xs ${
-                                      isOverdue(todo.dueDate) && todo.status !== "done"
-                                        ? "text-destructive"
+                                    className={`flex items-center space-x-1.5 text-xs ${isOverdue(todo.dueDate) && todo.status !== "done"
+                                        ? "text-destructive font-medium"
                                         : "text-muted-foreground"
-                                    }`}
+                                      }`}
                                     data-testid={`kanban-todo-due-date-${todo.id}`}
                                   >
                                     <Calendar className="h-3 w-3" />
@@ -210,21 +225,6 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
                                     {isOverdue(todo.dueDate) && todo.status !== "done" && (
                                       <AlertTriangle className="h-3 w-3 ml-1" />
                                     )}
-                                  </div>
-                                )}
-
-                                {todo.assignedUserId && (
-                                  <div
-                                    className="flex items-center space-x-1"
-                                    data-testid={`kanban-todo-assigned-${todo.id}`}
-                                  >
-                                    <Avatar className="h-4 w-4">
-                                      <AvatarFallback className="text-xs">
-                                        {todo.assignedUserId.substring(0, 2).toUpperCase()}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <User className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-xs text-muted-foreground">Assigned</span>
                                   </div>
                                 )}
                               </div>

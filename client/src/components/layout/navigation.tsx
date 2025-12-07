@@ -43,7 +43,8 @@ export function Navigation() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { signOut, user } = useAuth();
-  const smallLogoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/extra-files/dutchthrift-logo-small.jpg`;
+  // Use local logo
+  const smallLogoUrl = "/logo.svg";
 
   const handleLogout = async () => {
     await signOut();

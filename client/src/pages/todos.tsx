@@ -272,20 +272,20 @@ export default function Todos() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Te Doen:</span>
-              <span className="text-sm font-semibold text-blue-600">{statusCounts.todo}</span>
+              <span className="text-sm font-semibold text-chart-4">{statusCounts.todo}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Bezig:</span>
-              <span className="text-sm font-semibold text-purple-600">{statusCounts.in_progress}</span>
+              <span className="text-sm font-semibold text-primary">{statusCounts.in_progress}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Afgerond:</span>
-              <span className="text-sm font-semibold text-green-600">{statusCounts.done}</span>
+              <span className="text-sm font-semibold text-chart-2">{statusCounts.done}</span>
             </div>
             {overdueTasks > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Verlopen:</span>
-                <span className="text-sm font-semibold text-red-600">{overdueTasks}</span>
+                <span className="text-sm font-semibold text-destructive">{overdueTasks}</span>
               </div>
             )}
           </div>
@@ -406,12 +406,12 @@ export default function Todos() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {filteredTodos.map((todo) => (
                     <Card
                       key={todo.id}
-                      className={`transition-all hover:shadow-md cursor-pointer ${todo.status === 'done' ? 'opacity-60' : ''
-                        } ${isOverdue(todo.dueDate) && todo.status !== 'done' ? 'border-destructive' : ''}`}
+                      className={`transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${todo.status === 'done' ? 'opacity-60' : ''
+                        } ${isOverdue(todo.dueDate) && todo.status !== 'done' ? 'border-l-4 border-l-destructive' : ''}`}
                       data-testid={`todo-item-${todo.id}`}
                       onClick={() => {
                         setSelectedTask(todo);
@@ -482,7 +482,7 @@ export default function Todos() {
                                   {todo.priority ? todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1) : 'Medium'}
                                 </Badge>
                                 {todo.status === 'in_progress' && (
-                                  <Badge variant="outline" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0">
+                                  <Badge variant="outline" className="bg-primary/10 text-primary border-0">
                                     Bezig
                                   </Badge>
                                 )}

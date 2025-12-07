@@ -19,7 +19,7 @@ export function CalendarView({ todos, onTaskClick, isLoading }: CalendarViewProp
   // Group todos by date
   const todosByDate = useMemo(() => {
     const grouped = new Map<string, Todo[]>();
-    
+
     todos.forEach((todo) => {
       if (todo.dueDate) {
         const dateKey = format(new Date(todo.dueDate), "yyyy-MM-dd");
@@ -29,7 +29,7 @@ export function CalendarView({ todos, onTaskClick, isLoading }: CalendarViewProp
         grouped.get(dateKey)!.push(todo);
       }
     });
-    
+
     return grouped;
   }, [todos]);
 
@@ -43,7 +43,7 @@ export function CalendarView({ todos, onTaskClick, isLoading }: CalendarViewProp
       const now = new Date();
       const monthStart = startOfMonth(now);
       const monthEnd = endOfMonth(now);
-      
+
       return todos.filter((todo) => {
         if (!todo.dueDate) return false;
         const dueDate = new Date(todo.dueDate);
@@ -87,7 +87,7 @@ export function CalendarView({ todos, onTaskClick, isLoading }: CalendarViewProp
     const date = typeof dueDate === 'string' ? new Date(dueDate) : dueDate;
     const now = new Date();
     const diffInDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     if (diffInDays < 0) return "Overdue";
     if (diffInDays === 0) return "Due today";
     if (diffInDays === 1) return "Due tomorrow";
@@ -104,7 +104,7 @@ export function CalendarView({ todos, onTaskClick, isLoading }: CalendarViewProp
   const renderDayContent = (date: Date) => {
     const dateKey = format(date, "yyyy-MM-dd");
     const dateTodos = todosByDate.get(dateKey) || [];
-    
+
     if (dateTodos.length === 0) {
       return null;
     }
@@ -226,13 +226,11 @@ export function CalendarView({ todos, onTaskClick, isLoading }: CalendarViewProp
             displayedTodos.map((todo) => (
               <Card
                 key={todo.id}
-                className={`cursor-pointer hover:shadow-md transition-all ${
-                  todo.status === "done" ? "opacity-60" : ""
-                } ${
-                  isOverdue(todo.dueDate) && todo.status !== "done"
-                    ? "border-destructive"
+                className={`cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${todo.status === "done" ? "opacity-60" : ""
+                  } ${isOverdue(todo.dueDate) && todo.status !== "done"
+                    ? "border-l-4 border-l-destructive"
                     : ""
-                }`}
+                  }`}
                 onClick={() => onTaskClick(todo)}
                 data-testid={`calendar-task-card-${todo.id}`}
               >
@@ -241,9 +239,8 @@ export function CalendarView({ todos, onTaskClick, isLoading }: CalendarViewProp
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <h4
-                          className={`text-sm font-medium ${
-                            todo.status === "done" ? "line-through" : ""
-                          }`}
+                          className={`text-sm font-medium ${todo.status === "done" ? "line-through" : ""
+                            }`}
                           data-testid={`calendar-task-title-${todo.id}`}
                         >
                           {todo.title}
@@ -283,11 +280,10 @@ export function CalendarView({ todos, onTaskClick, isLoading }: CalendarViewProp
                         {/* Due Date Status */}
                         {todo.dueDate && (
                           <div
-                            className={`flex items-center gap-1 ${
-                              isOverdue(todo.dueDate) && todo.status !== "done"
+                            className={`flex items-center gap-1 ${isOverdue(todo.dueDate) && todo.status !== "done"
                                 ? "text-destructive font-medium"
                                 : "text-muted-foreground"
-                            }`}
+                              }`}
                             data-testid={`calendar-task-due-status-${todo.id}`}
                           >
                             <CalendarIcon className="h-3 w-3" />

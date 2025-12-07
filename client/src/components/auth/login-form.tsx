@@ -38,16 +38,17 @@ export function LoginForm() {
     }
   };
 
-  const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/extra-files/dutchthrift-logo-small.jpg`;
+  // Use local logo
+  const logoUrl = "/logo.svg";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <img 
-              src={logoUrl} 
-              alt="DutchThrift Logo" 
+            <img
+              src={logoUrl}
+              alt="DutchThrift Logo"
               className="h-16 w-16 object-cover rounded-lg"
               data-testid="login-logo"
             />

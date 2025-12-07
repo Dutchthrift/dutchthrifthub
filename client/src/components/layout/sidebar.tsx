@@ -42,7 +42,8 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const [location] = useLocation();
-  const smallLogoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/extra-files/dutchthrift-logo-small.jpg`;
+  // Use local logo or fallback to generated SVG
+  const smallLogoUrl = "/logo.svg";
 
   return (
     <div
