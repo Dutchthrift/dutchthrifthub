@@ -205,7 +205,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-4">
+      <DialogContent className="w-full sm:max-w-4xl max-h-[85vh] overflow-y-auto p-6">
         {/* Header */}
         <DialogHeader className="pb-2 border-b">
           <div className="flex items-start justify-between gap-2">
@@ -215,7 +215,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                 <span className="truncate">{currentRepair.title}</span>
               </DialogTitle>
               <p className="text-xs text-muted-foreground">
-                #{currentRepair.id.slice(0, 8)} • {currentRepair.orderNumber || (currentRepair.repairType === 'inventory' ? 'Inkoop' : 'Klant')}
+                {currentRepair.repairNumber || `#${currentRepair.id.slice(0, 8)}`} • {currentRepair.orderNumber || (currentRepair.repairType === 'inventory' ? 'Inkoop' : 'Klant')}
               </p>
             </div>
             <div className="flex items-center gap-1">
@@ -249,8 +249,8 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
         </DialogHeader>
 
         {/* Horizontal Timeline */}
-        <div className="py-3 border-b">
-          <div className="flex items-center justify-between">
+        <div className="py-3 border-b overflow-x-auto">
+          <div className="flex items-center justify-between min-w-[300px]">
             {STATUSES.map((status, idx) => {
               const isCompleted = idx < currentStatusIndex;
               const isCurrent = idx === currentStatusIndex;
@@ -259,7 +259,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                   <button
                     onClick={() => updateStatusMutation.mutate({ status: status.value })}
                     disabled={updateStatusMutation.isPending}
-                    className={`flex flex-col items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity ${isCurrent ? 'scale-110' : ''}`}
+                    className={`flex flex-col items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 ${isCurrent ? 'scale-110' : ''}`}
                   >
                     {isCompleted ? (
                       <CheckCircle className={`h-5 w-5 ${status.color}`} />
@@ -270,12 +270,12 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                     ) : (
                       <Circle className="h-5 w-5 text-gray-300" />
                     )}
-                    <span className={`text-[10px] ${isCurrent ? 'font-semibold ' + status.color : 'text-muted-foreground'}`}>
+                    <span className={`text-[10px] whitespace-nowrap ${isCurrent ? 'font-semibold ' + status.color : 'text-muted-foreground'}`}>
                       {status.label}
                     </span>
                   </button>
                   {idx < STATUSES.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-1 ${idx < currentStatusIndex ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+                    <div className={`flex-1 h-0.5 mx-1 min-w-[20px] ${idx < currentStatusIndex ? 'bg-emerald-500' : 'bg-gray-200'}`} />
                   )}
                 </div>
               );
@@ -336,7 +336,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
               {/* Left Column - Details */}
               <div className="space-y-2">
                 <div>
@@ -362,9 +362,9 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Prioriteit</span>
                   <Badge className={`text-[10px] h-4 px-1.5 ${currentRepair.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                      currentRepair.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                        currentRepair.priority === 'low' ? 'bg-emerald-100 text-emerald-700' :
-                          'bg-gray-100 text-gray-600'
+                    currentRepair.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                      currentRepair.priority === 'low' ? 'bg-emerald-100 text-emerald-700' :
+                        'bg-gray-100 text-gray-600'
                     }`}>
                     {currentRepair.priority === 'urgent' ? 'Urgent' : currentRepair.priority === 'high' ? 'Hoog' : currentRepair.priority === 'low' ? 'Laag' : 'Normaal'}
                   </Badge>

@@ -25,7 +25,7 @@ import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from "@dnd-kit/core";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 
 // Status configuration for the 4 simple statuses
 const STATUS_CONFIG = {
@@ -121,47 +121,21 @@ export default function Repairs() {
     },
   });
 
-  // Drag-and-drop state
-  const [activeRepair, setActiveRepair] = useState<Repair | null>(null);
+  // Handle drag end for @hello-pangea/dnd
+  const handleDragEnd = (result: DropResult) => {
+    const { destination, source, draggableId } = result;
 
-  // Configure sensors for better drag experience
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 100, tolerance: 5 },
-    })
-  );
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const repairId = event.active.id as string;
-    const repair = repairs.find(r => r.id === repairId);
-    console.log('[Drag] Started dragging:', repairId, repair?.title);
-    setActiveRepair(repair || null);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    console.log('[Drag] Ended. Active:', active.id, 'Over:', over?.id);
-    setActiveRepair(null);
-
-    if (!over) {
-      console.log('[Drag] No drop target');
+    // No destination or dropped in same position
+    if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) {
       return;
     }
 
-    const repairId = active.id as string;
-    const newStatus = over.id as string;
-    const repair = repairs.find(r => r.id === repairId);
+    const repair = repairs.find(r => r.id === draggableId);
+    if (!repair) return;
 
-    console.log('[Drag] Repair:', repair?.title, 'Current status:', repair?.status, 'New status:', newStatus);
-
-    if (repair && repair.status !== newStatus && STATUS_ORDER.includes(newStatus as any)) {
-      console.log('[Drag] Updating status...');
-      updateStatusMutation.mutate({ repairId, status: newStatus });
-    } else {
-      console.log('[Drag] Status not changed - same status or invalid');
+    const newStatus = destination.droppableId;
+    if (STATUS_ORDER.includes(newStatus as any) && repair.status !== newStatus) {
+      updateStatusMutation.mutate({ repairId: repair.id, status: newStatus });
     }
   };
 
@@ -219,160 +193,141 @@ export default function Repairs() {
   const customerByStatus = groupByStatus(filteredCustomerRepairs);
   const inventoryByStatus = groupByStatus(filteredInventoryRepairs);
 
-  // Draggable repair card component
-  const DraggableRepairCard = ({ repair }: { repair: Repair }) => {
-    const assignedUser = users.find(u => u.id === repair.assignedUserId);
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: repair.id,
-    });
-
-    const style: React.CSSProperties = transform ? {
-      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      zIndex: 50,
-      opacity: 0.8,
-    } : {};
-
-    const statusConfig = STATUS_CONFIG[repair.status as keyof typeof STATUS_CONFIG];
-
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className={cn(
-          "relative group",
-          isDragging && "pointer-events-none"
-        )}
-      >
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <Card
-              className={cn(
-                "hover:shadow-md transition-all border-l-4 select-none",
-                isDragging && "shadow-lg"
-              )}
-              style={{ borderLeftColor: statusConfig?.color.replace('bg-', '') }}
-              onDoubleClick={() => setSelectedRepair(repair)}
-            >
-              {/* Drag handle - the entire card is draggable */}
-              <div
-                {...attributes}
-                {...listeners}
-                className="absolute inset-0 cursor-grab active:cursor-grabbing"
-                style={{ touchAction: 'none' }}
-              />
-              <CardContent className="p-3 relative pointer-events-none">
-                {repair.repairType === 'customer' ? (
-                  <>
-                    {/* Customer repair: Order number as title */}
-                    <h4 className="font-medium text-sm truncate">{repair.orderNumber || 'Geen order'}</h4>
-                    <p className="text-xs text-muted-foreground truncate">{repair.productName || repair.title}</p>
-                    <p className="text-xs text-blue-500">{repair.repairNumber || `#${repair.id.slice(0, 6)}`}</p>
-                    {repair.customerName && (
-                      <p className="text-xs text-blue-600 truncate">👤 {repair.customerName}</p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {/* Inventory repair: Product title as title */}
-                    <h4 className="font-medium text-sm truncate">{repair.title}</h4>
-                    <p className="text-xs text-amber-600 truncate">
-                      {repair.repairNumber || `#${repair.id.slice(0, 6)}`}
-                    </p>
-                  </>
-                )}
-                <div className="flex items-center justify-between mt-1.5">
-                  {assignedUser && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <User className="h-3 w-3" />
-                      <span className="truncate max-w-[80px]">{assignedUser.firstName || assignedUser.username}</span>
-                    </div>
-                  )}
-                  {repair.priority && repair.priority !== 'medium' && (
-                    <Badge variant={repair.priority === 'urgent' ? 'destructive' : repair.priority === 'high' ? 'default' : 'secondary'} className="text-xs pointer-events-auto">
-                      {repair.priority === 'urgent' ? 'Urgent' : repair.priority === 'high' ? 'Hoog' : 'Laag'}
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            <ContextMenuItem onClick={() => setSelectedRepair(repair)}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Bewerken
-            </ContextMenuItem>
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>
-                <ArrowRight className="h-4 w-4 mr-2" />
-                Status wijzigen
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent>
-                {STATUS_ORDER.map(status => {
-                  const config = STATUS_CONFIG[status];
-                  return (
-                    <ContextMenuItem
-                      key={status}
-                      onClick={() => handleStatusChange(repair, status)}
-                      disabled={repair.status === status}
-                    >
-                      <div className={cn("w-2 h-2 rounded-full mr-2", config.color)} />
-                      {config.label}
-                      {repair.status === status && <span className="ml-auto text-xs text-muted-foreground">✓</span>}
-                    </ContextMenuItem>
-                  );
-                })}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-            <ContextMenuItem onClick={() => handleArchiveRepair(repair)} disabled={repair.status === 'returned'}>
-              <Archive className="h-4 w-4 mr-2" />
-              Archiveren
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => handleDeleteRepair(repair)} className="text-destructive focus:text-destructive">
-              <Trash2 className="h-4 w-4 mr-2" />
-              Verwijderen
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
-      </div>
-    );
-  };
-
-  // Droppable status column component
-  const DroppableStatusColumn = ({ status, repairs: columnRepairs }: { status: string; repairs: Repair[] }) => {
+  // Status column with @hello-pangea/dnd Droppable
+  const StatusColumn = ({ status, repairs: columnRepairs }: { status: string; repairs: Repair[] }) => {
     const config = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG];
-    const { setNodeRef, isOver } = useDroppable({ id: status });
     if (!config) return null;
 
+
     return (
-      <div
-        ref={setNodeRef}
-        className={cn(
-          "flex-1 min-w-[200px] rounded-lg p-3 transition-all",
-          config.bgColor,
-          config.borderColor,
-          "border",
-          isOver && "ring-2 ring-primary ring-offset-2 bg-primary/5"
-        )}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className={cn("w-2 h-2 rounded-full", config.color)} />
-            <span className="font-medium text-sm">{config.label}</span>
-          </div>
-          <Badge variant="secondary" className="text-xs">{columnRepairs.length}</Badge>
-        </div>
-        <div className="space-y-2 max-h-[400px] overflow-y-auto min-h-[100px]">
-          {columnRepairs.map(repair => (
-            <DraggableRepairCard key={repair.id} repair={repair} />
-          ))}
-          {columnRepairs.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground text-sm">
-              {isOver ? "Laat los om hier te plaatsen" : "Geen reparaties"}
+      <Droppable droppableId={status}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={cn(
+              "flex-1 min-w-[200px] rounded-lg p-3 transition-all",
+              config.bgColor,
+              config.borderColor,
+              "border",
+              snapshot.isDraggingOver && "ring-2 ring-primary ring-offset-2 bg-primary/5"
+            )}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className={cn("w-2 h-2 rounded-full", config.color)} />
+                <span className="font-medium text-sm">{config.label}</span>
+              </div>
+              <Badge variant="secondary" className="text-xs">{columnRepairs.length}</Badge>
             </div>
-          )}
-        </div>
-      </div>
+            <div className="space-y-2 max-h-[400px] overflow-y-auto min-h-[100px]">
+              {columnRepairs.map((repair, index) => {
+                const assignedUser = users.find(u => u.id === repair.assignedUserId);
+                return (
+                  <Draggable key={repair.id} draggableId={repair.id} index={index}>
+                    {(provided, snapshot) => (
+                      <ContextMenu>
+                        <ContextMenuTrigger asChild>
+                          <Card
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className={cn(
+                              "hover:shadow-md transition-all border-l-4 cursor-grab",
+                              snapshot.isDragging && "shadow-lg rotate-2"
+                            )}
+                            style={{
+                              ...provided.draggableProps.style,
+                              borderLeftColor: config?.color.replace('bg-', '') || undefined,
+                            }}
+                            onClick={() => setSelectedRepair(repair)}
+                          >
+                            <CardContent className="p-3">
+                              {repair.repairType === 'customer' ? (
+                                <>
+                                  <h4 className="font-medium text-sm truncate">{repair.orderNumber || 'Geen order'}</h4>
+                                  <p className="text-xs text-muted-foreground truncate">{repair.productName || repair.title}</p>
+                                  <p className="text-xs text-blue-500">{repair.repairNumber || `#${repair.id.slice(0, 6)}`}</p>
+                                  {repair.customerName && (
+                                    <p className="text-xs text-blue-600 truncate">👤 {repair.customerName}</p>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <h4 className="font-medium text-sm truncate">{repair.title}</h4>
+                                  <p className="text-xs text-amber-600 truncate">
+                                    {repair.repairNumber || `#${repair.id.slice(0, 6)}`}
+                                  </p>
+                                </>
+                              )}
+                              <div className="flex items-center justify-between mt-1.5">
+                                {assignedUser && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <User className="h-3 w-3" />
+                                    <span className="truncate max-w-[80px]">{assignedUser.firstName || assignedUser.username}</span>
+                                  </div>
+                                )}
+                                {repair.priority && repair.priority !== 'medium' && (
+                                  <Badge variant={repair.priority === 'urgent' ? 'destructive' : repair.priority === 'high' ? 'default' : 'secondary'} className="text-xs">
+                                    {repair.priority === 'urgent' ? 'Urgent' : repair.priority === 'high' ? 'Hoog' : 'Laag'}
+                                  </Badge>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem onClick={() => setSelectedRepair(repair)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Bewerken
+                          </ContextMenuItem>
+                          <ContextMenuSub>
+                            <ContextMenuSubTrigger>
+                              <ArrowRight className="h-4 w-4 mr-2" />
+                              Status wijzigen
+                            </ContextMenuSubTrigger>
+                            <ContextMenuSubContent>
+                              {STATUS_ORDER.map(s => {
+                                const cfg = STATUS_CONFIG[s];
+                                return (
+                                  <ContextMenuItem
+                                    key={s}
+                                    onClick={() => handleStatusChange(repair, s)}
+                                    disabled={repair.status === s}
+                                  >
+                                    <div className={cn("w-2 h-2 rounded-full mr-2", cfg.color)} />
+                                    {cfg.label}
+                                    {repair.status === s && <span className="ml-auto text-xs text-muted-foreground">✓</span>}
+                                  </ContextMenuItem>
+                                );
+                              })}
+                            </ContextMenuSubContent>
+                          </ContextMenuSub>
+                          <ContextMenuItem onClick={() => handleArchiveRepair(repair)} disabled={repair.status === 'returned'}>
+                            <Archive className="h-4 w-4 mr-2" />
+                            Archiveren
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem onClick={() => handleDeleteRepair(repair)} className="text-destructive focus:text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Verwijderen
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    )}
+                  </Draggable>
+                );
+              })}
+              {columnRepairs.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  {snapshot.isDraggingOver ? "Laat los om hier te plaatsen" : "Geen reparaties"}
+                </div>
+              )}
+              {provided.placeholder}
+            </div>
+          </div>
+        )}
+      </Droppable>
     );
   };
 
@@ -416,27 +371,13 @@ export default function Repairs() {
         </CardHeader>
         <CollapsibleContent>
           <CardContent className="p-4">
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            <DragDropContext onDragEnd={handleDragEnd}>
               <div className="flex gap-4 overflow-x-auto pb-2">
                 {STATUS_ORDER.map(status => (
-                  <DroppableStatusColumn key={status} status={status} repairs={byStatus[status] || []} />
+                  <StatusColumn key={status} status={status} repairs={byStatus[status] || []} />
                 ))}
               </div>
-              <DragOverlay>
-                {activeRepair && (
-                  <Card className="shadow-xl border-l-4 cursor-grabbing rotate-2 scale-105" style={{ borderLeftColor: STATUS_CONFIG[activeRepair.status as keyof typeof STATUS_CONFIG]?.color.replace('bg-', '') }}>
-                    <CardContent className="p-3">
-                      <h4 className="font-medium text-sm truncate">
-                        {activeRepair.repairType === 'customer' ? (activeRepair.orderNumber || 'Geen order') : activeRepair.title}
-                      </h4>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {activeRepair.repairNumber || `#${activeRepair.id.slice(0, 6)}`}
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </DragOverlay>
-            </DndContext>
+            </DragDropContext>
           </CardContent>
         </CollapsibleContent>
       </Card>
