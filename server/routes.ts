@@ -3560,7 +3560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("DEBUG PATCH PO - After schema parse:", JSON.stringify(updateData, null, 2));
 
-      // Convert orderDate string to Date object for database if present
+      // Auto-archive when status is set to 'verwerkt'
       const purchaseOrderUpdateData = updateData.orderDate
         ? {
           ...updateData,
@@ -3568,8 +3568,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             typeof updateData.orderDate === "string"
               ? new Date(updateData.orderDate)
               : updateData.orderDate,
+          // Auto-archive if status is verwerkt
+          ...(updateData.status === 'verwerkt' ? { archived: true } : {}),
         }
-        : updateData;
+        : {
+          ...updateData,
+          // Auto-archive if status is verwerkt
+          ...(updateData.status === 'verwerkt' ? { archived: true } : {}),
+        };
 
       console.log("DEBUG PATCH PO - Final update data:", JSON.stringify(purchaseOrderUpdateData, null, 2));
 

@@ -70,16 +70,6 @@ const STATUS_COLUMNS = [
         countBg: 'bg-emerald-500 text-white',
         statuses: ['ontvangen']
     },
-    {
-        id: 'verwerkt',
-        title: 'Verwerkt',
-        color: 'bg-gray-500',
-        headerBg: 'bg-gray-100 dark:bg-gray-800/50',
-        headerBorder: 'border-gray-200 dark:border-gray-700',
-        cardBorder: 'border-l-4 border-l-gray-400',
-        countBg: 'bg-gray-500 text-white',
-        statuses: ['verwerkt']
-    },
 ];
 
 export function PurchaseOrdersKanban({
@@ -173,8 +163,8 @@ export function PurchaseOrdersKanban({
 
     if (isLoading) {
         return (
-            <div className="grid grid-cols-3 gap-4" data-testid="kanban-loading">
-                {[...Array(3)].map((_, i) => (
+            <div className="grid grid-cols-2 gap-4" data-testid="kanban-loading">
+                {[...Array(2)].map((_, i) => (
                     <Card key={i} className="h-96">
                         <CardHeader>
                             <div className="h-4 bg-muted rounded animate-pulse"></div>
@@ -192,7 +182,7 @@ export function PurchaseOrdersKanban({
 
     return (
         <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="grid grid-cols-3 gap-4" data-testid="purchase-orders-kanban">
+            <div className="grid grid-cols-2 gap-4" data-testid="purchase-orders-kanban">
                 {columns.map((column) => (
                     <Card key={column.id} className={`flex flex-col h-[calc(100vh-280px)] overflow-hidden`} data-testid={`kanban-column-${column.id}`}>
                         <CardHeader className={`pb-2 px-3 pt-3 flex-shrink-0 ${column.headerBg} border-b ${column.headerBorder}`}>
@@ -308,7 +298,7 @@ export function PurchaseOrdersKanban({
                                                                                 </div>
                                                                             )}
 
-                                                                            {po.totalAmount && (
+                                                                            {(po.totalAmount !== null && po.totalAmount !== undefined) && (
                                                                                 <div className="flex items-center gap-2 pt-0.5">
                                                                                     <Euro className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                                                                                     <span className="text-sm font-semibold text-green-600 dark:text-green-500">
