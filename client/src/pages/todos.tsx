@@ -268,39 +268,35 @@ export default function Todos() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
-          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950/50 dark:to-slate-900/30 border-slate-200 dark:border-slate-800">
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">{statusCounts.all}</div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">Totaal</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/50 dark:to-amber-900/30 border-amber-200 dark:border-amber-800">
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{statusCounts.todo}</div>
-              <div className="text-sm text-amber-600 dark:text-amber-400">Te Doen</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 border-blue-200 dark:border-blue-800">
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{statusCounts.in_progress}</div>
-              <div className="text-sm text-blue-600 dark:text-blue-400">Bezig</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/50 dark:to-green-900/30 border-green-200 dark:border-green-800">
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-green-700 dark:text-green-300">{statusCounts.done}</div>
-              <div className="text-sm text-green-600 dark:text-green-400">Afgerond</div>
-            </CardContent>
-          </Card>
+        {/* Compact Stats Strip */}
+        <div className="flex flex-wrap items-center gap-3 sm:gap-6 px-4 py-3 bg-card rounded-lg border mb-6">
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold text-slate-700 dark:text-slate-300">{statusCounts.all}</span>
+            <span className="text-sm text-muted-foreground">Totaal</span>
+          </div>
+          <div className="h-4 w-px bg-border hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold text-amber-600 dark:text-amber-400">{statusCounts.todo}</span>
+            <span className="text-sm text-muted-foreground">Te Doen</span>
+          </div>
+          <div className="h-4 w-px bg-border hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{statusCounts.in_progress}</span>
+            <span className="text-sm text-muted-foreground">Bezig</span>
+          </div>
+          <div className="h-4 w-px bg-border hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold text-green-600 dark:text-green-400">{statusCounts.done}</span>
+            <span className="text-sm text-muted-foreground">Afgerond</span>
+          </div>
           {overdueTasks > 0 && (
-            <Card className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/50 dark:to-red-900/30 border-red-200 dark:border-red-800">
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-red-700 dark:text-red-300">{overdueTasks}</div>
-                <div className="text-sm text-red-600 dark:text-red-400">Verlopen</div>
-              </CardContent>
-            </Card>
+            <>
+              <div className="h-4 w-px bg-border hidden sm:block" />
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold text-red-600 dark:text-red-400">{overdueTasks}</span>
+                <span className="text-sm text-muted-foreground">Verlopen</span>
+              </div>
+            </>
           )}
         </div>
 
@@ -399,130 +395,108 @@ export default function Todos() {
             isLoading={isLoading}
           />
         ) : (
-          <Card data-testid="todos-list">
-            <CardContent className="p-6">
-              {isLoading ? (
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="flex items-center space-x-3 p-3 animate-pulse">
-                      <div className="h-4 w-4 bg-muted rounded"></div>
-                      <div className="flex-1 space-y-1">
-                        <div className="h-4 bg-muted rounded"></div>
-                        <div className="h-3 bg-muted rounded w-3/4"></div>
-                      </div>
+          <div data-testid="todos-list">
+            {isLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center space-x-3 p-3 bg-card rounded-lg border animate-pulse">
+                    <div className="h-4 w-4 bg-muted rounded"></div>
+                    <div className="flex-1 space-y-1">
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
                     </div>
-                  ))}
-                </div>
-              ) : filteredTodos.length === 0 ? (
-                <div className="text-center py-12">
-                  <CheckSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium">Geen taken gevonden</h3>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Maak een nieuwe taak aan om te beginnen
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredTodos.map((todo) => (
-                    <Card
-                      key={todo.id}
-                      className={`transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${todo.status === 'done' ? 'opacity-60' : ''
-                        } ${isOverdue(todo.dueDate) && todo.status !== 'done' ? 'border-l-4 border-l-destructive' : ''}`}
-                      data-testid={`todo-item-${todo.id}`}
-                      onClick={() => {
-                        setSelectedTask(todo);
-                        setShowDetailModal(true);
+                  </div>
+                ))}
+              </div>
+            ) : filteredTodos.length === 0 ? (
+              <div className="text-center py-12 bg-card rounded-lg border">
+                <CheckSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium">Geen taken gevonden</h3>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Maak een nieuwe taak aan om te beginnen
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {filteredTodos.map((todo) => (
+                  <div
+                    key={todo.id}
+                    className={`flex items-center gap-3 p-3 bg-card rounded-lg border cursor-pointer transition-all hover:shadow-sm hover:bg-accent/30 border-l-4 ${todo.priority === "urgent" || todo.priority === "high"
+                        ? "border-l-destructive"
+                        : todo.priority === "medium"
+                          ? "border-l-amber-500"
+                          : "border-l-green-500"
+                      } ${todo.status === 'done' ? 'opacity-50' : ''}`}
+                    data-testid={`todo-item-${todo.id}`}
+                    onClick={() => {
+                      setSelectedTask(todo);
+                      setShowDetailModal(true);
+                    }}
+                  >
+                    <Checkbox
+                      checked={todo.status === 'done'}
+                      onCheckedChange={(e) => {
+                        e.stopPropagation?.();
+                        handleToggleTodo(todo);
                       }}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start space-x-3">
-                          <Checkbox
-                            checked={todo.status === 'done'}
-                            onCheckedChange={(e) => {
-                              e.stopPropagation?.();
-                              handleToggleTodo(todo);
-                            }}
+                      onClick={(e) => e.stopPropagation()}
+                      disabled={updateTodoMutation.isPending}
+                      data-testid={`todo-checkbox-${todo.id}`}
+                    />
+
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-medium text-sm truncate ${todo.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
+                        {todo.title}
+                      </h3>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant={getPriorityVariant(todo.priority || 'medium')} className="text-[10px] px-1.5 py-0">
+                        {todo.priority ? todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1) : 'Medium'}
+                      </Badge>
+
+                      {todo.dueDate && (
+                        <span className={`text-[10px] ${isOverdue(todo.dueDate) && todo.status !== 'done' ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                          {formatDueDate(todo.dueDate)}
+                        </span>
+                      )}
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            data-testid={`todo-actions-${todo.id}`}
                             onClick={(e) => e.stopPropagation()}
-                            disabled={updateTodoMutation.isPending}
-                            data-testid={`todo-checkbox-${todo.id}`}
-                          />
-
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-start justify-between">
-                              <h3 className={`font-medium ${todo.status === 'done' ? 'line-through' : ''}`}>
-                                {todo.title}
-                              </h3>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    data-testid={`todo-actions-${todo.id}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingTodo(todo);
-                                  }}>
-                                    Bewerken
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                                    <ExternalLink className="mr-2 h-4 w-4" />
-                                    Bekijk Links
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteTodoMutation.mutate(todo.id);
-                                    }}
-                                    disabled={deleteTodoMutation.isPending}
-                                  >
-                                    Verwijderen
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-
-                            {todo.description && (
-                              <p className="text-sm text-muted-foreground">{todo.description}</p>
-                            )}
-
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                <Badge variant={getPriorityVariant(todo.priority || 'medium')}>
-                                  {todo.priority ? todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1) : 'Medium'}
-                                </Badge>
-                                {todo.status === 'in_progress' && (
-                                  <Badge variant="outline" className="bg-primary/10 text-primary border-0">
-                                    Bezig
-                                  </Badge>
-                                )}
-                              </div>
-
-                              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                                {todo.dueDate && (
-                                  <div className={`flex items-center space-x-1 ${isOverdue(todo.dueDate) && todo.status !== 'done' ? 'text-destructive' : ''
-                                    }`}>
-                                    <Calendar className="h-3 w-3" />
-                                    <span>{formatDueDate(todo.dueDate)}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTodo(todo);
+                          }}>
+                            Bewerken
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteTodoMutation.mutate(todo.id);
+                            }}
+                            disabled={deleteTodoMutation.isPending}
+                          >
+                            Verwijderen
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </main>
 

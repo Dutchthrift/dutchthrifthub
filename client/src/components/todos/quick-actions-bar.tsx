@@ -14,7 +14,6 @@ import {
     User,
     Calendar,
     Flag,
-    MoreHorizontal,
 } from "lucide-react";
 import type { Todo, User as UserType } from "@/lib/types";
 
@@ -40,29 +39,68 @@ export function QuickActionsBar({
     const getStatusIcon = (status: string) => {
         switch (status) {
             case "done":
-                return <CheckCircle className="h-4 w-4" />;
+                return <CheckCircle className="h-4 w-4 text-green-500" />;
             case "in_progress":
-                return <Clock className="h-4 w-4" />;
+                return <Clock className="h-4 w-4 text-blue-500" />;
             default:
-                return <AlertCircle className="h-4 w-4" />;
+                return <AlertCircle className="h-4 w-4 text-amber-500" />;
         }
     };
 
     const getStatusLabel = (status: string) => {
         switch (status) {
             case "done":
-                return "Done";
+                return "Afgerond";
             case "in_progress":
-                return "In Progress";
+                return "Bezig";
             case "todo":
-                return "To Do";
+                return "Te Doen";
             default:
                 return status;
         }
     };
 
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case "done":
+                return "bg-green-500/10 text-green-600 border-green-500/30 hover:bg-green-500/20";
+            case "in_progress":
+                return "bg-blue-500/10 text-blue-600 border-blue-500/30 hover:bg-blue-500/20";
+            case "todo":
+                return "bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20";
+            default:
+                return "";
+        }
+    };
+
     const getPriorityLabel = (priority: string) => {
-        return priority.charAt(0).toUpperCase() + priority.slice(1);
+        switch (priority) {
+            case "urgent":
+                return "Urgent";
+            case "high":
+                return "Hoog";
+            case "medium":
+                return "Normaal";
+            case "low":
+                return "Laag";
+            default:
+                return priority;
+        }
+    };
+
+    const getPriorityColor = (priority: string) => {
+        switch (priority) {
+            case "urgent":
+                return "bg-red-500/10 text-red-600 border-red-500/30 hover:bg-red-500/20";
+            case "high":
+                return "bg-orange-500/10 text-orange-600 border-orange-500/30 hover:bg-orange-500/20";
+            case "medium":
+                return "bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20";
+            case "low":
+                return "bg-green-500/10 text-green-600 border-green-500/30 hover:bg-green-500/20";
+            default:
+                return "";
+        }
     };
 
     const getAssignedUser = () => {
@@ -71,27 +109,33 @@ export function QuickActionsBar({
     };
 
     return (
-        <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border" data-testid="quick-actions-bar">
+        <div className="flex flex-wrap items-center gap-2" data-testid="quick-actions-bar">
             {/* Status Dropdown */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={isUpdating} data-testid="quick-status-button">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isUpdating}
+                        className={`${getStatusColor(todo.status || "todo")} border`}
+                        data-testid="quick-status-button"
+                    >
                         {getStatusIcon(todo.status || "todo")}
-                        <span className="ml-2">{getStatusLabel(todo.status || "todo")}</span>
+                        <span className="ml-1.5 text-xs font-medium">{getStatusLabel(todo.status || "todo")}</span>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                     <DropdownMenuItem onClick={() => onStatusChange("todo")} data-testid="status-todo">
-                        <AlertCircle className="h-4 w-4 mr-2" />
-                        To Do
+                        <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+                        Te Doen
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onStatusChange("in_progress")} data-testid="status-in-progress">
-                        <Clock className="h-4 w-4 mr-2" />
-                        In Progress
+                        <Clock className="h-4 w-4 mr-2 text-blue-500" />
+                        Bezig
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onStatusChange("done")} data-testid="status-done">
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Done
+                        <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                        Afgerond
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
@@ -99,23 +143,33 @@ export function QuickActionsBar({
             {/* Priority Dropdown */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={isUpdating} data-testid="quick-priority-button">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isUpdating}
+                        className={`${getPriorityColor(todo.priority || "medium")} border`}
+                        data-testid="quick-priority-button"
+                    >
                         <Flag className="h-4 w-4" />
-                        <span className="ml-2">{getPriorityLabel(todo.priority || "medium")}</span>
+                        <span className="ml-1.5 text-xs font-medium">{getPriorityLabel(todo.priority || "medium")}</span>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                     <DropdownMenuItem onClick={() => onPriorityChange("urgent")} data-testid="priority-urgent">
-                        <Badge variant="destructive" className="mr-2">Urgent</Badge>
+                        <div className="w-2 h-2 rounded-full bg-red-500 mr-2" />
+                        Urgent
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onPriorityChange("high")} data-testid="priority-high">
-                        <Badge variant="destructive" className="mr-2">High</Badge>
+                        <div className="w-2 h-2 rounded-full bg-orange-500 mr-2" />
+                        Hoog
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onPriorityChange("medium")} data-testid="priority-medium">
-                        <Badge variant="secondary" className="mr-2">Medium</Badge>
+                        <div className="w-2 h-2 rounded-full bg-amber-500 mr-2" />
+                        Normaal
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onPriorityChange("low")} data-testid="priority-low">
-                        <Badge variant="outline" className="mr-2">Low</Badge>
+                        <div className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+                        Laag
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
@@ -125,17 +179,17 @@ export function QuickActionsBar({
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" disabled={isUpdating} data-testid="quick-assign-button">
                         <User className="h-4 w-4" />
-                        <span className="ml-2">
+                        <span className="ml-1.5 text-xs">
                             {getAssignedUser()
-                                ? `${getAssignedUser()?.firstName} ${getAssignedUser()?.lastName}`
-                                : "Unassigned"}
+                                ? `${getAssignedUser()?.firstName}`
+                                : "Niemand"}
                         </span>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="max-h-[300px] overflow-y-auto">
                     <DropdownMenuItem onClick={() => onAssignUser(null)} data-testid="assign-none">
-                        <User className="h-4 w-4 mr-2" />
-                        Unassigned
+                        <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                        Niemand
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     {users.map((user) => (
@@ -154,24 +208,10 @@ export function QuickActionsBar({
             {/* Due Date */}
             <Button variant="outline" size="sm" disabled={isUpdating} data-testid="quick-due-date-button">
                 <Calendar className="h-4 w-4" />
-                <span className="ml-2">
-                    {todo.dueDate ? new Date(todo.dueDate).toLocaleDateString() : "No due date"}
+                <span className="ml-1.5 text-xs">
+                    {todo.dueDate ? new Date(todo.dueDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) : "Geen deadline"}
                 </span>
             </Button>
-
-            {/* More Actions */}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" disabled={isUpdating} data-testid="quick-more-button">
-                        <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuItem data-testid="quick-clear-due-date" onClick={() => onDueDateChange(null)}>
-                        Clear due date
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
         </div>
     );
 }
