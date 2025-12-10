@@ -9,8 +9,18 @@ import {
   Plus,
   Package2,
   Archive,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Calendar
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { PurchaseOrder, Supplier } from "@shared/schema";
 import { PurchaseOrderForm } from "@/components/purchase-orders/purchase-order-form";
@@ -39,6 +49,11 @@ export default function PurchaseOrders() {
   const [showArchived, setShowArchived] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [poToDelete, setPoToDelete] = useState<string | null>(null);
+  // Archive filters and pagination
+  const [archiveYear, setArchiveYear] = useState<string>("all");
+  const [archiveQuarter, setArchiveQuarter] = useState<string>("all");
+  const [archivePage, setArchivePage] = useState(1);
+  const archiveItemsPerPage = 10;
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -286,41 +301,150 @@ export default function PurchaseOrders() {
         {/* Kanban View for Active Orders, Table for Archived */}
         {showArchived ? (
           <div>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Archive className="h-5 w-5" />
-              Gearchiveerde Orders ({filteredPOs.length})
-            </h2>
-            {filteredPOs.length === 0 ? (
-              <div className="text-center py-12">
-                <Package2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">Geen gearchiveerde orders</h3>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Gearchiveerde inkoop orders verschijnen hier
-                </p>
+            {/* Archive Header with Filters */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Archive className="h-5 w-5" />
+                Gearchiveerde Orders
+              </h2>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Select value={archiveYear} onValueChange={(v) => { setArchiveYear(v); setArchivePage(1); }}>
+                  <SelectTrigger className="w-[100px] h-8 text-xs">
+                    <SelectValue placeholder="Jaar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle jaren</SelectItem>
+                    {Array.from(new Set(filteredPOs.map(po => new Date(po.orderDate || po.createdAt || '').getFullYear()))).sort((a, b) => b - a).map(year => (
+                      <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={archiveQuarter} onValueChange={(v) => { setArchiveQuarter(v); setArchivePage(1); }}>
+                  <SelectTrigger className="w-[90px] h-8 text-xs">
+                    <SelectValue placeholder="Kwartaal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle</SelectItem>
+                    <SelectItem value="1">Q1</SelectItem>
+                    <SelectItem value="2">Q2</SelectItem>
+                    <SelectItem value="3">Q3</SelectItem>
+                    <SelectItem value="4">Q4</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            ) : (
-              <PurchaseOrdersTable
-                purchaseOrders={filteredPOs}
-                suppliers={suppliers || []}
-                onPOClick={handlePOClick}
-                getStatusColor={(status: string) => {
-                  switch (status) {
-                    case "aangekocht": return "text-blue-600 bg-blue-100 dark:bg-blue-900";
-                    case "ontvangen": return "text-green-600 bg-green-100 dark:bg-green-900";
-                    case "verwerkt": return "text-gray-600 bg-gray-100 dark:bg-gray-800"; // Archief
-                    default: return "text-gray-600 bg-gray-100";
-                  }
-                }}
-                onPOOpen={(id: string) => {
-                  const po = purchaseOrders?.find(p => p.id === id);
-                  if (po) handlePOClick(po);
-                }}
-                onPOArchive={handlePOArchive}
-                onPOUnarchive={handlePOUnarchive}
-                onPODelete={handlePODelete}
-                onPOStatusChange={() => { }}
-              />
-            )}
+            </div>
+
+            {(() => {
+              // Filter by year and quarter
+              const dateFilteredPOs = filteredPOs.filter(po => {
+                const date = new Date(po.orderDate || po.createdAt || '');
+                const year = date.getFullYear();
+                const quarter = Math.ceil((date.getMonth() + 1) / 3);
+
+                if (archiveYear !== 'all' && year !== parseInt(archiveYear)) return false;
+                if (archiveQuarter !== 'all' && quarter !== parseInt(archiveQuarter)) return false;
+                return true;
+              });
+
+              // Pagination
+              const totalPages = Math.ceil(dateFilteredPOs.length / archiveItemsPerPage);
+              const paginatedPOs = dateFilteredPOs.slice(
+                (archivePage - 1) * archiveItemsPerPage,
+                archivePage * archiveItemsPerPage
+              );
+
+              return dateFilteredPOs.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">Geen gearchiveerde orders</h3>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {archiveYear !== 'all' || archiveQuarter !== 'all'
+                      ? 'Geen orders gevonden voor de geselecteerde periode'
+                      : 'Gearchiveerde inkoop orders verschijnen hier'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="text-sm text-muted-foreground mb-3">
+                    {dateFilteredPOs.length} order{dateFilteredPOs.length !== 1 ? 's' : ''} gevonden
+                  </div>
+                  <PurchaseOrdersTable
+                    purchaseOrders={paginatedPOs}
+                    suppliers={suppliers || []}
+                    onPOClick={handlePOClick}
+                    getStatusColor={(status: string) => {
+                      switch (status) {
+                        case "aangekocht": return "text-blue-600 bg-blue-100 dark:bg-blue-900";
+                        case "ontvangen": return "text-green-600 bg-green-100 dark:bg-green-900";
+                        case "verwerkt": return "text-gray-600 bg-gray-100 dark:bg-gray-800";
+                        default: return "text-gray-600 bg-gray-100";
+                      }
+                    }}
+                    onPOOpen={(id: string) => {
+                      const po = purchaseOrders?.find(p => p.id === id);
+                      if (po) handlePOClick(po);
+                    }}
+                    onPOArchive={handlePOArchive}
+                    onPOUnarchive={handlePOUnarchive}
+                    onPODelete={handlePODelete}
+                    onPOStatusChange={() => { }}
+                  />
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                      <div className="text-sm text-muted-foreground">
+                        Pagina {archivePage} van {totalPages}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setArchivePage(p => Math.max(1, p - 1))}
+                          disabled={archivePage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <div className="flex gap-1">
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (archivePage <= 3) {
+                              pageNum = i + 1;
+                            } else if (archivePage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = archivePage - 2 + i;
+                            }
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={archivePage === pageNum ? "default" : "outline"}
+                                size="sm"
+                                className="w-8 h-8 p-0"
+                                onClick={() => setArchivePage(pageNum)}
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setArchivePage(p => Math.min(totalPages, p + 1))}
+                          disabled={archivePage === totalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         ) : (
           <PurchaseOrdersKanban

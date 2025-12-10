@@ -865,34 +865,30 @@ export default function Orders() {
           <DialogContent className="w-full sm:max-w-4xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
             {selectedOrder && (
               <>
-                {/* Header - matching repair modal style */}
-                <DialogHeader className="pb-2 border-b text-left">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-                        <Package className="h-4 w-4 text-blue-500" />
-                        <span className="truncate">Order {selectedOrder.orderNumber}</span>
-                        <Badge className={`${getStatusColor(selectedOrder.status)} text-[10px] font-normal px-1.5 py-0`}>
-                          {selectedOrder.status?.charAt(0).toUpperCase() + selectedOrder.status?.slice(1)}
-                        </Badge>
-                      </DialogTitle>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleDateString('nl-NL', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric'
-                        })} om {new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleTimeString('nl-NL', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })} • <span className="font-medium text-foreground">€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</span>
-                      </p>
-                    </div>
-                  </div>
+                {/* Header - centered design */}
+                <DialogHeader className="pb-2 border-b text-center">
+                  <DialogTitle className="text-sm font-semibold flex items-center justify-center gap-2">
+                    <Package className="h-4 w-4 text-blue-500" />
+                    <span>Order {selectedOrder.orderNumber}</span>
+                    <Badge className={`${getStatusColor(selectedOrder.status)} text-[10px] font-normal px-1.5 py-0`}>
+                      {selectedOrder.status?.charAt(0).toUpperCase() + selectedOrder.status?.slice(1)}
+                    </Badge>
+                  </DialogTitle>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleDateString('nl-NL', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric'
+                    })} om {new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleTimeString('nl-NL', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })} • <span className="font-medium text-foreground">€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</span>
+                  </p>
                 </DialogHeader>
 
-                {/* Horizontal Status Timeline */}
-                <div className="py-3 border-b overflow-x-auto">
-                  <div className="flex items-center justify-between min-w-[280px]">
+                {/* Horizontal Status Timeline - centered */}
+                <div className="py-3 border-b">
+                  <div className="flex items-center justify-center px-4">
                     {[
                       { value: 'pending', label: 'Geplaatst', color: 'text-amber-500' },
                       { value: 'processing', label: 'In behandeling', color: 'text-blue-500' },
@@ -904,8 +900,8 @@ export default function Orders() {
                       const isCompleted = idx <= currentIdx;
                       const isCurrent = statusOrder[currentIdx] === status.value;
                       return (
-                        <div key={status.value} className="flex items-center flex-1">
-                          <div className={`flex flex-col items-center gap-1 flex-shrink-0 ${isCurrent ? 'scale-110' : ''}`}>
+                        <div key={status.value} className="flex items-center">
+                          <div className={`flex flex-col items-center gap-1 ${isCurrent ? 'scale-110' : ''}`}>
                             <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${isCompleted ? status.color + ' border-current' : 'border-gray-300 dark:border-gray-600'}`}>
                               {isCompleted && <div className={`h-2 w-2 rounded-full ${status.color} bg-current`} />}
                             </div>
@@ -914,7 +910,7 @@ export default function Orders() {
                             </span>
                           </div>
                           {idx < arr.length - 1 && (
-                            <div className={`flex-1 h-0.5 mx-1 min-w-[16px] ${idx < currentIdx ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                            <div className={`w-6 sm:w-10 h-0.5 mx-1 ${idx < currentIdx ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
                           )}
                         </div>
                       );
