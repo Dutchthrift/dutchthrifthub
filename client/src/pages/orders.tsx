@@ -862,249 +862,201 @@ export default function Orders() {
 
         {/* Order Details Dialog */}
         <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
-          <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto bg-white/95 backdrop-blur-md dark:bg-zinc-900/95 border-zinc-200 dark:border-zinc-800 shadow-2xl">
-            <DialogHeader className="border-b pb-4 mb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <DialogTitle className="text-2xl font-medium tracking-tight flex items-center gap-3">
-                    Order {selectedOrder?.orderNumber}
-                    {selectedOrder && (
-                      <Badge className={`${getStatusColor(selectedOrder.status)} text-sm font-normal px-3 py-1`}>
-                        {selectedOrder.status?.charAt(0).toUpperCase() + selectedOrder.status?.slice(1)}
-                      </Badge>
-                    )}
-                  </DialogTitle>
-                  <DialogDescription className="mt-1">
-                    Geplaatst op {selectedOrder && new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleString('nl-NL', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </DialogDescription>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-medium text-primary">
-                    €{((selectedOrder?.totalAmount || 0) / 100).toFixed(2)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Totaalbedrag
-                  </div>
-                </div>
-              </div>
-            </DialogHeader>
-
+          <DialogContent className="w-full sm:max-w-4xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
             {selectedOrder && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column - Order Items & History */}
-                <div className="lg:col-span-2 space-y-6">
-                  {/* Order Items */}
-                  <Card className="bg-gradient-to-br from-blue-50/80 to-white/50 dark:from-blue-950/20 dark:to-zinc-900/50 border-2 border-blue-200/70 dark:border-blue-800/50 border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="text-lg font-medium text-blue-900 dark:text-blue-100 flex items-center gap-2">
-                        <span className="p-1.5 bg-blue-500/10 rounded-lg">
-                          <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        </span>
-                        Orderartikelen
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {(selectedOrder.orderData as any)?.line_items?.map((item: any, index: number) => (
-                          <div key={index} className="flex items-start gap-4 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-zinc-700/50 transition-colors">
-                            <div className="h-16 w-16 bg-zinc-200 dark:bg-zinc-700 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden">
-                              <Package className="h-8 w-8 text-muted-foreground/50" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-sm truncate" title={item.title}>{item.title}</h4>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {item.variant_title && <span className="mr-2">{item.variant_title}</span>}
-                                <span>Aantal: {item.quantity}</span>
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-medium text-sm">€{item.price}</div>
-                              <div className="text-xs text-muted-foreground">Totaal: €{(parseFloat(item.price) * item.quantity).toFixed(2)}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+              <>
+                {/* Header - matching repair modal style */}
+                <DialogHeader className="pb-2 border-b text-left">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <DialogTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Package className="h-4 w-4 text-blue-500" />
+                        <span className="truncate">Order {selectedOrder.orderNumber}</span>
+                        <Badge className={`${getStatusColor(selectedOrder.status)} text-[10px] font-normal px-1.5 py-0`}>
+                          {selectedOrder.status?.charAt(0).toUpperCase() + selectedOrder.status?.slice(1)}
+                        </Badge>
+                      </DialogTitle>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleDateString('nl-NL', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })} om {new Date(selectedOrder.orderDate || selectedOrder.createdAt || '').toLocaleTimeString('nl-NL', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })} • <span className="font-medium text-foreground">€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</span>
+                      </p>
+                    </div>
+                  </div>
+                </DialogHeader>
 
-                  {/* Timeline / History Placeholder */}
-                  <Card className="bg-gradient-to-br from-indigo-50/80 to-white/50 dark:from-indigo-950/20 dark:to-zinc-900/50 border-2 border-indigo-200/70 dark:border-indigo-800/50 border-l-4 border-l-indigo-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="text-lg font-medium text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
-                        <span className="p-1.5 bg-indigo-500/10 rounded-lg">
-                          <Clock className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                        </span>
-                        Ordergeschiedenis
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="relative pl-4 border-l-2 border-zinc-200 dark:border-zinc-700 space-y-6 my-2">
-                        <div className="relative">
-                          <div className={`absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 ${selectedOrder.status === 'delivered' ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
-                          <div className="text-sm font-medium">Afgeleverd</div>
-                          <div className="text-xs text-muted-foreground">Verwachte levering</div>
-                        </div>
-                        <div className="relative">
-                          <div className={`absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 ${['shipped', 'delivered'].includes(selectedOrder.status || '') ? 'bg-purple-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
-                          <div className="text-sm font-medium">Verzonden</div>
-                          <div className="text-xs text-muted-foreground">Order is verzonden</div>
-                        </div>
-                        <div className="relative">
-                          <div className={`absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 ${['processing', 'shipped', 'delivered'].includes(selectedOrder.status || '') ? 'bg-blue-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
-                          <div className="text-sm font-medium">In behandeling</div>
-                          <div className="text-xs text-muted-foreground">Order wordt voorbereid</div>
-                        </div>
-                        <div className="relative">
-                          <div className="absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-900 bg-amber-500" />
-                          <div className="text-sm font-medium">Order Geplaatst</div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(selectedOrder.createdAt || '').toLocaleDateString()}
+                {/* Horizontal Status Timeline */}
+                <div className="py-3 border-b overflow-x-auto">
+                  <div className="flex items-center justify-between min-w-[280px]">
+                    {[
+                      { value: 'pending', label: 'Geplaatst', color: 'text-amber-500' },
+                      { value: 'processing', label: 'In behandeling', color: 'text-blue-500' },
+                      { value: 'shipped', label: 'Verzonden', color: 'text-purple-500' },
+                      { value: 'delivered', label: 'Afgeleverd', color: 'text-emerald-500' },
+                    ].map((status, idx, arr) => {
+                      const statusOrder = ['pending', 'processing', 'shipped', 'delivered'];
+                      const currentIdx = statusOrder.indexOf(selectedOrder.status || 'pending');
+                      const isCompleted = idx <= currentIdx;
+                      const isCurrent = statusOrder[currentIdx] === status.value;
+                      return (
+                        <div key={status.value} className="flex items-center flex-1">
+                          <div className={`flex flex-col items-center gap-1 flex-shrink-0 ${isCurrent ? 'scale-110' : ''}`}>
+                            <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${isCompleted ? status.color + ' border-current' : 'border-gray-300 dark:border-gray-600'}`}>
+                              {isCompleted && <div className={`h-2 w-2 rounded-full ${status.color} bg-current`} />}
+                            </div>
+                            <span className={`text-[10px] whitespace-nowrap ${isCurrent ? 'font-semibold ' + status.color : 'text-muted-foreground'}`}>
+                              {status.label}
+                            </span>
                           </div>
+                          {idx < arr.length - 1 && (
+                            <div className={`flex-1 h-0.5 mx-1 min-w-[16px] ${idx < currentIdx ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                          )}
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Team Notes */}
-                  <Card className="bg-gradient-to-br from-rose-50/80 to-white/50 dark:from-rose-950/20 dark:to-zinc-900/50 border-2 border-rose-200/70 dark:border-rose-800/50 border-l-4 border-l-rose-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="text-lg font-medium text-rose-900 dark:text-rose-100 flex items-center gap-2">
-                        <span className="p-1.5 bg-rose-500/10 rounded-lg">
-                          <FileText className="h-5 w-5 text-rose-600 dark:text-rose-400" />
-                        </span>
-                        Team Notities
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {currentUser && (
-                        <NotesPanel
-                          entityType="order"
-                          entityId={selectedOrder.id}
-                          currentUser={currentUser}
-                        />
-                      )}
-                    </CardContent>
-                  </Card>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Right Column - Customer & Payment Info */}
-                <div className="space-y-6">
-                  <Card className="bg-gradient-to-br from-purple-50/80 to-white/50 dark:from-purple-950/20 dark:to-zinc-900/50 border-2 border-purple-200/70 dark:border-purple-800/50 border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="text-lg font-medium text-purple-900 dark:text-purple-100 flex items-center gap-2">
-                        <span className="p-1.5 bg-purple-500/10 rounded-lg">
-                          <UserIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                        </span>
-                        Klant
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-                          {(selectedOrder.orderData as any)?.customer?.first_name?.[0] || 'G'}
-                        </div>
-                        <div>
-                          <div className="font-medium text-sm">
-                            {(selectedOrder.orderData as any)?.customer ?
-                              `${(selectedOrder.orderData as any).customer.first_name} ${(selectedOrder.orderData as any).customer.last_name}` :
-                              'Guest'
-                            }
-                          </div>
-                          <div className="text-xs text-muted-foreground">Klant</div>
-                        </div>
+                {/* Main Content - Mobile First Layout */}
+                <div className="py-3 space-y-4">
+                  {/* Customer & Shipping - Show FIRST on mobile */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 order-first lg:order-none">
+                    {/* Customer Info - Compact */}
+                    <div className="p-3 bg-purple-50/50 dark:bg-purple-950/20 rounded-lg border border-purple-200/50 dark:border-purple-800/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <UserIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        <span className="text-xs font-medium text-purple-900 dark:text-purple-100">Klant</span>
                       </div>
-
-                      <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-700">
-                        <div className="flex items-start gap-2 text-sm">
-                          <div className="min-w-[20px] text-muted-foreground"><MessageSquare className="h-4 w-4" /></div>
-                          <span className="break-all">{selectedOrder.customerEmail}</span>
-                        </div>
-                        {(selectedOrder.orderData as any)?.customer?.phone && (
-                          <div className="flex items-start gap-2 text-sm">
-                            <div className="min-w-[20px] text-muted-foreground"><Truck className="h-4 w-4" /></div>
-                            <span>{(selectedOrder.orderData as any).customer.phone}</span>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">
+                            {(selectedOrder.orderData as any)?.customer?.first_name?.[0] || 'G'}
                           </div>
+                          <div>
+                            <div className="font-medium text-sm">
+                              {(selectedOrder.orderData as any)?.customer ?
+                                `${(selectedOrder.orderData as any).customer.first_name} ${(selectedOrder.orderData as any).customer.last_name}` :
+                                'Gast'
+                              }
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground break-all pl-9">{selectedOrder.customerEmail}</div>
+                        {(selectedOrder.orderData as any)?.customer?.phone && (
+                          <div className="text-xs text-muted-foreground pl-9">{(selectedOrder.orderData as any).customer.phone}</div>
                         )}
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
 
-                  {(selectedOrder.orderData as any)?.shipping_address && (
-                    <Card className="bg-gradient-to-br from-cyan-50/80 to-white/50 dark:from-cyan-950/20 dark:to-zinc-900/50 border-2 border-cyan-200/70 dark:border-cyan-800/50 border-l-4 border-l-cyan-500 shadow-sm hover:shadow-md transition-shadow">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-medium text-cyan-900 dark:text-cyan-100 flex items-center gap-2">
-                          <span className="p-1.5 bg-cyan-500/10 rounded-lg">
-                            <Truck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-                          </span>
-                          Verzendadres
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-1 text-sm">
-                          <div>{(selectedOrder.orderData as any).shipping_address.name}</div>
+                    {/* Shipping Address - Compact */}
+                    {(selectedOrder.orderData as any)?.shipping_address && (
+                      <div className="p-3 bg-cyan-50/50 dark:bg-cyan-950/20 rounded-lg border border-cyan-200/50 dark:border-cyan-800/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Truck className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                          <span className="text-xs font-medium text-cyan-900 dark:text-cyan-100">Verzendadres</span>
+                        </div>
+                        <div className="text-xs space-y-0.5">
+                          <div className="font-medium">{(selectedOrder.orderData as any).shipping_address.name}</div>
                           <div>{(selectedOrder.orderData as any).shipping_address.address1}</div>
                           {(selectedOrder.orderData as any).shipping_address.address2 && (
                             <div>{(selectedOrder.orderData as any).shipping_address.address2}</div>
                           )}
-                          <div>
-                            {(selectedOrder.orderData as any).shipping_address.city}, {(selectedOrder.orderData as any).shipping_address.zip}
-                          </div>
+                          <div>{(selectedOrder.orderData as any).shipping_address.city}, {(selectedOrder.orderData as any).shipping_address.zip}</div>
                           <div>{(selectedOrder.orderData as any).shipping_address.country}</div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                      </div>
+                    )}
+                  </div>
 
-                  <Card className="bg-gradient-to-br from-emerald-50/80 to-white/50 dark:from-emerald-950/20 dark:to-zinc-900/50 border-2 border-emerald-200/70 dark:border-emerald-800/50 border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="text-lg font-medium text-emerald-900 dark:text-emerald-100 flex items-center gap-2">
-                        <span className="p-1.5 bg-emerald-500/10 rounded-lg">
-                          <CreditCard className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                        </span>
-                        Betaling
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Status</span>
-                        <Badge variant="outline" className="font-normal capitalize">
-                          {selectedOrder.paymentStatus || 'Pending'}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Methode</span>
-                        <span className="text-sm font-medium flex items-center gap-1">
-                          <CreditCard className="h-3 w-3" />
-                          {(selectedOrder.orderData as any)?.payment_gateway_names?.[0] || 'Onbekend'}
-                        </span>
-                      </div>
-                      <div className="pt-3 mt-3 border-t border-zinc-200 dark:border-zinc-700 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Subtotaal</span>
-                          <span>€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</span>
+                  {/* Order Items - Compact */}
+                  <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/30">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Package className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-xs font-medium text-blue-900 dark:text-blue-100">Orderartikelen</span>
+                      <Badge variant="outline" className="text-[10px] ml-auto">
+                        {(selectedOrder.orderData as any)?.line_items?.length || 0} {((selectedOrder.orderData as any)?.line_items?.length || 0) === 1 ? 'artikel' : 'artikelen'}
+                      </Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {(selectedOrder.orderData as any)?.line_items?.map((item: any, index: number) => (
+                        <div key={index} className="flex items-center gap-3 p-2 bg-white/50 dark:bg-zinc-800/50 rounded-md">
+                          <div className="h-10 w-10 bg-zinc-200 dark:bg-zinc-700 rounded flex items-center justify-center flex-shrink-0">
+                            <Package className="h-5 w-5 text-muted-foreground/50" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-xs truncate" title={item.title}>{item.title}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {item.variant_title && <span className="mr-2">{item.variant_title}</span>}
+                              <span>×{item.quantity}</span>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-medium text-xs">€{item.price}</div>
+                            {item.quantity > 1 && (
+                              <div className="text-[10px] text-muted-foreground">Totaal: €{(parseFloat(item.price) * item.quantity).toFixed(2)}</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Verzending</span>
-                          <span>€0.00</span>
-                        </div>
-                        <div className="flex justify-between text-sm font-medium pt-2">
-                          <span>Total</span>
-                          <span className="text-primary">€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</span>
-                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Payment Summary - Inline Compact */}
+                  <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200/50 dark:border-emerald-800/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <span className="text-xs font-medium text-emerald-900 dark:text-emerald-100">Betaling</span>
+                      <Badge variant="outline" className="text-[10px] ml-auto capitalize">
+                        {selectedOrder.paymentStatus || 'Pending'}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Methode</span>
+                        <div className="font-medium">{(selectedOrder.orderData as any)?.payment_gateway_names?.[0] || 'Onbekend'}</div>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div>
+                        <span className="text-muted-foreground">Subtotaal</span>
+                        <div className="font-medium">€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Verzending</span>
+                        <div className="font-medium">€0.00</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Totaal</span>
+                        <div className="font-semibold text-primary">€{((selectedOrder.totalAmount || 0) / 100).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes - At the bottom, renamed from "Team Notities" */}
+                  <Collapsible>
+                    <div className="p-3 bg-slate-50/50 dark:bg-slate-950/20 rounded-lg border border-slate-200/50 dark:border-slate-800/30">
+                      <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
+                        <FileText className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                        <span className="text-xs font-medium text-slate-900 dark:text-slate-100">Notities</span>
+                        <ChevronDown className="h-3 w-3 text-muted-foreground ml-auto" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-3">
+                        {currentUser && (
+                          <NotesPanel
+                            entityType="order"
+                            entityId={selectedOrder.id}
+                            currentUser={currentUser}
+                          />
+                        )}
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
                 </div>
-              </div>
+              </>
             )}
-
-
           </DialogContent>
         </Dialog>
 
