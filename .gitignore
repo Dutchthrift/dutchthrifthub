@@ -7,3 +7,4 @@ vite.config.ts.timestamp*
 .env
 uploads/
 server/uploads/
+data/

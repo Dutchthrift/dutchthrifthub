@@ -6,10 +6,205 @@ import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import DOMPurify from 'isomorphic-dompurify';
 
-// POST /api/mail/refresh - Refresh mails from IMAP
+// Helper to build thread ID from headers (Gmail-style threading)
+function buildThreadId(messageId: string, inReplyTo: string | undefined, references: string | undefined): string {
+    if (references && references.trim()) {
+        const refList = references.split(/\s+/).filter((r: string) => r.includes('@'));
+        if (refList.length > 0) {
+            return refList[0].replace(/[<>]/g, '');
+        }
+    }
+    if (inReplyTo && inReplyTo.trim()) {
+        return inReplyTo.replace(/[<>]/g, '');
+    }
+    return messageId.replace(/[<>]/g, '');
+}
+
+// Helper function to sync a single mailbox folder
+async function syncMailbox(
+    client: any,
+    folderName: string,
+    isOutbound: boolean,
+    storage: any,
+    startDate: Date
+): Promise<{ count: number; maxUid: number }> {
+    const settingKey = `mail_last_uid_${folderName.toLowerCase().replace(/[^a-z]/g, '_')}`;
+
+    try {
+        await client.mailboxOpen(folderName);
+    } catch (err) {
+        console.log(`⚠️ Could not open folder ${folderName}, skipping...`);
+        return { count: 0, maxUid: 0 };
+    }
+
+    const lastUid = await storage.getSetting(settingKey);
+    let newMailCount = 0;
+    let maxUid = lastUid ? parseInt(lastUid) : 0;
+
+    // Determine what UIDs to fetch
+    let uidsToFetch: number[] = [];
+    if (!lastUid) {
+        console.log(`📧 [${folderName}] Initial sync: searching since ${startDate.toDateString()}`);
+        const searchResults = await client.search({ since: startDate });
+        uidsToFetch = searchResults || [];
+    } else {
+        console.log(`📧 [${folderName}] Incremental sync: UIDs > ${lastUid}`);
+        const searchResults = await client.search({ uid: `${parseInt(lastUid) + 1}:*` });
+        uidsToFetch = searchResults || [];
+    }
+
+    console.log(`📧 [${folderName}] Found ${uidsToFetch.length} emails to process`);
+
+    if (uidsToFetch.length === 0) {
+        return { count: 0, maxUid };
+    }
+
+    const BATCH_SIZE = 20;
+    const DELAY_MS = 200;
+
+    for (let i = 0; i < uidsToFetch.length; i += BATCH_SIZE) {
+        const batchUids = uidsToFetch.slice(i, i + BATCH_SIZE);
+
+        for await (let msg of client.fetch(batchUids, { source: true, uid: true, envelope: true })) {
+            try {
+                const msgDate = msg.envelope?.date;
+                if (msgDate && new Date(msgDate) < startDate) {
+                    continue;
+                }
+
+                const parsed = await simpleParser(msg.source);
+                if (parsed.date && parsed.date < startDate) {
+                    continue;
+                }
+
+                const messageId = parsed.messageId || `${msg.uid}@${folderName}`;
+
+                // Check if message already exists
+                const existingMessage = await storage.getEmailMessage(messageId);
+                if (existingMessage) {
+                    maxUid = Math.max(maxUid, msg.uid);
+                    continue;
+                }
+
+                const cleanHtml = DOMPurify.sanitize(parsed.html || '', {
+                    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'img', 'div', 'span', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th'],
+                    ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'style']
+                });
+
+                const inReplyTo = parsed.inReplyTo;
+                const references = Array.isArray(parsed.references)
+                    ? parsed.references.join(' ')
+                    : (parsed.references || '');
+
+                // Gmail-style threading: extract ALL related Message-IDs
+                const allRelatedIds: string[] = [];
+
+                // Add all References
+                if (references.trim()) {
+                    const refs = references.split(/\s+/)
+                        .filter((r: string) => r.includes('@'))
+                        .map((r: string) => r.replace(/[<>]/g, ''));
+                    allRelatedIds.push(...refs);
+                }
+
+                // Add In-Reply-To
+                if (inReplyTo?.trim()) {
+                    allRelatedIds.push(inReplyTo.replace(/[<>]/g, ''));
+                }
+
+                // Add own Message-ID
+                const cleanMessageId = messageId.replace(/[<>]/g, '');
+                allRelatedIds.push(cleanMessageId);
+
+                const fromEmail = parsed.from?.value?.[0]?.address || '';
+                const toEmail = parsed.to?.value?.[0]?.address || '';
+
+                // Save to main emails table
+                const email = await storage.createEmail({
+                    subject: parsed.subject || '(No subject)',
+                    fromName: parsed.from?.value?.[0]?.name || '',
+                    fromEmail: fromEmail,
+                    html: cleanHtml,
+                    text: parsed.text || '',
+                    date: parsed.date || new Date(),
+                    imapUid: msg.uid
+                });
+
+                // Gmail-style: Find existing thread by checking ALL related Message-IDs
+                let thread = null;
+                for (const refId of allRelatedIds) {
+                    thread = await storage.getEmailThreadByThreadId(refId);
+                    if (thread) break;
+                }
+
+                // If no existing thread found, create new one using own Message-ID
+                if (!thread) {
+                    thread = await storage.createEmailThread({
+                        threadId: cleanMessageId,
+                        subject: parsed.subject || '(No subject)',
+                        customerEmail: isOutbound ? toEmail : fromEmail,
+                        status: 'open',
+                        isUnread: !isOutbound,
+                        lastActivity: parsed.date || new Date(),
+                        hasAttachment: (parsed.attachments?.length || 0) > 0,
+                    });
+                } else if (parsed.date && parsed.date > (thread.lastActivity || new Date(0))) {
+                    await storage.updateEmailThread(thread.id, {
+                        lastActivity: parsed.date,
+                        isUnread: !isOutbound && thread.isUnread
+                    });
+                }
+
+                // Create email message with isOutbound flag
+                await storage.createEmailMessage({
+                    messageId: messageId,
+                    threadId: thread.id,
+                    fromEmail: fromEmail,
+                    toEmail: toEmail,
+                    subject: parsed.subject || '(No subject)',
+                    body: cleanHtml || parsed.text || '',
+                    isHtml: !!cleanHtml,
+                    sentAt: parsed.date || new Date(),
+                    isOutbound: isOutbound,
+                });
+
+                // Save attachments
+                if (parsed.attachments?.length) {
+                    const attachmentData = parsed.attachments.map(att => ({
+                        emailId: email.id,
+                        filename: att.filename,
+                        mimeType: att.contentType,
+                        size: att.size,
+                        storagePath: `attachments/${email.id}/${att.filename}`
+                    }));
+                    await storage.createEmailAttachmentBulk(attachmentData);
+                }
+
+                maxUid = Math.max(maxUid, msg.uid);
+                newMailCount++;
+
+            } catch (parseError) {
+                console.error(`Failed to parse email in ${folderName}:`, parseError);
+            }
+        }
+
+        if (i + BATCH_SIZE < uidsToFetch.length) {
+            await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+        }
+    }
+
+    // Save the max UID for this folder
+    if (maxUid > 0) {
+        await storage.setSetting(settingKey, maxUid.toString());
+    }
+
+    return { count: newMailCount, maxUid };
+}
+
+// POST /api/mail/refresh - Refresh mails from IMAP (INBOX + SENT)
 app.post("/api/mail/refresh", requireAuth, async (req: any, res: any) => {
     try {
-        // Rate limiting: max 1 refresh per 30s
+        // Rate limiting
         const lastRefreshAt = await storage.getSetting('mail_last_refresh_at');
         if (lastRefreshAt) {
             const timeSinceLastRefresh = Date.now() - new Date(lastRefreshAt).getTime();
@@ -21,7 +216,6 @@ app.post("/api/mail/refresh", requireAuth, async (req: any, res: any) => {
             }
         }
 
-        // Get IMAP credentials from env
         const imapHost = process.env.IMAP_HOST || 'imap.strato.de';
         const imapPort = parseInt(process.env.IMAP_PORT || '993');
         const imapUser = process.env.IMAP_USER;
@@ -31,105 +225,48 @@ app.post("/api/mail/refresh", requireAuth, async (req: any, res: any) => {
             return res.status(500).json({ error: 'IMAP credentials not configured' });
         }
 
-        // Connect to IMAP
         const client = new ImapFlow({
             host: imapHost,
             port: imapPort,
             secure: true,
-            auth: {
-                user: imapUser,
-                pass: imapPass
-            },
+            auth: { user: imapUser, pass: imapPass },
             logger: false
         });
 
         await client.connect();
-        await client.mailboxOpen('INBOX');
 
-        // Get last UID and sync status
-        const lastUid = await storage.getSetting('mail_last_imap_uid');
-        const initialSyncDone = await storage.getSetting('mail_initial_sync_done');
+        const startDate = new Date('2025-01-01');
+        let totalNewMails = 0;
 
-        // Determine query (initial sync vs incremental)
-        const query = (!initialSyncDone || !lastUid) ? '1:*' : `${parseInt(lastUid) + 1}:*`;
+        // Sync INBOX (inbound emails)
+        console.log('📥 Syncing INBOX...');
+        const inboxResult = await syncMailbox(client, 'INBOX', false, storage, startDate);
+        totalNewMails += inboxResult.count;
+        console.log(`📥 INBOX: ${inboxResult.count} new emails`);
 
-        let newMailCount = 0;
-        let maxUid = lastUid ? parseInt(lastUid) : 0;
-
-        // Fetch emails
-        for await (let msg of client.fetch(query, { source: true, uid: true })) {
+        // Sync SENT folder (outbound emails) - try common folder names
+        const sentFolderNames = ['INBOX.Sent', 'Sent', 'Sent Items', 'Sent Messages', 'INBOX.Sent Items'];
+        for (const sentFolder of sentFolderNames) {
             try {
-                // Check if already exists (deduplication)
-                const existing = await storage.getEmailByImapUid(msg.uid);
-                if (existing) {
-                    console.log(`Skipping duplicate email UID ${msg.uid}`);
-                    continue;
-                }
-
-                // Parse email
-                const parsed = await simpleParser(msg.source);
-
-                // Sanitize HTML (server-side for security)
-                const cleanHtml = DOMPurify.sanitize(parsed.html || '', {
-                    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'img', 'div', 'span', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th'],
-                    ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'style']
-                });
-
-                // Save email
-                const email = await storage.createEmail({
-                    subject: parsed.subject || '(No subject)',
-                    fromName: parsed.from?.value?.[0]?.name || '',
-                    fromEmail: parsed.from?.value?.[0]?.address || '',
-                    html: cleanHtml,
-                    text: parsed.text || '',
-                    date: parsed.date || new Date(),
-                    imapUid: msg.uid
-                });
-
-                // Save attachments if any
-                if (parsed.attachments?.length) {
-                    const attachmentData = [];
-
-                    for (const att of parsed.attachments) {
-                        // TODO: Save attachment to storage (Supabase or local)
-                        // For now, just create metadata
-                        const storagePath = `attachments/${email.id}/${att.filename}`;
-
-                        attachmentData.push({
-                            emailId: email.id,
-                            filename: att.filename,
-                            mimeType: att.contentType,
-                            size: att.size,
-                            storagePath: storagePath
-                        });
-                    }
-
-                    if (attachmentData.length > 0) {
-                        await storage.createEmailAttachmentBulk(attachmentData);
-                    }
-                }
-
-                maxUid = Math.max(maxUid, msg.uid);
-                newMailCount++;
-            } catch (parseError) {
-                console.error('Failed to parse email:', parseError);
-                // Continue with next email
+                console.log(`📤 Trying SENT folder: ${sentFolder}...`);
+                const sentResult = await syncMailbox(client, sentFolder, true, storage, startDate);
+                totalNewMails += sentResult.count;
+                console.log(`📤 ${sentFolder}: ${sentResult.count} new emails`);
+                break; // Found a working sent folder
+            } catch (err) {
+                // Try next folder name
             }
         }
 
         await client.logout();
 
-        // Update settings
-        await storage.setSetting('mail_last_imap_uid', maxUid.toString());
-        await storage.setSetting('mail_initial_sync_done', 'true');
         await storage.setSetting('mail_last_refresh_at', new Date().toISOString());
 
-        // Keep only last 50 emails
-        await storage.deleteOldEmails(50);
+        console.log(`✅ Mail sync complete: ${totalNewMails} total new emails`);
 
         res.json({
             success: true,
-            newMails: newMailCount,
+            newMails: totalNewMails,
             lastSync: new Date()
         });
 

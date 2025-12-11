@@ -51,130 +51,141 @@ export class ImapSmtpProvider implements EmailProvider {
         // Get total message count from selected mailbox
         const totalMessages = client.mailbox && typeof client.mailbox === 'object' ? client.mailbox.exists : 10;
 
-        // Calculate range for last 100 messages
-        const startSeq = Math.max(1, totalMessages - 99); // Get last 100 messages
-        const endSeq = totalMessages;
+        console.log(`📧 IMAP total messages: ${totalMessages}`);
+        console.log(`📧 Will fetch ALL messages in batches of 20 with delays...`);
 
-        console.log(`IMAP total messages: ${totalMessages}, fetching range: ${startSeq}:${endSeq}`);
+        const messages: RawEmail[] = [];
+        const BATCH_SIZE = 20;
+        const DELAY_MS = 500; // 500ms delay between batches
 
-        // Get recent emails (last 10)
-        const messages = [];
-        let attachmentQueue: Array<{
-          messageIndex: number;
-          uid: number;
-          seq: number;
-          partId: string;
-          filename: string;
-          contentType: string;
-          contentId?: string;
-          isInline: boolean;
-          size: number;
-        }> = [];
-        for await (let message of client.fetch(`${startSeq}:${endSeq}`, {
-          envelope: true,
-          flags: true,
-          bodyStructure: true,
-          internalDate: true,
-          uid: true
-        })) {
+        // Process in batches from oldest to newest
+        for (let batchStart = 1; batchStart <= totalMessages; batchStart += BATCH_SIZE) {
+          const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalMessages);
+          console.log(`📦 Fetching batch ${Math.ceil(batchStart / BATCH_SIZE)}/${Math.ceil(totalMessages / BATCH_SIZE)}: messages ${batchStart}-${batchEnd}`);
 
-          // Check if message has attachments
-          const hasAttachment = this.checkForAttachments(message.bodyStructure);
+          // Fetch with headers for threading info
+          for await (let message of client.fetch(`${batchStart}:${batchEnd}`, {
+            envelope: true,
+            flags: true,
+            bodyStructure: true,
+            internalDate: true,
+            uid: true,
+            headers: ['references', 'in-reply-to', 'message-id'] // Fetch threading headers
+          })) {
 
-          // Build conversation ID from subject and participants
-          const envelope = message.envelope;
-          const conversationId = envelope ? this.buildConversationId(
-            envelope.subject || '',
-            envelope.from?.[0]?.address || '',
-            envelope.to?.[0]?.address || ''
-          ) : `${message.uid}@${this.imapConfig.host}`;
+            // Check if message has attachments
+            const hasAttachment = this.checkForAttachments(message.bodyStructure);
 
-          // Extract actual email body content by walking bodyStructure
-          let bodyText = '';
-          let isHtml = false;
+            const envelope = message.envelope;
 
-          try {
-            // Find text parts in the body structure
-            const textParts = this.findTextParts(message.bodyStructure);
-            console.log(`Found ${textParts.length} text parts for UID ${message.uid}`);
+            // Extract threading headers
+            let references = '';
+            let inReplyTo = envelope?.inReplyTo || '';
 
-            // Prefer HTML, fallback to plain text
-            let htmlPart = textParts.find(p => p.type === 'text/html');
-            let plainPart = textParts.find(p => p.type === 'text/plain');
+            // Parse headers if available
+            if (message.headers) {
+              const headersText = message.headers.toString();
 
-            const partToUse = htmlPart || plainPart;
+              // Extract References header
+              const referencesMatch = headersText.match(/^References:\s*(.+?)(?=\r?\n[^\s]|\r?\n\r?\n|$)/im);
+              if (referencesMatch) {
+                references = referencesMatch[1].replace(/\s+/g, ' ').trim();
+              }
 
-            if (partToUse) {
-              console.log(`Downloading ${partToUse.type} part ${partToUse.partId} for UID ${message.uid}`);
+              // Also check In-Reply-To from headers if not in envelope
+              if (!inReplyTo) {
+                const inReplyToMatch = headersText.match(/^In-Reply-To:\s*(.+?)(?=\r?\n[^\s]|\r?\n\r?\n|$)/im);
+                if (inReplyToMatch) {
+                  inReplyTo = inReplyToMatch[1].trim();
+                }
+              }
+            }
 
-              // Add timeout to prevent hanging on large emails
-              const downloadWithTimeout = async () => {
-                const timeoutMs = 30000; // 30 second timeout
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                  setTimeout(() => reject(new Error(`Download timeout after ${timeoutMs}ms`)), timeoutMs);
-                });
+            // Build thread ID from headers (proper Gmail-style threading)
+            const threadId = this.buildThreadId(
+              envelope?.messageId || `${message.uid}@${this.imapConfig.host}`,
+              inReplyTo,
+              references
+            );
 
-                const downloadPromise = async () => {
-                  const { content: stream } = await client.download(message.uid, partToUse.partId);
-                  const chunks: Buffer[] = [];
-                  for await (const chunk of stream) {
-                    chunks.push(chunk);
-                  }
-                  return Buffer.concat(chunks);
+            // Extract actual email body content
+            let bodyText = '';
+            let isHtml = false;
+
+            try {
+              const textParts = this.findTextParts(message.bodyStructure);
+              let htmlPart = textParts.find(p => p.type === 'text/html');
+              let plainPart = textParts.find(p => p.type === 'text/plain');
+              const partToUse = htmlPart || plainPart;
+
+              if (partToUse) {
+                // Add timeout to prevent hanging on large emails
+                const downloadWithTimeout = async () => {
+                  const timeoutMs = 30000;
+                  const timeoutPromise = new Promise<never>((_, reject) => {
+                    setTimeout(() => reject(new Error(`Download timeout after ${timeoutMs}ms`)), timeoutMs);
+                  });
+
+                  const downloadPromise = async () => {
+                    const { content: stream } = await client.download(message.uid, partToUse.partId);
+                    const chunks: Buffer[] = [];
+                    for await (const chunk of stream) {
+                      chunks.push(chunk);
+                    }
+                    return Buffer.concat(chunks);
+                  };
+
+                  return Promise.race([downloadPromise(), timeoutPromise]);
                 };
 
-                return Promise.race([downloadPromise(), timeoutPromise]);
-              };
-
-              const contentBuffer = await downloadWithTimeout();
-
-              // Decode based on encoding
-              bodyText = this.decodeContent(contentBuffer, partToUse.encoding);
-              isHtml = partToUse.type === 'text/html';
-
-              console.log(`Successfully extracted body (${partToUse.type}), length: ${bodyText.length}`);
+                const contentBuffer = await downloadWithTimeout();
+                bodyText = this.decodeContent(contentBuffer, partToUse.encoding);
+                isHtml = partToUse.type === 'text/html';
+              }
+            } catch (error) {
+              console.error('Error extracting body from message:', error);
             }
-          } catch (error) {
-            console.error('Error extracting body from message:', error);
+
+            // Final fallback if no body extracted
+            if (!bodyText || bodyText.trim().length === 0) {
+              const subject = envelope?.subject || 'No subject';
+              const fromAddr = envelope?.from?.[0]?.address || 'unknown';
+              bodyText = `[Content not available] Message from ${fromAddr} with subject: "${subject}"`;
+            }
+
+            const rawEmail: RawEmail = {
+              messageId: envelope?.messageId || `${message.uid}@${this.imapConfig.host}`,
+              uid: message.uid,
+              conversationId: threadId, // Now using proper thread ID
+              subject: envelope?.subject || '',
+              from: envelope?.from?.[0]?.address || '',
+              to: envelope?.to?.[0]?.address || '',
+              body: bodyText,
+              isHtml: isHtml,
+              receivedDateTime: message.internalDate instanceof Date ? message.internalDate.toISOString() : new Date().toISOString(),
+              isRead: message.flags?.has('\\Seen') || false,
+              hasAttachment,
+              inReplyTo: inReplyTo,
+              references: references
+            };
+
+            // Collect attachment descriptors if email has them
+            if (hasAttachment) {
+              const descriptors = this.collectAttachmentDescriptors(message, messages.length, message.seq);
+              rawEmail.attachments = descriptors;
+            }
+
+            messages.push(rawEmail);
           }
 
-          // Final fallback if no body extracted
-          if (!bodyText || bodyText.trim().length === 0) {
-            const subject = envelope?.subject || 'No subject';
-            const fromAddr = envelope?.from?.[0]?.address || 'unknown';
-            bodyText = `[Content not available] Message from ${fromAddr} with subject: "${subject}"`;
-            console.log('Using fallback placeholder for message:', message.uid);
+          // Delay between batches to avoid rate limiting
+          if (batchEnd < totalMessages) {
+            console.log(`⏳ Waiting ${DELAY_MS}ms before next batch...`);
+            await new Promise(resolve => setTimeout(resolve, DELAY_MS));
           }
-
-          const rawEmail: RawEmail = {
-            messageId: envelope?.messageId || `${message.uid}@${this.imapConfig.host}`,
-            uid: message.uid,
-            conversationId,
-            subject: envelope?.subject || '',
-            from: envelope?.from?.[0]?.address || '',
-            to: envelope?.to?.[0]?.address || '',
-            body: bodyText,
-            isHtml: isHtml,
-            receivedDateTime: message.internalDate instanceof Date ? message.internalDate.toISOString() : new Date().toISOString(),
-            isRead: message.flags?.has('\\Seen') || false,
-            hasAttachment,
-            inReplyTo: envelope?.inReplyTo,
-            references: ''
-          };
-
-          // Collect attachment descriptors if email has them
-          if (hasAttachment) {
-            console.log(`📎 Collecting attachment descriptors for Message UID ${message.uid}`);
-            const descriptors = this.collectAttachmentDescriptors(message, messages.length, message.seq);
-            rawEmail.attachments = descriptors;
-            console.log(`📎 Found ${descriptors.length} attachment descriptors`);
-          }
-
-          messages.push(rawEmail);
         }
 
-        // Phase 2: Download attachments removed - we now fetch on demand
-        console.log(`✅ Sync completed. Processed ${messages.length} messages.`);
+        console.log(`✅ Sync completed. Processed ${messages.length} messages with proper threading.`);
 
         lock.release();
         await client.logout();
@@ -192,6 +203,26 @@ export class ImapSmtpProvider implements EmailProvider {
         client.close();
       }
     }
+  }
+
+  // Build thread ID from email headers (Gmail-style threading)
+  private buildThreadId(messageId: string, inReplyTo: string, references: string): string {
+    // If we have references, use the first one (original message in thread)
+    if (references && references.trim()) {
+      const refList = references.split(/\s+/).filter(r => r.includes('@'));
+      if (refList.length > 0) {
+        // First reference is the original message that started the thread
+        return refList[0].replace(/[<>]/g, '');
+      }
+    }
+
+    // If we have inReplyTo, use that as thread identifier
+    if (inReplyTo && inReplyTo.trim()) {
+      return inReplyTo.replace(/[<>]/g, '');
+    }
+
+    // This is a new conversation - use own message ID as thread ID
+    return messageId.replace(/[<>]/g, '');
   }
 
 
@@ -594,26 +625,47 @@ export class ImapSmtpProvider implements EmailProvider {
       try {
         const messages: RawEmail[] = [];
 
-        // Fetch envelope and flags for the range
+        // Fetch envelope, flags, and headers for threading
         for await (let message of client.fetch(range, {
           envelope: true,
           flags: true,
           internalDate: true,
           uid: true,
-          bodyStructure: true
+          bodyStructure: true,
+          headers: ['references', 'in-reply-to', 'message-id']
         })) {
           const hasAttachment = this.checkForAttachments(message.bodyStructure);
           const envelope = message.envelope;
-          const conversationId = envelope ? this.buildConversationId(
-            envelope.subject || '',
-            envelope.from?.[0]?.address || '',
-            envelope.to?.[0]?.address || ''
-          ) : `${message.uid}@${this.imapConfig.host}`;
+
+          // Extract threading headers
+          let references = '';
+          let inReplyTo = envelope?.inReplyTo || '';
+
+          if (message.headers) {
+            const headersText = message.headers.toString();
+            const referencesMatch = headersText.match(/^References:\s*(.+?)(?=\r?\n[^\s]|\r?\n\r?\n|$)/im);
+            if (referencesMatch) {
+              references = referencesMatch[1].replace(/\s+/g, ' ').trim();
+            }
+            if (!inReplyTo) {
+              const inReplyToMatch = headersText.match(/^In-Reply-To:\s*(.+?)(?=\r?\n[^\s]|\r?\n\r?\n|$)/im);
+              if (inReplyToMatch) {
+                inReplyTo = inReplyToMatch[1].trim();
+              }
+            }
+          }
+
+          // Use proper thread ID
+          const threadId = this.buildThreadId(
+            envelope?.messageId || `${message.uid}@${this.imapConfig.host}`,
+            inReplyTo,
+            references
+          );
 
           messages.push({
             messageId: envelope?.messageId || `${message.uid}@${this.imapConfig.host}`,
             uid: message.uid,
-            conversationId,
+            conversationId: threadId,
             subject: envelope?.subject || '',
             from: envelope?.from?.[0]?.address || '',
             to: envelope?.to?.[0]?.address || '',
@@ -622,8 +674,8 @@ export class ImapSmtpProvider implements EmailProvider {
             receivedDateTime: message.internalDate instanceof Date ? message.internalDate.toISOString() : new Date().toISOString(),
             isRead: message.flags?.has('\\Seen') || false,
             hasAttachment,
-            inReplyTo: envelope?.inReplyTo,
-            references: ''
+            inReplyTo: inReplyTo,
+            references: references
           });
         }
 
@@ -636,17 +688,5 @@ export class ImapSmtpProvider implements EmailProvider {
     } finally {
       await client.logout();
     }
-  }
-
-  private buildConversationId(subject: string, from: string, to: string): string {
-    // Remove common reply prefixes and normalize
-    const cleanSubject = subject
-      .replace(/^(re:|fwd?:|fw:)\s*/i, '')
-      .trim()
-      .toLowerCase();
-
-    // Create consistent conversation ID
-    const participants = [from, to].sort().join('|');
-    return `${cleanSubject}|${participants}`.replace(/\s+/g, '_');
   }
 }

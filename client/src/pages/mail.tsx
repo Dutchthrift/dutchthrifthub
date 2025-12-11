@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { Navigation } from "@/components/layout/navigation";
+import { EmailThreadMessage } from '@/components/email/email-thread-message';
+import { parseEmailThread } from '@/lib/email-thread-parser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,7 +36,11 @@ import {
     Briefcase,
     RotateCcw,
     Wrench,
-    Filter
+    Filter,
+    ChevronDown,
+    ChevronUp,
+    ChevronsUpDown,
+    ChevronsDownUp
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -81,6 +87,32 @@ interface EmailDetails extends Email {
         entityId: string;
         createdAt: string;
     }>;
+    threadId?: string; // Link to email thread
+}
+
+// Thread message from emailMessages table
+interface ThreadMessage {
+    id: string;
+    messageId: string;
+    threadId: string;
+    fromEmail: string;
+    toEmail: string;
+    subject?: string;
+    body?: string;
+    isHtml?: boolean;
+    isOutbound?: boolean;
+    sentAt?: string;
+    createdAt?: string;
+    attachments?: any;
+}
+
+// Thread with all messages
+interface ThreadWithMessages {
+    id: string;
+    threadId: string;
+    subject: string;
+    customerEmail: string;
+    messages: ThreadMessage[];
 }
 
 export default function MailPage() {
@@ -108,6 +140,31 @@ export default function MailPage() {
     const [showLinkCase, setShowLinkCase] = useState(false);
     const [showLinkReturn, setShowLinkReturn] = useState(false);
     const [showLinkRepair, setShowLinkRepair] = useState(false);
+
+    // Thread message expansion state
+    const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set());
+
+    // Toggle message expansion
+    const toggleMessageExpanded = (messageId: string) => {
+        setExpandedMessageIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(messageId)) {
+                newSet.delete(messageId);
+            } else {
+                newSet.add(messageId);
+            }
+            return newSet;
+        });
+    };
+
+    // Expand/collapse all messages
+    const expandAllMessages = (messageIds: string[]) => {
+        setExpandedMessageIds(new Set(messageIds));
+    };
+
+    const collapseAllMessages = () => {
+        setExpandedMessageIds(new Set());
+    };
 
     // Fetch mail list with infinite scroll
     const {
@@ -160,6 +217,36 @@ export default function MailPage() {
         },
         enabled: !!selectedEmailId
     });
+
+    // Fetch thread messages (all emails in the conversation)
+    const { data: threadData, isLoading: isLoadingThread } = useQuery({
+        queryKey: ['email-thread', selectedEmailId],
+        queryFn: async () => {
+            if (!selectedEmailId) return null;
+            const res = await fetch(`/api/email-threads/${selectedEmailId}`, {
+                credentials: 'include'
+            });
+            if (!res.ok) {
+                // If thread not found, return null (single email without thread)
+                if (res.status === 404) return null;
+                throw new Error('Failed to fetch thread');
+            }
+            return res.json() as Promise<ThreadWithMessages>;
+        },
+        enabled: !!selectedEmailId
+    });
+
+    // Get thread messages sorted by date (oldest first for conversation flow)
+    const threadMessages = threadData?.messages?.slice().sort((a, b) => {
+        const dateA = new Date(a.sentAt || a.createdAt || 0);
+        const dateB = new Date(b.sentAt || b.createdAt || 0);
+        return dateA.getTime() - dateB.getTime();
+    }) || [];
+
+    // Gmail-style threading: only show actual emails from the database
+    // Each email has proper Message-ID/References headers for correct threading
+    // No body parsing - that causes incorrect timestamps and duplicate content
+    const parsedMessages = threadMessages;
 
     const unlinkMutation = useMutation({
         mutationFn: async (linkId: string) => {
@@ -720,23 +807,75 @@ export default function MailPage() {
                                         </div>
                                     </div>
 
-                                    {/* Email Body */}
-                                    <div className="flex-1 overflow-auto p-6">
-                                        {emailDetails.html ? (
-                                            <div
-                                                className="prose prose-sm max-w-none dark:prose-invert"
-                                                dangerouslySetInnerHTML={{
-                                                    __html: DOMPurify.sanitize(emailDetails.html, {
-                                                        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'img', 'div', 'span', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th'],
-                                                        ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'style']
-                                                    })
-                                                }}
-                                            />
-                                        ) : (
-                                            <pre className="whitespace-pre-wrap font-sans text-sm">
-                                                {emailDetails.text || '(Geen inhoud)'}
-                                            </pre>
-                                        )}
+                                    {/* Email Thread Messages - Gmail Style */}
+                                    <div className="flex-1 overflow-auto p-4">
+                                        {/* Thread header with expand/collapse controls */}
+                                        <div className="flex items-center justify-between mb-4">
+                                            <span className="text-sm text-muted-foreground">
+                                                Conversatie {parsedMessages.length > 1 && `(${parsedMessages.length} berichten)`}
+                                            </span>
+                                            {parsedMessages.length > 1 && (
+                                                <div className="flex gap-1">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => expandAllMessages(parsedMessages.map(m => m.id))}
+                                                        className="h-7 px-2 text-xs"
+                                                    >
+                                                        <ChevronsUpDown className="h-3 w-3 mr-1" />
+                                                        Alles uitvouwen
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={collapseAllMessages}
+                                                        className="h-7 px-2 text-xs"
+                                                    >
+                                                        <ChevronsDownUp className="h-3 w-3 mr-1" />
+                                                        Alles invouwen
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Thread messages */}
+                                        <div className="space-y-2">
+                                            {parsedMessages.length > 0 ? (
+                                                // Render all messages in thread (from DB or parsed from body)
+                                                parsedMessages.map((message, index) => (
+                                                    <EmailThreadMessage
+                                                        key={message.id}
+                                                        message={message}
+                                                        isExpanded={
+                                                            expandedMessageIds.has(message.id) ||
+                                                            (expandedMessageIds.size === 0 && index === parsedMessages.length - 1)
+                                                        }
+                                                        onToggle={() => toggleMessageExpanded(message.id)}
+                                                        isLatest={index === parsedMessages.length - 1}
+                                                    />
+                                                ))
+                                            ) : (
+                                                // Fallback: render current email as single message
+                                                <EmailThreadMessage
+                                                    message={{
+                                                        id: emailDetails.id,
+                                                        messageId: emailDetails.id,
+                                                        threadId: '',
+                                                        fromEmail: emailDetails.fromEmail,
+                                                        toEmail: 'contact@dutchthrift.com',
+                                                        subject: emailDetails.subject,
+                                                        body: emailDetails.html || emailDetails.text,
+                                                        isHtml: !!emailDetails.html,
+                                                        isOutbound: false,
+                                                        sentAt: emailDetails.date,
+                                                        attachments: emailDetails.attachments,
+                                                    }}
+                                                    isExpanded={true}
+                                                    onToggle={() => { }}
+                                                    isLatest={true}
+                                                />
+                                            )}
+                                        </div>
 
                                         {/* Attachments */}
                                         {emailDetails.attachments && emailDetails.attachments.length > 0 && (
