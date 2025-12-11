@@ -15,8 +15,14 @@ export function validateShopifyWebhook(req: Request, secret: string): boolean {
         return false;
     }
 
-    // Get raw body as string
-    const body = JSON.stringify(req.body);
+    // Get raw body - it's a Buffer when using express.raw()
+    // or an object when using express.json()
+    let body: string;
+    if (Buffer.isBuffer(req.body)) {
+        body = req.body.toString('utf8');
+    } else {
+        body = JSON.stringify(req.body);
+    }
 
     // Calculate HMAC
     const hash = crypto
