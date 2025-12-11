@@ -255,6 +255,9 @@ export default function Repairs() {
                               ) : (
                                 <>
                                   <h4 className="font-medium text-sm truncate">{repair.title}</h4>
+                                  {(repair as any).issueCategory && (
+                                    <p className="text-xs text-muted-foreground truncate">{(repair as any).issueCategory}</p>
+                                  )}
                                   <p className="text-xs text-amber-600 truncate">
                                     {repair.repairNumber || `#${repair.id.slice(0, 6)}`}
                                   </p>

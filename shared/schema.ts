@@ -116,6 +116,7 @@ export const emailMessages = pgTable("email_messages", {
   fromEmail: text("from_email").notNull(),
   toEmail: text("to_email").notNull(),
   subject: text("subject"),
+  body: text("body"), // Email body content (HTML or plain text)
   isHtml: boolean("is_html").default(false),
   isOutbound: boolean("is_outbound").default(false),
   folder: emailFolderEnum("folder").notNull().default("inbox"),

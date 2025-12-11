@@ -41,6 +41,7 @@ import {
   MessageSquare,
   CheckCircle,
   Circle,
+  Package,
 } from "lucide-react";
 import { format, isPast } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -205,229 +206,416 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full sm:max-w-4xl max-h-[85vh] overflow-y-auto p-6">
-        {/* Header */}
-        <DialogHeader className="pb-2 border-b">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-                <Wrench className="h-4 w-4 text-blue-500" />
-                <span className="truncate">{currentRepair.title}</span>
-              </DialogTitle>
-              <p className="text-xs text-muted-foreground">
-                {currentRepair.repairNumber || `#${currentRepair.id.slice(0, 8)}`} • {currentRepair.orderNumber || (currentRepair.repairType === 'inventory' ? 'Inkoop' : 'Klant')}
-              </p>
+      <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-hidden !flex !flex-col p-0 gap-0 [&>button]:hidden">
+        {/* Header with Title and Uniform Icon Buttons - matches purchase order detail */}
+        <div className="px-5 pt-4 pb-3 border-b">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <DialogTitle className="text-xl font-semibold">{currentRepair.title}</DialogTitle>
+                <Badge className={`font-mono text-xs shrink-0 ${(currentRepair as any).repairType === 'inventory'
+                  ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-600'
+                  : 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-600'
+                  }`}>
+                  {currentRepair.repairNumber || `#${currentRepair.id.slice(0, 8)}`}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
+                {(currentRepair as any).repairType === 'inventory' ? (
+                  <>
+                    <Package className="h-3.5 w-3.5 text-amber-600" />
+                    <span>Inkoopreparatie</span>
+                  </>
+                ) : (
+                  <>
+                    <UserIcon className="h-3.5 w-3.5 text-blue-600" />
+                    <span>{currentRepair.customerName || currentRepair.orderNumber || 'Klantreparatie'}</span>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-1">
+            {/* Uniform Icon Buttons Group */}
+            <div className="flex items-center gap-0.5 shrink-0">
               {isEditMode ? (
                 <>
-                  <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)} className="h-7 w-7 p-0">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setIsEditMode(false)}
+                    title="Annuleren"
+                    className="h-8 w-8 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
                     <X className="h-4 w-4" />
                   </Button>
-                  <Button size="sm" onClick={handleSaveEdit} disabled={updateRepairMutation.isPending} className="h-7 text-xs bg-emerald-500 hover:bg-emerald-600">
+                  <Button
+                    size="sm"
+                    onClick={handleSaveEdit}
+                    disabled={updateRepairMutation.isPending}
+                    className="h-8 text-xs bg-emerald-500 hover:bg-emerald-600 rounded-full px-3"
+                  >
                     <Save className="h-3 w-3 mr-1" />Opslaan
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)} className="h-7 w-7 p-0" title="Bewerken">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setIsEditMode(true)}
+                    title="Bewerken"
+                    className="h-8 w-8 rounded-full text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                  >
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setShowNotes(!showNotes)} className={`h-7 w-7 p-0 ${showNotes ? 'text-blue-500' : ''}`} title="Notities">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setShowNotes(!showNotes)}
+                    title="Notities"
+                    className={`h-8 w-8 rounded-full ${showNotes ? 'text-purple-600 bg-purple-100 dark:bg-purple-900/30' : 'text-purple-600 hover:text-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/30'}`}
+                  >
                     <MessageSquare className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setShowFiles(!showFiles)} className={`h-7 w-7 p-0 ${showFiles ? 'text-purple-500' : ''}`} title="Foto's">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setShowFiles(!showFiles)}
+                    title="Foto's"
+                    className={`h-8 w-8 rounded-full ${showFiles ? 'text-amber-600 bg-amber-100 dark:bg-amber-900/30' : 'text-amber-600 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30'}`}
+                  >
                     <ImageIcon className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setShowDeleteDialog(true)} className="h-7 w-7 p-0 text-red-500" title="Verwijderen">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setShowDeleteDialog(true)}
+                    title="Verwijderen"
+                    className="h-8 w-8 rounded-full text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30"
+                  >
                     <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => onOpenChange(false)}
+                    title="Sluiten"
+                    className="h-8 w-8 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <X className="h-4 w-4" />
                   </Button>
                 </>
               )}
             </div>
           </div>
-        </DialogHeader>
+        </div>
 
-        {/* Horizontal Timeline */}
-        <div className="py-3 border-b overflow-x-auto">
-          <div className="flex items-center justify-between min-w-[300px]">
-            {STATUSES.map((status, idx) => {
-              const isCompleted = idx < currentStatusIndex;
-              const isCurrent = idx === currentStatusIndex;
-              return (
-                <div key={status.value} className="flex items-center flex-1">
-                  <button
-                    onClick={() => updateStatusMutation.mutate({ status: status.value })}
-                    disabled={updateStatusMutation.isPending}
-                    className={`flex flex-col items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 ${isCurrent ? 'scale-110' : ''}`}
-                  >
-                    {isCompleted ? (
-                      <CheckCircle className={`h-5 w-5 ${status.color}`} />
-                    ) : isCurrent ? (
-                      <div className={`h-5 w-5 rounded-full border-2 ${status.color} border-current flex items-center justify-center`}>
-                        <div className={`h-2 w-2 rounded-full bg-current`} />
-                      </div>
-                    ) : (
-                      <Circle className="h-5 w-5 text-gray-300" />
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          {/* Horizontal Timeline */}
+          <div className="py-2 mb-3 overflow-x-auto">
+            <div className="flex items-center justify-between min-w-[280px]">
+              {STATUSES.map((status, idx) => {
+                const isCompleted = idx < currentStatusIndex;
+                const isCurrent = idx === currentStatusIndex;
+                return (
+                  <div key={status.value} className="flex items-center flex-1">
+                    <button
+                      onClick={() => updateStatusMutation.mutate({ status: status.value })}
+                      disabled={updateStatusMutation.isPending}
+                      className={`flex flex-col items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 ${isCurrent ? 'scale-110' : ''}`}
+                    >
+                      {isCompleted ? (
+                        <CheckCircle className={`h-5 w-5 ${status.color}`} />
+                      ) : isCurrent ? (
+                        <div className={`h-5 w-5 rounded-full border-2 ${status.color} border-current flex items-center justify-center`}>
+                          <div className={`h-2 w-2 rounded-full bg-current`} />
+                        </div>
+                      ) : (
+                        <Circle className="h-5 w-5 text-gray-300" />
+                      )}
+                      <span className={`text-[10px] whitespace-nowrap ${isCurrent ? 'font-semibold ' + status.color : 'text-muted-foreground'}`}>
+                        {status.label}
+                      </span>
+                    </button>
+                    {idx < STATUSES.length - 1 && (
+                      <div className={`flex-1 h-0.5 mx-1 min-w-[20px] ${idx < currentStatusIndex ? 'bg-emerald-500' : 'bg-gray-200'}`} />
                     )}
-                    <span className={`text-[10px] whitespace-nowrap ${isCurrent ? 'font-semibold ' + status.color : 'text-muted-foreground'}`}>
-                      {status.label}
-                    </span>
-                  </button>
-                  {idx < STATUSES.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-1 min-w-[20px] ${idx < currentStatusIndex ? 'bg-emerald-500' : 'bg-gray-200'}`} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {currentRepair.slaDeadline && !['completed', 'returned'].includes(currentRepair.status) && isPast(new Date(currentRepair.slaDeadline)) && (
-            <div className="flex items-center gap-1 text-red-500 text-xs mt-2 justify-center">
-              <AlertTriangle className="h-3 w-3" />Deadline overschreden
-            </div>
-          )}
-        </div>
-
-        {/* Main Content - 2 Column Layout */}
-        <div className="py-3">
-          {isEditMode ? (
-            <div className="space-y-2 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs font-medium">Titel</label>
-                  <Input value={editForm.title || ""} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} className="h-7 text-xs mt-0.5" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium">Product</label>
-                  <Input value={editForm.productName || ""} onChange={(e) => setEditForm({ ...editForm, productName: e.target.value })} className="h-7 text-xs mt-0.5" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium">SKU</label>
-                  <Input value={editForm.productSku || ""} onChange={(e) => setEditForm({ ...editForm, productSku: e.target.value })} className="h-7 text-xs mt-0.5" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium">Prioriteit</label>
-                  <Select value={editForm.priority} onValueChange={(v) => setEditForm({ ...editForm, priority: v })}>
-                    <SelectTrigger className="h-7 text-xs mt-0.5"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Laag</SelectItem>
-                      <SelectItem value="medium">Normaal</SelectItem>
-                      <SelectItem value="high">Hoog</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs font-medium">Technicus</label>
-                  <Select value={editForm.assignedUserId} onValueChange={(v) => setEditForm({ ...editForm, assignedUserId: v })}>
-                    <SelectTrigger className="h-7 text-xs mt-0.5"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Niet toegewezen</SelectItem>
-                      {technicians.map((tech) => (
-                        <SelectItem key={tech.id} value={tech.id}>{tech.firstName || tech.username}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs font-medium">Beschrijving</label>
-                  <Textarea value={editForm.description || ""} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="text-xs mt-0.5 min-h-[50px]" />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
-              {/* Left Column - Details */}
-              <div className="space-y-2">
-                <div>
-                  <span className="text-muted-foreground">Product</span>
-                  <p className="font-medium">{currentRepair.productName || currentRepair.title}</p>
-                </div>
-                {currentRepair.productSku && (
-                  <div>
-                    <span className="text-muted-foreground">SKU</span>
-                    <p className="font-medium font-mono">{currentRepair.productSku}</p>
                   </div>
-                )}
-                {currentRepair.customerEmail && (
-                  <div>
-                    <span className="text-muted-foreground">Klant</span>
-                    <p className="font-medium">{currentRepair.customerName || currentRepair.customerEmail}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Right Column - Meta */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Prioriteit</span>
-                  <Badge className={`text-[10px] h-4 px-1.5 ${currentRepair.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                    currentRepair.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                      currentRepair.priority === 'low' ? 'bg-emerald-100 text-emerald-700' :
-                        'bg-gray-100 text-gray-600'
-                    }`}>
-                    {currentRepair.priority === 'urgent' ? 'Urgent' : currentRepair.priority === 'high' ? 'Hoog' : currentRepair.priority === 'low' ? 'Laag' : 'Normaal'}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Technicus</span>
-                  <span className="font-medium flex items-center gap-1"><UserIcon className="h-3 w-3" />{getTechnicianName(currentRepair.assignedUserId)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Aangemaakt</span>
-                  <span className="font-medium flex items-center gap-1"><CalendarIcon className="h-3 w-3" />{currentRepair.createdAt ? format(new Date(currentRepair.createdAt), "d MMM", { locale: nl }) : '-'}</span>
-                </div>
-              </div>
-
-              {/* Full Width - Description */}
-              {currentRepair.description && (
-                <div className="col-span-2 pt-2 border-t mt-2">
-                  <span className="text-muted-foreground">Beschrijving</span>
-                  <p className="font-medium mt-0.5">{currentRepair.description}</p>
-                </div>
-              )}
+                );
+              })}
             </div>
-          )}
-        </div>
-
-        {/* Collapsible: Notes */}
-        {showNotes && currentUser && (
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 mb-2">
-            <NotesPanel entityType="repair" entityId={currentRepair.id} currentUser={currentUser} />
+            {currentRepair.slaDeadline && !['completed', 'returned'].includes(currentRepair.status) && isPast(new Date(currentRepair.slaDeadline)) && (
+              <div className="flex items-center gap-1 text-red-500 text-xs mt-2 justify-center">
+                <AlertTriangle className="h-3 w-3" />Deadline overschreden
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Collapsible: Files */}
-        {showFiles && (
-          <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 space-y-2">
-            {photos.length > 0 ? (
-              <div className="grid grid-cols-4 gap-2">
-                {photos.map((photo, idx) => {
-                  const photoPath = photo.startsWith('/attachments/') ? photo.substring('/attachments/'.length) : photo;
-                  const photoUrl = `/api/attachments/${photoPath}`;
-                  return (
-                    <div key={idx} className="relative aspect-square rounded overflow-hidden border group">
-                      <img src={photoUrl} alt="" className="w-full h-full object-cover cursor-pointer" onClick={() => setFullScreenImage(photoUrl)} />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <Button variant="secondary" size="sm" className="h-6 w-6 p-0" onClick={() => setFullScreenImage(photoUrl)}>
-                          <Maximize2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* Main Content */}
+          <div className="space-y-3">
+            {isEditMode ? (
+              <div className="space-y-2 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-medium">Titel</label>
+                    <Input value={editForm.title || ""} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} className="h-7 text-xs mt-0.5" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium">Product</label>
+                    <Input value={editForm.productName || ""} onChange={(e) => setEditForm({ ...editForm, productName: e.target.value })} className="h-7 text-xs mt-0.5" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium">SKU</label>
+                    <Input value={editForm.productSku || ""} onChange={(e) => setEditForm({ ...editForm, productSku: e.target.value })} className="h-7 text-xs mt-0.5" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium">Prioriteit</label>
+                    <Select value={editForm.priority} onValueChange={(v) => setEditForm({ ...editForm, priority: v })}>
+                      <SelectTrigger className="h-7 text-xs mt-0.5"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Laag</SelectItem>
+                        <SelectItem value="medium">Normaal</SelectItem>
+                        <SelectItem value="high">Hoog</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium">Technicus</label>
+                    <Select value={editForm.assignedUserId} onValueChange={(v) => setEditForm({ ...editForm, assignedUserId: v })}>
+                      <SelectTrigger className="h-7 text-xs mt-0.5"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Niet toegewezen</SelectItem>
+                        {technicians.map((tech) => (
+                          <SelectItem key={tech.id} value={tech.id}>{tech.firstName || tech.username}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium">Beschrijving</label>
+                    <Textarea value={editForm.description || ""} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="text-xs mt-0.5 min-h-[50px]" />
+                  </div>
+                </div>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground text-center py-2">Nog geen foto's</p>
+              <>
+                {/* Inventory Repair - Special Layout with amber theme */}
+                {(currentRepair as any).repairType === 'inventory' ? (
+                  <div className="space-y-3">
+                    {/* Product Info Section */}
+                    <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Package className="h-4 w-4 text-amber-600" />
+                        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Product Informatie</span>
+                      </div>
+                      <div className="space-y-1.5 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Titel: </span>
+                          <span className="font-medium">{currentRepair.title}</span>
+                        </div>
+                        {currentRepair.productName && currentRepair.productName !== currentRepair.title && (
+                          <div>
+                            <span className="text-muted-foreground">Merk & Model: </span>
+                            <span className="font-medium">{currentRepair.productName}</span>
+                          </div>
+                        )}
+                        {currentRepair.productSku && (
+                          <div>
+                            <span className="text-muted-foreground">SKU: </span>
+                            <span className="font-medium font-mono">{currentRepair.productSku}</span>
+                          </div>
+                        )}
+                        {(currentRepair as any).issueCategory && (
+                          <div>
+                            <span className="text-muted-foreground">Probleem Categorie: </span>
+                            <span className="font-medium">{(currentRepair as any).issueCategory}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Description Section - First */}
+                    {currentRepair.description && (
+                      <div className="p-3 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 rounded-lg border border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MessageSquare className="h-4 w-4 text-slate-600" />
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-400">Beschrijving</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground whitespace-pre-wrap">{currentRepair.description}</p>
+                      </div>
+                    )}
+
+                    {/* Details Section - After Description */}
+                    <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wrench className="h-4 w-4 text-purple-600" />
+                        <span className="text-xs font-semibold text-purple-700 dark:text-purple-400">Reparatie Details</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Prioriteit</span>
+                          <Badge className={`text-[10px] h-4 px-1.5 ${currentRepair.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                            currentRepair.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                              currentRepair.priority === 'low' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                            }`}>
+                            {currentRepair.priority === 'urgent' ? 'Urgent' : currentRepair.priority === 'high' ? 'Hoog' : currentRepair.priority === 'low' ? 'Laag' : 'Normaal'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Technicus</span>
+                          <span className="font-medium flex items-center gap-1"><UserIcon className="h-3 w-3" />{getTechnicianName(currentRepair.assignedUserId)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Aangemaakt</span>
+                          <span className="font-medium flex items-center gap-1"><CalendarIcon className="h-3 w-3" />{currentRepair.createdAt ? format(new Date(currentRepair.createdAt), "d MMM yyyy", { locale: nl }) : '-'}</span>
+                        </div>
+                        {currentRepair.slaDeadline && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Deadline</span>
+                            <span className={`font-medium flex items-center gap-1 ${isPast(new Date(currentRepair.slaDeadline)) && !['completed', 'returned'].includes(currentRepair.status) ? 'text-red-500' : ''}`}>
+                              <CalendarIcon className="h-3 w-3" />
+                              {format(new Date(currentRepair.slaDeadline), "d MMM yyyy", { locale: nl })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Customer Repair - Blue theme layout */
+                  <div className="space-y-3">
+                    {/* Customer Info Section */}
+                    <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <UserIcon className="h-4 w-4 text-blue-600" />
+                        <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">Klant & Product</span>
+                      </div>
+                      <div className="space-y-1.5 text-xs">
+                        {currentRepair.customerEmail && (
+                          <div>
+                            <span className="text-muted-foreground">Klant: </span>
+                            <span className="font-medium">{currentRepair.customerName || currentRepair.customerEmail}</span>
+                          </div>
+                        )}
+                        {currentRepair.orderNumber && (
+                          <div>
+                            <span className="text-muted-foreground">Order: </span>
+                            <span className="font-medium font-mono">{currentRepair.orderNumber}</span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-muted-foreground">Product: </span>
+                          <span className="font-medium">{currentRepair.productName || currentRepair.title}</span>
+                        </div>
+                        {currentRepair.productSku && (
+                          <div>
+                            <span className="text-muted-foreground">SKU: </span>
+                            <span className="font-medium font-mono">{currentRepair.productSku}</span>
+                          </div>
+                        )}
+                        {(currentRepair as any).issueCategory && (
+                          <div>
+                            <span className="text-muted-foreground">Probleem: </span>
+                            <span className="font-medium">{(currentRepair as any).issueCategory}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Description Section - First */}
+                    {currentRepair.description && (
+                      <div className="p-3 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 rounded-lg border border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MessageSquare className="h-4 w-4 text-slate-600" />
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-400">Beschrijving</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground whitespace-pre-wrap">{currentRepair.description}</p>
+                      </div>
+                    )}
+
+                    {/* Details Section - After Description */}
+                    <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wrench className="h-4 w-4 text-purple-600" />
+                        <span className="text-xs font-semibold text-purple-700 dark:text-purple-400">Reparatie Details</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Prioriteit</span>
+                          <Badge className={`text-[10px] h-4 px-1.5 ${currentRepair.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                            currentRepair.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                              currentRepair.priority === 'low' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                            }`}>
+                            {currentRepair.priority === 'urgent' ? 'Urgent' : currentRepair.priority === 'high' ? 'Hoog' : currentRepair.priority === 'low' ? 'Laag' : 'Normaal'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Technicus</span>
+                          <span className="font-medium flex items-center gap-1"><UserIcon className="h-3 w-3" />{getTechnicianName(currentRepair.assignedUserId)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Aangemaakt</span>
+                          <span className="font-medium flex items-center gap-1"><CalendarIcon className="h-3 w-3" />{currentRepair.createdAt ? format(new Date(currentRepair.createdAt), "d MMM yyyy", { locale: nl }) : '-'}</span>
+                        </div>
+                        {currentRepair.slaDeadline && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Deadline</span>
+                            <span className={`font-medium flex items-center gap-1 ${isPast(new Date(currentRepair.slaDeadline)) && !['completed', 'returned'].includes(currentRepair.status) ? 'text-red-500' : ''}`}>
+                              <CalendarIcon className="h-3 w-3" />
+                              {format(new Date(currentRepair.slaDeadline), "d MMM yyyy", { locale: nl })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
-            <div className="flex gap-2 items-center pt-2 border-t">
-              <Input type="file" multiple onChange={(e) => setSelectedFiles(e.target.files)} accept="image/*,.pdf" className="h-7 text-xs flex-1" />
-              <Button size="sm" onClick={handleFileUpload} disabled={!selectedFiles || uploadFilesMutation.isPending} className="h-7 text-xs">
-                <Upload className="h-3 w-3 mr-1" />Upload
-              </Button>
-            </div>
           </div>
-        )}
+
+          {/* Collapsible: Notes */}
+          {showNotes && currentUser && (
+            <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 mt-3">
+              <NotesPanel entityType="repair" entityId={currentRepair.id} currentUser={currentUser} />
+            </div>
+          )}
+
+          {/* Collapsible: Files */}
+          {showFiles && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 space-y-2 mt-3">
+              {photos.length > 0 ? (
+                <div className="grid grid-cols-4 gap-2">
+                  {photos.map((photo, idx) => {
+                    const photoPath = photo.startsWith('/attachments/') ? photo.substring('/attachments/'.length) : photo;
+                    const photoUrl = `/api/attachments/${photoPath}`;
+                    return (
+                      <div key={idx} className="relative aspect-square rounded overflow-hidden border group">
+                        <img src={photoUrl} alt="" className="w-full h-full object-cover cursor-pointer" onClick={() => setFullScreenImage(photoUrl)} />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <Button variant="secondary" size="sm" className="h-6 w-6 p-0" onClick={() => setFullScreenImage(photoUrl)}>
+                            <Maximize2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-2">Nog geen foto's</p>
+              )}
+              <div className="flex gap-2 items-center pt-2 border-t">
+                <Input type="file" multiple onChange={(e) => setSelectedFiles(e.target.files)} accept="image/*,.pdf" className="h-7 text-xs flex-1" />
+                <Button size="sm" onClick={handleFileUpload} disabled={!selectedFiles || uploadFilesMutation.isPending} className="h-7 text-xs">
+                  <Upload className="h-3 w-3 mr-1" />Upload
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </DialogContent>
 
       {/* Delete Dialog */}

@@ -79,8 +79,8 @@ const PRIORITY_OPTIONS = [
     { value: "urgent", label: "Urgent", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
 ] as const;
 
-const STEP_ICONS = [Camera, Settings, CheckCircle];
-const STEP_LABELS = ["Product", "Details", "Bevestig"];
+const STEP_ICONS = [Camera, CheckCircle];
+const STEP_LABELS = ["Gegevens", "Bevestig"];
 
 export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRepairWizardProps) {
     const [step, setStep] = useState(1);
@@ -220,7 +220,7 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                 </DialogHeader>
 
                 {/* Compact Step Progress Indicator */}
-                <div className="flex items-center justify-between mb-4 px-2">
+                <div className="flex items-center justify-center mb-4 px-2">
                     {STEP_LABELS.map((label, idx) => {
                         const StepIcon = STEP_ICONS[idx];
                         const stepNum = idx + 1;
@@ -242,24 +242,25 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                                         {label}
                                     </span>
                                 </div>
-                                {idx < 2 && (
-                                    <div className={`w-8 h-0.5 mx-1 ${step > stepNum ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                                {idx < 1 && (
+                                    <div className={`w-12 h-0.5 mx-2 ${step > stepNum ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
                                 )}
                             </div>
                         );
                     })}
                 </div>
 
-                {/* Step 1: Product Details */}
+                {/* Step 1: All Details Combined */}
                 {step === 1 && (
-                    <div className="space-y-3">
+                    <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
                         {/* Info banner */}
-                        <div className="p-2.5 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <div className="p-2 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
                             <p className="text-xs text-amber-700 dark:text-amber-300">
                                 <strong>Inkoopreparatie:</strong> Voor ingekochte camera's en lenzen die gerepareerd moeten worden.
                             </p>
                         </div>
 
+                        {/* Title */}
                         <div>
                             <Label className="text-xs">Titel *</Label>
                             <Input
@@ -272,7 +273,8 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                             )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        {/* Merk & Model + Producttype */}
+                        <div className="grid grid-cols-2 gap-2">
                             <div>
                                 <Label className="text-xs">Merk & Model *</Label>
                                 <Input
@@ -291,6 +293,7 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                             </div>
                         </div>
 
+                        {/* Probleem Categorie */}
                         <div>
                             <Label className="text-xs">Probleem Categorie</Label>
                             <Select
@@ -327,21 +330,8 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                             </div>
                         )}
 
-                        <div>
-                            <Label className="text-xs">Beschrijving</Label>
-                            <Textarea
-                                placeholder="Wat moet er gerepareerd worden..."
-                                {...register("description")}
-                                className="text-sm min-h-[60px] mt-1"
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* Step 2: Priority & Assignment */}
-                {step === 2 && (
-                    <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
+                        {/* Priority + Deadline + Technicus in grid */}
+                        <div className="grid grid-cols-3 gap-2">
                             <div>
                                 <Label className="text-xs">Prioriteit</Label>
                                 <Select
@@ -354,7 +344,7 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                                     <SelectContent>
                                         {PRIORITY_OPTIONS.map((opt) => (
                                             <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                                                <span className="flex items-center gap-2">
+                                                <span className="flex items-center gap-1.5">
                                                     <span className={`w-2 h-2 rounded-full ${opt.value === 'urgent' ? 'bg-red-500' : opt.value === 'high' ? 'bg-orange-500' : opt.value === 'medium' ? 'bg-gray-400' : 'bg-emerald-500'}`} />
                                                     {opt.label}
                                                 </span>
@@ -373,8 +363,8 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                                             type="button"
                                             className="w-full h-8 text-xs mt-1 justify-start"
                                         >
-                                            <CalendarIcon className="mr-1.5 h-3 w-3" />
-                                            {slaDeadline ? format(slaDeadline, "d MMM", { locale: nl }) : "Selecteer"}
+                                            <CalendarIcon className="mr-1 h-3 w-3" />
+                                            {slaDeadline ? format(slaDeadline, "d MMM", { locale: nl }) : "—"}
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
@@ -387,56 +377,61 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                                     </PopoverContent>
                                 </Popover>
                             </div>
+
+                            <div>
+                                <Label className="text-xs">Technicus</Label>
+                                <Select
+                                    onValueChange={(value) => setValue("assignedUserId", value)}
+                                    value={watch("assignedUserId") || "none"}
+                                >
+                                    <SelectTrigger className="h-8 text-xs mt-1">
+                                        <SelectValue placeholder="Geen" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none" className="text-xs">Niet toegewezen</SelectItem>
+                                        {technicians.map((tech) => (
+                                            <SelectItem key={tech.id} value={tech.id} className="text-xs">
+                                                {tech.firstName || tech.username}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
 
+                        {/* Beschrijving */}
                         <div>
-                            <Label className="text-xs">Technicus (optioneel)</Label>
-                            <Select
-                                onValueChange={(value) => setValue("assignedUserId", value)}
-                                value={watch("assignedUserId") || "none"}
-                            >
-                                <SelectTrigger className="h-8 text-xs mt-1">
-                                    <SelectValue placeholder="Niet toegewezen" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none" className="text-xs">Niet toegewezen</SelectItem>
-                                    {technicians.map((tech) => (
-                                        <SelectItem key={tech.id} value={tech.id} className="text-xs">
-                                            {tech.firstName || ''} {tech.lastName || ''} ({tech.username})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Label className="text-xs">Beschrijving</Label>
+                            <Textarea
+                                placeholder="Wat moet er gerepareerd worden..."
+                                {...register("description")}
+                                className="text-sm min-h-[50px] mt-1"
+                            />
                         </div>
 
-                        {/* File Upload */}
+                        {/* File Upload - Compact */}
                         <div>
-                            <Label className="text-xs">Foto's / Bijlagen (optioneel)</Label>
-                            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-3 text-center mt-1">
-                                <Upload className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                                <p className="text-[10px] text-muted-foreground">
-                                    Max 10 bestanden
-                                </p>
+                            <Label className="text-xs">Foto's (optioneel)</Label>
+                            <div className="flex items-center gap-2 mt-1">
                                 <Input
                                     type="file"
                                     multiple
                                     onChange={handleFileSelect}
-                                    className="mt-2 h-7 text-xs"
+                                    className="h-8 text-xs flex-1"
                                     accept="image/*"
                                 />
                             </div>
-
                             {selectedFiles.length > 0 && (
-                                <div className="space-y-1 mt-2">
+                                <div className="flex flex-wrap gap-1 mt-2">
                                     {selectedFiles.map((file, index) => (
-                                        <div key={index} className="flex items-center justify-between border p-1.5 rounded text-xs">
-                                            <span className="truncate">{file.name}</span>
+                                        <div key={index} className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded text-xs">
+                                            <span className="truncate max-w-[100px]">{file.name}</span>
                                             <Button
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
                                                 onClick={() => removeFile(index)}
-                                                className="h-5 w-5 p-0"
+                                                className="h-4 w-4 p-0"
                                             >
                                                 <X className="h-3 w-3" />
                                             </Button>
@@ -448,8 +443,8 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                     </div>
                 )}
 
-                {/* Step 3: Review & Photos */}
-                {step === 3 && (
+                {/* Step 2: Review & Confirm */}
+                {step === 2 && (
                     <div className="space-y-3">
                         {/* Product Info */}
                         <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
@@ -483,10 +478,11 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                                 {watch("description") && (
                                     <p><span className="text-muted-foreground">Omschrijving:</span> {watch("description")}</p>
                                 )}
+                                {selectedFiles.length > 0 && (
+                                    <p><span className="text-muted-foreground">Foto's:</span> {selectedFiles.length} bestand(en)</p>
+                                )}
                             </div>
                         </div>
-
-
                     </div>
                 )}
 
@@ -503,7 +499,7 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                         {step === 1 ? "Annuleren" : "Terug"}
                     </Button>
 
-                    {step < 3 ? (
+                    {step < 2 ? (
                         <Button onClick={handleNext} size="sm" className="h-8 text-sm bg-amber-500 hover:bg-amber-600">
                             Volgende
                             <ChevronRight className="h-3 w-3 ml-1" />

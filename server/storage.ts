@@ -86,6 +86,7 @@ export interface IStorage {
   getEmailMessages(threadId: string): Promise<EmailMessage[]>;
   getEmailMessage(messageId: string): Promise<EmailMessage | undefined>;
   createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage>;
+  findThreadByEmailAttributes(fromEmail: string, subject: string, date: Date | null): Promise<EmailThread | undefined>;
 
   // Email Attachments
   getEmailAttachment(attachmentPath: string): Promise<EmailAttachment | undefined>;
@@ -572,6 +573,53 @@ export class DatabaseStorage implements IStorage {
   async createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage> {
     const result = await db.insert(emailMessages).values(message).returning();
     return result[0];
+  }
+
+  async findThreadByEmailAttributes(fromEmail: string, subject: string, date: Date | null): Promise<EmailThread | undefined> {
+    // Strategy 1: Find a thread where customerEmail matches fromEmail
+    let result = await db.select().from(emailThreads).where(
+      eq(emailThreads.customerEmail, fromEmail)
+    ).orderBy(desc(emailThreads.lastActivity)).limit(1);
+
+    if (result.length > 0) {
+      // Check if subject is similar (ignoring Re: Fwd: prefixes)
+      const cleanSubject = (s: string) => s.replace(/^(Re:|Fwd:|Fw:|RE:|FW:)\s*/gi, '').trim().toLowerCase();
+      const threadSubject = cleanSubject(result[0].subject || '');
+      const emailSubject = cleanSubject(subject);
+
+      if (threadSubject === emailSubject || threadSubject.includes(emailSubject) || emailSubject.includes(threadSubject)) {
+        return result[0];
+      }
+    }
+
+    // Strategy 2: Find an emailMessage with matching fromEmail and similar sentAt time
+    if (date) {
+      const messageResult = await db.select().from(emailMessages).where(
+        eq(emailMessages.fromEmail, fromEmail)
+      ).limit(1);
+
+      if (messageResult.length > 0) {
+        // Get the thread for this message
+        const thread = await db.select().from(emailThreads).where(
+          eq(emailThreads.id, messageResult[0].threadId)
+        ).limit(1);
+        return thread[0];
+      }
+    }
+
+    // Strategy 3: Look for thread by subject match only
+    if (subject) {
+      const cleanSubject = subject.replace(/^(Re:|Fwd:|Fw:|RE:|FW:)\s*/gi, '').trim();
+      result = await db.select().from(emailThreads).where(
+        ilike(emailThreads.subject, `%${cleanSubject}%`)
+      ).orderBy(desc(emailThreads.lastActivity)).limit(1);
+
+      if (result.length > 0) {
+        return result[0];
+      }
+    }
+
+    return undefined;
   }
 
   // Repairs

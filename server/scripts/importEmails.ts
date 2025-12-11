@@ -12,7 +12,7 @@ import * as path from 'path';
 import { simpleParser } from 'mailparser';
 import DOMPurify from 'isomorphic-dompurify';
 import { db } from '../services/supabaseClient';
-import { emails, emailThreads, emailMessages, emailAttachments } from '../../shared/schema';
+import { emailThreads, emailMessages, emailAttachments } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 
 // Configuration
@@ -131,15 +131,8 @@ async function importEmails() {
                 const cleanMessageId = messageId.replace(/[<>]/g, '');
                 allRelatedIds.push(cleanMessageId);
 
-                // Create email in main table
-                const [email] = await db.insert(emails).values({
-                    subject: parsed.subject || '(No subject)',
-                    fromName: parsed.from?.value?.[0]?.name || '',
-                    fromEmail: parsed.from?.value?.[0]?.address || '',
-                    html: cleanHtml,
-                    text: parsed.text || '',
-                    date: parsed.date || new Date(),
-                }).returning();
+                // Thread-first architecture: no longer write to legacy 'emails' table
+                // Only emailThreads and emailMessages are used
 
                 // Gmail-style: Find existing thread by checking ALL related Message-IDs
                 let thread = null;

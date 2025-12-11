@@ -284,40 +284,121 @@ app.post("/api/mail/refresh", requireAuth, async (req: any, res: any) => {
     }
 });
 
-// GET /api/mail/list - Get last 50 emails
+// GET /api/mail/list - Get email threads (not individual emails)
+// Thread-first architecture: list shows threads, each with latest message preview
 app.get("/api/mail/list", requireAuth, async (req: any, res: any) => {
     try {
-        const emails = await storage.getEmails({ limit: 50, orderBy: 'date DESC' });
-        res.json({ emails });
+        const limit = parseInt(req.query.limit as string) || 50;
+        const offset = parseInt(req.query.offset as string) || 0;
+
+        // Get threads with pagination
+        const { threads, total } = await storage.getEmailThreads({
+            limit,
+            offset,
+            folder: 'inbox'
+        });
+
+        // For each thread, get the latest message for preview
+        const threadsWithPreview = await Promise.all(threads.map(async (thread) => {
+            const messages = await storage.getEmailMessages(thread.id);
+            const latestMessage = messages.sort((a, b) => {
+                const dateA = new Date(a.sentAt || a.createdAt || 0);
+                const dateB = new Date(b.sentAt || b.createdAt || 0);
+                return dateB.getTime() - dateA.getTime(); // Most recent first
+            })[0];
+
+            return {
+                ...thread,
+                messageCount: messages.length,
+                latestMessage: latestMessage ? {
+                    id: latestMessage.id,
+                    fromEmail: latestMessage.fromEmail,
+                    body: latestMessage.body?.substring(0, 200) || '',
+                    sentAt: latestMessage.sentAt,
+                    isOutbound: latestMessage.isOutbound
+                } : null,
+                // For backwards compatibility with existing UI
+                id: thread.id,
+                subject: thread.subject,
+                fromEmail: thread.customerEmail,
+                fromName: thread.customerEmail?.split('@')[0] || '',
+                date: thread.lastActivity,
+                html: latestMessage?.body || '',
+                text: latestMessage?.body?.replace(/<[^>]*>/g, '') || ''
+            };
+        }));
+
+        res.json({
+            emails: threadsWithPreview, // Use 'emails' key for backwards compatibility
+            threads: threadsWithPreview,
+            total
+        });
     } catch (error) {
-        console.error('Error fetching emails:', error);
+        console.error('Error fetching email threads:', error);
         res.status(500).json({ error: 'Failed to fetch emails' });
     }
 });
 
-// GET /api/mail/:id - Get single email with attachments and links
+// GET /api/mail/:id - Get thread with all messages
+// Thread-first architecture: clicking a thread shows all messages in conversation
 app.get("/api/mail/:id", requireAuth, async (req: any, res: any) => {
     try {
         const { id } = req.params;
 
-        const email = await storage.getEmail(id);
-        if (!email) {
-            return res.status(404).json({ error: 'Email not found' });
+        // First, try to find as a thread
+        let thread = await storage.getEmailThread(id);
+
+        if (!thread) {
+            return res.status(404).json({ error: 'Thread not found' });
         }
 
-        const attachments = await storage.getEmailAttachmentsByEmailId(id);
-        const links = await storage.getEmailLinks(id);
+        // Get all messages in the thread
+        const messages = await storage.getEmailMessages(thread.id);
+        const sortedMessages = messages.sort((a: any, b: any) => {
+            const dateA = new Date(a.sentAt || a.createdAt || 0);
+            const dateB = new Date(b.sentAt || b.createdAt || 0);
+            return dateA.getTime() - dateB.getTime(); // Oldest first for conversation flow
+        });
+
+        // Get the latest message for header info
+        const latestMessage = sortedMessages[sortedMessages.length - 1];
 
         res.json({
-            ...email,
-            attachments,
-            links
+            // Thread info
+            id: thread.id,
+            threadId: thread.threadId,
+            subject: thread.subject,
+            customerEmail: thread.customerEmail,
+            status: thread.status,
+            isUnread: thread.isUnread,
+            starred: thread.starred,
+            hasAttachment: thread.hasAttachment,
+            lastActivity: thread.lastActivity,
+            createdAt: thread.createdAt,
+
+            // For backwards compatibility with existing UI
+            fromEmail: thread.customerEmail,
+            fromName: thread.customerEmail?.split('@')[0] || '',
+            date: thread.lastActivity,
+            html: latestMessage?.body || '',
+            text: latestMessage?.body?.replace(/<[^>]*>/g, '') || '',
+
+            // Thread messages
+            messages: sortedMessages,
+            messageCount: sortedMessages.length,
+
+            // Attachments (from all messages)
+            attachments: sortedMessages.flatMap((m: any) => m.attachments || []),
+
+            // Links (if any)
+            links: []
         });
     } catch (error) {
-        console.error('Error fetching email:', error);
-        res.status(500).json({ error: 'Failed to fetch email' });
+        console.error('Error fetching thread:', error);
+        res.status(500).json({ error: 'Failed to fetch thread' });
     }
 });
+
 
 // POST /api/mail/link - Link email to entity (order/case/return/repair)
 app.post("/api/mail/link", requireAuth, async (req: any, res: any) => {

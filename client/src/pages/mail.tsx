@@ -218,34 +218,16 @@ export default function MailPage() {
         enabled: !!selectedEmailId
     });
 
-    // Fetch thread messages (all emails in the conversation)
-    const { data: threadData, isLoading: isLoadingThread } = useQuery({
-        queryKey: ['email-thread', selectedEmailId],
-        queryFn: async () => {
-            if (!selectedEmailId) return null;
-            const res = await fetch(`/api/email-threads/${selectedEmailId}`, {
-                credentials: 'include'
-            });
-            if (!res.ok) {
-                // If thread not found, return null (single email without thread)
-                if (res.status === 404) return null;
-                throw new Error('Failed to fetch thread');
-            }
-            return res.json() as Promise<ThreadWithMessages>;
-        },
-        enabled: !!selectedEmailId
-    });
 
-    // Get thread messages sorted by date (oldest first for conversation flow)
-    const threadMessages = threadData?.messages?.slice().sort((a, b) => {
+    // Thread messages come directly from emailDetails (thread-first architecture)
+    // No separate API call needed - /api/mail/:id now returns thread with all messages
+    const threadMessages = emailDetails?.messages?.slice().sort((a: any, b: any) => {
         const dateA = new Date(a.sentAt || a.createdAt || 0);
         const dateB = new Date(b.sentAt || b.createdAt || 0);
         return dateA.getTime() - dateB.getTime();
     }) || [];
 
-    // Gmail-style threading: only show actual emails from the database
-    // Each email has proper Message-ID/References headers for correct threading
-    // No body parsing - that causes incorrect timestamps and duplicate content
+    // Gmail-style threading: messages come from database with proper headers
     const parsedMessages = threadMessages;
 
     const unlinkMutation = useMutation({
