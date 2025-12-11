@@ -24,6 +24,65 @@ export function mapStatusToLocal(shopifyStatus: string): string {
 }
 
 /**
+ * Fetch tracking info for a return by querying its reverse fulfillment orders
+ */
+async function fetchTrackingInfoForReturn(returnId: string): Promise<{ number?: string; company?: string; url?: string } | null> {
+    try {
+        const query = `
+            query getReturnTracking($id: ID!) {
+                return(id: $id) {
+                    id
+                    reverseFulfillmentOrders(first: 5) {
+                        nodes {
+                            id
+                            reverseDeliveries(first: 1) {
+                                nodes {
+                                    id
+                                    deliverables(first: 1) {
+                                        nodes {
+                                            ... on ReverseDeliveryShippingDeliverable {
+                                                tracking {
+                                                    number
+                                                    carrierName
+                                                    url
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        `;
+
+        const data = await shopifyClient.makeGraphQLRequest(query, { id: returnId });
+
+        const rfos = data?.return?.reverseFulfillmentOrders?.nodes || [];
+        for (const rfo of rfos) {
+            const deliveries = rfo?.reverseDeliveries?.nodes || [];
+            for (const delivery of deliveries) {
+                const deliverables = delivery?.deliverables?.nodes || [];
+                for (const deliverable of deliverables) {
+                    if (deliverable?.tracking) {
+                        return {
+                            number: deliverable.tracking.number,
+                            company: deliverable.tracking.carrierName,
+                            url: deliverable.tracking.url
+                        };
+                    }
+                }
+            }
+        }
+        return null;
+    } catch (error) {
+        console.log('ℹ️  Could not fetch tracking info:', error);
+        return null;
+    }
+}
+
+/**
  * Process a Shopify return webhook (RETURNS_REQUEST, RETURNS_APPROVE, RETURNS_DECLINE, RETURNS_CLOSE, RETURNS_CANCEL)
  * Fetches complete return data by ID and syncs to database
  */
@@ -49,11 +108,31 @@ export async function processReturnWebhook(
 
             const localStatus = mapStatusToLocal(shopifyReturn.status);
 
-            await storage.updateReturn(existing.id, {
+            const updateData: any = {
                 status: localStatus as any,
                 shopifyStatus: shopifyReturn.status,
                 syncedAt: new Date(),
-            });
+            };
+
+            // For RETURNS_APPROVE, also try to fetch tracking info (label is usually created at approval)
+            if (webhookTopic === 'returns/approve' || shopifyReturn.status === 'OPEN') {
+                try {
+                    const trackingInfo = await fetchTrackingInfoForReturn(returnId);
+                    if (trackingInfo) {
+                        if (trackingInfo.number) updateData.trackingNumber = trackingInfo.number;
+                        if (trackingInfo.company) updateData.trackingCarrier = trackingInfo.company;
+                        if (trackingInfo.url) updateData.trackingUrl = trackingInfo.url;
+                        if (trackingInfo.number && !existing.labelCreatedAt) {
+                            updateData.labelCreatedAt = new Date();
+                        }
+                        console.log(`📦 Tracking info: ${trackingInfo.number} (${trackingInfo.company})`);
+                    }
+                } catch (e) {
+                    console.log(`ℹ️  No tracking info available yet`);
+                }
+            }
+
+            await storage.updateReturn(existing.id, updateData);
 
             console.log(`✅ Updated return ${existing.returnNumber} to status: ${localStatus}`);
             return {
