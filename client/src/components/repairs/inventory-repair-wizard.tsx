@@ -56,20 +56,52 @@ interface FormData {
 }
 
 const ISSUE_CATEGORIES = [
-    "Lensdefect - autofocus werkt niet",
-    "Lensdefect - beeldstabilisatie defect",
-    "Lensdefect - diafragma vastgelopen",
-    "Lensdefect - schade aan lenselement",
-    "Camera - sluiter defect",
-    "Camera - sensor vervuiling",
-    "Camera - schade aan behuizing",
-    "Camera - batterij/oplaad probleem",
-    "Camera - display defect",
+    // Algemene problemen (bovenaan) - met emoji
+    "❓ Overig",
+    "🧹 Schoonmaak en onderhoud",
+    "🔍 Algemene inspectie",
+    "💻 Firmware/software probleem",
+    "⚡ Elektronica storing",
+    "🌫️ Stof binnendringen",
+    "💧 Water/vochtschade",
+    "💥 Mechanische schade",
+    // Slijtage en erosie
+    "Erosie - lensmount slijtage",
+    "Erosie - elektronische contacten gecorrodeerd",
+    "Erosie - afdichtingsrubbers versleten",
+    "Erosie - lettering/opdruk vervaagd",
+    "Erosie - coating slijtage",
+    "Erosie - rubber grip plakkerig/degradatie",
+    "Erosie - rubber grip loslating",
+    // Camera defecten
+    "Camera - hotshoe/flitsschoen defect",
+    "Camera - USB/HDMI poort defect",
+    "Camera - geheugenkaartslot defect",
+    "Camera - modusknop defect",
     "Camera - knoppen/draaiknoppen defect",
-    "Mechanische schade",
-    "Water/vochtschade",
-    "Algemene inspectie",
-    "Overig",
+    "Camera - viewfinder/zoeker probleem",
+    "Camera - display defect",
+    "Camera - batterijcompartiment defect",
+    "Camera - batterij/oplaad probleem",
+    "Camera - schade aan behuizing",
+    "Camera - sensor beschadigd/dode pixels",
+    "Camera - sensor vervuiling",
+    "Camera - spiegelmechanisme defect",
+    "Camera - sluiter versleten (hoog aantal clicks)",
+    "Camera - sluiter defect",
+    // Lens defecten (onderaan)
+    "Lensdefect - lenselement losgeraakt",
+    "Lensdefect - focusring probleem",
+    "Lensdefect - zoomring vastgelopen",
+    "Lensdefect - krasjes op lens coating",
+    "Lensdefect - nevel/haze in lens",
+    "Lensdefect - schimmel in lens",
+    "Lensdefect - schade aan lenselement",
+    "Lensdefect - diafragma olie-lekkage",
+    "Lensdefect - diafragma vastgelopen",
+    "Lensdefect - beeldstabilisatie defect",
+    "Lensdefect - autofocus traag/onnauwkeurig",
+    "Lensdefect - autofocus werkt niet",
 ];
 
 const PRIORITY_OPTIONS = [
@@ -293,6 +325,16 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                             </div>
                         </div>
 
+                        {/* Beschrijving - verplaatst naar boven */}
+                        <div>
+                            <Label className="text-xs">Beschrijving</Label>
+                            <Textarea
+                                placeholder="Wat moet er gerepareerd worden..."
+                                {...register("description")}
+                                className="text-sm min-h-[50px] mt-1"
+                            />
+                        </div>
+
                         {/* Probleem Categorie */}
                         <div>
                             <Label className="text-xs">Probleem Categorie</Label>
@@ -397,16 +439,6 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                                     </SelectContent>
                                 </Select>
                             </div>
-                        </div>
-
-                        {/* Beschrijving */}
-                        <div>
-                            <Label className="text-xs">Beschrijving</Label>
-                            <Textarea
-                                placeholder="Wat moet er gerepareerd worden..."
-                                {...register("description")}
-                                className="text-sm min-h-[50px] mt-1"
-                            />
                         </div>
 
                         {/* File Upload - Compact */}

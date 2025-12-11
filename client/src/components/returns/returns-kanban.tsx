@@ -426,9 +426,23 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
                                       {returnItem.trackingNumber && (
                                         <div className="flex items-center gap-1">
                                           <Package className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                          <span className="text-[10px] text-muted-foreground font-mono truncate">
-                                            {returnItem.trackingNumber}
-                                          </span>
+                                          {(returnItem as any).trackingUrl ? (
+                                            <a
+                                              href={(returnItem as any).trackingUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-[10px] text-primary hover:underline font-mono truncate"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              {(returnItem as any).trackingCarrier
+                                                ? `📦 ${(returnItem as any).trackingCarrier}`
+                                                : returnItem.trackingNumber}
+                                            </a>
+                                          ) : (
+                                            <span className="text-[10px] text-muted-foreground font-mono truncate">
+                                              {returnItem.trackingNumber}
+                                            </span>
+                                          )}
                                         </div>
                                       )}
 

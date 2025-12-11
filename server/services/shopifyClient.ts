@@ -602,6 +602,81 @@ class ShopifyClient {
     console.log(`✅ Retrieved return: ${returnData.name}`);
     return returnData;
   }
+
+  /**
+   * Fetch a reverse delivery by ID to get tracking information
+   */
+  async getReverseDeliveryById(reverseDeliveryId: string): Promise<ShopifyReverseDelivery | null> {
+    console.log(`📬 Fetching reverse delivery by ID: ${reverseDeliveryId}`);
+
+    const query = `
+      query getReverseDelivery($id: ID!) {
+        reverseDelivery(id: $id) {
+          id
+          reverseFulfillmentOrder {
+            id
+            return {
+              id
+              name
+            }
+          }
+          deliverables(first: 10) {
+            nodes {
+              id
+              ... on ReverseDeliveryShippingDeliverable {
+                tracking {
+                  number
+                  carrierName
+                  url
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      id: reverseDeliveryId
+    };
+
+    try {
+      const data = await this.makeGraphQLRequest(query, variables);
+
+      if (!data.reverseDelivery) {
+        console.log(`⚠️  Reverse delivery not found: ${reverseDeliveryId}`);
+        return null;
+      }
+
+      const rd = data.reverseDelivery;
+
+      // Extract tracking info from deliverables
+      let trackingInfo: { number?: string; company?: string; url?: string } | null = null;
+
+      if (rd.deliverables?.nodes?.length > 0) {
+        const deliverable = rd.deliverables.nodes[0];
+        if (deliverable.tracking) {
+          trackingInfo = {
+            number: deliverable.tracking.number,
+            company: deliverable.tracking.carrierName,
+            url: deliverable.tracking.url
+          };
+        }
+      }
+
+      console.log(`✅ Retrieved reverse delivery with tracking: ${trackingInfo?.number || 'none'}`);
+
+      return {
+        id: rd.id,
+        returnId: rd.reverseFulfillmentOrder?.return?.id || '',
+        returnName: rd.reverseFulfillmentOrder?.return?.name || '',
+        trackingInfo
+      };
+    } catch (error) {
+      console.error(`❌ Error fetching reverse delivery:`, error);
+      return null;
+    }
+  }
 }
 
 export interface ShopifyReturn {
@@ -645,6 +720,17 @@ export interface ShopifyReturn {
     }>;
   };
   totalQuantity: number;
+}
+
+export interface ShopifyReverseDelivery {
+  id: string; // gid://shopify/ReverseDelivery/...
+  returnId: string; // gid://shopify/Return/...
+  returnName: string; // #1001-R1
+  trackingInfo: {
+    number?: string;
+    company?: string;
+    url?: string;
+  } | null;
 }
 
 export const shopifyClient = new ShopifyClient();

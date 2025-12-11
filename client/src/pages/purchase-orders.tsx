@@ -86,10 +86,21 @@ export default function PurchaseOrders() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const supplier = suppliers?.find(s => s.id === po.supplierId);
+
+      // Format amount for search (e.g., "600" or "600.00" or "€600")
+      const amountInEuros = (po.totalAmount || 0) / 100;
+      const amountStr = amountInEuros.toString();
+      const amountFormatted = amountInEuros.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      // Clean query for amount comparison (remove € symbol if present)
+      const cleanQuery = query.replace('€', '').trim();
+
       return (
         po.title?.toLowerCase().includes(query) ||
         po.poNumber?.toLowerCase().includes(query) ||
-        supplier?.name?.toLowerCase().includes(query)
+        supplier?.name?.toLowerCase().includes(query) ||
+        amountStr.includes(cleanQuery) ||
+        amountFormatted.includes(cleanQuery)
       );
     }
     return true;
@@ -279,7 +290,7 @@ export default function PurchaseOrders() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               ref={searchInputRef}
-              placeholder="Zoek op titel, PO nummer, leverancier..."
+              placeholder="Zoek op titel, PO nummer, leverancier, bedrag..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"

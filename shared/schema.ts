@@ -388,7 +388,13 @@ export const returns = pgTable("returns", {
   // Shopify Integration
   shopifyReturnId: text("shopify_return_id").unique(), // Shopify's gid://shopify/Return/...
   shopifyReturnName: text("shopify_return_name"), // e.g., #1001-R1
+  shopifyStatus: text("shopify_status"), // Raw Shopify status (REQUESTED, OPEN, CLOSED, DECLINED)
   syncedAt: timestamp("synced_at"), // Last sync from Shopify
+
+  // Tracking (from Shopify ReverseDelivery)
+  trackingCarrier: text("tracking_carrier"), // PostNL, DHL, etc.
+  trackingUrl: text("tracking_url"), // Clickable tracking link
+  labelCreatedAt: timestamp("label_created_at"), // When label was created in Shopify
 
   // Notes & evidence
   customerNotes: text("customer_notes"),

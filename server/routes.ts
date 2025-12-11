@@ -6467,7 +6467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       setImmediate(async () => {
         try {
           const { processReturnWebhook } = await import('./services/shopifyReturnsWebhookProcessor');
-          const result = await processReturnWebhook(payload.id, storage);
+          const result = await processReturnWebhook(payload.id, storage, topic);
 
           if (result.success) {
             console.log(`✅ Webhook processed successfully: ${result.returnNumber}`);
@@ -6484,6 +6484,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error: any) {
       console.error('❌ Webhook error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/shopify/webhooks/reverse-deliveries - Webhook endpoint for Shopify reverse deliveries (tracking info)
+  app.post('/api/shopify/webhooks/reverse-deliveries', express.raw({ type: 'application/json' }), async (req: any, res: any) => {
+    try {
+      const { validateShopifyWebhook, getWebhookTopic, getWebhookShop } = await import('./services/shopifyWebhookValidator');
+
+      // Get webhook secret from environment
+      const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        console.error('❌ SHOPIFY_WEBHOOK_SECRET not configured');
+        return res.status(500).json({ error: 'Webhook secret not configured' });
+      }
+
+      // Log webhook receipt
+      const topic = getWebhookTopic(req);
+      const shop = getWebhookShop(req);
+      console.log('📬 Received Shopify reverse delivery webhook:', { topic, shop });
+
+      // Validate HMAC signature
+      if (!validateShopifyWebhook(req, webhookSecret)) {
+        console.error('❌ Invalid webhook signature');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+
+      // Parse the body (it's raw buffer from express.raw())
+      const payload = JSON.parse(req.body.toString('utf8'));
+
+      console.log('✅ Reverse delivery webhook validated successfully', {
+        topic,
+        reverseDeliveryId: payload.id
+      });
+
+      // Process webhook asynchronously (don't block response)
+      setImmediate(async () => {
+        try {
+          const { processReverseDeliveryWebhook } = await import('./services/shopifyReturnsWebhookProcessor');
+          const result = await processReverseDeliveryWebhook(payload.id, storage);
+
+          if (result.success) {
+            console.log(`✅ Reverse delivery webhook processed: ${result.returnNumber}`);
+          } else {
+            console.error(`❌ Reverse delivery processing failed: ${result.error}`);
+          }
+        } catch (error) {
+          console.error('❌ Error processing reverse delivery webhook:', error);
+        }
+      });
+
+      // Respond immediately to Shopify
+      res.status(200).json({ received: true });
+
+    } catch (error: any) {
+      console.error('❌ Reverse delivery webhook error:', error);
       res.status(500).json({ error: error.message });
     }
   });
