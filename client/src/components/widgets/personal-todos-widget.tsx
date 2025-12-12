@@ -64,16 +64,16 @@ export function PersonalTodosWidget() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <CheckSquare className="h-5 w-5" />
-            Mijn Taken
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-xl truncate">
+            <CheckSquare className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+            <span className="truncate">Taken</span>
           </CardTitle>
           <button
             onClick={() => setLocation('/todos')}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap flex-shrink-0"
           >
-            Alles bekijken →
+            Bekijken →
           </button>
         </div>
       </CardHeader>

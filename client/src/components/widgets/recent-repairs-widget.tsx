@@ -62,16 +62,16 @@ export function RecentRepairsWidget() {
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                        <Wrench className="h-5 w-5" />
-                        Recente Reparaties
+                <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-xl truncate">
+                        <Wrench className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                        <span className="truncate">Reparaties</span>
                     </CardTitle>
                     <button
                         onClick={() => setLocation('/repairs')}
-                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap flex-shrink-0"
                     >
-                        Alles bekijken →
+                        Bekijken →
                     </button>
                 </div>
             </CardHeader>

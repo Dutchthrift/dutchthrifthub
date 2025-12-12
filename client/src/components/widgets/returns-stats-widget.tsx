@@ -120,70 +120,71 @@ export function ReturnsStatsWidget() {
     };
 
     return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
             {/* Orders Today */}
             <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/50 border-blue-200 dark:border-blue-800 hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4 lg:p-6">
                     <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Bestellingen Vandaag</p>
-                            <h3 className="text-3xl font-bold text-blue-900 dark:text-blue-100">{ordersTodayCount}</h3>
-                            <p className="text-xs text-blue-600 dark:text-blue-400">
-                                {formatChange(ordersChange)} t.o.v. gisteren
+                        <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                            <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 truncate">Bestellingen</p>
+                            <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-900 dark:text-blue-100">{ordersTodayCount}</h3>
+                            <p className="text-[10px] sm:text-xs text-blue-600 dark:text-blue-400 truncate">
+                                {formatChange(ordersChange)} vandaag
                             </p>
                         </div>
-                        <Package className="h-12 w-12 text-blue-500 dark:text-blue-400 opacity-20" />
+                        <Package className="hidden sm:block h-8 w-8 lg:h-12 lg:w-12 text-blue-500 dark:text-blue-400 opacity-20 flex-shrink-0" />
                     </div>
                 </CardContent>
             </Card>
 
             {/* Active Returns */}
             <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/50 dark:to-orange-900/50 border-orange-200 dark:border-orange-800 hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4 lg:p-6">
                     <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Actieve Retouren</p>
-                            <h3 className="text-3xl font-bold text-orange-900 dark:text-orange-100">{activeReturns}</h3>
-                            <p className="text-xs text-orange-600 dark:text-orange-400">
-                                {oldestAge > 0 ? `Oudste: ${oldestAge} dagen` : 'Alles bijgewerkt'}
+                        <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                            <p className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400 truncate">Retouren</p>
+                            <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-orange-900 dark:text-orange-100">{activeReturns}</h3>
+                            <p className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 truncate">
+                                {oldestAge > 0 ? `${oldestAge}d oud` : 'Bijgewerkt'}
                             </p>
                         </div>
-                        <AlertCircle className="h-12 w-12 text-orange-500 dark:text-orange-400 opacity-20" />
+                        <AlertCircle className="hidden sm:block h-8 w-8 lg:h-12 lg:w-12 text-orange-500 dark:text-orange-400 opacity-20 flex-shrink-0" />
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Active Repairs - NEW 3rd card */}
+            {/* Active Repairs */}
             <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/50 dark:to-purple-900/50 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4 lg:p-6">
                     <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Actieve Reparaties</p>
-                            <h3 className="text-3xl font-bold text-purple-900 dark:text-purple-100">{activeRepairs}</h3>
-                            <p className="text-xs text-purple-600 dark:text-purple-400">
+                        <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                            <p className="text-xs sm:text-sm font-medium text-purple-600 dark:text-purple-400 truncate">Reparaties</p>
+                            <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-purple-900 dark:text-purple-100">{activeRepairs}</h3>
+                            <p className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400 truncate">
                                 {repairs.length} totaal
                             </p>
                         </div>
-                        <Wrench className="h-12 w-12 text-purple-500 dark:text-purple-400 opacity-20" />
+                        <Wrench className="hidden sm:block h-8 w-8 lg:h-12 lg:w-12 text-purple-500 dark:text-purple-400 opacity-20 flex-shrink-0" />
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Today's Revenue - Now 4th card */}
+            {/* Today's Revenue */}
             <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/50 dark:to-green-900/50 border-green-200 dark:border-green-800 hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4 lg:p-6">
                     <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <p className="text-sm font-medium text-green-600 dark:text-green-400">Omzet Vandaag</p>
-                            <h3 className="text-3xl font-bold text-green-900 dark:text-green-100">{formatCurrency(todayRevenue)}</h3>
-                            <p className="text-xs text-green-600 dark:text-green-400">
-                                {formatChange(revenueChange)} t.o.v. gisteren
+                        <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                            <p className="text-xs sm:text-sm font-medium text-green-600 dark:text-green-400 truncate">Omzet</p>
+                            <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-900 dark:text-green-100">{formatCurrency(todayRevenue)}</h3>
+                            <p className="text-[10px] sm:text-xs text-green-600 dark:text-green-400 truncate">
+                                {formatChange(revenueChange)} vandaag
                             </p>
                         </div>
-                        <DollarSign className="h-12 w-12 text-green-500 dark:text-green-400 opacity-20" />
+                        <DollarSign className="hidden sm:block h-8 w-8 lg:h-12 lg:w-12 text-green-500 dark:text-green-400 opacity-20 flex-shrink-0" />
                     </div>
                 </CardContent>
             </Card>
         </div>
     );
 }
+
