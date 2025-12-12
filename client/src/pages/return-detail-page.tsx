@@ -88,8 +88,26 @@ const CONDITION_LABELS: Record<string, string> = {
     damaged: "Beschadigd",
 };
 
-const getCarrierInfo = (tn: string | null) => {
+const getCarrierInfo = (tn: string | null, shopifyTrackingUrl?: string | null) => {
     if (!tn) return null;
+
+    // Priority 1: Use Shopify's provided tracking URL
+    if (shopifyTrackingUrl) {
+        // Try to detect carrier from URL for icon
+        const urlLower = shopifyTrackingUrl.toLowerCase();
+        if (urlLower.includes("postnl")) {
+            return { name: "PostNL", icon: "🟠", url: shopifyTrackingUrl };
+        }
+        if (urlLower.includes("dhl")) {
+            return { name: "DHL", icon: "🟡", url: shopifyTrackingUrl };
+        }
+        if (urlLower.includes("ups")) {
+            return { name: "UPS", icon: "🟤", url: shopifyTrackingUrl };
+        }
+        return { name: "Tracking", icon: "📦", url: shopifyTrackingUrl };
+    }
+
+    // Priority 2: Detect carrier from tracking number pattern
     const upper = tn.toUpperCase();
     if (upper.startsWith("3S") || upper.startsWith("JVGL")) {
         return { name: "PostNL", icon: "🟠", url: `https://postnl.nl/tracktrace/?B=${tn}` };
@@ -100,7 +118,9 @@ const getCarrierInfo = (tn: string | null) => {
     if (upper.startsWith("1Z")) {
         return { name: "UPS", icon: "🟤", url: `https://www.ups.com/track?tracknum=${tn}` };
     }
-    return { name: "Carrier", icon: "📦", url: `https://track24.net/?code=${tn}` };
+
+    // Fallback: Just show tracking number, no URL (avoid third-party sites)
+    return { name: "Tracking", icon: "📦", url: null };
 };
 
 interface EnrichedReturnData {
@@ -184,7 +204,7 @@ export default function ReturnDetailPage() {
         : "Onbekend";
     const customerEmail = customer?.email;
     const customerPhone = customer?.phone || shippingAddress?.phone;
-    const carrier = getCarrierInfo(ret.trackingNumber);
+    const carrier = getCarrierInfo(ret.trackingNumber, ret.trackingUrl);
     const turnaroundDays = ret.requestedAt
         ? differenceInDays(ret.completedAt ? new Date(ret.completedAt) : new Date(), new Date(ret.requestedAt))
         : null;
@@ -363,15 +383,22 @@ export default function ReturnDetailPage() {
                                             placeholder="Trackingnummer"
                                         />
                                     ) : carrier ? (
-                                        <Button
-                                            variant="outline"
-                                            className="w-full justify-start gap-2"
-                                            onClick={() => window.open(carrier.url, "_blank")}
-                                        >
-                                            <span className="text-lg">{carrier.icon}</span>
-                                            <code className="flex-1 text-left">{ret.trackingNumber}</code>
-                                            <ExternalLink className="h-4 w-4" />
-                                        </Button>
+                                        carrier.url ? (
+                                            <Button
+                                                variant="outline"
+                                                className="w-full justify-start gap-2"
+                                                onClick={() => window.open(carrier.url!, "_blank")}
+                                            >
+                                                <span className="text-lg">{carrier.icon}</span>
+                                                <code className="flex-1 text-left">{ret.trackingNumber}</code>
+                                                <ExternalLink className="h-4 w-4" />
+                                            </Button>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg">{carrier.icon}</span>
+                                                <code>{ret.trackingNumber}</code>
+                                            </div>
+                                        )
                                     ) : (
                                         <span className="text-muted-foreground">Geen tracking</span>
                                     )}

@@ -86,8 +86,26 @@ const CONDITION_LABELS: Record<string, string> = {
     damaged: "Beschadigd",
 };
 
-const getCarrierInfo = (tn: string | null) => {
+const getCarrierInfo = (tn: string | null, shopifyTrackingUrl?: string | null) => {
     if (!tn) return null;
+
+    // Priority 1: Use Shopify's provided tracking URL
+    if (shopifyTrackingUrl) {
+        // Try to detect carrier from URL for icon
+        const urlLower = shopifyTrackingUrl.toLowerCase();
+        if (urlLower.includes("postnl")) {
+            return { name: "PostNL", icon: "🟠", url: shopifyTrackingUrl };
+        }
+        if (urlLower.includes("dhl")) {
+            return { name: "DHL", icon: "🟡", url: shopifyTrackingUrl };
+        }
+        if (urlLower.includes("ups")) {
+            return { name: "UPS", icon: "🟤", url: shopifyTrackingUrl };
+        }
+        return { name: "Tracking", icon: "📦", url: shopifyTrackingUrl };
+    }
+
+    // Priority 2: Detect carrier from tracking number pattern
     const upper = tn.toUpperCase();
     if (upper.startsWith("3S") || upper.startsWith("JVGL")) {
         return { name: "PostNL", icon: "🟠", url: `https://postnl.nl/tracktrace/?B=${tn}` };
@@ -98,7 +116,9 @@ const getCarrierInfo = (tn: string | null) => {
     if (upper.startsWith("1Z")) {
         return { name: "UPS", icon: "🟤", url: `https://www.ups.com/track?tracknum=${tn}` };
     }
-    return { name: "Carrier", icon: "📦", url: `https://track24.net/?code=${tn}` };
+
+    // Fallback: Just show tracking number, no URL (avoid third-party sites)
+    return { name: "Tracking", icon: "📦", url: null };
 };
 
 export function ReturnDetailModalContent({
@@ -144,7 +164,7 @@ export function ReturnDetailModalContent({
         : "Onbekend";
     const customerEmail = customer?.email;
     const customerPhone = customer?.phone || shippingAddress?.phone;
-    const carrier = getCarrierInfo(ret.trackingNumber);
+    const carrier = getCarrierInfo(ret.trackingNumber, ret.trackingUrl);
 
     // Calculate days using same logic as kanban:
     // - "onderweg": count from acceptedAt
@@ -291,11 +311,18 @@ export function ReturnDetailModalContent({
                         {isEditMode ? (
                             <Input value={editedData.trackingNumber} onChange={(e) => setEditedData({ ...editedData, trackingNumber: e.target.value })} className="h-8 text-sm" placeholder="Trackingnummer" />
                         ) : carrier ? (
-                            <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={() => window.open(carrier.url, "_blank")}>
-                                <span>{carrier.icon}</span>
-                                <code className="text-xs flex-1 text-left">{ret.trackingNumber}</code>
-                                <ExternalLink className="h-3 w-3" />
-                            </Button>
+                            carrier.url ? (
+                                <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={() => window.open(carrier.url!, "_blank")}>
+                                    <span>{carrier.icon}</span>
+                                    <code className="text-xs flex-1 text-left">{ret.trackingNumber}</code>
+                                    <ExternalLink className="h-3 w-3" />
+                                </Button>
+                            ) : (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span>{carrier.icon}</span>
+                                    <code className="text-xs">{ret.trackingNumber}</code>
+                                </div>
+                            )
                         ) : (
                             <span className="text-sm text-muted-foreground">Geen tracking</span>
                         )}
