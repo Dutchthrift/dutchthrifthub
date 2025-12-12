@@ -49,6 +49,13 @@ import {
   CheckCircle,
   Circle,
   ArrowRight,
+  Truck,
+  CreditCard,
+  AlertTriangle,
+  HelpCircle,
+  ShoppingCart,
+  Pencil,
+  Clock,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Case, CaseWithDetails, EmailThread, Order, Repair, Todo } from "@/lib/types";
@@ -80,6 +87,34 @@ const getPriorityBadgeClass = (priority: string | null) => {
     case "low": return "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-900/40 dark:text-slate-300";
     default: return "bg-gray-100 text-gray-600 border-gray-300";
   }
+};
+
+const CASE_TYPE_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+  return_request: { label: "Retour", color: "bg-blue-100 text-blue-700 border-blue-300", icon: Package },
+  complaint: { label: "Klacht", color: "bg-red-100 text-red-700 border-red-300", icon: AlertTriangle },
+  shipping_issue: { label: "Verzending", color: "bg-orange-100 text-orange-700 border-orange-300", icon: Truck },
+  payment_issue: { label: "Betaling", color: "bg-purple-100 text-purple-700 border-purple-300", icon: CreditCard },
+  general: { label: "Algemeen", color: "bg-gray-100 text-gray-700 border-gray-300", icon: FileText },
+  other: { label: "Overig", color: "bg-slate-100 text-slate-700 border-slate-300", icon: HelpCircle },
+};
+
+const CASE_SOURCE_CONFIG: Record<string, { label: string; icon: any }> = {
+  email: { label: "Email", icon: Mail },
+  shopify: { label: "Shopify", icon: ShoppingCart },
+  manual: { label: "Handmatig", icon: Pencil },
+};
+
+const getDaysOpen = (createdAt: string | Date | null): number => {
+  if (!createdAt) return 0;
+  const created = new Date(createdAt);
+  const now = new Date();
+  return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const getDaysOpenColor = (days: number): string => {
+  if (days > 7) return "text-red-600 bg-red-100";
+  if (days > 3) return "text-orange-600 bg-orange-100";
+  return "text-muted-foreground bg-muted";
 };
 
 interface CaseDetailModalProps {
@@ -317,13 +352,53 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                     {priorityLabel}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 flex-wrap">
+                  {/* Case Type Badge */}
+                  {(() => {
+                    const caseType = (caseData as any).caseType || 'general';
+                    const typeConfig = CASE_TYPE_CONFIG[caseType];
+                    const TypeIcon = typeConfig?.icon || FileText;
+                    return (
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-5 ${typeConfig?.color || ''}`}>
+                        <TypeIcon className="h-3 w-3 mr-1" />
+                        {caseType === 'other'
+                          ? ((caseData as any).otherTypeDescription || 'Overig').slice(0, 15)
+                          : typeConfig?.label}
+                      </Badge>
+                    );
+                  })()}
+                  {/* Source Icon */}
+                  {(() => {
+                    const source = (caseData as any).source || 'manual';
+                    const sourceConfig = CASE_SOURCE_CONFIG[source];
+                    const SourceIcon = sourceConfig?.icon || Pencil;
+                    return (
+                      <span className="flex items-center gap-1 text-xs" title={`Bron: ${sourceConfig?.label}`}>
+                        <SourceIcon className="h-3.5 w-3.5" />
+                      </span>
+                    );
+                  })()}
+                  <span className="mx-0.5">•</span>
                   <Mail className="h-3.5 w-3.5" />
-                  <span>{caseData.customerEmail || "Geen klant"}</span>
+                  <span className="truncate max-w-[150px]">{caseData.customerEmail || "Geen klant"}</span>
                   {caseData.createdAt && (
                     <>
-                      <span className="mx-1">•</span>
-                      <span>{format(new Date(caseData.createdAt), "d MMM yyyy", { locale: nl })}</span>
+                      <span className="mx-0.5">•</span>
+                      <span>{format(new Date(caseData.createdAt), "d MMM", { locale: nl })}</span>
+                    </>
+                  )}
+                  {/* Days Open */}
+                  {caseData.status !== 'resolved' && (
+                    <>
+                      <span className="mx-0.5">•</span>
+                      {(() => {
+                        const days = getDaysOpen(caseData.createdAt);
+                        return (
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${getDaysOpenColor(days)}`}>
+                            <Clock className="h-3 w-3 inline mr-0.5" />{days}d open
+                          </span>
+                        );
+                      })()}
                     </>
                   )}
                 </div>
@@ -400,8 +475,8 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                     onClick={() => updateCaseMutation.mutate({ id: caseId, data: { status: status.value as any } })}
                     disabled={updateCaseMutation.isPending}
                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full cursor-pointer transition-all whitespace-nowrap ${isCurrent
-                        ? `bg-${status.color.replace('text-', '')}/10 ${status.color} font-medium border border-current`
-                        : 'text-muted-foreground/60 hover:bg-muted'
+                      ? `bg-${status.color.replace('text-', '')}/10 ${status.color} font-medium border border-current`
+                      : 'text-muted-foreground/60 hover:bg-muted'
                       }`}
                   >
                     {isCompleted ? (
