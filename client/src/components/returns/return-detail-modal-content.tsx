@@ -146,12 +146,27 @@ export function ReturnDetailModalContent({
     const customerPhone = customer?.phone || shippingAddress?.phone;
     const carrier = getCarrierInfo(ret.trackingNumber);
 
-    // Calculate days using calendar days (startOfDay) for accurate counting
+    // Calculate days using same logic as kanban:
+    // - "onderweg": count from acceptedAt
+    // - other statuses: count from acceptedAt (if set) or requestedAt
     const turnaroundDays = (() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // For onderweg or later: use acceptedAt if available
+        if (ret.acceptedAt && (ret.status === 'onderweg' || ret.status !== 'nieuw')) {
+            const acceptedDay = new Date(ret.acceptedAt);
+            acceptedDay.setHours(0, 0, 0, 0);
+            const endDay = ret.completedAt ? new Date(ret.completedAt) : today;
+            endDay.setHours(0, 0, 0, 0);
+            return Math.round((endDay.getTime() - acceptedDay.getTime()) / (1000 * 60 * 60 * 24));
+        }
+
+        // Fallback: use requestedAt
         if (!ret.requestedAt) return null;
         const requestedDay = new Date(ret.requestedAt);
         requestedDay.setHours(0, 0, 0, 0);
-        const endDay = ret.completedAt ? new Date(ret.completedAt) : new Date();
+        const endDay = ret.completedAt ? new Date(ret.completedAt) : today;
         endDay.setHours(0, 0, 0, 0);
         return Math.round((endDay.getTime() - requestedDay.getTime()) / (1000 * 60 * 60 * 24));
     })();

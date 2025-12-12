@@ -150,14 +150,16 @@ export async function syncShopifyReturns(
                 const shopifyStatus = shopifyReturn.status.toUpperCase();
 
                 if (existing.status === 'nieuw' && shopifyStatus === 'OPEN') {
+                    // Reset timer: always set acceptedAt to NOW when transitioning to onderweg
+                    const now = new Date();
                     await storage.updateReturn(existing.id, {
                         status: 'onderweg',
-                        acceptedAt: existing.acceptedAt || new Date(), // Set acceptance date for 14-day deadline
+                        acceptedAt: now, // Start of 14-day deadline - always reset on transition
                         shopifyStatus: shopifyStatus,
-                        syncedAt: new Date(),
+                        syncedAt: now,
                     });
                     updated++;
-                    console.log(`🔄 Updated ${existing.returnNumber}: nieuw → onderweg (Shopify: OPEN)`);
+                    console.log(`🔄 Updated ${existing.returnNumber}: nieuw → onderweg (Shopify: OPEN), timer reset to 0d`);
                     continue;
                 }
 
