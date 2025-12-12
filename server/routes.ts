@@ -5980,6 +5980,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lastSyncAt = await storage.getSetting('mail_last_sync_at');
       const initialSyncDone = await storage.getSetting('mail_initial_sync_done');
 
+      console.log('📧 [MAIL SYNC] Settings:', {
+        lastSyncAt,
+        initialSyncDone,
+        force: !!force,
+        mailboxExists: mailbox.exists,
+        uidNext: mailbox.uidNext
+      });
+
       let searchCriteria: any;
       let syncMode: string;
 
@@ -5988,24 +5996,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Force sync or initial sync: Get last 2000 emails (newest)
         const totalMessages = mailbox.exists;
         if (totalMessages > 0) {
-          const startUid = Math.max(1, totalMessages - 1999);
+          // Use uidNext to calculate which UIDs to fetch (safer than using message count)
+          const uidNext = mailbox.uidNext || totalMessages + 1;
+          const startUid = Math.max(1, uidNext - 2000);
           searchCriteria = `${startUid}:*`;
           syncMode = 'force';
+          console.log(`📧 [MAIL SYNC] Force mode: fetching UIDs ${startUid}:* (uidNext=${uidNext})`);
         } else {
           searchCriteria = '1:*';
           syncMode = 'force';
+          console.log('📧 [MAIL SYNC] Force mode: empty mailbox, fetching all');
         }
       } else if (lastSyncAt) {
         // Normal refresh: Get emails since last sync date
         const lastSync = new Date(lastSyncAt);
         searchCriteria = { since: lastSync };
         syncMode = 'date-based';
+        console.log(`📧 [MAIL SYNC] Date-based mode: since ${lastSync.toISOString()}`);
       } else {
         // Fallback: get recent emails
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         searchCriteria = { since: yesterday };
         syncMode = 'date-based';
+        console.log(`📧 [MAIL SYNC] Fallback mode: since yesterday`);
       }
 
       let newMailCount = 0;
@@ -6014,12 +6028,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let uidsToFetch: number[];
       if (syncMode === 'date-based') {
         uidsToFetch = await client.search(searchCriteria);
+        console.log(`📧 [MAIL SYNC] Search found ${uidsToFetch.length} UIDs`);
       } else {
         uidsToFetch = [];
       }
 
       // Fetch emails
       const fetchQuery = uidsToFetch.length > 0 ? uidsToFetch : searchCriteria;
+      console.log(`📧 [MAIL SYNC] Fetching with query:`, typeof fetchQuery === 'string' ? fetchQuery : `${uidsToFetch.length} UIDs`);
 
       for await (let msg of client.fetch(fetchQuery, { source: true, uid: true })) {
         try {
@@ -6110,6 +6126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/mail/list - Get emails with cursor pagination
+  // OPTIMIZED: Uses batch query for email links instead of N+1 queries
   app.get("/api/mail/list", requireAuth, async (req: any, res: any) => {
     try {
       const limit = parseInt(req.query.limit as string) || 50;
@@ -6144,16 +6161,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[MAIL] Returning:', { count: emails.length, hasMore });
 
-      // Fetch links for all emails
-      const emailsWithLinks = await Promise.all(
-        emails.map(async (email: any) => {
-          const links = await storage.getEmailLinks(email.id);
-          return {
-            ...email,
-            links: links || []
-          };
-        })
-      );
+      // OPTIMIZED: Batch fetch links for all emails in ONE query instead of N queries
+      const emailIds = emails.map((e: any) => e.id);
+      const allLinks = emailIds.length > 0 ? await storage.getEmailLinksForEmails(emailIds) : [];
+
+      // Group links by emailId
+      const linksByEmailId = new Map<string, typeof allLinks>();
+      for (const link of allLinks) {
+        const existing = linksByEmailId.get(link.emailId) || [];
+        existing.push(link);
+        linksByEmailId.set(link.emailId, existing);
+      }
+
+      // Add links to each email
+      const emailsWithLinks = emails.map((email: any) => ({
+        ...email,
+        links: linksByEmailId.get(email.id) || []
+      }));
 
       res.json({
         emails: emailsWithLinks,

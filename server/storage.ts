@@ -84,6 +84,7 @@ export interface IStorage {
 
   // Email Messages
   getEmailMessages(threadId: string): Promise<EmailMessage[]>;
+  getEmailMessagesForThreads(threadIds: string[]): Promise<EmailMessage[]>;
   getEmailMessage(messageId: string): Promise<EmailMessage | undefined>;
   createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage>;
   findThreadByEmailAttributes(fromEmail: string, subject: string, date: Date | null): Promise<EmailThread | undefined>;
@@ -296,6 +297,7 @@ export interface IStorage {
   createEmailAttachmentBulk(attachments: InsertEmailAttachment[]): Promise<EmailAttachment[]>;
 
   getEmailLinks(emailId: string): Promise<EmailLink[]>;
+  getEmailLinksForEmails(emailIds: string[]): Promise<EmailLink[]>;
   createEmailLink(link: InsertEmailLink): Promise<EmailLink>;
 
   getSetting(key: string): Promise<string | undefined>;
@@ -563,6 +565,12 @@ export class DatabaseStorage implements IStorage {
   // Email Messages
   async getEmailMessages(threadId: string): Promise<EmailMessage[]> {
     return await db.select().from(emailMessages).where(eq(emailMessages.threadId, threadId)).orderBy(desc(emailMessages.sentAt));
+  }
+
+  // OPTIMIZED: Get messages for multiple threads in one query
+  async getEmailMessagesForThreads(threadIds: string[]): Promise<EmailMessage[]> {
+    if (threadIds.length === 0) return [];
+    return await db.select().from(emailMessages).where(inArray(emailMessages.threadId, threadIds)).orderBy(desc(emailMessages.sentAt));
   }
 
   async getEmailMessage(messageId: string): Promise<EmailMessage | undefined> {
@@ -1999,6 +2007,14 @@ export class DatabaseStorage implements IStorage {
     return await db.select()
       .from(emailLinks)
       .where(eq(emailLinks.emailId, emailId));
+  }
+
+  // OPTIMIZED: Get email links for multiple emails in one query
+  async getEmailLinksForEmails(emailIds: string[]): Promise<EmailLink[]> {
+    if (emailIds.length === 0) return [];
+    return await db.select()
+      .from(emailLinks)
+      .where(inArray(emailLinks.emailId, emailIds));
   }
 
   // Create email link

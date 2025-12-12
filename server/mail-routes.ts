@@ -286,6 +286,7 @@ app.post("/api/mail/refresh", requireAuth, async (req: any, res: any) => {
 
 // GET /api/mail/list - Get email threads (not individual emails)
 // Thread-first architecture: list shows threads, each with latest message preview
+// OPTIMIZED: Uses single query with subquery to get latest message per thread
 app.get("/api/mail/list", requireAuth, async (req: any, res: any) => {
     try {
         const limit = parseInt(req.query.limit as string) || 50;
@@ -298,9 +299,30 @@ app.get("/api/mail/list", requireAuth, async (req: any, res: any) => {
             folder: 'inbox'
         });
 
-        // For each thread, get the latest message for preview
-        const threadsWithPreview = await Promise.all(threads.map(async (thread) => {
-            const messages = await storage.getEmailMessages(thread.id);
+        // If no threads, return early
+        if (threads.length === 0) {
+            return res.json({
+                emails: [],
+                threads: [],
+                total: 0
+            });
+        }
+
+        // OPTIMIZED: Get all messages for all threads in ONE query instead of N queries
+        const threadIds = threads.map(t => t.id);
+        const allMessages = await storage.getEmailMessagesForThreads(threadIds);
+
+        // Group messages by threadId
+        const messagesByThread = new Map<string, typeof allMessages>();
+        for (const msg of allMessages) {
+            const existing = messagesByThread.get(msg.threadId) || [];
+            existing.push(msg);
+            messagesByThread.set(msg.threadId, existing);
+        }
+
+        // Build response with latest message for each thread
+        const threadsWithPreview = threads.map((thread) => {
+            const messages = messagesByThread.get(thread.id) || [];
             const latestMessage = messages.sort((a, b) => {
                 const dateA = new Date(a.sentAt || a.createdAt || 0);
                 const dateB = new Date(b.sentAt || b.createdAt || 0);
@@ -326,7 +348,7 @@ app.get("/api/mail/list", requireAuth, async (req: any, res: any) => {
                 html: latestMessage?.body || '',
                 text: latestMessage?.body?.replace(/<[^>]*>/g, '') || ''
             };
-        }));
+        });
 
         res.json({
             emails: threadsWithPreview, // Use 'emails' key for backwards compatibility
