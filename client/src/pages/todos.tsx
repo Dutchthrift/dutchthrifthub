@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Navigation } from "@/components/layout/navigation";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,7 @@ import {
 } from "@/components/ui/select";
 
 export default function Todos() {
+  const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -71,6 +73,21 @@ export default function Todos() {
       return response.json();
     },
   });
+
+  // Check for todoId in URL and open detail modal
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const todoId = params.get('todoId');
+
+    if (todoId && todos && todos.length > 0) {
+      const todo = todos.find(t => t.id === todoId);
+      if (todo) {
+        setSelectedTask(todo);
+        setShowDetailModal(true);
+        setLocation('/todos');
+      }
+    }
+  }, [location, todos, setLocation]);
 
   const updateTodoMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Todo> }) => {
@@ -421,10 +438,10 @@ export default function Todos() {
                   <div
                     key={todo.id}
                     className={`flex items-center gap-3 p-3 bg-card rounded-lg border cursor-pointer transition-all hover:shadow-sm hover:bg-accent/30 border-l-4 ${todo.priority === "urgent" || todo.priority === "high"
-                        ? "border-l-destructive"
-                        : todo.priority === "medium"
-                          ? "border-l-amber-500"
-                          : "border-l-green-500"
+                      ? "border-l-destructive"
+                      : todo.priority === "medium"
+                        ? "border-l-amber-500"
+                        : "border-l-green-500"
                       } ${todo.status === 'done' ? 'opacity-50' : ''}`}
                     data-testid={`todo-item-${todo.id}`}
                     onClick={() => {

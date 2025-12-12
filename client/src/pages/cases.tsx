@@ -381,8 +381,8 @@ export default function Cases() {
             {...provided.draggableProps}
             {...provided.dragHandleProps}
             className={`mb-3 cursor-pointer transition-all duration-200 ${snapshot.isDragging
-                ? "shadow-xl scale-[1.02] ring-2 ring-primary/30 z-50"
-                : "hover:shadow-md"
+              ? "shadow-xl scale-[1.02] ring-2 ring-primary/30 z-50"
+              : "hover:shadow-md"
               } ${caseItem.archived ? "opacity-60" : ""}`}
             style={{
               ...provided.draggableProps.style,
@@ -394,17 +394,17 @@ export default function Cases() {
             onClick={() => setSelectedCase(caseItem)}
             data-testid={`case-card-${caseItem.id}`}
           >
-            <CardContent className="p-3">
+            <CardContent className="p-2.5">
               {/* Top row: Type badge + Days open + Priority */}
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-1.5 min-w-0">
+              <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                <div className="flex items-center gap-1 min-w-0">
                   {/* Case Type Badge */}
                   {(() => {
                     const typeConfig = CASE_TYPE_CONFIG[(caseItem as any).caseType || 'general'];
                     const TypeIcon = typeConfig?.icon || FileText;
                     return (
-                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-5 shrink-0 ${typeConfig?.color || ''}`}>
-                        <TypeIcon className="h-3 w-3 mr-1" />
+                      <Badge variant="outline" className={`text-[9px] px-1 py-0 h-4 shrink-0 ${typeConfig?.color || ''}`}>
+                        <TypeIcon className="h-2.5 w-2.5 mr-0.5" />
                         {(caseItem as any).caseType === 'other'
                           ? ((caseItem as any).otherTypeDescription || 'Overig').slice(0, 12)
                           : typeConfig?.label}
@@ -416,70 +416,70 @@ export default function Cases() {
                     const sourceConfig = CASE_SOURCE_CONFIG[(caseItem as any).source || 'manual'];
                     const SourceIcon = sourceConfig?.icon || Pencil;
                     return (
-                      <SourceIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" title={sourceConfig?.label} />
+                      <SourceIcon className="h-3 w-3 text-muted-foreground shrink-0" title={sourceConfig?.label} />
                     );
                   })()}
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   {/* Days Open */}
                   {(() => {
                     const days = getDaysOpen(caseItem.createdAt);
                     if (caseItem.status === 'resolved') return null;
                     return (
-                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${getDaysOpenColor(days)}`}>
+                      <span className={`text-[9px] font-medium px-1 py-0 rounded ${getDaysOpenColor(days)}`}>
                         {days}d
                       </span>
                     );
                   })()}
                   {/* Priority Badge */}
-                  <Badge variant={getPriorityVariant(caseItem.priority)} className="text-[10px] h-5">
+                  <Badge variant={getPriorityVariant(caseItem.priority)} className="text-[9px] h-4 px-1">
                     {caseItem.priority === 'urgent' ? '🔥' : caseItem.priority === 'high' ? '⚡' : ''}
                     {caseItem.priority}
                   </Badge>
                 </div>
               </div>
 
-              {/* Title */}
-              <h3 className="font-medium text-sm line-clamp-2 mb-1" data-testid={`case-title-${caseItem.id}`}>
+              {/* Title / Description */}
+              <h3 className="font-medium text-xs line-clamp-2 mb-1 leading-snug" data-testid={`case-title-${caseItem.id}`}>
                 {caseItem.title}
-                {caseItem.archived && (
-                  <Badge variant="outline" className="ml-2 text-[10px]">
-                    Gearchiveerd
-                  </Badge>
-                )}
               </h3>
 
-              {/* Description */}
-              {caseItem.description && (
-                <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
-                  {caseItem.description}
-                </p>
-              )}
-
-              {/* Bottom row: Case number + Customer + Assignee */}
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <span className="font-mono" data-testid={`case-number-${caseItem.id}`}>
-                    #{caseItem.caseNumber}
-                  </span>
-                  {caseItem.customer ? (
-                    <span className="truncate max-w-[80px]" data-testid={`case-customer-${caseItem.id}`}>
-                      {caseItem.customer.firstName}
-                    </span>
-                  ) : caseItem.customerEmail && (
-                    <span className="truncate max-w-[80px]">{caseItem.customerEmail.split('@')[0]}</span>
+              {/* Bottom row: Order/Customer info */}
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5 pt-1.5 border-t border-dashed">
+                <div className="flex flex-col min-w-0 flex-1 mr-2">
+                  {/* Display Order Info if present, otherwise just Case Number */}
+                  {(caseItem as any).order ? (
+                    <>
+                      <span className="font-semibold text-foreground truncate">
+                        Order {(caseItem as any).order.orderNumber}
+                      </span>
+                      <span className="truncate">
+                        {(caseItem as any).customer
+                          ? `${(caseItem as any).customer.firstName} ${(caseItem as any).customer.lastName || ''}`
+                          : ((caseItem as any).order?.customerEmail || caseItem.customerEmail || '').split('@')[0]}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-mono">{caseItem.caseNumber}</span>
+                      <span className="truncate">
+                        {(caseItem as any).customer
+                          ? (caseItem as any).customer.firstName
+                          : (caseItem.customerEmail || '').split('@')[0]}
+                      </span>
+                    </>
                   )}
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 shrink-0">
                   {caseItem.notesCount !== undefined && caseItem.notesCount > 0 && (
-                    <Badge variant="outline" className="text-[10px] h-5 px-1" data-testid={`case-notes-count-${caseItem.id}`}>
+                    <Badge variant="outline" className="text-[9px] h-4 px-1" data-testid={`case-notes-count-${caseItem.id}`}>
                       💬 {caseItem.notesCount}
                     </Badge>
                   )}
                   {caseItem.assignedUser && (
-                    <Avatar className="h-5 w-5">
-                      <AvatarFallback className="text-[10px]" data-testid={`case-assignee-${caseItem.id}`}>
+                    <Avatar className="h-4 w-4">
+                      <AvatarFallback className="text-[8px]" data-testid={`case-assignee-${caseItem.id}`}>
                         {(caseItem.assignedUser.firstName?.[0] || '') + (caseItem.assignedUser.lastName?.[0] || '')}
                       </AvatarFallback>
                     </Avatar>

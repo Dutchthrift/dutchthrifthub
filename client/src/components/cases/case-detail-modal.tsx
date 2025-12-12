@@ -4,6 +4,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -56,27 +57,29 @@ import {
   ShoppingCart,
   Pencil,
   Clock,
+  RotateCcw,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { Case, CaseWithDetails, EmailThread, Order, Repair, Todo } from "@/lib/types";
+import type { Case, CaseWithDetails, EmailThread, Order, Repair, Todo, Return } from "@/lib/types";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { NotesPanel } from "@/components/notes/NotesPanel";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
+import { useLocation } from "wouter";
 
 const CASE_STATUS_OPTIONS = [
-  { value: "new", label: "Nieuw", color: "text-emerald-500" },
-  { value: "in_progress", label: "In Behandeling", color: "text-blue-500" },
-  { value: "waiting_customer", label: "Wacht op Klant", color: "text-amber-500" },
-  { value: "resolved", label: "Opgelost", color: "text-green-500" },
+  { value: "new", label: "Nieuw", color: "text-emerald-500", emoji: "🆕" },
+  { value: "in_progress", label: "In Behandeling", color: "text-blue-500", emoji: "🔄" },
+  { value: "waiting_customer", label: "Wacht op Klant", color: "text-amber-500", emoji: "⏳" },
+  { value: "resolved", label: "Opgelost", color: "text-green-500", emoji: "✅" },
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: "low", label: "Laag" },
-  { value: "medium", label: "Normaal" },
-  { value: "high", label: "Hoog" },
-  { value: "urgent", label: "Urgent" },
+  { value: "low", label: "Laag", emoji: "🟢" },
+  { value: "medium", label: "Normaal", emoji: "🟡" },
+  { value: "high", label: "Hoog", emoji: "🟠" },
+  { value: "urgent", label: "Urgent", emoji: "🔴" },
 ];
 
 const getPriorityBadgeClass = (priority: string | null) => {
@@ -126,14 +129,16 @@ interface CaseDetailModalProps {
 
 export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDetailModalProps) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ title: "", description: "" });
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNotes, setShowNotes] = useState(true);
   const [showActivity, setShowActivity] = useState(false);
   const [showRelatedItems, setShowRelatedItems] = useState(true);
-  const [linkType, setLinkType] = useState<"email" | "order" | "repair" | "todo" | "">("");
+  const [linkType, setLinkType] = useState<"email" | "order" | "repair" | "todo" | "return" | "">("order");
   const [linkSearchTerm, setLinkSearchTerm] = useState("");
+  const [showLinkDropdown, setShowLinkDropdown] = useState(false);
 
   const { data: caseData, isLoading } = useQuery<CaseWithDetails>({
     queryKey: ["/api/cases", caseId],
@@ -157,9 +162,17 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
 
   const { data: allEmailsData = [] } = useQuery<EmailThread[]>({
     queryKey: ["/api/email-threads"],
+    queryFn: async () => {
+      const response = await fetch(`/api/email-threads?limit=100`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch emails');
+      const data = await response.json();
+      return data.items || [];
+    },
     enabled: !!caseId && open && linkType === "email",
   });
 
+  // Always fetch orders when modal is open (for both displaying links and searching)
+  // This avoids timing issues with caseData.links being undefined on first render
   const { data: allOrdersData } = useQuery<any>({
     queryKey: ["/api/orders", { page: 1, limit: 100 }],
     queryFn: async () => {
@@ -167,17 +180,24 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
       if (!response.ok) throw new Error("Failed to fetch orders");
       return response.json();
     },
-    enabled: !!caseId && open && linkType === "order",
+    enabled: !!caseId && open,
   });
 
+  // Always fetch repairs and todos when modal is open
   const { data: allRepairsData } = useQuery<Repair[]>({
     queryKey: ["/api/repairs"],
-    enabled: !!caseId && open && linkType === "repair",
+    enabled: !!caseId && open,
   });
 
   const { data: allTodosData } = useQuery<Todo[]>({
     queryKey: ["/api/todos"],
-    enabled: !!caseId && open && linkType === "todo",
+    enabled: !!caseId && open,
+  });
+
+  // Fetch returns for linking
+  const { data: allReturnsData = [] } = useQuery<Return[]>({
+    queryKey: ["/api/returns"],
+    enabled: !!caseId && open,
   });
 
   const { data: currentUser } = useQuery<User>({
@@ -194,10 +214,24 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
   const linkedOrderIds = caseLinksData.filter((link: any) => link.linkType === "order").map((link: any) => link.linkedId);
   const linkedRepairIds = caseLinksData.filter((link: any) => link.linkType === "repair").map((link: any) => link.linkedId);
   const linkedTodoIds = caseLinksData.filter((link: any) => link.linkType === "todo").map((link: any) => link.linkedId);
+  const linkedReturnIds = caseLinksData.filter((link: any) => link.linkType === "return").map((link: any) => link.linkedId);
 
-  const relatedOrders = (allOrdersData?.orders || []).filter((order: Order) => linkedOrderIds.includes(order.id));
+  const { data: caseRelatedOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders", { caseId }],
+    queryFn: async () => {
+      if (!caseId) return [];
+      const res = await fetch(`/api/orders?caseId=${caseId}`);
+      if (!res.ok) throw new Error("Failed to fetch related orders");
+      return res.json();
+    },
+    enabled: !!caseId && open,
+  });
+
+  const relatedOrders = caseRelatedOrders || [];
+
   const relatedRepairs = (allRepairsData || []).filter((repair: Repair) => linkedRepairIds.includes(repair.id));
   const relatedTodos = (allTodosData || []).filter((todo: Todo) => linkedTodoIds.includes(todo.id));
+  const relatedReturns = (allReturnsData || []).filter((returnItem: Return) => linkedReturnIds.includes(returnItem.id));
 
   useEffect(() => {
     if (caseData) {
@@ -284,29 +318,34 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
   };
 
   const getFilteredSearchResults = () => {
-    if (!linkSearchTerm.trim()) return [];
-    const search = linkSearchTerm.toLowerCase();
+    const search = linkSearchTerm.toLowerCase().trim();
     const linkedIds = caseLinksData.map((link: any) => link.linkedId);
     let results: any[] = [];
 
     if (linkType === "email") {
-      results = allEmailsData.filter((email: any) =>
+      results = (allEmailsData || []).filter((email: any) =>
         !linkedIds.includes(email.id) &&
-        (email.subject?.toLowerCase().includes(search) || email.customerEmail?.toLowerCase().includes(search))
-      ).slice(0, 5);
+        (!search || email.subject?.toLowerCase().includes(search) || email.customerEmail?.toLowerCase().includes(search))
+      ).slice(0, 10);
     } else if (linkType === "order") {
       results = (allOrdersData?.orders || []).filter((order: any) =>
         !linkedIds.includes(order.id) &&
-        (order.orderNumber?.toString().includes(search) || order.customerEmail?.toLowerCase().includes(search))
-      ).slice(0, 5);
+        (!search || order.orderNumber?.toString().includes(search) || order.customerEmail?.toLowerCase().includes(search))
+      ).slice(0, 10);
     } else if (linkType === "repair") {
       results = (allRepairsData || []).filter((repair: any) =>
-        !linkedIds.includes(repair.id) && repair.title?.toLowerCase().includes(search)
-      ).slice(0, 5);
+        !linkedIds.includes(repair.id) && (!search || repair.title?.toLowerCase().includes(search))
+      ).slice(0, 10);
     } else if (linkType === "todo") {
       results = (allTodosData || []).filter((todo: any) =>
-        !linkedIds.includes(todo.id) && todo.title?.toLowerCase().includes(search)
-      ).slice(0, 5);
+        !linkedIds.includes(todo.id) && (!search || todo.title?.toLowerCase().includes(search))
+      ).slice(0, 10);
+    } else if (linkType === "return") {
+      results = (allReturnsData || []).filter((returnItem: any) =>
+        !linkedIds.includes(returnItem.id) &&
+        (!search || returnItem.returnNumber?.toLowerCase().includes(search) ||
+          returnItem.shopifyReturnName?.toLowerCase().includes(search))
+      ).slice(0, 10);
     }
     return results;
   };
@@ -319,6 +358,7 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
     return (
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden !flex !flex-col p-0 gap-0 [&>button]:hidden">
+          <DialogDescription className="sr-only">Details van case worden geladen</DialogDescription>
           <div className="px-5 pt-4 pb-3 border-b">
             <DialogTitle className="text-xl font-semibold">Laden...</DialogTitle>
           </div>
@@ -336,18 +376,19 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
   const currentStatusIndex = getStatusIndex(caseData.status);
   const statusLabel = CASE_STATUS_OPTIONS.find(s => s.value === caseData.status)?.label || caseData.status;
   const priorityLabel = PRIORITY_OPTIONS.find(p => p.value === caseData.priority)?.label || caseData.priority;
-  const totalRelatedItems = linkedEmails.length + relatedOrders.length + relatedRepairs.length + relatedTodos.length;
+  const totalRelatedItems = linkedEmails.length + relatedOrders.length + relatedRepairs.length + relatedTodos.length + relatedReturns.length;
 
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden !flex !flex-col p-0 gap-0 [&>button]:hidden">
+          <DialogDescription className="sr-only">Details en acties voor case {caseData.title}</DialogDescription>
           {/* Header */}
           <div className="px-5 pt-4 pb-3 border-b">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <DialogTitle className="text-xl font-semibold">Case #{caseData.caseNumber}</DialogTitle>
+                  <DialogTitle className="text-xl font-semibold">Case {caseData.caseNumber}</DialogTitle>
                   <Badge className={`font-mono text-xs shrink-0 ${getPriorityBadgeClass(caseData.priority)}`}>
                     {priorityLabel}
                   </Badge>
@@ -464,38 +505,39 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
             </div>
           </div>
 
-          {/* Status Timeline */}
-          <div className="px-5 py-2.5 border-b bg-muted/20 flex items-center justify-center gap-2 text-xs overflow-x-auto">
-            {CASE_STATUS_OPTIONS.map((status, idx) => {
-              const isCompleted = idx < currentStatusIndex;
-              const isCurrent = idx === currentStatusIndex;
-              return (
-                <div key={status.value} className="flex items-center">
-                  <button
-                    onClick={() => updateCaseMutation.mutate({ id: caseId, data: { status: status.value as any } })}
-                    disabled={updateCaseMutation.isPending}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full cursor-pointer transition-all whitespace-nowrap ${isCurrent
-                      ? `bg-${status.color.replace('text-', '')}/10 ${status.color} font-medium border border-current`
-                      : 'text-muted-foreground/60 hover:bg-muted'
-                      }`}
-                  >
-                    {isCompleted ? (
-                      <CheckCircle className={`h-3.5 w-3.5 ${status.color}`} />
-                    ) : isCurrent ? (
-                      <div className={`h-3.5 w-3.5 rounded-full border-2 ${status.color} border-current flex items-center justify-center`}>
-                        <div className="h-1.5 w-1.5 rounded-full bg-current" />
-                      </div>
-                    ) : (
-                      <Circle className="h-3.5 w-3.5" />
+          {/* Status Timeline - Centered like todo modal */}
+          <div className="px-5 py-3 border-b">
+            <div className="flex items-center justify-center gap-0">
+              {CASE_STATUS_OPTIONS.map((status, idx) => {
+                const isCompleted = idx < currentStatusIndex;
+                const isCurrent = idx === currentStatusIndex;
+                return (
+                  <div key={status.value} className="flex items-center">
+                    <button
+                      onClick={() => updateCaseMutation.mutate({ id: caseId, data: { status: status.value as any } })}
+                      disabled={updateCaseMutation.isPending}
+                      className={`flex flex-col items-center gap-1.5 cursor-pointer hover:opacity-80 transition-all px-3 py-1 rounded-lg ${isCurrent ? 'bg-muted/50' : 'hover:bg-muted/30'}`}
+                    >
+                      {isCompleted ? (
+                        <CheckCircle className={`h-6 w-6 ${status.color}`} />
+                      ) : isCurrent ? (
+                        <div className={`h-6 w-6 rounded-full border-2 ${status.color} border-current flex items-center justify-center`}>
+                          <div className="h-2.5 w-2.5 rounded-full bg-current" />
+                        </div>
+                      ) : (
+                        <Circle className="h-6 w-6 text-gray-300 dark:text-gray-600" />
+                      )}
+                      <span className={`text-[10px] whitespace-nowrap ${isCurrent ? 'font-semibold ' + status.color : 'text-muted-foreground'}`}>
+                        {status.emoji} {status.label}
+                      </span>
+                    </button>
+                    {idx < CASE_STATUS_OPTIONS.length - 1 && (
+                      <div className={`w-8 h-0.5 ${idx < currentStatusIndex ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
                     )}
-                    {status.label}
-                  </button>
-                  {idx < CASE_STATUS_OPTIONS.length - 1 && (
-                    <ArrowRight className="h-3 w-3 mx-1 text-muted-foreground/40 flex-shrink-0" />
-                  )}
-                </div>
-              );
-            })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Scrollable Content */}
@@ -503,136 +545,160 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
             <div className="space-y-3">
 
               {/* Case Details */}
-              <div className="border rounded-lg border-l-4 border-l-blue-500">
-                <div className="flex items-center gap-2 px-3 py-2 border-b bg-blue-50/50 dark:bg-blue-950/20">
-                  <FileText className="h-3.5 w-3.5 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Case Details</span>
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">Case Details</span>
                 </div>
-                <div className="p-3">
-                  {isEditing ? (
-                    <div className="space-y-3">
+                {isEditing ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Titel</label>
+                      <Input
+                        value={editForm.title}
+                        onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                        className="h-9 text-sm mt-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Beschrijving</label>
+                      <Textarea
+                        value={editForm.description}
+                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                        className="text-sm mt-1 min-h-[80px]"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Titel</div>
+                      <div className="text-sm font-medium">{caseData.title}</div>
+                    </div>
+                    {caseData.description && (
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground">Titel</label>
-                        <Input
-                          value={editForm.title}
-                          onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                          className="h-8 text-sm mt-1"
-                        />
+                        <div className="text-xs text-muted-foreground mb-1">Beschrijving</div>
+                        <div className="text-sm whitespace-pre-wrap bg-white/50 dark:bg-black/20 rounded p-2">{caseData.description}</div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-blue-200/50">
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1.5">Status</div>
+                        <Select
+                          value={caseData.status}
+                          onValueChange={(value) => updateCaseMutation.mutate({ id: caseId, data: { status: value as any } })}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CASE_STATUS_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.emoji} {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground">Beschrijving</label>
-                        <Textarea
-                          value={editForm.description}
-                          onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                          className="text-sm mt-1 min-h-[80px]"
-                        />
+                        <div className="text-xs text-muted-foreground mb-1.5">Prioriteit</div>
+                        <Select
+                          value={caseData.priority || "medium"}
+                          onValueChange={(value) => updateCaseMutation.mutate({ id: caseId, data: { priority: value as any } })}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PRIORITY_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.emoji} {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-0.5">Titel</div>
-                        <div className="text-sm font-medium">{caseData.title}</div>
-                      </div>
-                      {caseData.description && (
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-0.5">Beschrijving</div>
-                          <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded p-2">{caseData.description}</div>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-2 gap-3 pt-2 border-t">
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Status</div>
-                          <Select
-                            value={caseData.status}
-                            onValueChange={(value) => updateCaseMutation.mutate({ id: caseId, data: { status: value as any } })}
-                          >
-                            <SelectTrigger className="h-8 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {CASE_STATUS_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Prioriteit</div>
-                          <Select
-                            value={caseData.priority || "medium"}
-                            onValueChange={(value) => updateCaseMutation.mutate({ id: caseId, data: { priority: value as any } })}
-                          >
-                            <SelectTrigger className="h-8 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {PRIORITY_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Related Items */}
               <Collapsible open={showRelatedItems} onOpenChange={setShowRelatedItems}>
-                <div className="border rounded-lg border-l-4 border-l-emerald-500">
+                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
                   <CollapsibleTrigger asChild>
-                    <div className="flex items-center justify-between px-3 py-2 border-b bg-emerald-50/50 dark:bg-emerald-950/20 cursor-pointer hover:bg-emerald-100/50 transition-colors">
+                    <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-emerald-900/20 transition-colors rounded-t-lg">
                       <div className="flex items-center gap-2">
-                        <LinkIcon className="h-3.5 w-3.5 text-emerald-600" />
-                        <span className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
-                          Gekoppelde Items ({totalRelatedItems})
+                        <LinkIcon className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                          🔗 Gekoppelde Items ({totalRelatedItems})
                         </span>
                       </div>
                       {showRelatedItems ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="p-3 space-y-3">
+                    <div className="p-4 pt-0 space-y-3">
                       {/* Link Search */}
+                      <div className="text-xs text-muted-foreground mb-2">➕ Voeg koppeling toe:</div>
                       <div className="flex gap-2">
                         <Select value={linkType} onValueChange={(v: any) => { setLinkType(v); setLinkSearchTerm(""); }}>
                           <SelectTrigger className="w-28 h-8 text-xs">
                             <SelectValue placeholder="Type..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="email">Email</SelectItem>
-                            <SelectItem value="order">Order</SelectItem>
-                            <SelectItem value="repair">Repair</SelectItem>
-                            <SelectItem value="todo">Todo</SelectItem>
+                            <SelectItem value="order">📦 Order</SelectItem>
+                            <SelectItem value="return">↩️ Retour</SelectItem>
+                            <SelectItem value="repair">🔧 Reparatie</SelectItem>
+                            <SelectItem value="email">📧 Email</SelectItem>
+                            <SelectItem value="todo">✅ Todo</SelectItem>
                           </SelectContent>
                         </Select>
                         <div className="flex-1 relative">
                           <Input
-                            placeholder={linkType ? "Zoeken..." : "Selecteer type"}
+                            placeholder={linkType ? "Klik om te zoeken..." : "Selecteer type"}
                             value={linkSearchTerm}
                             onChange={(e) => setLinkSearchTerm(e.target.value)}
+                            onFocus={() => setShowLinkDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowLinkDropdown(false), 200)}
                             disabled={!linkType}
                             className="h-8 text-xs"
                           />
-                          {linkSearchTerm && searchResults.length > 0 && (
+                          {showLinkDropdown && linkType && searchResults.length > 0 && (
                             <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
-                              {searchResults.map((item: any) => (
-                                <button
-                                  key={item.id}
-                                  onClick={() => linkItemMutation.mutate({ type: linkType, id: item.id })}
-                                  className="w-full p-2 text-left hover:bg-muted text-xs border-b last:border-0"
-                                >
-                                  <div className="font-medium truncate">
-                                    {linkType === "email" ? item.subject : linkType === "order" ? `Order ${item.orderNumber}` : item.title}
-                                  </div>
-                                </button>
-                              ))}
+                              {searchResults.map((item: any) => {
+                                let date = null;
+                                if (linkType === "email") date = item.lastMessageDate || item.date;
+                                else if (linkType === "order") date = item.orderDate || item.createdAt;
+                                else if (linkType === "return") date = item.requestedAt || item.createdAt;
+                                else if (linkType === "repair") date = item.createdAt;
+                                else if (linkType === "todo") date = item.dueDate || item.createdAt;
+
+                                return (
+                                  <button
+                                    key={item.id}
+                                    onClick={() => { linkItemMutation.mutate({ type: linkType, id: item.id }); setShowLinkDropdown(false); }}
+                                    className="w-full p-2 text-left hover:bg-muted text-xs border-b last:border-0 group"
+                                  >
+                                    <div className="flex justify-between items-center w-full">
+                                      <div className="font-medium truncate flex-1 pr-2">
+                                        {linkType === "email" ? item.subject :
+                                          linkType === "order" ? `Order ${item.orderNumber}` :
+                                            linkType === "return" ? (item.orderNumber ? `Order ${item.orderNumber}` : `Retour ${item.returnNumber || item.shopifyReturnName}`) :
+                                              item.title}
+                                      </div>
+                                      {date && (
+                                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                          {format(new Date(date), "d MMM", { locale: nl })}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {(linkType === "email" && item.customerEmail) && (
+                                      <div className="text-[10px] text-muted-foreground truncate">{item.customerEmail}</div>
+                                    )}
+                                  </button>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -669,12 +735,19 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                           {relatedOrders.map((order: Order) => {
                             const link = caseLinksData.find((l: any) => l.linkedId === order.id && l.linkType === "order");
                             return (
-                              <div key={order.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs">
-                                <div className="min-w-0 flex-1">
+                              <div key={order.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs group hover:bg-muted/50 transition-colors">
+                                <button
+                                  onClick={() => { onClose(); setLocation(`/orders?orderId=${order.id}`); }}
+                                  className="min-w-0 flex-1 text-left hover:underline cursor-pointer"
+                                >
                                   <div className="font-medium">Order {order.orderNumber}</div>
-                                  <div className="text-muted-foreground">€{((order.totalAmount || 0) / 100).toFixed(2)}</div>
-                                </div>
-                                <Button size="icon" variant="ghost" onClick={() => link && unlinkItemMutation.mutate(link.id)} className="h-6 w-6 flex-shrink-0">
+                                  <div className="text-muted-foreground">
+                                    {((order.orderData as any)?.customer?.first_name || (order.orderData as any)?.customer?.last_name)
+                                      ? `${(order.orderData as any)?.customer?.first_name || ''} ${(order.orderData as any)?.customer?.last_name || ''}`.trim()
+                                      : (order.customerEmail || 'Onbekende klant')}
+                                  </div>
+                                </button>
+                                <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); link && unlinkItemMutation.mutate(link.id); }} className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <X className="h-3 w-3" />
                                 </Button>
                               </div>
@@ -693,9 +766,41 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                           {relatedRepairs.map((repair: Repair) => {
                             const link = caseLinksData.find((l: any) => l.linkedId === repair.id && l.linkType === "repair");
                             return (
-                              <div key={repair.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs">
-                                <div className="font-medium truncate">{repair.title}</div>
-                                <Button size="icon" variant="ghost" onClick={() => link && unlinkItemMutation.mutate(link.id)} className="h-6 w-6 flex-shrink-0">
+                              <div key={repair.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs group hover:bg-muted/50 transition-colors">
+                                <button
+                                  onClick={() => { onClose(); setLocation(`/repairs?repairId=${repair.id}`); }}
+                                  className="font-medium truncate text-left hover:underline cursor-pointer flex-1"
+                                >
+                                  {repair.title}
+                                </button>
+                                <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); link && unlinkItemMutation.mutate(link.id); }} className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Linked Returns */}
+                      {relatedReturns.length > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <RotateCcw className="h-3 w-3" />
+                            <span>Retouren ({relatedReturns.length})</span>
+                          </div>
+                          {relatedReturns.map((returnItem: Return) => {
+                            const link = caseLinksData.find((l: any) => l.linkedId === returnItem.id && l.linkType === "return");
+                            return (
+                              <div key={returnItem.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs group hover:bg-muted/50 transition-colors">
+                                <button
+                                  onClick={() => { onClose(); setLocation(`/returns/${returnItem.id}`); }}
+                                  className="min-w-0 flex-1 text-left hover:underline cursor-pointer"
+                                >
+                                  <div className="font-medium truncate">{returnItem.shopifyReturnName || returnItem.returnNumber}</div>
+                                  <div className="text-muted-foreground truncate">{returnItem.status}</div>
+                                </button>
+                                <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); link && unlinkItemMutation.mutate(link.id); }} className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <X className="h-3 w-3" />
                                 </Button>
                               </div>
@@ -714,9 +819,14 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                           {relatedTodos.map((todo: Todo) => {
                             const link = caseLinksData.find((l: any) => l.linkedId === todo.id && l.linkType === "todo");
                             return (
-                              <div key={todo.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs">
-                                <div className="font-medium truncate">{todo.title}</div>
-                                <Button size="icon" variant="ghost" onClick={() => link && unlinkItemMutation.mutate(link.id)} className="h-6 w-6 flex-shrink-0">
+                              <div key={todo.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs group hover:bg-muted/50 transition-colors">
+                                <button
+                                  onClick={() => { onClose(); setLocation(`/todos?todoId=${todo.id}`); }}
+                                  className="font-medium truncate text-left hover:underline cursor-pointer flex-1"
+                                >
+                                  {todo.title}
+                                </button>
+                                <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); link && unlinkItemMutation.mutate(link.id); }} className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <X className="h-3 w-3" />
                                 </Button>
                               </div>
@@ -738,20 +848,20 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
 
               {/* Activity Timeline */}
               <Collapsible open={showActivity} onOpenChange={setShowActivity}>
-                <div className="border rounded-lg border-l-4 border-l-amber-500">
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
                   <CollapsibleTrigger asChild>
-                    <div className="flex items-center justify-between px-3 py-2 border-b bg-amber-50/50 dark:bg-amber-950/20 cursor-pointer hover:bg-amber-100/50 transition-colors">
+                    <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors rounded-t-lg">
                       <div className="flex items-center gap-2">
-                        <ActivityIcon className="h-3.5 w-3.5 text-amber-600" />
-                        <span className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                          Activiteit ({caseEvents.length})
+                        <ActivityIcon className="h-4 w-4 text-amber-600" />
+                        <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                          📊 Activiteit ({caseEvents.length})
                         </span>
                       </div>
                       {showActivity ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="p-3">
+                    <div className="p-4 pt-0">
                       {caseEvents.length === 0 ? (
                         <div className="text-center py-4 border border-dashed rounded">
                           <ActivityIcon className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
@@ -784,18 +894,18 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
               {/* Notes */}
               {currentUser && (
                 <Collapsible open={showNotes} onOpenChange={setShowNotes}>
-                  <div className="border rounded-lg border-l-4 border-l-rose-500">
+                  <div className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30 rounded-lg border border-rose-200 dark:border-rose-800">
                     <CollapsibleTrigger asChild>
-                      <div className="flex items-center justify-between px-3 py-2 border-b bg-rose-50/50 dark:bg-rose-950/20 cursor-pointer hover:bg-rose-100/50 transition-colors">
+                      <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-rose-100/50 dark:hover:bg-rose-900/20 transition-colors rounded-t-lg">
                         <div className="flex items-center gap-2">
-                          <MessageSquare className="h-3.5 w-3.5 text-rose-600" />
-                          <span className="text-sm font-medium text-rose-900 dark:text-rose-100">Notities</span>
+                          <MessageSquare className="h-4 w-4 text-rose-600" />
+                          <span className="text-sm font-semibold text-rose-700 dark:text-rose-400">💬 Notities</span>
                         </div>
                         {showNotes ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                       </div>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <div className="p-3">
+                      <div className="p-4 pt-0">
                         <NotesPanel
                           entityType="case"
                           entityId={caseId}
@@ -818,7 +928,7 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
           <AlertDialogHeader>
             <AlertDialogTitle>Case verwijderen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Dit verwijdert case #{caseData?.caseNumber} permanent. Deze actie kan niet ongedaan worden.
+              Dit verwijdert case {caseData?.caseNumber} permanent. Deze actie kan niet ongedaan worden.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

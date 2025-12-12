@@ -41,6 +41,9 @@ import {
   User,
   CalendarIcon,
   Image as ImageIcon,
+  Wrench,
+  RotateCcw,
+  CheckSquare,
 } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -83,8 +86,14 @@ const STEP_LABELS = ["Type", "Details", "Bevestig"];
 
 export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseModalProps) {
   const [step, setStep] = useState(1);
+  const [linkType, setLinkType] = useState<"order" | "return" | "repair" | "todo">("order");
+  const [linkSearch, setLinkSearch] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
+  const [showLinkDropdown, setShowLinkDropdown] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedReturn, setSelectedReturn] = useState<any>(null);
+  const [selectedRepair, setSelectedRepair] = useState<any>(null);
+  const [selectedTodo, setSelectedTodo] = useState<any>(null);
   const [selectedItems, setSelectedItems] = useState<Map<string, SelectedItemData>>(new Map());
   const { toast } = useToast();
 
@@ -118,6 +127,27 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
   });
 
   const orders = ordersData?.orders || [];
+
+  // Query for repairs
+  const { data: repairsData } = useQuery<any[]>({
+    queryKey: ["/api/repairs"],
+    enabled: open && step === 2 && linkType === "repair",
+  });
+  const repairs = repairsData || [];
+
+  // Query for returns
+  const { data: returnsData } = useQuery<any[]>({
+    queryKey: ["/api/returns"],
+    enabled: open && step === 2 && linkType === "return",
+  });
+  const returns = returnsData || [];
+
+  // Query for todos
+  const { data: todosData } = useQuery<any[]>({
+    queryKey: ["/api/todos"],
+    enabled: open && step === 2 && linkType === "todo",
+  });
+  const todos = todosData || [];
 
   const createCaseMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -193,7 +223,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
       orderId: selectedOrder?.id || null,
       customerId: selectedOrder?.customerId || null,
       assignedUserId: formData.assignedUserId || null,
-      items: selectedItems.size > 0 ? Array.from(selectedItems.entries()).map(([itemId, data]) => {
+      items: selectedItems.size > 0 && selectedOrder ? Array.from(selectedItems.entries()).map(([itemId, data]) => {
         const lineItems = selectedOrder?.orderData?.line_items || [];
         const lineItem = lineItems.find((li: any) => (li.id?.toString() || li.sku) === itemId);
         return {
@@ -202,7 +232,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
           quantity: data.quantity,
           itemNotes: data.itemNotes,
         };
-      }) : [],
+      }).filter(item => item.sku && item.sku.trim() !== "") : [],
     };
 
     createCaseMutation.mutate(caseData);
@@ -428,26 +458,41 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
               </div>
             )}
 
-            {/* Order Search (Optional) */}
+            {/* Link Type Selection */}
             <div>
-              <Label className="text-xs">Bestelling koppelen (optioneel)</Label>
-              <div className="relative mt-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Zoek op ordernummer..."
-                  value={orderSearch}
-                  onChange={(e) => setOrderSearch(e.target.value)}
-                  className="pl-8 h-8 text-xs"
-                />
+              <Label className="text-xs">🔗 Items koppelen (optioneel)</Label>
+              <div className="flex gap-2 mt-1">
+                <Select value={linkType} onValueChange={(v: any) => { setLinkType(v); setLinkSearch(""); }}>
+                  <SelectTrigger className="w-32 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="order">📦 Order</SelectItem>
+                    <SelectItem value="return">↩️ Retour</SelectItem>
+                    <SelectItem value="repair">🔧 Reparatie</SelectItem>
+                    <SelectItem value="todo">✅ Todo</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder={linkType === "order" ? "Klik om te zoeken..." : linkType === "return" ? "Klik om te zoeken..." : linkType === "repair" ? "Klik om te zoeken..." : "Klik om te zoeken..."}
+                    value={linkType === "order" ? orderSearch : linkSearch}
+                    onChange={(e) => linkType === "order" ? setOrderSearch(e.target.value) : setLinkSearch(e.target.value)}
+                    onFocus={() => setShowLinkDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowLinkDropdown(false), 200)}
+                    className="pl-8 h-8 text-xs"
+                  />
+                </div>
               </div>
 
-              {orderSearch && orders.length > 0 && (
-                <div className="mt-2 space-y-1.5 max-h-[150px] overflow-y-auto">
-                  {orders.slice(0, 5).map((order: any) => (
+              {/* Order search results */}
+              {showLinkDropdown && linkType === "order" && orders.length > 0 && (
+                <div className="mt-2 space-y-1.5 max-h-[120px] overflow-y-auto">
+                  {orders.filter((o: any) => !orderSearch || o.orderNumber.toLowerCase().includes(orderSearch.toLowerCase()) || o.customerEmail?.toLowerCase().includes(orderSearch.toLowerCase())).slice(0, 5).map((order: any) => (
                     <div
                       key={order.id}
-                      className={`p-2 border rounded-lg cursor-pointer text-xs hover:bg-muted/50 ${selectedOrder?.id === order.id ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20" : ""
-                        }`}
+                      className={`p-2 border rounded-lg cursor-pointer text-xs hover:bg-muted/50 ${selectedOrder?.id === order.id ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20" : ""}`}
                       onClick={() => {
                         setSelectedOrder(order);
                         setFormData({ ...formData, customerEmail: order.customerEmail || formData.customerEmail });
@@ -463,11 +508,77 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
                 </div>
               )}
 
-              {selectedOrder && (
-                <div className="mt-2 p-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
-                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                    ✓ Order {selectedOrder.orderNumber} gekoppeld
-                  </p>
+              {/* Return search results */}
+              {showLinkDropdown && linkType === "return" && returns.length > 0 && (
+                <div className="mt-2 space-y-1.5 max-h-[120px] overflow-y-auto">
+                  {returns.filter((r: any) => !linkSearch || (r.returnNumber || r.shopifyReturnName || "").toLowerCase().includes(linkSearch.toLowerCase())).slice(0, 5).map((ret: any) => (
+                    <div
+                      key={ret.id}
+                      className={`p-2 border rounded-lg cursor-pointer text-xs hover:bg-muted/50 ${selectedReturn?.id === ret.id ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20" : ""}`}
+                      onClick={() => setSelectedReturn(ret)}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{ret.shopifyReturnName || ret.returnNumber}</span>
+                        <Badge variant="outline" className="text-[9px] px-1 py-0">{ret.status}</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Repair search results */}
+              {showLinkDropdown && linkType === "repair" && repairs.length > 0 && (
+                <div className="mt-2 space-y-1.5 max-h-[120px] overflow-y-auto">
+                  {repairs.filter((r: any) => !linkSearch || r.title?.toLowerCase().includes(linkSearch.toLowerCase())).slice(0, 5).map((repair: any) => (
+                    <div
+                      key={repair.id}
+                      className={`p-2 border rounded-lg cursor-pointer text-xs hover:bg-muted/50 ${selectedRepair?.id === repair.id ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20" : ""}`}
+                      onClick={() => setSelectedRepair(repair)}
+                    >
+                      <span className="font-medium">{repair.title}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Todo search results */}
+              {showLinkDropdown && linkType === "todo" && todos.length > 0 && (
+                <div className="mt-2 space-y-1.5 max-h-[120px] overflow-y-auto">
+                  {todos.filter((t: any) => !linkSearch || t.title?.toLowerCase().includes(linkSearch.toLowerCase())).slice(0, 5).map((todo: any) => (
+                    <div
+                      key={todo.id}
+                      className={`p-2 border rounded-lg cursor-pointer text-xs hover:bg-muted/50 ${selectedTodo?.id === todo.id ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20" : ""}`}
+                      onClick={() => setSelectedTodo(todo)}
+                    >
+                      <span className="font-medium">{todo.title}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Selected items confirmation */}
+              {(selectedOrder || selectedReturn || selectedRepair || selectedTodo) && (
+                <div className="mt-2 p-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg space-y-1">
+                  {selectedOrder && (
+                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      ✓ Order {selectedOrder.orderNumber} gekoppeld
+                    </p>
+                  )}
+                  {selectedReturn && (
+                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      ✓ Retour {selectedReturn.shopifyReturnName || selectedReturn.returnNumber} gekoppeld
+                    </p>
+                  )}
+                  {selectedRepair && (
+                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      ✓ Reparatie {selectedRepair.title} gekoppeld
+                    </p>
+                  )}
+                  {selectedTodo && (
+                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      ✓ Todo {selectedTodo.title} gekoppeld
+                    </p>
+                  )}
                 </div>
               )}
             </div>

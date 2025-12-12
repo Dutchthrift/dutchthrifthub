@@ -1,13 +1,13 @@
 import type {
-  User, Customer, Order, EmailThread, EmailMessage, 
-  Repair, Todo, InternalNote, Activity, Case,
+  User, Customer, Order, EmailThread, EmailMessage,
+  Repair, Todo, InternalNote, Activity, Case, Return, CaseLink, CaseEvent,
   InsertUser, InsertCustomer, InsertOrder, InsertEmailThread, InsertEmailMessage,
   InsertRepair, InsertTodo, InsertInternalNote, InsertActivity, InsertCase
 } from "@shared/schema";
 
 export type {
-  User, Customer, Order, EmailThread, EmailMessage, 
-  Repair, Todo, InternalNote, Activity, Case,
+  User, Customer, Order, EmailThread, EmailMessage,
+  Repair, Todo, InternalNote, Activity, Case, Return, CaseLink, CaseEvent,
   InsertUser, InsertCustomer, InsertOrder, InsertEmailThread, InsertEmailMessage,
   InsertRepair, InsertTodo, InsertInternalNote, InsertActivity, InsertCase
 };
@@ -100,4 +100,8 @@ export interface CaseWithDetails extends Case {
   customer?: Customer;
   assignedUser?: User;
   notesCount?: number;
+  items?: any[];
+  links?: CaseLink[];
+  events?: CaseEvent[];
 }
+

@@ -815,6 +815,9 @@ export class DatabaseStorage implements IStorage {
     const casesData = await db
       .select({
         ...getTableColumns(cases),
+        order: orders,
+        customer: customers,
+        assignedUser: users,
         notesCount: sql<number>`COALESCE((
           SELECT COUNT(*)::int 
           FROM ${notes} 
@@ -824,10 +827,68 @@ export class DatabaseStorage implements IStorage {
         ), 0)`,
       })
       .from(cases)
+      .leftJoin(orders, eq(cases.orderId, orders.id))
+      .leftJoin(customers, eq(cases.customerId, customers.id))
+      .leftJoin(users, eq(cases.assignedUserId, users.id))
       .where(whereClause)
       .orderBy(desc(cases.createdAt));
 
-    return casesData;
+    // Map the result to match the expected structure where nested objects are properties
+    const mappedCases = casesData.map(row => ({
+      ...row,
+      // Ensure we don't return null objects if join failed
+      order: row.order || undefined,
+      customer: row.customer || undefined,
+      assignedUser: row.assignedUser || undefined
+    }));
+
+    // Fallback: If order is missing, check if there's a linked order in case_links
+    // This handles cases that were linked manually but might not have orderId set on the case record
+    const casesMissingOrder = mappedCases.filter(c => !c.order);
+
+    if (casesMissingOrder.length > 0) {
+      const missingCaseIds = casesMissingOrder.map(c => c.id);
+
+      const linkedOrderLinks = await db
+        .select()
+        .from(caseLinks)
+        .where(and(
+          inArray(caseLinks.caseId, missingCaseIds),
+          eq(caseLinks.linkType, 'order')
+        ));
+
+      if (linkedOrderLinks.length > 0) {
+        const orderIds = linkedOrderLinks
+          .map(link => parseInt(link.linkedId))
+          .filter(id => !isNaN(id));
+
+        if (orderIds.length > 0) {
+          const linkedOrders = await db
+            .select()
+            .from(orders)
+            .where(inArray(orders.id, orderIds));
+
+          const orderMap = new Map(linkedOrders.map(o => [o.id, o]));
+          const caseToOrderMap = new Map();
+
+          linkedOrderLinks.forEach(link => {
+            const orderHeight = orderMap.get(parseInt(link.linkedId));
+            if (orderHeight) {
+              caseToOrderMap.set(link.caseId, orderHeight);
+            }
+          });
+
+          // Update mappedCases with found orders
+          mappedCases.forEach(c => {
+            if (!c.order && caseToOrderMap.has(c.id)) {
+              c.order = caseToOrderMap.get(c.id);
+            }
+          });
+        }
+      }
+    }
+
+    return mappedCases;
   }
 
   async getCase(id: string): Promise<Case | undefined> {
@@ -1055,14 +1116,31 @@ export class DatabaseStorage implements IStorage {
     repairs: Repair[];
     todos: Todo[];
   }> {
-    const [caseEmails, caseRepairs, caseTodos] = await Promise.all([
+    const [caseEmails, caseRepairs, caseTodos, caseLinksResult, caseResult] = await Promise.all([
       db.select().from(emailThreads).where(eq(emailThreads.caseId, caseId)),
       db.select().from(repairs).where(eq(repairs.caseId, caseId)),
-      db.select().from(todos).where(eq(todos.caseId, caseId))
+      db.select().from(todos).where(eq(todos.caseId, caseId)),
+      db.select().from(caseLinks).where(and(eq(caseLinks.caseId, caseId), eq(caseLinks.linkType, 'order'))),
+      db.select().from(cases).where(eq(cases.id, caseId)).limit(1)
     ]);
 
     // Get orders that are linked via email threads
-    const orderIds = caseEmails.filter(email => email.orderId).map(email => email.orderId!);
+    const emailOrderIds = caseEmails.filter(email => email.orderId).map(email => email.orderId!);
+
+    // Get orders linked via case_links
+    const linkedOrderIds = caseLinksResult.map(link => link.linkedId);
+
+    // Get primary order ID from case
+    const primaryOrderId = caseResult[0]?.orderId;
+
+    // Combine all order IDs
+    const allOrderIds = new Set([...emailOrderIds, ...linkedOrderIds]);
+    if (primaryOrderId) {
+      allOrderIds.add(primaryOrderId);
+    }
+
+    const orderIds = Array.from(allOrderIds);
+
     const caseOrders: Order[] = orderIds.length > 0 ?
       await db.select().from(orders).where(or(
         ...orderIds.map(orderId => eq(orders.id, orderId))
@@ -2037,14 +2115,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // Create case link
-  async createCaseLink(caseId: string, type: 'order' | 'email' | 'repair' | 'todo' | 'return', entityId: string): Promise<void> {
-    await db.insert(caseLinks).values({
-      caseId,
-      type,
-      entityId,
-    });
-  }
+  // Note: createCaseLink is defined earlier in the class (line ~1084) with correct InsertCaseLink interface
 
   // Get setting (for mail system config like last_imap_uid)
   async getSetting(key: string): Promise<string | undefined> {

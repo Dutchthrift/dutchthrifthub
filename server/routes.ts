@@ -4698,6 +4698,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? await storage.createCaseWithItems(validatedData, validatedItems)
         : await storage.createCase(validatedData);
 
+      // If orderId is provided, also create a CaseLink for consistency
+      if (validatedData.orderId) {
+        console.log("[DEBUG] Creating case link for orderId:", validatedData.orderId, "caseId:", newCase.id);
+        try {
+          const caseLink = await storage.createCaseLink({
+            caseId: newCase.id,
+            linkType: 'order',
+            linkedId: validatedData.orderId,
+            createdBy: validatedData.assignedUserId || null,
+          });
+          console.log("[DEBUG] Case link created:", caseLink);
+        } catch (linkError) {
+          console.error("[DEBUG] Error creating order link:", linkError);
+          // Continue even if link creation fails - the case is already created
+        }
+      }
+
       // Create activity
       await storage.createActivity({
         type: "case_created",
@@ -4733,6 +4750,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getCaseLinks(id),
         storage.getCaseEvents(id)
       ]);
+
+      console.log("[DEBUG] Case:", id, "links found:", caseLinks.length, caseLinks);
 
       // Return complete case data in one response
       res.json({
@@ -4811,7 +4830,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid entityType" });
       }
 
+      // First creating a CaseLink record
+      const link = await storage.createCaseLink({
+        caseId: id,
+        linkType: entityType,
+        linkedId: entityId,
+        createdBy: null // We don't have the user ID easily available here usually, could be improved
+      });
+
+      // Also call the legacy linkEntityToCase for backward compatibility/other side updates
       await storage.linkEntityToCase(id, entityType, entityId);
+
+      // If linking an order, and the case doesn't have a primary order yet, set it
+      if (entityType === 'order') {
+        const currentCase = await storage.getCase(id);
+        if (currentCase && !currentCase.orderId) {
+          await storage.updateCase(id, { orderId: Number(entityId) });
+        }
+      }
 
       const caseItem = await storage.getCase(id);
       await storage.createActivity({
