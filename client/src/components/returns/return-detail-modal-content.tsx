@@ -145,9 +145,17 @@ export function ReturnDetailModalContent({
     const customerEmail = customer?.email;
     const customerPhone = customer?.phone || shippingAddress?.phone;
     const carrier = getCarrierInfo(ret.trackingNumber);
-    const turnaroundDays = ret.requestedAt
-        ? differenceInDays(ret.completedAt ? new Date(ret.completedAt) : new Date(), new Date(ret.requestedAt))
-        : null;
+
+    // Calculate days using calendar days (startOfDay) for accurate counting
+    const turnaroundDays = (() => {
+        if (!ret.requestedAt) return null;
+        const requestedDay = new Date(ret.requestedAt);
+        requestedDay.setHours(0, 0, 0, 0);
+        const endDay = ret.completedAt ? new Date(ret.completedAt) : new Date();
+        endDay.setHours(0, 0, 0, 0);
+        return Math.round((endDay.getTime() - requestedDay.getTime()) / (1000 * 60 * 60 * 24));
+    })();
+
     const fmt = (c: number | null) => c ? `€${(c / 100).toFixed(2)}` : "";
     const currentStatusIndex = STATUS_FLOW.findIndex(s => s.value === ret.status);
     const isSpecialStatus = currentStatusIndex === -1;
@@ -334,7 +342,7 @@ export function ReturnDetailModalContent({
                     <span className="text-sm font-medium">Interne Notities</span>
                 </div>
                 {currentUser ? (
-                    <NotesPanel entityType="return" entityId={ret.id} currentUser={currentUser} />
+                    <NotesPanel entityType="return" entityId={ret.id} currentUser={currentUser} className="notes-two-column" />
                 ) : (
                     <div className="text-sm text-muted-foreground">Laden...</div>
                 )}

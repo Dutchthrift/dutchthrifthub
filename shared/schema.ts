@@ -375,6 +375,7 @@ export const returns = pgTable("returns", {
 
   // Dates
   requestedAt: timestamp("requested_at").defaultNow(),
+  acceptedAt: timestamp("accepted_at"), // When status changed to "onderweg" (start of 14-day deadline)
   receivedAt: timestamp("received_at"),
   expectedReturnDate: timestamp("expected_return_date"),
   completedAt: timestamp("completed_at"),
@@ -742,6 +743,9 @@ export const insertReturnSchema = createInsertSchema(returns).omit({
   updatedAt: true,
 }).extend({
   requestedAt: z.union([z.string(), z.date()]).optional().transform(val =>
+    val && typeof val === 'string' ? new Date(val) : val
+  ),
+  acceptedAt: z.union([z.string(), z.date()]).optional().nullable().transform(val =>
     val && typeof val === 'string' ? new Date(val) : val
   ),
   receivedAt: z.union([z.string(), z.date()]).optional().nullable().transform(val =>

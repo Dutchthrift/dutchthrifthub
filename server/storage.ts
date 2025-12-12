@@ -36,7 +36,7 @@ import {
   users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks, repairCounters
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
-import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns, lt } from "drizzle-orm";
+import { eq, desc, asc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns, lt } from "drizzle-orm";
 import { ObjectStorageService } from "./objectStorage";
 import type { Response } from "express";
 
@@ -1404,7 +1404,8 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return await query.orderBy(desc(returns.createdAt));
+    // Sort by requestedAt ascending - oldest returns first (closer to deadline)
+    return await query.orderBy(asc(returns.requestedAt));
   }
 
   async getReturn(id: string): Promise<Return | undefined> {
@@ -1509,11 +1510,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getReturnsByStatus(status: string): Promise<Return[]> {
-    return await db.select().from(returns).where(eq(returns.status, status as any)).orderBy(desc(returns.createdAt));
+    return await db.select().from(returns).where(eq(returns.status, status as any)).orderBy(asc(returns.requestedAt));
   }
 
   async getReturnsByCustomer(customerId: string): Promise<Return[]> {
-    return await db.select().from(returns).where(eq(returns.customerId, customerId)).orderBy(desc(returns.createdAt));
+    return await db.select().from(returns).where(eq(returns.customerId, customerId)).orderBy(asc(returns.requestedAt));
   }
 
   async createReturnFromCase(caseId: string): Promise<Return> {

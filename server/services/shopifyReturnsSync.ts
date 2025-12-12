@@ -145,8 +145,24 @@ export async function syncShopifyReturns(
             const existing = await storage.getReturnByShopifyId(shopifyReturn.id);
 
             if (existing) {
-                // DON'T update existing returns - preserve local status changes
-                console.log(`⏭️  Skipping existing return ${shopifyReturn.name} (${existing.returnNumber}) - preserving local changes`);
+                // Smart sync: Update status from "nieuw" to "onderweg" when Shopify shows OPEN
+                // This means the customer has a return label and the package is likely in transit
+                const shopifyStatus = shopifyReturn.status.toUpperCase();
+
+                if (existing.status === 'nieuw' && shopifyStatus === 'OPEN') {
+                    await storage.updateReturn(existing.id, {
+                        status: 'onderweg',
+                        acceptedAt: existing.acceptedAt || new Date(), // Set acceptance date for 14-day deadline
+                        shopifyStatus: shopifyStatus,
+                        syncedAt: new Date(),
+                    });
+                    updated++;
+                    console.log(`🔄 Updated ${existing.returnNumber}: nieuw → onderweg (Shopify: OPEN)`);
+                    continue;
+                }
+
+                // For all other cases, preserve local changes
+                console.log(`⏭️  Skipping ${existing.returnNumber} - local status "${existing.status}" preserved`);
                 skipped++;
                 continue;
             }

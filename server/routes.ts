@@ -4309,6 +4309,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/returns/:id", requireAuth, async (req: any, res: any) => {
     try {
       const { id } = req.params;
+
+      // If status is changing to "onderweg", set acceptedAt if not already set
+      if (req.body.status === 'onderweg') {
+        const existingReturn = await storage.getReturn(id);
+        if (existingReturn && !existingReturn.acceptedAt) {
+          req.body.acceptedAt = new Date();
+        }
+      }
+
       const returnData = await storage.updateReturn(id, req.body);
 
       // Create activity if status changed

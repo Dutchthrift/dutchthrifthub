@@ -47,5 +47,5 @@ export function startScheduledSync() {
     }
   });
 
-  log('⏰ Scheduled Shopify sync enabled - will run every 10 minutes');
+  log('⏰ Scheduled Shopify sync enabled - will run every 5 minutes');
 }

@@ -241,6 +241,54 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
     return reason ? reasons[reason] || reason : null;
   };
 
+  // Calculate days and deadline alerts
+  // - "Nieuw": Alert when approaching 14 days (action needed)
+  // - "Onderweg": Alert when approaching 14 days since accepted
+  // - Other statuses: Count from acceptedAt but NO alert (pressure is off)
+  const getDaysInfo = (returnItem: Return) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const requestedAt = returnItem.requestedAt ? new Date(returnItem.requestedAt) : new Date(returnItem.createdAt || Date.now());
+    const requestedDay = new Date(requestedAt);
+    requestedDay.setHours(0, 0, 0, 0);
+    const daysOpen = Math.round((today.getTime() - requestedDay.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Helper to calculate days since acceptedAt
+    const getDaysSinceAccepted = () => {
+      if (!(returnItem as any).acceptedAt) return daysOpen; // Fallback to requestedAt
+      const acceptedAt = new Date((returnItem as any).acceptedAt);
+      const acceptedDay = new Date(acceptedAt);
+      acceptedDay.setHours(0, 0, 0, 0);
+      return Math.round((today.getTime() - acceptedDay.getTime()) / (1000 * 60 * 60 * 24));
+    };
+
+    // "NIEUW" status - 14-day deadline, count from requestedAt
+    if (returnItem.status === 'nieuw') {
+      if (daysOpen >= 14) {
+        return { days: daysOpen, label: `${daysOpen}d`, badgeClass: 'bg-red-500 text-white border-red-500', cardClass: 'ring-2 ring-red-500' };
+      } else if (daysOpen >= 11) {
+        return { days: daysOpen, label: `${daysOpen}d`, badgeClass: 'bg-orange-500 text-white border-orange-500', cardClass: 'ring-2 ring-orange-500' };
+      }
+      return { days: daysOpen, label: `${daysOpen}d`, badgeClass: 'bg-muted', cardClass: '' };
+    }
+
+    // "ONDERWEG" status - 14-day deadline, count from acceptedAt WITH alert
+    if (returnItem.status === 'onderweg') {
+      const daysSinceAccepted = getDaysSinceAccepted();
+      if (daysSinceAccepted >= 14) {
+        return { days: daysSinceAccepted, label: `${daysSinceAccepted}d`, badgeClass: 'bg-red-500 text-white border-red-500', cardClass: 'ring-2 ring-red-500' };
+      } else if (daysSinceAccepted >= 11) {
+        return { days: daysSinceAccepted, label: `${daysSinceAccepted}d`, badgeClass: 'bg-orange-500 text-white border-orange-500', cardClass: 'ring-2 ring-orange-500' };
+      }
+      return { days: daysSinceAccepted, label: `${daysSinceAccepted}d`, badgeClass: 'bg-muted', cardClass: '' };
+    }
+
+    // All other statuses - count from acceptedAt, NO alert (pressure is off)
+    const daysSinceAccepted = getDaysSinceAccepted();
+    return { days: daysSinceAccepted, label: `${daysSinceAccepted}d`, badgeClass: 'bg-muted', cardClass: '' };
+  };
+
   const handleStatusChange = (returnItem: Return, newStatus: string) => {
     updateReturnMutation.mutate({
       id: returnItem.id,
@@ -336,7 +384,7 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
                                   className={`cursor-pointer hover:shadow-md transition-all ${column.cardBorder} ${snapshot.isDragging ? 'shadow-lg rotate-2' : 'bg-card'
-                                    } ${getPriorityColor(returnItem.priority)}`}
+                                    } ${getPriorityColor(returnItem.priority)} ${getDaysInfo(returnItem).cardClass}`}
                                   onClick={() => handleViewReturn(returnItem)}
                                   data-testid={`return-card-${returnItem.id}`}
                                 >
@@ -465,6 +513,10 @@ export function ReturnsKanban({ returns, isLoading, onViewReturn, onEditReturn, 
 
                                       <div className="flex items-center gap-1 pt-0.5">
                                         {getPriorityBadge(returnItem.priority)}
+                                        <Badge variant="outline" className={`text-[9px] px-1 py-0 h-4 font-mono ${getDaysInfo(returnItem).badgeClass}`}>
+                                          <Clock className="h-2.5 w-2.5 mr-0.5" />
+                                          {getDaysInfo(returnItem).label}
+                                        </Badge>
                                       </div>
                                     </div>
                                   </CardContent>
