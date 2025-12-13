@@ -57,6 +57,7 @@ import express from "express";
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import DOMPurify from 'isomorphic-dompurify';
+import * as emailService from "./services/emailService";
 
 // Extend Request type to include session
 interface AuthenticatedRequest extends Request {
@@ -5970,8 +5971,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
 
-  // POST /api/mail/refresh - Refresh mails from IMAP
-  app.post("/api/mail/refresh", requireAuth, async (req: any, res: any) => {
+  // POST /api/mail/refresh-inbox-only - OLD Refresh mails from INBOX only
+  // NOTE: Use /api/mail/refresh for multi-folder sync (Inbox + Sent)
+  app.post("/api/mail/refresh-inbox-only", requireAuth, async (req: any, res: any) => {
     try {
       const { force } = req.query;
 
@@ -6160,23 +6162,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  // POST /api/mail/refresh - Trigger incremental email sync (new emails only)
+  app.post("/api/mail/refresh", requireAuth, async (req: any, res: any) => {
+    try {
+      console.log('[MAIL] Starting manual email sync...');
+
+      // Import incrementalEmailSync dynamically to avoid circular dependencies
+      const { incrementalEmailSync } = await import('./services/incrementalEmailSync');
+      const result = await incrementalEmailSync();
+
+      console.log(`[MAIL] Sync completed. New emails: ${result.synced}`);
+
+      if (result.errors.length > 0) {
+        console.warn('[MAIL] Sync errors:', result.errors);
+      }
+
+      res.json({
+        success: true,
+        newMails: result.synced,
+        errors: result.errors,
+        lastSync: new Date()
+      });
+
+    } catch (error) {
+      console.error('Error syncing emails:', error);
+      res.status(500).json({ error: 'Failed to sync emails' });
+    }
+  });
 
   // GET /api/mail/list - Get emails with cursor pagination
   // OPTIMIZED: Uses batch query for email links instead of N+1 queries
   app.get("/api/mail/list", requireAuth, async (req: any, res: any) => {
     try {
       const limit = parseInt(req.query.limit as string) || 50;
+      const folder = req.query.folder as string || 'inbox';
       const beforeDate = req.query.before as string; // ISO date
       const beforeId = req.query.beforeId as string; // UUID
 
-      console.log('[MAIL] Pagination request:', { limit, beforeDate, beforeId });
+      console.log('[MAIL] Pagination request:', { limit, folder, beforeDate, beforeId });
 
       // Fetch emails
       const emails = await storage.getEmails({
         limit,
         beforeDate,
         beforeId,
-        orderBy: 'date DESC'
+        orderBy: 'date DESC',
+        folder
       });
 
       console.log('[MAIL] Found emails:', emails.length);
@@ -6231,8 +6262,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
 
       const email = await storage.getEmail(id);
+      console.log(`[MAIL] GET /api/mail/${id} - Found:`, email ? {
+        id: email.id,
+        subject: email.subject?.substring(0, 40),
+        hasHtml: !!email.html,
+        hasText: !!email.text,
+        htmlPreview: email.html?.substring(0, 50),
+        textPreview: email.text?.substring(0, 50),
+        folder: email.folder
+      } : 'NOT FOUND');
+
       if (!email) {
         return res.status(404).json({ error: 'Email not found' });
+      }
+
+      // On-demand body loading: if body is placeholder, fetch from IMAP
+      let html = email.html;
+      let text = email.text;
+
+      const isPlaceholder = (content: string | null) =>
+        !content || content.includes('[Content will be loaded when email is opened]');
+
+      if (isPlaceholder(html) && isPlaceholder(text) && email.imapUid) {
+        console.log(`[MAIL] On-demand body fetch for email ${id} (UID: ${email.imapUid})`);
+        try {
+          const { body, isHtml } = await emailService.fetchEmailBody(email.imapUid);
+          if (isHtml) {
+            html = body;
+            text = body.replace(/<[^>]*>/g, ''); // Strip HTML for text version
+          } else {
+            text = body;
+            html = null;
+          }
+
+          // Optionally update the database with the fetched body (cache it)
+          // This is commented out to avoid updating during read, but can be enabled
+          // await storage.updateEmailBody(id, { html, text });
+        } catch (fetchError) {
+          console.error(`[MAIL] Failed to fetch body for email ${id}:`, fetchError);
+          // Keep placeholder if fetch fails
+        }
       }
 
       const attachments = await storage.getEmailAttachmentsByEmailId(id);
@@ -6240,6 +6309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         ...email,
+        html,
+        text,
         attachments,
         links
       });

@@ -19,9 +19,14 @@ export function getEmailProvider(): EmailProvider {
 }
 
 // Convenience functions
-export async function syncEmails() {
+export async function getMailboxes() {
   const provider = getEmailProvider();
-  return provider.syncEmails();
+  return provider.getMailboxes();
+}
+
+export async function syncEmails(mailbox?: string) {
+  const provider = getEmailProvider();
+  return provider.syncEmails(mailbox);
 }
 
 export async function sendEmail(to: string, subject: string, body: string, replyToMessageId?: string) {

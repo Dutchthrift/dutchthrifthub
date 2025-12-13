@@ -296,7 +296,7 @@ app.get("/api/mail/list", requireAuth, async (req: any, res: any) => {
         const { threads, total } = await storage.getEmailThreads({
             limit,
             offset,
-            folder: 'inbox'
+            folder: (req.query.folder as string) || 'inbox'
         });
 
         // If no threads, return early

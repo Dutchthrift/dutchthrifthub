@@ -287,9 +287,10 @@ export interface IStorage {
   getNoteLinks(noteId: string): Promise<NoteLink[]>;
 
   // Mail System (New)
-  getEmails(options?: { limit?: number; orderBy?: string }): Promise<Email[]>;
+  getEmails(options?: { limit?: number; orderBy?: string; beforeDate?: string; beforeId?: string; folder?: string }): Promise<Email[]>;
   getEmail(id: string): Promise<Email | undefined>;
-  getEmailByImapUid(imapUid: number): Promise<Email | undefined>;
+  getEmailByImapUid(imapUid: number, folder: string): Promise<Email | undefined>;
+  upsertEmail(email: InsertEmail): Promise<Email>;
   createEmail(email: InsertEmail): Promise<Email>;
   deleteOldEmails(keepLast: number): Promise<void>;
 
@@ -2004,14 +2005,20 @@ export class DatabaseStorage implements IStorage {
     orderBy?: string;
     beforeDate?: string;
     beforeId?: string;
+    folder?: string;
   }): Promise<Email[]> {
-    const { limit = 50, orderBy = 'date DESC', beforeDate, beforeId } = options || {};
+    const { limit = 50, orderBy = 'date DESC', beforeDate, beforeId, folder = 'inbox' } = options || {};
 
     let query = db.select().from(emails);
+    const conditions = [];
+
+    if (folder) {
+      conditions.push(eq(emails.folder, folder as any));
+    }
 
     // Cursor pagination: fetch emails before a certain date/id
     if (beforeDate && beforeId) {
-      query = query.where(
+      conditions.push(
         or(
           lt(emails.date, new Date(beforeDate)),
           and(
@@ -2019,7 +2026,11 @@ export class DatabaseStorage implements IStorage {
             lt(emails.id, beforeId)
           )
         )
-      ) as any;
+      );
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
     }
 
     return await query
@@ -2034,14 +2045,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Get email by IMAP UID (for deduplication)
-  async getEmailByImapUid(imapUid: number): Promise<Email | undefined> {
-    const result = await db.select().from(emails).where(eq(emails.imapUid, imapUid)).limit(1);
+  async getEmailByImapUid(imapUid: number, folder: string = 'inbox'): Promise<Email | undefined> {
+    const result = await db.select()
+      .from(emails)
+      .where(and(eq(emails.imapUid, imapUid), eq(emails.folder, folder as any)))
+      .limit(1);
+    return result[0];
+  }
+
+  // Create or return existing email
+  async upsertEmail(email: InsertEmail): Promise<Email> {
+    const existing = await this.getEmailByImapUid(email.imapUid!, email.folder || 'inbox');
+    if (existing) {
+      // Optioneel: update flags/status hier
+      return existing;
+    }
+    const result = await db.insert(emails).values(email).returning();
     return result[0];
   }
 
   // Create email
   async createEmail(email: InsertEmail): Promise<Email> {
     const result = await db.insert(emails).values(email).returning();
+    return result[0];
+  }
+
+  // Update email (for updating placeholder content with real body)
+  async updateEmail(id: string, updates: Partial<InsertEmail>): Promise<Email> {
+    const result = await db.update(emails).set(updates).where(eq(emails.id, id)).returning();
     return result[0];
   }
 

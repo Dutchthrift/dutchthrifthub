@@ -1024,7 +1024,8 @@ export const emails = pgTable("emails", {
   html: text("html"),
   text: text("text"),
   date: timestamp("date"),
-  imapUid: integer("imap_uid").unique(),
+  folder: emailFolderEnum("folder").default("inbox"),
+  imapUid: integer("imap_uid"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

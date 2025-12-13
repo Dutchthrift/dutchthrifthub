@@ -53,6 +53,9 @@ import { LinkCaseDialog } from '@/components/mail/dialogs/LinkCaseDialog';
 import { LinkReturnDialog } from '@/components/mail/dialogs/LinkReturnDialog';
 import { LinkRepairDialog } from '@/components/mail/dialogs/LinkRepairDialog';
 import { EmailContextMenu } from '@/components/mail/EmailContextMenu';
+import { CaseDetailModal } from '@/components/cases/case-detail-modal';
+import { RepairDetailModal } from '@/components/repairs/repair-detail-modal';
+import { ReturnDetailModalContent } from '@/components/returns/return-detail-modal-content';
 
 // Types
 interface Email {
@@ -124,6 +127,8 @@ export default function MailPage() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
 
+
+
     // Detect mobile viewport
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -140,6 +145,11 @@ export default function MailPage() {
     const [showLinkCase, setShowLinkCase] = useState(false);
     const [showLinkReturn, setShowLinkReturn] = useState(false);
     const [showLinkRepair, setShowLinkRepair] = useState(false);
+
+    // Detail modal states
+    const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+    const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
+    const [selectedRepairId, setSelectedRepairId] = useState<string | null>(null);
 
     // Thread message expansion state
     const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set());
@@ -184,6 +194,10 @@ export default function MailPage() {
         queryFn: async ({ pageParam }: { pageParam?: { date: string; id: string } }) => {
             let url = '/api/mail/list?limit=50';
 
+            if (activeFolder && activeFolder !== 'inbox') {
+                url += `&folder=${activeFolder}`;
+            }
+
             if (pageParam) {
                 url += `&before=${encodeURIComponent(pageParam.date)}&beforeId=${pageParam.id}`;
             }
@@ -216,6 +230,19 @@ export default function MailPage() {
             return res.json() as Promise<EmailDetails>;
         },
         enabled: !!selectedEmailId
+    });
+
+    // Fetch orders for the current sender (Must be after emailDetails is defined)
+    const { data: customerOrders } = useQuery({
+        queryKey: ['orders', 'search', emailDetails?.fromEmail],
+        queryFn: async () => {
+            if (!emailDetails?.fromEmail) return [];
+            const res = await fetch(`/api/orders?search=${encodeURIComponent(emailDetails.fromEmail)}&limit=5`);
+            if (!res.ok) return [];
+            const data = await res.json();
+            return Array.isArray(data) ? data : data.orders || [];
+        },
+        enabled: !!emailDetails?.fromEmail
     });
 
 
@@ -451,35 +478,77 @@ export default function MailPage() {
     const linkedCaseId = linkedCase?.entityId;
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="flex flex-col h-screen bg-background">
             <Navigation />
 
-            <main className="container mx-auto px-4 py-6">
-                {/* Header */}
-                <div className="bg-card rounded-lg p-6 mb-6 border">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <h1 className="text-3xl font-bold tracking-tight">Mail</h1>
-                            <p className="text-muted-foreground">Beheer je emails en koppel ze aan orders, cases, retours en reparaties</p>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button
-                                onClick={() => refreshMutation.mutate()}
-                                disabled={refreshMutation.isPending}
-                                variant="default"
-                            >
-                                <RefreshCw className={`mr-2 h-4 w-4 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
-                                {refreshMutation.isPending ? 'Synchroniseren...' : 'Vernieuwen'}
-                            </Button>
-                        </div>
+            <main className="flex-1 flex flex-col overflow-hidden px-6 py-4">
+                {/* Compact Header */}
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Mail</h1>
                     </div>
+                    <Button
+                        onClick={() => refreshMutation.mutate()}
+                        disabled={refreshMutation.isPending}
+                        variant="default"
+                        size="sm"
+                    >
+                        <RefreshCw className={`mr-2 h-4 w-4 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+                        {refreshMutation.isPending ? 'Synchroniseren...' : 'Vernieuwen'}
+                    </Button>
                 </div>
 
-                {/* Mail Layout - Responsive: stacked on mobile, side-by-side on desktop */}
-                <div className="flex flex-col md:flex-row gap-4">
-                    {/* Mail List - Full width on mobile, sidebar on desktop */}
-                    <Card className="w-full md:w-80 md:flex-shrink-0">
-                        <CardContent className="p-4 flex flex-col gap-3 h-[60vh] md:h-[calc(100vh-280px)]">
+                {/* Filter Tabs */}
+                <Tabs value={linkFilter} onValueChange={(value: any) => setLinkFilter(value)} className="mb-4">
+                    <TabsList className="bg-muted">
+                        <TabsTrigger value="all" className="gap-2">
+                            <Mail className="h-4 w-4" />
+                            Alle
+                            <Badge variant="secondary" className="ml-1">{allEmails.length}</Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="order" className="gap-2">
+                            <Package className="h-4 w-4" />
+                            Orders
+                            <Badge variant="secondary" className="ml-1">
+                                {allEmails.filter((e: Email) => e.links?.some((l: any) => l.entityType === 'order')).length}
+                            </Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="case" className="gap-2">
+                            <Briefcase className="h-4 w-4" />
+                            Cases
+                            <Badge variant="secondary" className="ml-1">
+                                {allEmails.filter((e: Email) => e.links?.some((l: any) => l.entityType === 'case')).length}
+                            </Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="return" className="gap-2">
+                            <RotateCcw className="h-4 w-4" />
+                            Retouren
+                            <Badge variant="secondary" className="ml-1">
+                                {allEmails.filter((e: Email) => e.links?.some((l: any) => l.entityType === 'return')).length}
+                            </Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="repair" className="gap-2">
+                            <Wrench className="h-4 w-4" />
+                            Reparaties
+                            <Badge variant="secondary" className="ml-1">
+                                {allEmails.filter((e: Email) => e.links?.some((l: any) => l.entityType === 'repair')).length}
+                            </Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="unlinked" className="gap-2">
+                            <Mail className="h-4 w-4 opacity-50" />
+                            Niet gekoppeld
+                            <Badge variant="secondary" className="ml-1">
+                                {allEmails.filter((e: Email) => !e.links || e.links.length === 0).length}
+                            </Badge>
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
+
+                {/* Mail Layout - Full width 3-column layout */}
+                <div className="flex-1 flex gap-4 overflow-hidden">
+                    {/* Mail List - Wider sidebar */}
+                    <Card className="w-96 min-w-96 max-w-96 flex-shrink-0 flex flex-col">
+                        <CardContent className="p-4 flex flex-col gap-3 flex-1 overflow-hidden">
                             {/* Folder Tabs */}
                             <Tabs value={activeFolder} onValueChange={(value) => setActiveFolder(value as any)}>
                                 <TabsList className="grid w-full grid-cols-2 mb-2">
@@ -516,59 +585,7 @@ export default function MailPage() {
                                 />
                             </div>
 
-                            {/* Link Filter */}
-                            <div className="space-y-1">
-                                <label className="text-xs font-medium text-muted-foreground">Filter op koppeling</label>
-                                <Select value={linkFilter} onValueChange={(value: any) => setLinkFilter(value)}>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            <div className="flex items-center gap-2">
-                                                <Mail className="h-4 w-4" />
-                                                Alle emails
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="linked">
-                                            <div className="flex items-center gap-2">
-                                                <LinkIcon className="h-4 w-4" />
-                                                Gekoppeld
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="unlinked">
-                                            <div className="flex items-center gap-2">
-                                                <Mail className="h-4 w-4 opacity-50" />
-                                                Niet gekoppeld
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="order">
-                                            <div className="flex items-center gap-2">
-                                                <Package className="h-4 w-4" />
-                                                Bestellingen
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="case">
-                                            <div className="flex items-center gap-2">
-                                                <Briefcase className="h-4 w-4" />
-                                                Cases
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="return">
-                                            <div className="flex items-center gap-2">
-                                                <RotateCcw className="h-4 w-4" />
-                                                Retouren
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="repair">
-                                            <div className="flex items-center gap-2">
-                                                <Wrench className="h-4 w-4" />
-                                                Reparaties
-                                            </div>
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+
 
                             {/* Mail List */}
                             <div className="flex-1 overflow-auto space-y-1">
@@ -576,18 +593,11 @@ export default function MailPage() {
                                     <div className="flex justify-center py-8">
                                         <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                                     </div>
-                                ) : activeFolder !== 'inbox' ? (
-                                    <div className="text-center py-8 text-muted-foreground text-sm">
-                                        <div className="mb-2">
-                                            {activeFolder === 'sent' && <Send className="h-8 w-8 mx-auto mb-2 opacity-30" />}
-                                            {activeFolder === 'drafts' && <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />}
-                                            {activeFolder === 'trash' && <Trash className="h-8 w-8 mx-auto mb-2 opacity-30" />}
-                                        </div>
-                                        Nog niet beschikbaar
-                                    </div>
                                 ) : filteredEmails.length === 0 && !isLoadingList ? (
                                     <div className="text-center py-8 text-muted-foreground text-sm">
-                                        Geen emails gevonden
+                                        Geen emails gevonden in {activeFolder === 'sent' ? 'Verzonden' :
+                                            activeFolder === 'drafts' ? 'Concepten' :
+                                                activeFolder === 'trash' ? 'Prullenbak' : 'Postvak IN'}
                                     </div>
                                 ) : (
                                     <>
@@ -641,8 +651,28 @@ export default function MailPage() {
                                                     <div className="text-sm line-clamp-1 mb-1">
                                                         {email.subject || '(Geen onderwerp)'}
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground line-clamp-1">
-                                                        {email.fromEmail}
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="text-xs text-muted-foreground line-clamp-1 flex-1">
+                                                            {email.fromEmail}
+                                                        </div>
+                                                        {email.links && email.links.length > 0 && (
+                                                            <div className="flex gap-1 flex-shrink-0">
+                                                                {email.links.map(link => {
+                                                                    const iconMap = {
+                                                                        order: Package,
+                                                                        case: Briefcase,
+                                                                        return: RotateCcw,
+                                                                        repair: Wrench
+                                                                    };
+                                                                    const Icon = iconMap[link.entityType];
+                                                                    return Icon ? (
+                                                                        <div key={link.id} title={`Gekoppeld aan ${link.entityType}`}>
+                                                                            <Icon className="h-3 w-3 text-primary" />
+                                                                        </div>
+                                                                    ) : null;
+                                                                })}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </EmailContextMenu>
@@ -671,11 +701,11 @@ export default function MailPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Email Viewer - Hidden on mobile, shown on desktop */}
-                    <Card className="hidden md:block flex-1">
-                        <CardContent className="p-0">
+                    {/* Email Viewer - Full height */}
+                    <Card className="flex-1 flex flex-col overflow-hidden">
+                        <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
                             {!selectedEmailId ? (
-                                <div className="flex items-center justify-center h-[calc(100vh-280px)] text-muted-foreground">
+                                <div className="flex items-center justify-center flex-1 text-muted-foreground">
                                     <div className="text-center">
                                         <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
                                         <p className="text-lg font-medium">Selecteer een email om te bekijken</p>
@@ -683,28 +713,77 @@ export default function MailPage() {
                                     </div>
                                 </div>
                             ) : isLoadingDetails ? (
-                                <div className="flex justify-center items-center h-[calc(100vh-280px)]">
+                                <div className="flex justify-center items-center flex-1">
                                     <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
                                 </div>
                             ) : emailDetails ? (
-                                <div className="flex flex-col h-[calc(100vh-280px)]">
+                                <div className="flex flex-col flex-1 overflow-hidden">
                                     {/* Email Header */}
                                     <div className="p-6 border-b bg-muted/30">
-                                        <h2 className="text-2xl font-bold mb-3">
-                                            {emailDetails.subject || '(Geen onderwerp)'}
-                                        </h2>
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-semibold">{emailDetails.fromName || 'Onbekend'}</span>
-                                                    <Badge variant="outline" className="text-xs">
-                                                        {emailDetails.fromEmail}
-                                                    </Badge>
-                                                </div>
-                                                <div className="text-sm text-muted-foreground">
-                                                    {new Date(emailDetails.date).toLocaleString('nl-NL')}
+                                        <div className="flex gap-6">
+                                            <div className="flex-1">
+                                                <h2 className="text-2xl font-bold mb-3">
+                                                    {emailDetails.subject || '(Geen onderwerp)'}
+                                                </h2>
+                                                <div className="flex items-start justify-between mb-4">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-semibold">{emailDetails.fromName || 'Onbekend'}</span>
+                                                            <Badge variant="outline" className="text-xs">
+                                                                {emailDetails.fromEmail}
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {new Date(emailDetails.date).toLocaleString('nl-NL')}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
+
+                                            {/* Suggested Orders Sidebar */}
+                                            {customerOrders && customerOrders.length > 0 && (
+                                                <div className="w-72 border-l pl-4 hidden xl:block">
+                                                    <h4 className="text-sm font-semibold mb-2 flex items-center gap-2 text-muted-foreground">
+                                                        <Package className="h-4 w-4" />
+                                                        Gevonden Orders
+                                                    </h4>
+                                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                                        {customerOrders.map((order: any) => {
+                                                            const isLinked = emailDetails.links?.some(l => l.entityType === 'order' && l.entityId === order.id);
+                                                            return (
+                                                                <div key={order.id} className="text-sm border rounded p-2 bg-background/50 hover:bg-background transition-colors group">
+                                                                    <div className="flex justify-between items-start mb-1">
+                                                                        <span className="font-medium">#{order.orderNumber}</span>
+                                                                        <Badge variant="outline" className="text-[10px] h-5 px-1">
+                                                                            {new Date(order.orderDate).toLocaleDateString()}
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className="text-xs text-muted-foreground">€{(order.totalAmount / 100).toFixed(2)}</span>
+                                                                        {!isLinked && (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="ghost"
+                                                                                className="h-6 text-xs px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                                onClick={() => handleLinkOrder(order)}
+                                                                            >
+                                                                                <LinkIcon className="h-3 w-3 mr-1" />
+                                                                                Koppelen
+                                                                            </Button>
+                                                                        )}
+                                                                        {isLinked && (
+                                                                            <span className="text-xs text-emerald-600 flex items-center">
+                                                                                <LinkIcon className="h-3 w-3 mr-1" />
+                                                                                Gekoppeld
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Linked Entities */}
@@ -719,7 +798,7 @@ export default function MailPage() {
                                                         const getEntityInfo = () => {
                                                             switch (link.entityType) {
                                                                 case 'order':
-                                                                    return { icon: Package, label: 'Bestelling', path: `/orders/${link.entityId}` };
+                                                                    return { icon: Package, label: 'Bestelling', path: `/orders?orderId=${link.entityId}` };
                                                                 case 'case':
                                                                     return { icon: Briefcase, label: 'Case', path: `/cases/${link.entityId}` };
                                                                 case 'return':
@@ -731,13 +810,34 @@ export default function MailPage() {
                                                             }
                                                         };
                                                         const { icon: Icon, label, path } = getEntityInfo();
+
+                                                        // Handler to open appropriate modal or navigate
+                                                        const handleEntityClick = () => {
+                                                            switch (link.entityType) {
+                                                                case 'case':
+                                                                    setSelectedCaseId(link.entityId);
+                                                                    break;
+                                                                case 'return':
+                                                                    setSelectedReturnId(link.entityId);
+                                                                    break;
+                                                                case 'repair':
+                                                                    setSelectedRepairId(link.entityId);
+                                                                    break;
+                                                                case 'order':
+                                                                default:
+                                                                    // Navigate to page for orders (no modal available)
+                                                                    window.location.href = path;
+                                                                    break;
+                                                            }
+                                                        };
+
                                                         return (
                                                             <div key={link.id} className="flex items-center gap-1 bg-background border rounded-md pl-1 pr-1">
                                                                 <Button
                                                                     size="sm"
                                                                     variant="ghost"
                                                                     className="gap-2 h-8 px-2"
-                                                                    onClick={() => window.location.href = path}
+                                                                    onClick={handleEntityClick}
                                                                 >
                                                                     <Icon className="h-3 w-3" />
                                                                     {label}
@@ -1080,6 +1180,31 @@ export default function MailPage() {
                 onOpenChange={setShowLinkRepair}
                 onLink={handleLinkRepair}
             />
+
+            {/* Detail Modals */}
+            {selectedCaseId && (
+                <CaseDetailModal
+                    caseId={selectedCaseId}
+                    open={!!selectedCaseId}
+                    onClose={() => setSelectedCaseId(null)}
+                />
+            )}
+
+            {selectedRepairId && (
+                <RepairDetailModal
+                    repairId={selectedRepairId}
+                    open={!!selectedRepairId}
+                    onClose={() => setSelectedRepairId(null)}
+                />
+            )}
+
+            {selectedReturnId && (
+                <Dialog open={!!selectedReturnId} onOpenChange={(open) => !open && setSelectedReturnId(null)}>
+                    <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+                        <ReturnDetailModalContent returnId={selectedReturnId} />
+                    </DialogContent>
+                </Dialog>
+            )}
         </div >
     );
 }
