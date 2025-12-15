@@ -471,46 +471,50 @@ export default function Cases() {
                 {caseItem.title}
               </h3>
 
-              {/* Bottom row: Order/Customer info */}
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5 pt-1.5 border-t border-dashed">
-                <div className="flex flex-col min-w-0 flex-1 mr-2">
-                  {/* Display Order Info if present, otherwise just Case Number */}
-                  {(caseItem as any).order ? (
-                    <>
-                      <span className="font-semibold text-foreground truncate">
-                        Order {(caseItem as any).order.orderNumber}
-                      </span>
-                      <span className="truncate">
-                        {(caseItem as any).customer
-                          ? `${(caseItem as any).customer.firstName} ${(caseItem as any).customer.lastName || ''}`
-                          : ((caseItem as any).order?.customerEmail || caseItem.customerEmail || '').split('@')[0]}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-mono">{caseItem.caseNumber}</span>
-                      <span className="truncate">
-                        {(caseItem as any).customer
-                          ? (caseItem as any).customer.firstName
-                          : (caseItem.customerEmail || '').split('@')[0]}
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {caseItem.notesCount !== undefined && caseItem.notesCount > 0 && (
-                    <Badge variant="outline" className="text-[9px] h-4 px-1" data-testid={`case-notes-count-${caseItem.id}`}>
-                      💬 {caseItem.notesCount}
+              {/* Bottom row: Order/Customer info - More prominent display */}
+              <div className="mt-2 pt-2 border-t border-dashed space-y-1.5">
+                {/* Order Badge - Prominent blue styling when order is linked */}
+                {(caseItem as any).order ? (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs px-2 py-0.5 font-semibold">
+                      <ShoppingCart className="h-3.5 w-3.5 mr-1" />
+                      {((caseItem as any).order.orderNumber || '').replace(/^#+/, '#')}
                     </Badge>
-                  )}
-                  {caseItem.assignedUser && (
-                    <Avatar className="h-4 w-4">
-                      <AvatarFallback className="text-[8px]" data-testid={`case-assignee-${caseItem.id}`}>
-                        {(caseItem.assignedUser.firstName?.[0] || '') + (caseItem.assignedUser.lastName?.[0] || '')}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
+                    <span className="text-[10px] font-mono text-muted-foreground">{caseItem.caseNumber}</span>
+                  </div>
+                ) : (
+                  <span className="text-xs font-mono text-muted-foreground">{caseItem.caseNumber}</span>
+                )}
+
+                {/* Customer info - Always visible when available */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    {((caseItem as any).customer || caseItem.customerEmail) && (
+                      <div className="flex items-center gap-1.5 text-xs text-foreground">
+                        <Users className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="font-medium truncate">
+                          {(caseItem as any).customer
+                            ? `${(caseItem as any).customer.firstName || ''} ${(caseItem as any).customer.lastName || ''}`.trim()
+                            : (caseItem.customerEmail || '').split('@')[0]}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {caseItem.notesCount !== undefined && caseItem.notesCount > 0 && (
+                      <Badge variant="outline" className="text-[10px] h-5 px-1.5" data-testid={`case-notes-count-${caseItem.id}`}>
+                        💬 {caseItem.notesCount}
+                      </Badge>
+                    )}
+                    {caseItem.assignedUser && (
+                      <Avatar className="h-5 w-5 border-2 border-primary/20">
+                        <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-semibold" data-testid={`case-assignee-${caseItem.id}`}>
+                          {(caseItem.assignedUser.firstName?.[0] || '') + (caseItem.assignedUser.lastName?.[0] || '')}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
