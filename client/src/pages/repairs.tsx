@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigation } from "@/components/layout/navigation";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +65,7 @@ const STATUS_ORDER = ["new", "in_repair", "completed", "returned"] as const;
 export default function Repairs() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewCustomerRepair, setShowNewCustomerRepair] = useState(false);
   const [showNewInventoryRepair, setShowNewInventoryRepair] = useState(false);
@@ -75,6 +77,20 @@ export default function Repairs() {
   const { data: repairs = [], isLoading } = useQuery<Repair[]>({
     queryKey: ["/api/repairs"],
   });
+
+  // Check for repairId in URL and open detail modal
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const repairId = params.get('repairId');
+
+    if (repairId && repairs.length > 0) {
+      const repair = repairs.find(r => r.id === repairId);
+      if (repair) {
+        setSelectedRepair(repair);
+        setLocation('/repairs');
+      }
+    }
+  }, [location, repairs, setLocation]);
 
   const { data: users = [] } = useQuery<UserType[]>({
     queryKey: ["/api/users"],

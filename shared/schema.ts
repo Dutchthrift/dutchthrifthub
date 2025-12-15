@@ -17,6 +17,8 @@ export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", ["aangeko
 export const caseStatusEnum = pgEnum("case_status", ["new", "in_progress", "waiting_customer", "resolved"]);
 export const caseEventTypeEnum = pgEnum("case_event_type", ["created", "status_change", "note_added", "link_added", "link_removed", "sla_set", "assigned", "email_sent", "email_received"]);
 export const caseLinkTypeEnum = pgEnum("case_link_type", ["order", "email", "repair", "todo", "return"]);
+export const caseTypeEnum = pgEnum("case_type", ["return_request", "complaint", "shipping_issue", "payment_issue", "general", "other"]);
+export const caseSourceEnum = pgEnum("case_source", ["email", "shopify", "manual"]);
 
 // Repair number counters - never decreases, ensures unique sequential numbers
 export const repairCounters = pgTable("repair_counters", {
@@ -210,6 +212,13 @@ export const cases = pgTable("cases", {
   status: caseStatusEnum("status").notNull().default("new"),
   priority: priorityEnum("priority").default("medium"),
   caseNumber: text("case_number").notNull().unique(), // Auto-generated case number
+  // New fields for case categorization
+  caseType: caseTypeEnum("case_type").default("general"),
+  otherTypeDescription: text("other_type_description"), // Custom description when caseType is "other"
+  source: caseSourceEnum("source").default("manual"),
+  waitingReason: text("waiting_reason"), // customer/supplier/shopify - used when status is waiting_customer
+  isEscalated: boolean("is_escalated").default(false),
+  // Existing fields
   timeline: jsonb("timeline"), // Chronological log of all activities
   slaDeadline: timestamp("sla_deadline"),
   resolvedAt: timestamp("resolved_at"),
@@ -375,6 +384,7 @@ export const returns = pgTable("returns", {
 
   // Dates
   requestedAt: timestamp("requested_at").defaultNow(),
+  acceptedAt: timestamp("accepted_at"), // When status changed to "onderweg" (start of 14-day deadline)
   receivedAt: timestamp("received_at"),
   expectedReturnDate: timestamp("expected_return_date"),
   completedAt: timestamp("completed_at"),
@@ -742,6 +752,9 @@ export const insertReturnSchema = createInsertSchema(returns).omit({
   updatedAt: true,
 }).extend({
   requestedAt: z.union([z.string(), z.date()]).optional().transform(val =>
+    val && typeof val === 'string' ? new Date(val) : val
+  ),
+  acceptedAt: z.union([z.string(), z.date()]).optional().nullable().transform(val =>
     val && typeof val === 'string' ? new Date(val) : val
   ),
   receivedAt: z.union([z.string(), z.date()]).optional().nullable().transform(val =>

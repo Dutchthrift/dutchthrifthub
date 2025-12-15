@@ -36,7 +36,7 @@ import {
   users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks, repairCounters
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
-import { eq, desc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns, lt } from "drizzle-orm";
+import { eq, desc, asc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns, lt } from "drizzle-orm";
 import { ObjectStorageService } from "./objectStorage";
 import type { Response } from "express";
 
@@ -84,6 +84,7 @@ export interface IStorage {
 
   // Email Messages
   getEmailMessages(threadId: string): Promise<EmailMessage[]>;
+  getEmailMessagesForThreads(threadIds: string[]): Promise<EmailMessage[]>;
   getEmailMessage(messageId: string): Promise<EmailMessage | undefined>;
   createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage>;
   findThreadByEmailAttributes(fromEmail: string, subject: string, date: Date | null): Promise<EmailThread | undefined>;
@@ -296,6 +297,7 @@ export interface IStorage {
   createEmailAttachmentBulk(attachments: InsertEmailAttachment[]): Promise<EmailAttachment[]>;
 
   getEmailLinks(emailId: string): Promise<EmailLink[]>;
+  getEmailLinksForEmails(emailIds: string[]): Promise<EmailLink[]>;
   createEmailLink(link: InsertEmailLink): Promise<EmailLink>;
 
   getSetting(key: string): Promise<string | undefined>;
@@ -565,6 +567,12 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(emailMessages).where(eq(emailMessages.threadId, threadId)).orderBy(desc(emailMessages.sentAt));
   }
 
+  // OPTIMIZED: Get messages for multiple threads in one query
+  async getEmailMessagesForThreads(threadIds: string[]): Promise<EmailMessage[]> {
+    if (threadIds.length === 0) return [];
+    return await db.select().from(emailMessages).where(inArray(emailMessages.threadId, threadIds)).orderBy(desc(emailMessages.sentAt));
+  }
+
   async getEmailMessage(messageId: string): Promise<EmailMessage | undefined> {
     const result = await db.select().from(emailMessages).where(eq(emailMessages.messageId, messageId)).limit(1);
     return result[0];
@@ -807,6 +815,9 @@ export class DatabaseStorage implements IStorage {
     const casesData = await db
       .select({
         ...getTableColumns(cases),
+        order: orders,
+        customer: customers,
+        assignedUser: users,
         notesCount: sql<number>`COALESCE((
           SELECT COUNT(*)::int 
           FROM ${notes} 
@@ -816,10 +827,68 @@ export class DatabaseStorage implements IStorage {
         ), 0)`,
       })
       .from(cases)
+      .leftJoin(orders, eq(cases.orderId, orders.id))
+      .leftJoin(customers, eq(cases.customerId, customers.id))
+      .leftJoin(users, eq(cases.assignedUserId, users.id))
       .where(whereClause)
       .orderBy(desc(cases.createdAt));
 
-    return casesData;
+    // Map the result to match the expected structure where nested objects are properties
+    const mappedCases = casesData.map(row => ({
+      ...row,
+      // Ensure we don't return null objects if join failed
+      order: row.order || undefined,
+      customer: row.customer || undefined,
+      assignedUser: row.assignedUser || undefined
+    }));
+
+    // Fallback: If order is missing, check if there's a linked order in case_links
+    // This handles cases that were linked manually but might not have orderId set on the case record
+    const casesMissingOrder = mappedCases.filter(c => !c.order);
+
+    if (casesMissingOrder.length > 0) {
+      const missingCaseIds = casesMissingOrder.map(c => c.id);
+
+      const linkedOrderLinks = await db
+        .select()
+        .from(caseLinks)
+        .where(and(
+          inArray(caseLinks.caseId, missingCaseIds),
+          eq(caseLinks.linkType, 'order')
+        ));
+
+      if (linkedOrderLinks.length > 0) {
+        const orderIds = linkedOrderLinks
+          .map(link => parseInt(link.linkedId))
+          .filter(id => !isNaN(id));
+
+        if (orderIds.length > 0) {
+          const linkedOrders = await db
+            .select()
+            .from(orders)
+            .where(inArray(orders.id, orderIds));
+
+          const orderMap = new Map(linkedOrders.map(o => [o.id, o]));
+          const caseToOrderMap = new Map();
+
+          linkedOrderLinks.forEach(link => {
+            const orderHeight = orderMap.get(parseInt(link.linkedId));
+            if (orderHeight) {
+              caseToOrderMap.set(link.caseId, orderHeight);
+            }
+          });
+
+          // Update mappedCases with found orders
+          mappedCases.forEach(c => {
+            if (!c.order && caseToOrderMap.has(c.id)) {
+              c.order = caseToOrderMap.get(c.id);
+            }
+          });
+        }
+      }
+    }
+
+    return mappedCases;
   }
 
   async getCase(id: string): Promise<Case | undefined> {
@@ -1047,14 +1116,31 @@ export class DatabaseStorage implements IStorage {
     repairs: Repair[];
     todos: Todo[];
   }> {
-    const [caseEmails, caseRepairs, caseTodos] = await Promise.all([
+    const [caseEmails, caseRepairs, caseTodos, caseLinksResult, caseResult] = await Promise.all([
       db.select().from(emailThreads).where(eq(emailThreads.caseId, caseId)),
       db.select().from(repairs).where(eq(repairs.caseId, caseId)),
-      db.select().from(todos).where(eq(todos.caseId, caseId))
+      db.select().from(todos).where(eq(todos.caseId, caseId)),
+      db.select().from(caseLinks).where(and(eq(caseLinks.caseId, caseId), eq(caseLinks.linkType, 'order'))),
+      db.select().from(cases).where(eq(cases.id, caseId)).limit(1)
     ]);
 
     // Get orders that are linked via email threads
-    const orderIds = caseEmails.filter(email => email.orderId).map(email => email.orderId!);
+    const emailOrderIds = caseEmails.filter(email => email.orderId).map(email => email.orderId!);
+
+    // Get orders linked via case_links
+    const linkedOrderIds = caseLinksResult.map(link => link.linkedId);
+
+    // Get primary order ID from case
+    const primaryOrderId = caseResult[0]?.orderId;
+
+    // Combine all order IDs
+    const allOrderIds = new Set([...emailOrderIds, ...linkedOrderIds]);
+    if (primaryOrderId) {
+      allOrderIds.add(primaryOrderId);
+    }
+
+    const orderIds = Array.from(allOrderIds);
+
     const caseOrders: Order[] = orderIds.length > 0 ?
       await db.select().from(orders).where(or(
         ...orderIds.map(orderId => eq(orders.id, orderId))
@@ -1404,7 +1490,8 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return await query.orderBy(desc(returns.createdAt));
+    // Sort by requestedAt ascending - oldest returns first (closer to deadline)
+    return await query.orderBy(asc(returns.requestedAt));
   }
 
   async getReturn(id: string): Promise<Return | undefined> {
@@ -1509,11 +1596,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getReturnsByStatus(status: string): Promise<Return[]> {
-    return await db.select().from(returns).where(eq(returns.status, status as any)).orderBy(desc(returns.createdAt));
+    return await db.select().from(returns).where(eq(returns.status, status as any)).orderBy(asc(returns.requestedAt));
   }
 
   async getReturnsByCustomer(customerId: string): Promise<Return[]> {
-    return await db.select().from(returns).where(eq(returns.customerId, customerId)).orderBy(desc(returns.createdAt));
+    return await db.select().from(returns).where(eq(returns.customerId, customerId)).orderBy(asc(returns.requestedAt));
   }
 
   async createReturnFromCase(caseId: string): Promise<Return> {
@@ -2000,6 +2087,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(emailLinks.emailId, emailId));
   }
 
+  // OPTIMIZED: Get email links for multiple emails in one query
+  async getEmailLinksForEmails(emailIds: string[]): Promise<EmailLink[]> {
+    if (emailIds.length === 0) return [];
+    return await db.select()
+      .from(emailLinks)
+      .where(inArray(emailLinks.emailId, emailIds));
+  }
+
   // Create email link
   async createEmailLink(link: InsertEmailLink): Promise<EmailLink> {
     const result = await db.insert(emailLinks).values(link).returning();
@@ -2020,14 +2115,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // Create case link
-  async createCaseLink(caseId: string, type: 'order' | 'email' | 'repair' | 'todo' | 'return', entityId: string): Promise<void> {
-    await db.insert(caseLinks).values({
-      caseId,
-      type,
-      entityId,
-    });
-  }
+  // Note: createCaseLink is defined earlier in the class (line ~1084) with correct InsertCaseLink interface
 
   // Get setting (for mail system config like last_imap_uid)
   async getSetting(key: string): Promise<string | undefined> {

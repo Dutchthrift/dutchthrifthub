@@ -2,8 +2,8 @@ import cron from 'node-cron';
 import { log } from './vite';
 
 export function startScheduledSync() {
-  // Run every 10 minutes
-  cron.schedule('*/10 * * * *', async () => {
+  // Run every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
     try {
       log('🔄 [Auto-Sync] Starting scheduled Shopify sync (orders + returns)...');
 
@@ -47,5 +47,5 @@ export function startScheduledSync() {
     }
   });
 
-  log('⏰ Scheduled Shopify sync enabled - will run every 10 minutes');
+  log('⏰ Scheduled Shopify sync enabled - will run every 5 minutes');
 }

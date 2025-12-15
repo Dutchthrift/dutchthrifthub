@@ -4309,6 +4309,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/returns/:id", requireAuth, async (req: any, res: any) => {
     try {
       const { id } = req.params;
+
+      // If status is changing to "onderweg", set acceptedAt if not already set
+      if (req.body.status === 'onderweg') {
+        const existingReturn = await storage.getReturn(id);
+        if (existingReturn && !existingReturn.acceptedAt) {
+          req.body.acceptedAt = new Date();
+        }
+      }
+
       const returnData = await storage.updateReturn(id, req.body);
 
       // Create activity if status changed
@@ -4689,6 +4698,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? await storage.createCaseWithItems(validatedData, validatedItems)
         : await storage.createCase(validatedData);
 
+      // If orderId is provided, also create a CaseLink for consistency
+      if (validatedData.orderId) {
+        console.log("[DEBUG] Creating case link for orderId:", validatedData.orderId, "caseId:", newCase.id);
+        try {
+          const caseLink = await storage.createCaseLink({
+            caseId: newCase.id,
+            linkType: 'order',
+            linkedId: validatedData.orderId,
+            createdBy: validatedData.assignedUserId || null,
+          });
+          console.log("[DEBUG] Case link created:", caseLink);
+        } catch (linkError) {
+          console.error("[DEBUG] Error creating order link:", linkError);
+          // Continue even if link creation fails - the case is already created
+        }
+      }
+
       // Create activity
       await storage.createActivity({
         type: "case_created",
@@ -4724,6 +4750,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getCaseLinks(id),
         storage.getCaseEvents(id)
       ]);
+
+      console.log("[DEBUG] Case:", id, "links found:", caseLinks.length, caseLinks);
 
       // Return complete case data in one response
       res.json({
@@ -4802,7 +4830,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid entityType" });
       }
 
+      // First creating a CaseLink record
+      const link = await storage.createCaseLink({
+        caseId: id,
+        linkType: entityType,
+        linkedId: entityId,
+        createdBy: null // We don't have the user ID easily available here usually, could be improved
+      });
+
+      // Also call the legacy linkEntityToCase for backward compatibility/other side updates
       await storage.linkEntityToCase(id, entityType, entityId);
+
+      // If linking an order, and the case doesn't have a primary order yet, set it
+      if (entityType === 'order') {
+        const currentCase = await storage.getCase(id);
+        if (currentCase && !currentCase.orderId) {
+          await storage.updateCase(id, { orderId: Number(entityId) });
+        }
+      }
 
       const caseItem = await storage.getCase(id);
       await storage.createActivity({
@@ -5971,6 +6016,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lastSyncAt = await storage.getSetting('mail_last_sync_at');
       const initialSyncDone = await storage.getSetting('mail_initial_sync_done');
 
+      console.log('📧 [MAIL SYNC] Settings:', {
+        lastSyncAt,
+        initialSyncDone,
+        force: !!force,
+        mailboxExists: mailbox.exists,
+        uidNext: mailbox.uidNext
+      });
+
       let searchCriteria: any;
       let syncMode: string;
 
@@ -5979,24 +6032,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Force sync or initial sync: Get last 2000 emails (newest)
         const totalMessages = mailbox.exists;
         if (totalMessages > 0) {
-          const startUid = Math.max(1, totalMessages - 1999);
+          // Use uidNext to calculate which UIDs to fetch (safer than using message count)
+          const uidNext = mailbox.uidNext || totalMessages + 1;
+          const startUid = Math.max(1, uidNext - 2000);
           searchCriteria = `${startUid}:*`;
           syncMode = 'force';
+          console.log(`📧 [MAIL SYNC] Force mode: fetching UIDs ${startUid}:* (uidNext=${uidNext})`);
         } else {
           searchCriteria = '1:*';
           syncMode = 'force';
+          console.log('📧 [MAIL SYNC] Force mode: empty mailbox, fetching all');
         }
       } else if (lastSyncAt) {
         // Normal refresh: Get emails since last sync date
         const lastSync = new Date(lastSyncAt);
         searchCriteria = { since: lastSync };
         syncMode = 'date-based';
+        console.log(`📧 [MAIL SYNC] Date-based mode: since ${lastSync.toISOString()}`);
       } else {
         // Fallback: get recent emails
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         searchCriteria = { since: yesterday };
         syncMode = 'date-based';
+        console.log(`📧 [MAIL SYNC] Fallback mode: since yesterday`);
       }
 
       let newMailCount = 0;
@@ -6005,12 +6064,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let uidsToFetch: number[];
       if (syncMode === 'date-based') {
         uidsToFetch = await client.search(searchCriteria);
+        console.log(`📧 [MAIL SYNC] Search found ${uidsToFetch.length} UIDs`);
       } else {
         uidsToFetch = [];
       }
 
       // Fetch emails
       const fetchQuery = uidsToFetch.length > 0 ? uidsToFetch : searchCriteria;
+      console.log(`📧 [MAIL SYNC] Fetching with query:`, typeof fetchQuery === 'string' ? fetchQuery : `${uidsToFetch.length} UIDs`);
 
       for await (let msg of client.fetch(fetchQuery, { source: true, uid: true })) {
         try {
@@ -6101,6 +6162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/mail/list - Get emails with cursor pagination
+  // OPTIMIZED: Uses batch query for email links instead of N+1 queries
   app.get("/api/mail/list", requireAuth, async (req: any, res: any) => {
     try {
       const limit = parseInt(req.query.limit as string) || 50;
@@ -6135,16 +6197,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[MAIL] Returning:', { count: emails.length, hasMore });
 
-      // Fetch links for all emails
-      const emailsWithLinks = await Promise.all(
-        emails.map(async (email: any) => {
-          const links = await storage.getEmailLinks(email.id);
-          return {
-            ...email,
-            links: links || []
-          };
-        })
-      );
+      // OPTIMIZED: Batch fetch links for all emails in ONE query instead of N queries
+      const emailIds = emails.map((e: any) => e.id);
+      const allLinks = emailIds.length > 0 ? await storage.getEmailLinksForEmails(emailIds) : [];
+
+      // Group links by emailId
+      const linksByEmailId = new Map<string, typeof allLinks>();
+      for (const link of allLinks) {
+        const existing = linksByEmailId.get(link.emailId) || [];
+        existing.push(link);
+        linksByEmailId.set(link.emailId, existing);
+      }
+
+      // Add links to each email
+      const emailsWithLinks = emails.map((email: any) => ({
+        ...email,
+        links: linksByEmailId.get(email.id) || []
+      }));
 
       res.json({
         emails: emailsWithLinks,

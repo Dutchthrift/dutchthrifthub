@@ -16,7 +16,15 @@ import {
   CheckCircle,
   Archive,
   Users,
-  FileText
+  FileText,
+  Package,
+  Truck,
+  CreditCard,
+  MessageSquare,
+  Mail,
+  ShoppingCart,
+  Pencil,
+  HelpCircle
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -32,6 +40,34 @@ const CASE_STATUS_CONFIG = {
   in_progress: { label: "In Behandeling", color: "bg-primary", icon: Clock },
   waiting_customer: { label: "Wachtend op Klant", color: "bg-chart-1", icon: Users },
   resolved: { label: "Opgelost", color: "bg-chart-2", icon: CheckCircle },
+};
+
+const CASE_TYPE_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+  return_request: { label: "Retour", color: "bg-blue-100 text-blue-700 border-blue-300", icon: Package },
+  complaint: { label: "Klacht", color: "bg-red-100 text-red-700 border-red-300", icon: AlertTriangle },
+  shipping_issue: { label: "Verzending", color: "bg-orange-100 text-orange-700 border-orange-300", icon: Truck },
+  payment_issue: { label: "Betaling", color: "bg-purple-100 text-purple-700 border-purple-300", icon: CreditCard },
+  general: { label: "Algemeen", color: "bg-gray-100 text-gray-700 border-gray-300", icon: FileText },
+  other: { label: "Overig", color: "bg-slate-100 text-slate-700 border-slate-300", icon: HelpCircle },
+};
+
+const CASE_SOURCE_CONFIG: Record<string, { label: string; icon: any }> = {
+  email: { label: "Email", icon: Mail },
+  shopify: { label: "Shopify", icon: ShoppingCart },
+  manual: { label: "Handmatig", icon: Pencil },
+};
+
+const getDaysOpen = (createdAt: string | Date | null): number => {
+  if (!createdAt) return 0;
+  const created = new Date(createdAt);
+  const now = new Date();
+  return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const getDaysOpenColor = (days: number): string => {
+  if (days > 7) return "text-red-600 bg-red-50";
+  if (days > 3) return "text-orange-600 bg-orange-50";
+  return "text-muted-foreground";
 };
 
 export default function Cases() {
@@ -344,67 +380,110 @@ export default function Cases() {
             ref={provided.innerRef}
             {...provided.draggableProps}
             {...provided.dragHandleProps}
-            className={`mb-3 cursor-pointer hover:shadow-md transition-shadow ${snapshot.isDragging ? "rotate-3 shadow-lg" : ""
+            className={`mb-3 cursor-pointer transition-all duration-200 ${snapshot.isDragging
+              ? "shadow-xl scale-[1.02] ring-2 ring-primary/30 z-50"
+              : "hover:shadow-md"
               } ${caseItem.archived ? "opacity-60" : ""}`}
+            style={{
+              ...provided.draggableProps.style,
+              // Reset transform when not dragging to prevent stuck state
+              transform: snapshot.isDragging
+                ? provided.draggableProps.style?.transform
+                : undefined,
+            }}
             onClick={() => setSelectedCase(caseItem)}
             data-testid={`case-card-${caseItem.id}`}
           >
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-medium text-sm line-clamp-2" data-testid={`case-title-${caseItem.id}`}>
-                  {caseItem.title}
-                  {caseItem.archived && (
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      Gearchiveerd
-                    </Badge>
-                  )}
-                </h3>
-                <Badge variant={getPriorityVariant(caseItem.priority)} className="ml-2 text-xs">
-                  {caseItem.priority}
-                </Badge>
+            <CardContent className="p-2.5">
+              {/* Top row: Type badge + Days open + Priority */}
+              <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                <div className="flex items-center gap-1 min-w-0">
+                  {/* Case Type Badge */}
+                  {(() => {
+                    const typeConfig = CASE_TYPE_CONFIG[(caseItem as any).caseType || 'general'];
+                    const TypeIcon = typeConfig?.icon || FileText;
+                    return (
+                      <Badge variant="outline" className={`text-[9px] px-1 py-0 h-4 shrink-0 ${typeConfig?.color || ''}`}>
+                        <TypeIcon className="h-2.5 w-2.5 mr-0.5" />
+                        {(caseItem as any).caseType === 'other'
+                          ? ((caseItem as any).otherTypeDescription || 'Overig').slice(0, 12)
+                          : typeConfig?.label}
+                      </Badge>
+                    );
+                  })()}
+                  {/* Source Icon */}
+                  {(() => {
+                    const sourceConfig = CASE_SOURCE_CONFIG[(caseItem as any).source || 'manual'];
+                    const SourceIcon = sourceConfig?.icon || Pencil;
+                    return (
+                      <SourceIcon className="h-3 w-3 text-muted-foreground shrink-0" title={sourceConfig?.label} />
+                    );
+                  })()}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Days Open */}
+                  {(() => {
+                    const days = getDaysOpen(caseItem.createdAt);
+                    if (caseItem.status === 'resolved') return null;
+                    return (
+                      <span className={`text-[9px] font-medium px-1 py-0 rounded ${getDaysOpenColor(days)}`}>
+                        {days}d
+                      </span>
+                    );
+                  })()}
+                  {/* Priority Badge */}
+                  <Badge variant={getPriorityVariant(caseItem.priority)} className="text-[9px] h-4 px-1">
+                    {caseItem.priority === 'urgent' ? '🔥' : caseItem.priority === 'high' ? '⚡' : ''}
+                    {caseItem.priority}
+                  </Badge>
+                </div>
               </div>
 
-              <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
-                {caseItem.description}
-              </p>
+              {/* Title / Description */}
+              <h3 className="font-medium text-xs line-clamp-2 mb-1 leading-snug" data-testid={`case-title-${caseItem.id}`}>
+                {caseItem.title}
+              </h3>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-mono text-muted-foreground" data-testid={`case-number-${caseItem.id}`}>
-                    #{caseItem.caseNumber}
-                  </span>
-                  {caseItem.slaDeadline && (
-                    <span className={`font-medium ${isOverdue(caseItem.slaDeadline) ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {isOverdue(caseItem.slaDeadline) ? 'Verlopen' : formatDate(caseItem.slaDeadline)}
-                    </span>
+              {/* Bottom row: Order/Customer info */}
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5 pt-1.5 border-t border-dashed">
+                <div className="flex flex-col min-w-0 flex-1 mr-2">
+                  {/* Display Order Info if present, otherwise just Case Number */}
+                  {(caseItem as any).order ? (
+                    <>
+                      <span className="font-semibold text-foreground truncate">
+                        Order {(caseItem as any).order.orderNumber}
+                      </span>
+                      <span className="truncate">
+                        {(caseItem as any).customer
+                          ? `${(caseItem as any).customer.firstName} ${(caseItem as any).customer.lastName || ''}`
+                          : ((caseItem as any).order?.customerEmail || caseItem.customerEmail || '').split('@')[0]}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-mono">{caseItem.caseNumber}</span>
+                      <span className="truncate">
+                        {(caseItem as any).customer
+                          ? (caseItem as any).customer.firstName
+                          : (caseItem.customerEmail || '').split('@')[0]}
+                      </span>
+                    </>
                   )}
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-muted-foreground">
-                    {caseItem.customer ? (
-                      <span data-testid={`case-customer-${caseItem.id}`}>
-                        {caseItem.customer.firstName} {caseItem.customer.lastName}
-                      </span>
-                    ) : (
-                      <span>{caseItem.customerEmail}</span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {caseItem.notesCount !== undefined && caseItem.notesCount > 0 && (
-                      <Badge variant="outline" className="text-xs" data-testid={`case-notes-count-${caseItem.id}`}>
-                        📝 {caseItem.notesCount}
-                      </Badge>
-                    )}
-                    {caseItem.assignedUser && (
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-xs" data-testid={`case-assignee-${caseItem.id}`}>
-                          {(caseItem.assignedUser.firstName?.[0] || '') + (caseItem.assignedUser.lastName?.[0] || '')}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {caseItem.notesCount !== undefined && caseItem.notesCount > 0 && (
+                    <Badge variant="outline" className="text-[9px] h-4 px-1" data-testid={`case-notes-count-${caseItem.id}`}>
+                      💬 {caseItem.notesCount}
+                    </Badge>
+                  )}
+                  {caseItem.assignedUser && (
+                    <Avatar className="h-4 w-4">
+                      <AvatarFallback className="text-[8px]" data-testid={`case-assignee-${caseItem.id}`}>
+                        {(caseItem.assignedUser.firstName?.[0] || '') + (caseItem.assignedUser.lastName?.[0] || '')}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
                 </div>
               </div>
             </CardContent>

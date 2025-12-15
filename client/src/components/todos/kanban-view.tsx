@@ -138,7 +138,7 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
                 <CardContent
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`flex-1 overflow-y-auto space-y-3 pb-3 ${snapshot.isDraggingOver ? "bg-muted/50" : ""
+                  className={`flex-1 overflow-y-auto scrollbar-thin space-y-3 pb-3 ${snapshot.isDraggingOver ? "bg-muted/50" : ""
                     }`}
                 >
                   {column.todos.length === 0 ? (
@@ -166,8 +166,8 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
                             onClick={() => onTaskClick(todo)}
                             data-testid={`kanban-todo-card-${todo.id}`}
                           >
-                            <CardContent className="p-2.5">
-                              <div className="space-y-1.5">
+                            <CardContent className="!p-2">
+                              <div className="space-y-0.5">
                                 <div className="flex items-start justify-between gap-2">
                                   <h4
                                     className={`text-sm font-medium flex-1 leading-snug ${todo.status === "done" ? "line-through text-muted-foreground" : ""
@@ -191,8 +191,8 @@ export function KanbanView({ todos, onUpdateStatus, isLoading, onTaskClick }: Ka
                                     {todo.dueDate && (
                                       <span
                                         className={`text-[10px] ${isOverdue(todo.dueDate) && todo.status !== "done"
-                                            ? "text-destructive font-medium"
-                                            : "text-muted-foreground"
+                                          ? "text-destructive font-medium"
+                                          : "text-muted-foreground"
                                           }`}
                                       >
                                         {formatDueDate(todo.dueDate)}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { NoteComposer } from "@/components/notes/NoteComposer";
 import { NoteItem } from "@/components/notes/NoteItem";
@@ -17,7 +17,7 @@ import {
   Calendar,
   CheckCircle,
   Clock,
-  AlertCircle,
+  Circle,
   Package,
   Wrench,
   UserCircle,
@@ -28,6 +28,8 @@ import {
   MessageSquare,
   ExternalLink,
   ListTodo,
+  Flag,
+  Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -55,6 +57,27 @@ interface TaskDetailModalProps {
   onUpdate?: () => void;
 }
 
+const STATUSES = [
+  { value: 'todo', label: 'Te Doen', color: 'text-amber-500', emoji: '📋' },
+  { value: 'in_progress', label: 'Bezig', color: 'text-blue-500', emoji: '🔄' },
+  { value: 'done', label: 'Afgerond', color: 'text-emerald-500', emoji: '✅' },
+];
+
+const PRIORITY_CONFIG = {
+  urgent: { color: 'bg-red-500', bgLight: 'bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/30', borderColor: 'border-red-200 dark:border-red-800', text: 'text-red-700 dark:text-red-300', label: '🔴 Urgent' },
+  high: { color: 'bg-orange-500', bgLight: 'bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30', borderColor: 'border-orange-200 dark:border-orange-800', text: 'text-orange-700 dark:text-orange-300', label: '🟠 Hoog' },
+  medium: { color: 'bg-amber-500', bgLight: 'bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30', borderColor: 'border-amber-200 dark:border-amber-800', text: 'text-amber-700 dark:text-amber-300', label: '🟡 Normaal' },
+  low: { color: 'bg-green-500', bgLight: 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30', borderColor: 'border-green-200 dark:border-green-800', text: 'text-green-700 dark:text-green-300', label: '🟢 Laag' },
+};
+
+const CATEGORY_CONFIG: Record<string, { emoji: string; label: string; color: string }> = {
+  orders: { emoji: '📦', label: 'Orders', color: 'text-blue-600' },
+  purchasing: { emoji: '🛒', label: 'Inkoop', color: 'text-purple-600' },
+  marketing: { emoji: '📣', label: 'Marketing', color: 'text-pink-600' },
+  admin: { emoji: '⚙️', label: 'Admin', color: 'text-slate-600' },
+  other: { emoji: '📌', label: 'Overig', color: 'text-gray-600' },
+};
+
 export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDetailModalProps) {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -62,7 +85,16 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
   const [editedDescription, setEditedDescription] = useState("");
+  const [showNotes, setShowNotes] = useState(false);
+  const [localStatus, setLocalStatus] = useState<string>(todo?.status || 'todo');
   const { toast } = useToast();
+
+  // Sync local status with todo prop when it changes
+  useEffect(() => {
+    if (todo?.status) {
+      setLocalStatus(todo.status);
+    }
+  }, [todo?.status]);
 
   const { data: users } = useQuery<UserType[]>({
     queryKey: ["/api/users/list"],
@@ -133,7 +165,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
       toast({
-        title: "Taak verwijderd",
+        title: "✅ Taak verwijderd",
         description: "Taak is succesvol verwijderd",
       });
       onOpenChange(false);
@@ -160,7 +192,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
-      toast({ title: "Taak bijgewerkt" });
+      toast({ title: "✅ Taak bijgewerkt" });
       onUpdate?.();
     },
     onError: () => {
@@ -196,7 +228,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notes", "todo", todo?.id] });
-      toast({ title: "Notitie toegevoegd" });
+      toast({ title: "✅ Notitie toegevoegd" });
     },
     onError: () => {
       toast({
@@ -294,6 +326,21 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
     setIsEditingDescription(false);
   };
 
+  const handleStatusChange = (newStatus: string) => {
+    if (todo) {
+      // Optimistic update - update local state immediately
+      setLocalStatus(newStatus);
+
+      updateTodoMutation.mutate({
+        id: todo.id,
+        data: {
+          status: newStatus as any,
+          completedAt: newStatus === 'done' ? new Date().toISOString() : null,
+        },
+      });
+    }
+  };
+
   const getAssignedUser = () => {
     if (!todo || !users) return null;
     return users.find(u => u.id === todo.assignedUserId);
@@ -304,44 +351,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
     return users.find(u => u.id === todo.createdBy);
   };
 
-  const getPriorityConfig = (priority: string) => {
-    switch (priority) {
-      case "urgent":
-        return { color: "bg-red-500", bgLight: "bg-red-50 dark:bg-red-950/30", text: "text-red-700 dark:text-red-300", label: "Urgent" };
-      case "high":
-        return { color: "bg-orange-500", bgLight: "bg-orange-50 dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-300", label: "Hoog" };
-      case "medium":
-        return { color: "bg-amber-500", bgLight: "bg-amber-50 dark:bg-amber-950/30", text: "text-amber-700 dark:text-amber-300", label: "Normaal" };
-      case "low":
-        return { color: "bg-green-500", bgLight: "bg-green-50 dark:bg-green-950/30", text: "text-green-700 dark:text-green-300", label: "Laag" };
-      default:
-        return { color: "bg-slate-500", bgLight: "bg-slate-50 dark:bg-slate-950/30", text: "text-slate-700 dark:text-slate-300", label: "Normaal" };
-    }
-  };
-
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case "done":
-        return { icon: <CheckCircle className="h-5 w-5 text-green-500" />, label: "Afgerond", color: "text-green-600" };
-      case "in_progress":
-        return { icon: <Clock className="h-5 w-5 text-blue-500" />, label: "Bezig", color: "text-blue-600" };
-      case "todo":
-        return { icon: <AlertCircle className="h-5 w-5 text-amber-500" />, label: "Te Doen", color: "text-amber-600" };
-      default:
-        return { icon: <AlertCircle className="h-5 w-5 text-slate-500" />, label: status, color: "text-slate-600" };
-    }
-  };
-
-  const formatCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      orders: "Orders",
-      purchasing: "Inkoop",
-      marketing: "Marketing",
-      admin: "Admin",
-      other: "Overig",
-    };
-    return labels[category] || category;
-  };
+  const getStatusIndex = (status: string) => STATUSES.findIndex(s => s.value === status);
 
   if (showEditForm && todo) {
     return (
@@ -358,22 +368,23 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
     );
   }
 
-  const priorityConfig = getPriorityConfig(todo?.priority || 'medium');
-  const statusConfig = getStatusConfig(todo?.status || 'todo');
-
+  const priorityConfig = PRIORITY_CONFIG[todo?.priority as keyof typeof PRIORITY_CONFIG] || PRIORITY_CONFIG.medium;
+  const categoryConfig = CATEGORY_CONFIG[todo?.category || 'other'];
+  const currentStatusIndex = getStatusIndex(localStatus);
   const pinnedNotes = notes.filter((note) => note.isPinned && !note.deletedAt);
   const unpinnedNotes = notes.filter((note) => !note.isPinned && !note.deletedAt);
+  const hasLinkedEntities = linkedOrder || linkedCase || linkedRepair || linkedCustomer;
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 [&>button]:hidden"
+          className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 [&>button]:hidden"
           data-testid="task-detail-modal"
         >
-          {/* Header with Title and Uniform Icon Buttons (like PO modal) */}
+          {/* Header with gradient based on priority */}
           {todo && (
-            <div className={`${priorityConfig.bgLight} px-5 pt-4 pb-3 border-b`}>
+            <div className={`${priorityConfig.bgLight} ${priorityConfig.borderColor} px-5 pt-4 pb-3 border-b`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   {isEditingTitle ? (
@@ -398,6 +409,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
                   ) : (
                     <>
                       <div className="flex items-center gap-2 flex-wrap">
+                        <Sparkles className="h-5 w-5 text-primary" />
                         <DialogTitle
                           className="text-xl font-semibold cursor-pointer hover:opacity-70"
                           onClick={handleStartEditTitle}
@@ -407,22 +419,20 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
                       </div>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <Badge className={`${priorityConfig.color} text-white text-xs`}>
-                          {priorityConfig.label}
+                          <Flag className="h-3 w-3 mr-1" />
+                          {priorityConfig.label.split(' ')[1]}
                         </Badge>
-                        <Badge variant="outline" className={statusConfig.color}>
-                          {statusConfig.label}
-                        </Badge>
-                        {todo.category && (
+                        {categoryConfig && (
                           <Badge variant="secondary" className="text-xs">
-                            <Folder className="h-3 w-3 mr-1" />
-                            {formatCategoryLabel(todo.category)}
+                            <span className="mr-1">{categoryConfig.emoji}</span>
+                            {categoryConfig.label}
                           </Badge>
                         )}
                       </div>
                     </>
                   )}
                 </div>
-                {/* Uniform Icon Buttons Group (matching PO modal) */}
+                {/* Icon Buttons Group */}
                 <div className="flex items-center gap-0.5 shrink-0">
                   <Button
                     size="icon"
@@ -433,6 +443,15 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
                     className="h-8 w-8 rounded-full text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                   >
                     <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setShowNotes(!showNotes)}
+                    title="Notities"
+                    className={`h-8 w-8 rounded-full ${showNotes ? 'text-purple-600 bg-purple-100 dark:bg-purple-900/30' : 'text-purple-600 hover:text-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/30'}`}
+                  >
+                    <MessageSquare className="h-4 w-4" />
                   </Button>
                   <Button
                     size="icon"
@@ -460,7 +479,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
           )}
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-4 space-y-4">
             {!todo ? (
               <div className="flex items-center justify-center py-8" data-testid="task-loading">
                 <div className="text-center">
@@ -470,21 +489,48 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
               </div>
             ) : (
               <>
+                {/* Horizontal Status Timeline */}
+                <div className="py-3 px-2">
+                  <div className="flex items-center justify-center gap-0">
+                    {STATUSES.map((status, idx) => {
+                      const isCompleted = idx < currentStatusIndex;
+                      const isCurrent = idx === currentStatusIndex;
+                      return (
+                        <div key={status.value} className="flex items-center">
+                          <button
+                            onClick={() => handleStatusChange(status.value)}
+                            disabled={updateTodoMutation.isPending}
+                            className={`flex flex-col items-center gap-1.5 cursor-pointer hover:opacity-80 transition-all px-4 py-1 rounded-lg ${isCurrent ? 'bg-muted/50' : 'hover:bg-muted/30'}`}
+                          >
+                            {isCompleted ? (
+                              <CheckCircle className={`h-7 w-7 ${status.color}`} />
+                            ) : isCurrent ? (
+                              <div className={`h-7 w-7 rounded-full border-2 ${status.color} border-current flex items-center justify-center`}>
+                                <div className={`h-3 w-3 rounded-full bg-current`} />
+                              </div>
+                            ) : (
+                              <Circle className="h-7 w-7 text-gray-300 dark:text-gray-600" />
+                            )}
+                            <span className={`text-xs whitespace-nowrap ${isCurrent ? 'font-semibold ' + status.color : 'text-muted-foreground'}`}>
+                              {status.emoji} {status.label}
+                            </span>
+                          </button>
+                          {idx < STATUSES.length - 1 && (
+                            <div className={`w-12 h-0.5 ${idx < currentStatusIndex ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Quick Actions */}
                 {users && (
-                  <div className="bg-muted/30 rounded-lg p-3 border">
+                  <div className="p-3 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-900/50 dark:to-gray-900/50 rounded-lg border">
                     <QuickActionsBar
                       todo={todo}
                       users={users}
-                      onStatusChange={(status) => {
-                        updateTodoMutation.mutate({
-                          id: todo.id,
-                          data: {
-                            status: status as any,
-                            completedAt: status === 'done' ? new Date().toISOString() : null,
-                          },
-                        });
-                      }}
+                      onStatusChange={handleStatusChange}
                       onPriorityChange={(priority) => {
                         updateTodoMutation.mutate({
                           id: todo.id,
@@ -510,241 +556,215 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
 
                 {/* 2-Column Layout */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Left Column: Description, Subtasks, Note Composer */}
+                  {/* Left Column */}
                   <div className="space-y-4">
                     {/* Description */}
-                    <div className="border rounded-lg border-l-4 border-l-blue-500">
-                      <div className="flex items-center gap-2 px-3 py-2 border-b bg-blue-50/50 dark:bg-blue-950/20">
-                        <Folder className="h-3.5 w-3.5 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Beschrijving</span>
+                    <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Folder className="h-4 w-4 text-blue-600" />
+                        <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">Beschrijving</span>
                       </div>
-                      <div className="p-3">
-                        {isEditingDescription ? (
-                          <div className="space-y-2">
-                            <textarea
-                              value={editedDescription}
-                              onChange={(e) => setEditedDescription(e.target.value)}
-                              className="w-full min-h-[80px] p-2 text-sm border rounded bg-background resize-none"
-                              autoFocus
-                              placeholder="Voeg een beschrijving toe..."
-                            />
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={handleSaveDescription}>
-                                <Check className="h-3 w-3 mr-1" />
-                                Opslaan
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                                Annuleren
-                              </Button>
-                            </div>
+                      {isEditingDescription ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editedDescription}
+                            onChange={(e) => setEditedDescription(e.target.value)}
+                            className="w-full min-h-[60px] p-2 text-sm border rounded bg-background resize-none"
+                            autoFocus
+                            placeholder="Voeg een beschrijving toe..."
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={handleSaveDescription} className="h-7 text-xs">
+                              <Check className="h-3 w-3 mr-1" />
+                              Opslaan
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={handleCancelEdit} className="h-7 text-xs">
+                              Annuleren
+                            </Button>
                           </div>
-                        ) : (
-                          <p
-                            className="text-sm whitespace-pre-wrap cursor-pointer hover:bg-muted/50 rounded p-1 -m-1 transition-colors min-h-[40px]"
-                            onClick={handleStartEditDescription}
-                          >
-                            {todo.description || <span className="text-muted-foreground italic">Klik om beschrijving toe te voegen...</span>}
-                          </p>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <p
+                          className="text-xs whitespace-pre-wrap cursor-pointer hover:bg-white/50 dark:hover:bg-black/20 rounded p-1.5 -m-1 transition-colors min-h-[40px]"
+                          onClick={handleStartEditDescription}
+                        >
+                          {todo.description || <span className="text-muted-foreground italic">Klik om beschrijving toe te voegen...</span>}
+                        </p>
+                      )}
                     </div>
 
                     {/* Subtasks */}
-                    <div className="border rounded-lg border-l-4 border-l-purple-500">
-                      <div className="flex items-center gap-2 px-3 py-2 border-b bg-purple-50/50 dark:bg-purple-950/20">
-                        <ListTodo className="h-3.5 w-3.5 text-purple-600" />
-                        <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Subtaken</span>
+                    <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ListTodo className="h-4 w-4 text-purple-600" />
+                        <span className="text-xs font-semibold text-purple-700 dark:text-purple-400">Subtaken</span>
                       </div>
-                      <div className="p-3">
-                        <SubtasksSection todoId={todo.id} subtasks={subtasks} />
-                      </div>
+                      <SubtasksSection todoId={todo.id} subtasks={subtasks} />
                     </div>
-
-                    {/* Note Composer - Left Side */}
-                    {currentUser && (
-                      <div className="border rounded-lg border-l-4 border-l-rose-500">
-                        <div className="flex items-center gap-2 px-3 py-2 border-b bg-rose-50/50 dark:bg-rose-950/20">
-                          <MessageSquare className="h-3.5 w-3.5 text-rose-600" />
-                          <span className="text-sm font-medium text-rose-900 dark:text-rose-100">Notitie Toevoegen</span>
-                        </div>
-                        <div className="p-3">
-                          <NoteComposer
-                            onSubmit={(noteData) => createNoteMutation.mutate(noteData)}
-                            isPending={createNoteMutation.isPending}
-                            availableTags={availableTags}
-                            placeholder="Schrijf een notitie..."
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Right Column: Details, Linked Entities, Notes List */}
+                  {/* Right Column */}
                   <div className="space-y-4">
                     {/* Details */}
-                    <div className="border rounded-lg border-l-4 border-l-emerald-500">
-                      <div className="flex items-center gap-2 px-3 py-2 border-b bg-emerald-50/50 dark:bg-emerald-950/20">
-                        <User className="h-3.5 w-3.5 text-emerald-600" />
-                        <span className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Details</span>
+                    <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                      <div className="flex items-center gap-2 mb-3">
+                        <User className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Details</span>
                       </div>
-                      <div className="p-3">
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              Toegewezen aan
-                            </div>
-                            <div className="font-medium">
-                              {getAssignedUser() ?
-                                `${getAssignedUser()?.firstName} ${getAssignedUser()?.lastName}` :
-                                <span className="text-muted-foreground">Niemand</span>}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              Deadline
-                            </div>
-                            <div className="font-medium">
-                              {todo.dueDate ? (
-                                <span className={new Date(todo.dueDate) < new Date() && todo.status !== 'done' ? 'text-destructive' : ''}>
-                                  {format(new Date(todo.dueDate), "d MMM yyyy", { locale: nl })}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">Geen</span>
-                              )}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
-                              <UserCircle className="h-3 w-3" />
-                              Aangemaakt door
-                            </div>
-                            <div className="font-medium">
-                              {getCreatedByUser() ?
-                                `${getCreatedByUser()?.firstName}` :
-                                <span className="text-muted-foreground">Onbekend</span>}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
-                              <CheckCircle className="h-3 w-3" />
-                              Voltooid op
-                            </div>
-                            <div className="font-medium">
-                              {todo.completedAt ? (
-                                <span className="text-green-600 dark:text-green-400">
-                                  {format(new Date(todo.completedAt), "d MMM", { locale: nl })}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </div>
-                          </div>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            Toegewezen aan
+                          </span>
+                          <span className="text-sm font-medium">
+                            {getAssignedUser() ? `${getAssignedUser()?.firstName} ${getAssignedUser()?.lastName || ''}`.trim() : <span className="text-muted-foreground">Niemand</span>}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            Deadline
+                          </span>
+                          <span className={`text-sm font-medium ${todo.dueDate && new Date(todo.dueDate) < new Date() && todo.status !== 'done' ? 'text-red-500' : ''}`}>
+                            {todo.dueDate ? format(new Date(todo.dueDate), "d MMMM yyyy", { locale: nl }) : <span className="text-muted-foreground">Geen deadline</span>}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground flex items-center gap-2">
+                            <UserCircle className="h-4 w-4" />
+                            Aangemaakt door
+                          </span>
+                          <span className="text-sm font-medium">
+                            {getCreatedByUser() ? `${getCreatedByUser()?.firstName} ${getCreatedByUser()?.lastName || ''}`.trim() : <span className="text-muted-foreground">Onbekend</span>}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4" />
+                            Voltooid op
+                          </span>
+                          <span className="text-sm font-medium">
+                            {todo.completedAt ? (
+                              <span className="text-emerald-600 dark:text-emerald-400">
+                                {format(new Date(todo.completedAt), "d MMMM yyyy", { locale: nl })}
+                              </span>
+                            ) : <span className="text-muted-foreground">Nog niet voltooid</span>}
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     {/* Linked Entities */}
-                    {(linkedOrder || linkedCase || linkedRepair || linkedCustomer) && (
-                      <div className="border rounded-lg border-l-4 border-l-amber-500">
-                        <div className="flex items-center gap-2 px-3 py-2 border-b bg-amber-50/50 dark:bg-amber-950/20">
-                          <ExternalLink className="h-3.5 w-3.5 text-amber-600" />
-                          <span className="text-sm font-medium text-amber-900 dark:text-amber-100">Gekoppeld aan</span>
+                    {hasLinkedEntities && (
+                      <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ExternalLink className="h-4 w-4 text-amber-600" />
+                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Gekoppeld aan</span>
                         </div>
-                        <div className="p-3 space-y-1.5">
+                        <div className="space-y-1.5">
                           {linkedOrder && (
                             <Button
                               variant="outline"
                               size="sm"
-                              className="w-full justify-start h-8 text-xs"
+                              className="w-full justify-start h-7 text-xs"
                               onClick={() => window.location.href = `/orders/${linkedOrder.id}`}
                             >
                               <Package className="h-3.5 w-3.5 mr-2 text-blue-500" />
-                              Order {linkedOrder.orderNumber}
+                              📦 Order {linkedOrder.orderNumber}
                             </Button>
                           )}
                           {linkedCase && (
                             <Button
                               variant="outline"
                               size="sm"
-                              className="w-full justify-start h-8 text-xs"
+                              className="w-full justify-start h-7 text-xs"
                               onClick={() => window.location.href = `/cases/${linkedCase.id}`}
                             >
                               <Folder className="h-3.5 w-3.5 mr-2 text-purple-500" />
-                              Case #{linkedCase.caseNumber}
+                              📁 Case #{linkedCase.caseNumber}
                             </Button>
                           )}
                           {linkedRepair && (
                             <Button
                               variant="outline"
                               size="sm"
-                              className="w-full justify-start h-8 text-xs"
+                              className="w-full justify-start h-7 text-xs"
                               onClick={() => window.location.href = `/repairs/${linkedRepair.id}`}
                             >
                               <Wrench className="h-3.5 w-3.5 mr-2 text-orange-500" />
-                              Reparatie: {linkedRepair.title}
+                              🔧 {linkedRepair.title}
                             </Button>
                           )}
                           {linkedCustomer && (
                             <Button
                               variant="outline"
                               size="sm"
-                              className="w-full justify-start h-8 text-xs"
+                              className="w-full justify-start h-7 text-xs"
                               onClick={() => window.location.href = `/customers/${linkedCustomer.id}`}
                             >
                               <UserCircle className="h-3.5 w-3.5 mr-2 text-green-500" />
-                              {linkedCustomer.firstName} {linkedCustomer.lastName}
+                              👤 {linkedCustomer.firstName} {linkedCustomer.lastName}
                             </Button>
                           )}
                         </div>
                       </div>
                     )}
-
-                    {/* Notes List - Right Side */}
-                    <div className="border rounded-lg border-l-4 border-l-rose-500">
-                      <div className="flex items-center gap-2 px-3 py-2 border-b bg-rose-50/50 dark:bg-rose-950/20">
-                        <MessageSquare className="h-3.5 w-3.5 text-rose-600" />
-                        <span className="text-sm font-medium text-rose-900 dark:text-rose-100">
-                          Notities ({notes.filter(n => !n.deletedAt).length})
-                        </span>
-                      </div>
-                      <div className="p-3 max-h-[250px] overflow-y-auto">
-                        {notes.filter(n => !n.deletedAt).length === 0 ? (
-                          <div className="text-center py-4 text-muted-foreground text-sm">
-                            <MessageSquare className="h-6 w-6 mx-auto mb-1 opacity-40" />
-                            <p>Nog geen notities</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {pinnedNotes.map((note) => (
-                              <NoteItem
-                                key={note.id}
-                                note={note}
-                                currentUserId={currentUser?.id || ""}
-                                onPin={(noteId) => pinNoteMutation.mutate(noteId)}
-                                onUnpin={(noteId) => unpinNoteMutation.mutate(noteId)}
-                                onDelete={(noteId) => deleteNoteMutation.mutate(noteId)}
-                                onReact={(noteId, emoji) => reactToNoteMutation.mutate({ noteId, emoji })}
-                              />
-                            ))}
-                            {unpinnedNotes.map((note) => (
-                              <NoteItem
-                                key={note.id}
-                                note={note}
-                                currentUserId={currentUser?.id || ""}
-                                onPin={(noteId) => pinNoteMutation.mutate(noteId)}
-                                onUnpin={(noteId) => unpinNoteMutation.mutate(noteId)}
-                                onDelete={(noteId) => deleteNoteMutation.mutate(noteId)}
-                                onReact={(noteId, emoji) => reactToNoteMutation.mutate({ noteId, emoji })}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 </div>
+
+                {/* Collapsible Notes Section */}
+                {showNotes && currentUser && (
+                  <div className="p-4 bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30 rounded-lg border border-rose-200 dark:border-rose-800 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-rose-600" />
+                      <span className="text-sm font-semibold text-rose-700 dark:text-rose-400">
+                        Notities ({notes.filter(n => !n.deletedAt).length})
+                      </span>
+                    </div>
+
+                    {/* Note Composer */}
+                    <NoteComposer
+                      onSubmit={(noteData) => createNoteMutation.mutate(noteData)}
+                      isPending={createNoteMutation.isPending}
+                      availableTags={availableTags}
+                      placeholder="Schrijf een notitie..."
+                    />
+
+                    {/* Notes List */}
+                    {notes.filter(n => !n.deletedAt).length === 0 ? (
+                      <div className="text-center py-4 text-muted-foreground text-sm">
+                        <MessageSquare className="h-6 w-6 mx-auto mb-1 opacity-40" />
+                        <p>Nog geen notities</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[200px] overflow-y-auto scrollbar-thin">
+                        {pinnedNotes.map((note) => (
+                          <NoteItem
+                            key={note.id}
+                            note={note}
+                            currentUserId={currentUser?.id || ""}
+                            onPin={(noteId) => pinNoteMutation.mutate(noteId)}
+                            onUnpin={(noteId) => unpinNoteMutation.mutate(noteId)}
+                            onDelete={(noteId) => deleteNoteMutation.mutate(noteId)}
+                            onReact={(noteId, emoji) => reactToNoteMutation.mutate({ noteId, emoji })}
+                          />
+                        ))}
+                        {unpinnedNotes.map((note) => (
+                          <NoteItem
+                            key={note.id}
+                            note={note}
+                            currentUserId={currentUser?.id || ""}
+                            onPin={(noteId) => pinNoteMutation.mutate(noteId)}
+                            onUnpin={(noteId) => unpinNoteMutation.mutate(noteId)}
+                            onDelete={(noteId) => deleteNoteMutation.mutate(noteId)}
+                            onReact={(noteId, emoji) => reactToNoteMutation.mutate({ noteId, emoji })}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -755,7 +775,7 @@ export function TaskDetailModal({ todo, open, onOpenChange, onUpdate }: TaskDeta
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent data-testid="delete-confirmation-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>Taak verwijderen?</AlertDialogTitle>
+            <AlertDialogTitle>🗑️ Taak verwijderen?</AlertDialogTitle>
             <AlertDialogDescription>
               Deze actie kan niet ongedaan worden gemaakt. De taak "{todo?.title}" wordt permanent verwijderd.
             </AlertDialogDescription>

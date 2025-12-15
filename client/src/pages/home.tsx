@@ -27,14 +27,14 @@ export default function Home() {
     <div className="min-h-screen bg-background" data-testid="home-page">
       <Navigation />
 
-      <main className="flex-1 space-y-6 p-8 pt-6">
+      <main className="flex-1 space-y-4 sm:space-y-6 p-4 sm:p-6 md:p-8 pt-4 sm:pt-6 overflow-x-hidden">
         {/* Page Header */}
         <div className="flex items-center justify-between" data-testid="page-header">
           <div>
-            <h2 className="text-4xl font-bold tracking-tight bg-gradient-primary bg-clip-text text-transparent">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight bg-gradient-primary bg-clip-text text-transparent">
               Welkom terug, {userName}! 👋
             </h2>
-            <p className="text-muted-foreground mt-1 text-lg">
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base md:text-lg">
               Hier is je bedrijfsoverzicht voor vandaag.
             </p>
           </div>
@@ -44,17 +44,11 @@ export default function Home() {
         <ReturnsStatsWidget />
 
         {/* Main Content Grid - 4 Info Blocks */}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {/* Recent Returns */}
-          <RecentReturnsWidget />
-
-          {/* Recent Orders */}
+        {/* Single column on small screens, 2 on tablet, 4 on desktop */}
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
           <RecentOrdersWidget />
-
-          {/* Recent Repairs */}
+          <RecentReturnsWidget />
           <RecentRepairsWidget />
-
-          {/* Personal Todos */}
           <PersonalTodosWidget />
         </div>
 
