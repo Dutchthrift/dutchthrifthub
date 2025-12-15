@@ -138,10 +138,37 @@ export default function Cases() {
       }
 
       if (priorityFilter !== "all" && caseItem.priority !== priorityFilter) return false;
-      if (searchQuery &&
-        !caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !caseItem.description?.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !caseItem.caseNumber.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+
+      // Extended search across multiple fields
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const caseWithDetails = caseItem as CaseWithDetails & { order?: any; customer?: any };
+
+        const matchesTitle = caseItem.title.toLowerCase().includes(query);
+        const matchesDescription = caseItem.description?.toLowerCase().includes(query);
+        const matchesCaseNumber = caseItem.caseNumber.toLowerCase().includes(query);
+        const matchesCustomerEmail = caseItem.customerEmail?.toLowerCase().includes(query);
+
+        // Search in linked order
+        const matchesOrderNumber = caseWithDetails.order?.orderNumber?.toLowerCase().includes(query);
+        const matchesOrderEmail = caseWithDetails.order?.customerEmail?.toLowerCase().includes(query);
+
+        // Search in linked customer
+        const matchesCustomerFirstName = caseWithDetails.customer?.firstName?.toLowerCase().includes(query);
+        const matchesCustomerLastName = caseWithDetails.customer?.lastName?.toLowerCase().includes(query);
+
+        // Search in case items (SKU, product name)
+        const matchesCaseItems = caseWithDetails.items?.some((item: any) =>
+          item.sku?.toLowerCase().includes(query) ||
+          item.productName?.toLowerCase().includes(query)
+        );
+
+        if (!matchesTitle && !matchesDescription && !matchesCaseNumber &&
+          !matchesCustomerEmail && !matchesOrderNumber && !matchesOrderEmail &&
+          !matchesCustomerFirstName && !matchesCustomerLastName && !matchesCaseItems) {
+          return false;
+        }
+      }
       return true;
     });
   }, [cases, priorityFilter, searchQuery, showArchived]);
@@ -599,7 +626,7 @@ export default function Cases() {
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Cases zoeken..."
+                    placeholder="Zoek op casenr, klant, order, SKU..."
                     className="pl-10"
                     value={searchQuery}
                     onChange={(e) => {
