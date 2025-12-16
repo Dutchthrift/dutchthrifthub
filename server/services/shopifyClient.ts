@@ -575,6 +575,29 @@ class ShopifyClient {
             }
           }
           totalQuantity
+          reverseFulfillmentOrders(first: 5) {
+            edges {
+              node {
+                id
+                reverseDeliveries(first: 5) {
+                  edges {
+                    node {
+                      id
+                      deliverable {
+                        ... on ReverseDeliveryShippingDeliverable {
+                          tracking {
+                            number
+                            carrierName
+                            url
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     `;
@@ -589,6 +612,16 @@ class ShopifyClient {
       throw new Error(`Return not found: ${returnId}`);
     }
 
+    // Flatten reverseDeliveries from all reverseFulfillmentOrders
+    const reverseDeliveriesEdges: any[] = [];
+    if (data.return.reverseFulfillmentOrders?.edges) {
+      for (const rfoEdge of data.return.reverseFulfillmentOrders.edges) {
+        if (rfoEdge.node.reverseDeliveries?.edges) {
+          reverseDeliveriesEdges.push(...rfoEdge.node.reverseDeliveries.edges);
+        }
+      }
+    }
+
     // Transform nodes to edges format to match ShopifyReturn interface
     // Use order createdAt as fallback for return date
     const returnData = {
@@ -596,6 +629,9 @@ class ShopifyClient {
       orderCreatedAt: data.return.order.createdAt, // Enrich with order date
       returnLineItems: {
         edges: data.return.returnLineItems.nodes.map((node: any) => ({ node }))
+      },
+      reverseDeliveries: {
+        edges: reverseDeliveriesEdges
       }
     };
 
@@ -654,8 +690,9 @@ class ShopifyClient {
       let trackingInfo: { number?: string; company?: string; url?: string } | null = null;
 
       if (rd.deliverables?.nodes?.length > 0) {
-        const deliverable = rd.deliverables.nodes[0];
-        if (deliverable.tracking) {
+        // Find first deliverable with tracking
+        const deliverable = rd.deliverables.nodes.find((n: any) => n.tracking);
+        if (deliverable?.tracking) {
           trackingInfo = {
             number: deliverable.tracking.number,
             company: deliverable.tracking.carrierName,
@@ -720,6 +757,20 @@ export interface ShopifyReturn {
     }>;
   };
   totalQuantity: number;
+  reverseDeliveries?: {
+    edges: Array<{
+      node: {
+        id: string;
+        deliverable?: {
+          tracking?: {
+            number: string;
+            carrierName: string;
+            url: string;
+          };
+        };
+      };
+    }>;
+  };
 }
 
 export interface ShopifyReverseDelivery {

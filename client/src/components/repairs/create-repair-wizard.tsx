@@ -63,6 +63,8 @@ interface FormData {
     description: string;
     priority: "low" | "medium" | "high" | "urgent";
     assignedUserId: string;
+    trackingNumber?: string;
+    trackingCarrier?: string;
 }
 
 const PRIORITY_OPTIONS = [
@@ -106,6 +108,8 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
             description: "",
             priority: "medium",
             assignedUserId: "none",
+            trackingNumber: "",
+            trackingCarrier: "",
         },
     });
 
@@ -204,6 +208,8 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
             repairType: repairType,
             caseId: caseId,
             emailThreadId: emailThreadId,
+            trackingNumber: data.trackingNumber || undefined,
+            trackingCarrier: data.trackingCarrier || undefined,
         };
 
         createRepairMutation.mutate(repairData);
@@ -514,6 +520,26 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
                                         />
                                     </PopoverContent>
                                 </Popover>
+                            </div>
+                        </div>
+
+                        {/* Tracking Info (Optional) */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label className="text-xs">Tracking Code (Retour)</Label>
+                                <Input
+                                    placeholder="Track & Trace"
+                                    {...register("trackingNumber")}
+                                    className="h-8 text-xs mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-xs">Vervoerder</Label>
+                                <Input
+                                    placeholder="bijv. PostNL"
+                                    {...register("trackingCarrier")}
+                                    className="h-8 text-xs mt-1"
+                                />
                             </div>
                         </div>
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { printRepairLabel } from "@/lib/print-repair-label";
 import type { Repair, User } from "@shared/schema";
 import { NotesPanel } from "@/components/notes/NotesPanel";
 import {
@@ -42,6 +43,7 @@ import {
   CheckCircle,
   Circle,
   Package,
+  Printer,
 } from "lucide-react";
 import { format, isPast } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -86,6 +88,8 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
         productName: repair.productName || "",
         assignedUserId: repair.assignedUserId || "none",
         priority: repair.priority || "medium",
+        trackingNumber: repair.trackingNumber || "",
+        trackingCarrier: repair.trackingCarrier || "",
       });
     }
   }, [repair]);
@@ -181,6 +185,11 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
     });
   };
 
+  const handlePrintLabel = () => {
+    if (!currentRepair) return;
+    printRepairLabel(currentRepair);
+  };
+
   if (!currentRepair) return null;
 
   const getStatusIndex = (status: string) => STATUSES.findIndex(s => s.value === status);
@@ -266,6 +275,15 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                     className="h-8 w-8 rounded-full text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                   >
                     <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={handlePrintLabel}
+                    title="Print DYMO Label"
+                    className="h-8 w-8 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <Printer className="h-4 w-4" />
                   </Button>
                   <Button
                     size="icon"
@@ -392,9 +410,19 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="col-span-2 grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-medium">Tracking Code (Retour)</label>
+                      <Input value={editForm.trackingNumber || ""} onChange={(e) => setEditForm({ ...editForm, trackingNumber: e.target.value })} className="h-7 text-xs mt-0.5" placeholder="Track & Trace" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium">Vervoerder</label>
+                      <Input value={editForm.trackingCarrier || ""} onChange={(e) => setEditForm({ ...editForm, trackingCarrier: e.target.value })} className="h-7 text-xs mt-0.5" placeholder="bijv. PostNL" />
+                    </div>
+                  </div>
                   <div className="col-span-2">
                     <label className="text-xs font-medium">Beschrijving</label>
-                    <Textarea value={editForm.description || ""} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="text-xs mt-0.5 min-h-[50px]" />
+                    <Textarea value={editForm.description || ""} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="text-xs mt-0.5 min-h-[120px]" />
                   </div>
                 </div>
               </div>
@@ -437,7 +465,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
                     {/* Description Section - First */}
                     {currentRepair.description && (
-                      <div className="p-3 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 rounded-lg border border-slate-200 dark:border-slate-800">
+                      <div className="p-3 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 rounded-lg border border-slate-200 dark:border-slate-800 min-h-[80px]">
                         <div className="flex items-center gap-2 mb-2">
                           <MessageSquare className="h-4 w-4 text-slate-600" />
                           <span className="text-xs font-semibold text-slate-700 dark:text-slate-400">Beschrijving</span>
@@ -478,6 +506,16 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                               <CalendarIcon className="h-3 w-3" />
                               {format(new Date(currentRepair.slaDeadline), "d MMM yyyy", { locale: nl })}
                             </span>
+                          </div>
+                        )}
+                        {/* Tracking Display for Inventory Repairs */}
+                        {(currentRepair.trackingNumber || currentRepair.trackingCarrier) && (
+                          <div className="flex items-center justify-between col-span-2 pt-2 border-t border-purple-200 dark:border-purple-800 mt-1">
+                            <span className="text-muted-foreground flex items-center gap-1"><Package className="h-3 w-3" />Retour Tracking</span>
+                            <div className="flex flex-col items-end">
+                              <span className="font-medium font-mono">{currentRepair.trackingNumber || '-'}</span>
+                              {currentRepair.trackingCarrier && <span className="text-[10px] text-muted-foreground">{currentRepair.trackingCarrier}</span>}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -526,7 +564,7 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
 
                     {/* Description Section - First */}
                     {currentRepair.description && (
-                      <div className="p-3 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 rounded-lg border border-slate-200 dark:border-slate-800">
+                      <div className="p-3 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 rounded-lg border border-slate-200 dark:border-slate-800 min-h-[80px]">
                         <div className="flex items-center gap-2 mb-2">
                           <MessageSquare className="h-4 w-4 text-slate-600" />
                           <span className="text-xs font-semibold text-slate-700 dark:text-slate-400">Beschrijving</span>
@@ -567,6 +605,16 @@ export function RepairDetailModal({ repair, open, onOpenChange, users }: RepairD
                               <CalendarIcon className="h-3 w-3" />
                               {format(new Date(currentRepair.slaDeadline), "d MMM yyyy", { locale: nl })}
                             </span>
+                          </div>
+                        )}
+                        {/* Tracking Display for Customer Repairs */}
+                        {(currentRepair.trackingNumber || currentRepair.trackingCarrier) && (
+                          <div className="flex items-center justify-between col-span-2 pt-2 border-t border-purple-200 dark:border-purple-800 mt-1">
+                            <span className="text-muted-foreground flex items-center gap-1"><Package className="h-3 w-3" />Retour Tracking</span>
+                            <div className="flex flex-col items-end">
+                              <span className="font-medium font-mono">{currentRepair.trackingNumber || '-'}</span>
+                              {currentRepair.trackingCarrier && <span className="text-[10px] text-muted-foreground">{currentRepair.trackingCarrier}</span>}
+                            </div>
                           </div>
                         )}
                       </div>

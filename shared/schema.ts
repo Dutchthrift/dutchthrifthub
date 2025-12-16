@@ -156,6 +156,8 @@ export const repairs = pgTable("repairs", {
   completedAt: timestamp("completed_at"),
   returnedAt: timestamp("returned_at"),
   repairType: repairTypeEnum("repair_type").notNull().default("customer"), // customer or inventory
+  trackingNumber: text("tracking_number"), // New: for mechanic to trace return
+  trackingCarrier: text("tracking_carrier"),
   isArchived: boolean("is_archived").default(false), // Archive completed/returned repairs
   caseId: varchar("case_id").references(() => cases.id), // Link repairs to cases
   createdAt: timestamp("created_at").defaultNow(),

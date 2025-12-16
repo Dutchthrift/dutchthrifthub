@@ -74,6 +74,23 @@ export async function mapShopifyReturnToLocal(
         refundStatus: shopifyReturn.status === 'CLOSED' || shopifyReturn.status === 'COMPLETE' ? 'completed' : 'pending',
     };
 
+    // Extract tracking info if available
+    if (shopifyReturn.reverseDeliveries?.edges?.length) {
+        for (const edge of shopifyReturn.reverseDeliveries.edges) {
+            const delivery = edge.node;
+            if (delivery.deliverable?.tracking) {
+                const tracking = delivery.deliverable.tracking;
+                if (tracking.number) {
+                    returnData.trackingNumber = tracking.number;
+                    returnData.trackingCarrier = tracking.carrierName;
+                    returnData.trackingUrl = tracking.url;
+                    console.log(`📦 Found tracking info for ${shopifyReturn.name}: ${returnData.trackingNumber} (${returnData.trackingCarrier})`);
+                    break;
+                }
+            }
+        }
+    }
+
     // Extract line items - without product details
     const items: Omit<InsertReturnItem, 'returnId'>[] = [];
     const customerNotes: string[] = [];
@@ -161,6 +178,39 @@ export async function syncShopifyReturns(
                     updated++;
                     console.log(`🔄 Updated ${existing.returnNumber}: nieuw → onderweg (Shopify: OPEN), timer reset to 0d`);
                     continue;
+                }
+
+                // Check for missing tracking number
+                if (!existing.trackingNumber) {
+                    let trackingNumber = null;
+                    let trackingCarrier = null;
+                    let trackingUrl = null;
+
+                    if (shopifyReturn.reverseDeliveries?.edges?.length) {
+                        for (const edge of shopifyReturn.reverseDeliveries.edges) {
+                            const delivery = edge.node;
+                            if (delivery.deliverable?.tracking) {
+                                const tracking = delivery.deliverable.tracking;
+                                if (tracking.number) {
+                                    trackingNumber = tracking.number;
+                                    trackingCarrier = tracking.carrierName;
+                                    trackingUrl = tracking.url;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (trackingNumber) {
+                        await storage.updateReturn(existing.id, {
+                            trackingNumber,
+                            trackingCarrier,
+                            trackingUrl
+                        });
+                        updated++;
+                        console.log(`🔄 Updated ${existing.returnNumber}: added missing tracking info ${trackingNumber}`);
+                        continue;
+                    }
                 }
 
                 // For all other cases, preserve local changes
