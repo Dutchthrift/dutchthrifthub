@@ -782,10 +782,37 @@ export class DatabaseStorage implements IStorage {
     if (search) {
       const searchTerm = `%${search}%`;
       conditions.push(or(
+        // Direct case fields
         ilike(cases.title, searchTerm),
         ilike(cases.description, searchTerm),
         ilike(cases.caseNumber, searchTerm),
-        ilike(cases.customerEmail, searchTerm)
+        ilike(cases.customerEmail, searchTerm),
+        // Joined customer fields (firstName, lastName)
+        ilike(customers.firstName, searchTerm),
+        ilike(customers.lastName, searchTerm),
+        // Joined order fields (orderNumber)
+        ilike(orders.orderNumber, searchTerm),
+        // Case items: SKU or productName match (subquery)
+        sql`EXISTS (
+          SELECT 1 FROM ${caseItems} 
+          WHERE ${caseItems.caseId} = ${cases.id} 
+          AND (
+            ${caseItems.sku} ILIKE ${searchTerm} 
+            OR ${caseItems.productName} ILIKE ${searchTerm}
+          )
+        )`,
+        // Linked returns via caseLinks: returnNumber, shopifyReturnName, trackingNumber (subquery)
+        sql`EXISTS (
+          SELECT 1 FROM ${caseLinks} cl
+          INNER JOIN ${returns} r ON cl.linked_id = r.id
+          WHERE cl.case_id = ${cases.id} 
+          AND cl.link_type = 'return'
+          AND (
+            r.return_number ILIKE ${searchTerm}
+            OR r.shopify_return_name ILIKE ${searchTerm}
+            OR r.tracking_number ILIKE ${searchTerm}
+          )
+        )`
       ));
     }
 
