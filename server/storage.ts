@@ -33,7 +33,10 @@ import {
   type NoteLink, type InsertNoteLink,
   type Email, type InsertEmail,
   type EmailLink, type InsertEmailLink,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks, repairCounters
+  type MailThreadLink, type InsertMailThreadLink,
+  type EmailMetadata, type InsertEmailMetadata,
+  type CaseNote, type InsertCaseNote,
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, mailThreadLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks, repairCounters, emailMetadata, insertEmailMetadataSchema, caseNotes, insertCaseNoteSchema
 } from "@shared/schema";
 import { db } from "./services/supabaseClient";
 import { eq, desc, asc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns, lt } from "drizzle-orm";
@@ -81,6 +84,7 @@ export interface IStorage {
   createEmailThread(thread: InsertEmailThread): Promise<EmailThread>;
   updateEmailThread(id: string, thread: Partial<InsertEmailThread>): Promise<EmailThread>;
   deleteEmailThread(id: string): Promise<void>;
+  getLatestEmailThreadWithHistoryId(): Promise<EmailThread | undefined>;
 
   // Email Messages
   getEmailMessages(threadId: string): Promise<EmailMessage[]>;
@@ -94,6 +98,11 @@ export interface IStorage {
   getEmailMessageAttachments(messageId: string): Promise<EmailAttachment[]>;
   createEmailAttachment(attachment: InsertEmailAttachment): Promise<EmailAttachment>;
   downloadAttachment(attachmentPath: string, res: any, forceDownload?: boolean): Promise<void>;
+  getEmailAttachmentsByEmailId(emailId: string): Promise<EmailAttachment[]>;
+  createEmailAttachmentBulk(attachments: InsertEmailAttachment[]): Promise<EmailAttachment[]>;
+  getEmailLinks(emailId: string): Promise<EmailLink[]>;
+  getEmailLinksForEmails(emailIds: string[]): Promise<EmailLink[]>;
+  createEmailLink(link: InsertEmailLink): Promise<EmailLink>;
 
   // Repairs
   getRepairs(): Promise<Repair[]>;
@@ -195,6 +204,9 @@ export interface IStorage {
   createCaseLink(link: InsertCaseLink): Promise<CaseLink>;
   deleteCaseLink(linkId: string): Promise<void>;
 
+  // Email context lookups
+  getCasesByCustomerEmail(email: string): Promise<Case[]>;
+  getReturnsByCustomerEmail(email: string): Promise<Return[]>;
 
 
   // Case Events
@@ -246,6 +258,17 @@ export interface IStorage {
   pinNote(noteId: string): Promise<void>;
   unpinNote(noteId: string): Promise<void>;
   searchNotes(query: string, filters?: { entityType?: string; visibility?: string; }): Promise<Note[]>;
+
+  getCaseNotes(caseId: string): Promise<CaseNote[]>;
+  createCaseNote(note: InsertCaseNote): Promise<CaseNote>;
+
+  // Settings
+  getSetting(key: string): Promise<string | undefined>;
+  setSetting(key: string, value: string): Promise<void>;
+
+  // Mail Thread Links
+  createMailThreadLink(link: InsertMailThreadLink): Promise<MailThreadLink>;
+  getMailThreadLinks(threadId: string): Promise<MailThreadLink[]>;
 
   // Note Tags
   getNoteTags(): Promise<NoteTag[]>;
@@ -300,6 +323,10 @@ export interface IStorage {
   getEmailLinks(emailId: string): Promise<EmailLink[]>;
   getEmailLinksForEmails(emailIds: string[]): Promise<EmailLink[]>;
   createEmailLink(link: InsertEmailLink): Promise<EmailLink>;
+
+  // Mail Thread Links
+  createMailThreadLink(link: InsertMailThreadLink): Promise<MailThreadLink>;
+  getMailThreadLinks(threadId: string): Promise<MailThreadLink[]>;
 
   getSetting(key: string): Promise<string | undefined>;
   setSetting(key: string, value: string): Promise<void>;
@@ -561,6 +588,14 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEmailThread(id: string): Promise<void> {
     await db.delete(emailThreads).where(eq(emailThreads.id, id));
+  }
+
+  async getLatestEmailThreadWithHistoryId(): Promise<EmailThread | undefined> {
+    const result = await db.select().from(emailThreads)
+      .where(isNotNull(emailThreads.lastHistoryId))
+      .orderBy(desc(emailThreads.lastActivity))
+      .limit(1);
+    return result[0];
   }
 
   // Email Messages
@@ -887,8 +922,8 @@ export class DatabaseStorage implements IStorage {
 
       if (linkedOrderLinks.length > 0) {
         const orderIds = linkedOrderLinks
-          .map(link => parseInt(link.linkedId))
-          .filter(id => !isNaN(id));
+          .map(link => link.linkedId)
+          .filter(id => !!id);
 
         if (orderIds.length > 0) {
           const linkedOrders = await db
@@ -900,7 +935,7 @@ export class DatabaseStorage implements IStorage {
           const caseToOrderMap = new Map();
 
           linkedOrderLinks.forEach(link => {
-            const orderHeight = orderMap.get(parseInt(link.linkedId));
+            const orderHeight = orderMap.get(link.linkedId);
             if (orderHeight) {
               caseToOrderMap.set(link.caseId, orderHeight);
             }
@@ -924,7 +959,12 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getCasesByCustomerEmail(email: string): Promise<Case[]> {
+    return await db.select().from(cases).where(eq(cases.customerEmail, email)).orderBy(desc(cases.createdAt));
+  }
+
   async createCase(caseData: InsertCase): Promise<Case> {
+
     // Generate a unique case number
     const existingCases = await db.select({ caseNumber: cases.caseNumber }).from(cases);
     const maxNumber = existingCases
@@ -1631,7 +1671,16 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(returns).where(eq(returns.customerId, customerId)).orderBy(asc(returns.requestedAt));
   }
 
+  async getReturnsByCustomerEmail(email: string): Promise<Return[]> {
+    // First find the customer by email
+    const customer = await this.getCustomerByEmail(email);
+    if (!customer) return [];
+    // Then get their returns
+    return await db.select().from(returns).where(eq(returns.customerId, customer.id)).orderBy(desc(returns.requestedAt));
+  }
+
   async createReturnFromCase(caseId: string): Promise<Return> {
+
     // Get case details
     const caseData = await this.getCase(caseId);
     if (!caseData) {
@@ -1732,12 +1781,12 @@ export class DatabaseStorage implements IStorage {
 
   // Email Attachments
   async getEmailAttachment(attachmentPath: string): Promise<EmailAttachment | undefined> {
-    const result = await db.select().from(emailAttachments).where(eq(emailAttachments.storageUrl, attachmentPath)).limit(1);
+    const result = await db.select().from(emailAttachments).where(eq(emailAttachments.storagePath, attachmentPath)).limit(1);
     return result[0];
   }
 
   async getEmailMessageAttachments(messageId: string): Promise<EmailAttachment[]> {
-    return await db.select().from(emailAttachments).where(eq(emailAttachments.messageId, messageId));
+    return await db.select().from(emailAttachments).where(eq(emailAttachments.emailId, messageId));
   }
 
   async createEmailAttachment(attachment: InsertEmailAttachment): Promise<EmailAttachment> {
@@ -2159,6 +2208,16 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  // Mail Thread Links
+  async createMailThreadLink(link: InsertMailThreadLink): Promise<MailThreadLink> {
+    const result = await db.insert(mailThreadLinks).values(link).returning();
+    return result[0];
+  }
+
+  async getMailThreadLinks(threadId: string): Promise<MailThreadLink[]> {
+    return await db.select().from(mailThreadLinks).where(eq(mailThreadLinks.threadId, threadId));
+  }
+
   // Link email thread to entity
   async linkEmailThread(threadId: string, type: 'order' | 'case', entityId: string): Promise<EmailThread> {
     const updateData: Partial<EmailThread> = {};
@@ -2175,12 +2234,21 @@ export class DatabaseStorage implements IStorage {
 
   // Note: createCaseLink is defined earlier in the class (line ~1084) with correct InsertCaseLink interface
 
-  // Get setting (for mail system config like last_imap_uid)
+  // Case Notes
+  async getCaseNotes(caseId: string): Promise<CaseNote[]> {
+    return await db.select().from(caseNotes).where(eq(caseNotes.caseId, caseId)).orderBy(desc(caseNotes.createdAt));
+  }
+
+  async createCaseNote(note: InsertCaseNote): Promise<CaseNote> {
+    const result = await db.insert(caseNotes).values(note).returning();
+    return result[0];
+  }
+
+  // Settings
   async getSetting(key: string): Promise<string | undefined> {
     return await this.getSystemSetting(key);
   }
 
-  // Set setting
   async setSetting(key: string, value: string): Promise<void> {
     await this.setSystemSetting(key, value);
   }

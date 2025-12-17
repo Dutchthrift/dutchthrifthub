@@ -99,7 +99,7 @@ async function syncFolder(client: ImapFlow, folder: { path: string; folderEnum: 
         const uids = await client.search(searchQuery, { uid: true });
 
         // Filter out the lastUid itself (IMAP range is inclusive)
-        const newUids = uids.filter(uid => uid > lastUid);
+        const newUids = Array.isArray(uids) ? uids.filter(uid => uid > lastUid) : [];
 
         if (newUids.length === 0) {
             return 0;

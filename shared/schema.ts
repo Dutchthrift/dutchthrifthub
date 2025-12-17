@@ -89,8 +89,9 @@ export const orders = pgTable("orders", {
 // Email threads table
 export const emailThreads = pgTable("email_threads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  threadId: text("thread_id").notNull().unique(), // from email provider
+  threadId: text("thread_id").notNull().unique(), // Gmail threadId
   subject: text("subject"),
+  snippet: text("snippet"), // Short preview of the latest message
   customerId: varchar("customer_id").references(() => customers.id),
   customerEmail: text("customer_email"),
   assignedUserId: varchar("assigned_user_id").references(() => users.id),
@@ -104,7 +105,11 @@ export const emailThreads = pgTable("email_threads", {
   lastActivity: timestamp("last_activity").defaultNow(),
   slaDeadline: timestamp("sla_deadline"),
   orderId: varchar("order_id").references(() => orders.id),
-  caseId: varchar("case_id").references(() => cases.id), // Link email threads to cases
+  caseId: varchar("case_id").references(() => cases.id),
+  participants: jsonb("participants"), // Array of {name, email}
+  labels: jsonb("labels"), // Gmail labelIds
+  messageCount: integer("message_count").default(1),
+  lastHistoryId: text("last_history_id"), // For incremental sync
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -112,17 +117,22 @@ export const emailThreads = pgTable("email_threads", {
 // Email messages table
 export const emailMessages = pgTable("email_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  messageId: text("message_id").notNull().unique(), // from email provider
-  uid: integer("uid"), // IMAP UID for on-demand fetching
+  messageId: text("message_id").notNull().unique(), // Gmail messageId
   threadId: varchar("thread_id").references(() => emailThreads.id).notNull(),
+  fromName: text("from_name"),
   fromEmail: text("from_email").notNull(),
   toEmail: text("to_email").notNull(),
+  to: jsonb("to"), // Detailed recipients list
+  cc: jsonb("cc"),
   subject: text("subject"),
-  body: text("body"), // Email body content (HTML or plain text)
+  body: text("body"), // Full HTML sanitized content
+  bodyText: text("body_text"), // Plain text version
+  bodyClean: text("body_clean"), // Stripped content for AI/search
+  snippet: text("snippet"),
   isHtml: boolean("is_html").default(false),
   isOutbound: boolean("is_outbound").default(false),
   folder: emailFolderEnum("folder").notNull().default("inbox"),
-  attachments: jsonb("attachments"), // array of attachment metadata
+  attachments: jsonb("attachments"), // array of {gmailAttachmentId, filename, mimeType, size}
   sentAt: timestamp("sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -1071,3 +1081,19 @@ export const insertEmailLinkSchema = createInsertSchema(emailLinks);
 // TypeScript types
 export type EmailLink = typeof emailLinks.$inferSelect;
 export type InsertEmailLink = z.infer<typeof insertEmailLinkSchema>;
+
+// Mail thread links table - flexible links between Gmail threads and other entities
+export const mailThreadLinks = pgTable("mail_thread_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar("thread_id").notNull().references(() => emailThreads.id, { onDelete: "cascade" }),
+  entityType: text("entity_type").notNull(), // 'case', 'order', 'return', 'repair'
+  entityId: varchar("entity_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Zod schema
+export const insertMailThreadLinkSchema = createInsertSchema(mailThreadLinks);
+
+// TypeScript types
+export type MailThreadLink = typeof mailThreadLinks.$inferSelect;
+export type InsertMailThreadLink = z.infer<typeof insertMailThreadLinkSchema>;

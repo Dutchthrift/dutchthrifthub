@@ -712,12 +712,15 @@ export function CaseDetailModal({ caseId, initialData, open, onClose }: CaseDeta
                             <span>Emails ({linkedEmails.length})</span>
                           </div>
                           {linkedEmails.map((email) => (
-                            <div key={email.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs">
-                              <div className="min-w-0 flex-1">
+                            <div key={email.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs group hover:bg-muted/50 transition-colors">
+                              <button
+                                onClick={() => { onClose(); setLocation(`/mail?threadId=${email.id}`); }}
+                                className="min-w-0 flex-1 text-left hover:underline cursor-pointer"
+                              >
                                 <div className="font-medium truncate">{email.subject}</div>
                                 <div className="text-muted-foreground truncate">{email.customerEmail}</div>
-                              </div>
-                              <Button size="icon" variant="ghost" onClick={() => unlinkEmailMutation.mutate(email.id)} className="h-6 w-6 flex-shrink-0">
+                              </button>
+                              <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); unlinkEmailMutation.mutate(email.id); }} className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <X className="h-3 w-3" />
                               </Button>
                             </div>

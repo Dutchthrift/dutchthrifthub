@@ -1,7 +1,9 @@
-import { ChevronDown, ChevronRight, Paperclip } from 'lucide-react';
+import { ChevronDown, ChevronRight, Paperclip, X, Image as ImageIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import DOMPurify from 'isomorphic-dompurify';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 interface EmailMessage {
     id: string;
@@ -30,6 +32,7 @@ export function EmailThreadMessage({
     onToggle,
     isLatest = false,
 }: EmailThreadMessageProps) {
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
     const sentDate = message.sentAt ? new Date(message.sentAt) : new Date(message.createdAt || '');
     const hasAttachments = message.attachments && (
         Array.isArray(message.attachments) ? message.attachments.length > 0 : Object.keys(message.attachments).length > 0
@@ -173,16 +176,68 @@ export function EmailThreadMessage({
                                 Bijlagen
                             </h4>
                             <div className="flex flex-wrap gap-2">
-                                {Array.isArray(message.attachments) && message.attachments.map((att: any, idx: number) => (
-                                    <Badge key={idx} variant="outline" className="text-xs">
-                                        {att.filename || att.name || `Bijlage ${idx + 1}`}
-                                    </Badge>
-                                ))}
+                                {Array.isArray(message.attachments) && message.attachments.map((att: any, idx: number) => {
+                                    // Normalize properties
+                                    const mimeType = att.mimeType || att.contentType || '';
+                                    const filename = att.filename || att.name || `Bijlage ${idx + 1}`;
+                                    const attachmentId = att.gmailAttachmentId || att.attachmentId || att.id;
+
+                                    const isImage = mimeType.startsWith('image/') || filename.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+
+                                    const attachmentUrl = attachmentId
+                                        ? `/api/mail/attachment/${message.messageId}/${attachmentId}`
+                                        : '#';
+
+                                    return (
+                                        <Badge
+                                            key={idx}
+                                            variant="outline"
+                                            className={cn(
+                                                "text-xs flex items-center gap-1.5 cursor-pointer hover:bg-muted transition-colors pr-2",
+                                                isImage ? "hover:text-primary border-primary/20" : ""
+                                            )}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (isImage && attachmentId) {
+                                                    setPreviewImage(attachmentUrl);
+                                                } else if (attachmentId) {
+                                                    window.open(attachmentUrl, '_blank');
+                                                }
+                                            }}
+                                        >
+                                            {isImage ? <ImageIcon className="h-3 w-3" /> : <Paperclip className="h-3 w-3" />}
+                                            <span className="truncate max-w-[200px]">{att.filename || att.name || `Bijlage ${idx + 1}`}</span>
+                                        </Badge>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
                 </div>
             )}
+
+            {/* Image Preview Modal */}
+            <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
+                <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 overflow-hidden bg-transparent border-none shadow-none flex items-center justify-center pointer-events-none">
+                    <div className="relative pointer-events-auto">
+                        <button
+                            onClick={() => setPreviewImage(null)}
+                            className="absolute -top-10 right-0 p-2 text-white hover:text-gray-300 transition-colors bg-black/50 rounded-full"
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+                        {previewImage && (
+                            <img
+                                src={previewImage}
+                                alt="Bijlage"
+                                className="max-w-[90vw] max-h-[85vh] object-contain rounded-md shadow-2xl"
+                            />
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
+
+// Add state to component (move inside function)

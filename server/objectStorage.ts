@@ -20,7 +20,6 @@ export class ObjectStorageService {
     if (!fs.existsSync(this.uploadDir)) {
       fs.mkdirSync(this.uploadDir, { recursive: true });
     }
-    console.log(`ObjectStorageService initialized with local storage: ${this.uploadDir}`);
   }
 
   async uploadFile(data: Buffer, filename: string, contentType?: string): Promise<string> {
@@ -116,3 +115,5 @@ export class ObjectStorageService {
     return attachmentPath;
   }
 }
+
+export const objectStorage = new ObjectStorageService();

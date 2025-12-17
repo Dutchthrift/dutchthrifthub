@@ -8,6 +8,21 @@ export class OrderMatchingService {
     this.storage = storage;
   }
 
+  static extractOrderNumber(text: string): string | null {
+    if (!text) return null;
+    const patterns = [
+      /#(\d{3,6})\b/i,
+      /\border\s*#?(\d{3,6})\b/i,
+      /return\s+request\s*#?(\d{3,6})\b/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) return match[1];
+    }
+    return null;
+  }
+
   /**
    * Extract potential order numbers from email content
    * Looks for patterns like: #8001, #8001, Order 8001, etc.
@@ -32,9 +47,10 @@ export class OrderMatchingService {
     for (const pattern of patterns) {
       let match;
       while ((match = pattern.exec(text)) !== null) {
-        const orderNumber = match[1];
-        if (orderNumber && orderNumber.length >= 3) {
-          orderNumbers.add(orderNumber);
+        if (match[1]) {
+          orderNumbers.add(match[1]);
+        } else if (match[0] && match[0].match(/^\d+$/)) {
+          orderNumbers.add(match[0]);
         }
       }
     }
@@ -43,100 +59,62 @@ export class OrderMatchingService {
   }
 
   /**
-   * Try to match orders by order number patterns found in email content
-   */
-  private async matchByOrderNumber(text: string): Promise<Order[]> {
-    const orderNumbers = this.extractOrderNumbers(text);
-    const matchedOrders: Order[] = [];
-
-    console.log(`🔍 Extracted potential order numbers from email: [${orderNumbers.join(', ')}]`);
-
-    for (const orderNumber of orderNumbers) {
-      try {
-        // Try exact match first
-        let order = await this.storage.getOrderByOrderNumber(orderNumber);
-        
-        if (!order) {
-          // Try with leading zeros padding for shorter numbers
-          const paddedOrderNumber = orderNumber.padStart(4, '0');
-          order = await this.storage.getOrderByOrderNumber(paddedOrderNumber);
-        }
-
-        if (order) {
-          console.log(`✅ Found order match by order number: ${orderNumber} -> Order ID: ${order.id}`);
-          matchedOrders.push(order);
-        } else {
-          console.log(`❌ No order found for order number: ${orderNumber}`);
-        }
-      } catch (error) {
-        console.error(`Error searching for order number ${orderNumber}:`, error);
-      }
-    }
-
-    return matchedOrders;
-  }
-
-  /**
-   * Try to match orders by customer email address
-   */
-  private async matchByEmail(customerEmail: string): Promise<Order[]> {
-    if (!customerEmail) return [];
-
-    try {
-      const orders = await this.storage.getOrdersByCustomerEmail(customerEmail);
-      console.log(`📧 Found ${orders.length} orders for email: ${customerEmail}`);
-      return orders;
-    } catch (error) {
-      console.error(`Error searching orders by email ${customerEmail}:`, error);
-      return [];
-    }
-  }
-
-  /**
-   * Main function to automatically match orders from email content
-   * 1. First tries to match by order numbers found in email content
-   * 2. Falls back to matching by customer email address
-   * 3. Returns the most likely order match(es)
+   * Try to match an email to an order using multiple strategies
    */
   async matchOrders(emailContent: string, customerEmail: string, emailSubject?: string): Promise<{
     primaryMatch: Order | null;
     allMatches: Order[];
     matchMethod: 'order_number' | 'email_fallback' | 'none';
   }> {
-    console.log(`\n🎯 Starting automatic order matching...`);
-    console.log(`Email: ${customerEmail}`);
-    console.log(`Subject: ${emailSubject || 'N/A'}`);
-    
-    // Combine subject and content for order number extraction
-    const fullText = `${emailSubject || ''} ${emailContent || ''}`;
+    const combinedText = `${emailSubject || ''} ${emailContent}`;
 
-    // Step 1: Try matching by order number
-    const orderNumberMatches = await this.matchByOrderNumber(fullText);
-    if (orderNumberMatches.length > 0) {
-      console.log(`✅ Order matching successful via order number: ${orderNumberMatches.length} match(es) found`);
-      return {
-        primaryMatch: orderNumberMatches[0], // Return the first/most relevant match
-        allMatches: orderNumberMatches,
-        matchMethod: 'order_number'
-      };
+    // Strategy 1: Find order numbers in content
+    const potentialNumbers = this.extractOrderNumbers(combinedText);
+
+    if (potentialNumbers.length > 0) {
+      const matchedOrders: Order[] = [];
+
+      for (const number of potentialNumbers) {
+        const order = await this.storage.getOrderByOrderNumber(number);
+        if (order) {
+          matchedOrders.push(order);
+        }
+      }
+
+      if (matchedOrders.length > 0) {
+        // Sort matches by date (most recent first)
+        const sortedMatches = matchedOrders.sort((a, b) => {
+          const dateA = new Date(a.orderDate || a.createdAt || 0).getTime();
+          const dateB = new Date(b.orderDate || b.createdAt || 0).getTime();
+          return dateB - dateA;
+        });
+
+        return {
+          primaryMatch: sortedMatches[0],
+          allMatches: sortedMatches,
+          matchMethod: 'order_number'
+        };
+      }
     }
 
-    // Step 2: Fallback to email matching
-    console.log(`⚡ No order number matches found, falling back to email matching...`);
-    const emailMatches = await this.matchByEmail(customerEmail);
-    if (emailMatches.length > 0) {
-      console.log(`✅ Order matching successful via email fallback: ${emailMatches.length} match(es) found`);
-      
-      // Sort by most recent order as primary match
-      const sortedEmailMatches = emailMatches.sort((a, b) => 
-        new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
-      );
-      
-      return {
-        primaryMatch: sortedEmailMatches[0], // Most recent order
-        allMatches: emailMatches,
-        matchMethod: 'email_fallback'
-      };
+    // Strategy 2: Fallback to customer email
+    if (customerEmail) {
+      const emailMatches = await this.storage.getOrdersByCustomerEmail(customerEmail);
+
+      if (emailMatches.length > 0) {
+        // Sort matches by date (most recent first)
+        const sortedEmailMatches = emailMatches.sort((a, b) => {
+          const dateA = new Date(a.orderDate || a.createdAt || 0).getTime();
+          const dateB = new Date(b.orderDate || b.createdAt || 0).getTime();
+          return dateB - dateA;
+        });
+
+        return {
+          primaryMatch: sortedEmailMatches[0], // Most recent order
+          allMatches: emailMatches,
+          matchMethod: 'email_fallback'
+        };
+      }
     }
 
     console.log(`❌ No order matches found for email: ${customerEmail}`);
@@ -155,3 +133,6 @@ export class OrderMatchingService {
     return result.primaryMatch;
   }
 }
+
+import { storage } from "../storage";
+export const orderMatchingService = new OrderMatchingService(storage);

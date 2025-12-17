@@ -38,14 +38,26 @@ export function startScheduledSync() {
         log(`⚠️ [Auto-Sync] Returns sync failed with status: ${returnsResponse.status}`);
       }
 
-      // Finally sync emails (incremental - only new emails)
+      // Finally sync emails (Gmail API or IMAP fallback)
       try {
-        const emailResult = await incrementalEmailSync();
-        if (emailResult.synced > 0) {
-          log(`✅ [Auto-Sync] Emails: ${emailResult.synced} new emails synced`);
-        }
-        if (emailResult.errors.length > 0) {
-          log(`⚠️ [Auto-Sync] Email sync had ${emailResult.errors.length} errors`);
+        const hasGmailCreds = process.env.GMAIL_CLIENT_ID &&
+          process.env.GMAIL_CLIENT_SECRET &&
+          process.env.GMAIL_REFRESH_TOKEN;
+
+        if (hasGmailCreds) {
+          const { gmailService } = await import('./services/gmailService');
+          log('🔄 [Auto-Sync] Starting Gmail incremental sync...');
+          await gmailService.incrementalSync();
+          log('✅ [Auto-Sync] Gmail sync completed');
+        } else {
+          // Fallback to IMAP sync (already exists)
+          const emailResult = await incrementalEmailSync();
+          if (emailResult.synced > 0) {
+            log(`✅ [Auto-Sync] IMAP Emails: ${emailResult.synced} new emails synced`);
+          }
+          if (emailResult.errors.length > 0) {
+            log(`⚠️ [Auto-Sync] IMAP Email sync had ${emailResult.errors.length} errors`);
+          }
         }
       } catch (emailError) {
         log(`⚠️ [Auto-Sync] Email sync failed: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`);

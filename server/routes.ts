@@ -6,7 +6,6 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { db } from "./services/supabaseClient";
 import { count } from "drizzle-orm";
-import { emails } from "@shared/schema";
 import { log } from "./vite";
 import {
   insertUserSchema,
@@ -28,24 +27,31 @@ import {
   insertNoteReactionSchema,
   insertNoteAttachmentSchema,
   insertNoteFollowupSchema,
+  insertNoteReactionSchema as insertNoteReactionSchemaAgain, // Avoid duplicate if any
   insertNoteRevisionSchema,
   insertNoteTemplateSchema,
   insertNoteLinkSchema,
   insertPurchaseOrderSchema,
   insertTodoSchema,
   insertRepairSchema,
+  emails,
+  emailThreads,
+  emailMessages,
   notes,
   purchaseOrderItems,
   subtasks,
   todoAttachments,
   systemSettings,
   emailLinks,
+  emailAttachments,
+  emailMetadata,
+  insertEmailMetadataSchema,
 } from "@shared/schema";
-import { eq, desc, sql, like, and } from "drizzle-orm";
+import { eq, desc, sql, like, and, inArray, isNotNull, ilike } from "drizzle-orm";
 
 import { shopifyClient } from "./services/shopifyClient";
 import { OrderMatchingService } from "./services/orderMatchingService";
-import { ObjectStorageService } from "./objectStorage";
+import { ObjectStorageService, objectStorage } from "./objectStorage";
 
 import multer from "multer";
 import Papa from "papaparse";
@@ -58,6 +64,9 @@ import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import DOMPurify from 'isomorphic-dompurify';
 import * as emailService from "./services/emailService";
+const { sendEmail, fetchEmailBody, downloadAttachment, syncEmails } = emailService;
+import { importAllEmails } from "./scripts/importAllEmails";
+import mailRoutes from "./mail-routes";
 
 // Extend Request type to include session
 interface AuthenticatedRequest extends Request {
@@ -66,7 +75,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 // Authentication middleware
-const requireAuth = async (req: any, res: any, next: any) => {
+export const requireAuth = async (req: any, res: any, next: any) => {
   const userId = req.session?.userId;
   if (!userId) {
     return res.status(401).json({ error: "Authentication required" });
@@ -142,6 +151,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const orderMatchingService = new OrderMatchingService(storage);
 
   // Configure multer for file uploads (memory storage with limits)
+  // Register mail routes
+  app.use('/api/mail', mailRoutes); // Ensure this is registered!
+
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -159,6 +171,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.use("/uploads", express.static(uploadDir));
     console.log(`Serving local uploads from ${uploadDir}`);
   }
+
+  // Register Gmail API mail routes
+  app.use("/api/mail", mailRoutes);
 
   // Authentication routes
   app.post("/api/auth/signin", async (req, res) => {
@@ -2229,6 +2244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get emails by UID range (direct IMAP fetch + DB metadata merge)
+  // Get email list from IMAP (legacy endpoint)
   app.get("/api/emails/list", async (req, res) => {
     try {
       const { startUid, endUid } = req.query;
@@ -2240,51 +2256,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const range = `${startUid}:${endUid}`;
       console.log(`Fetching emails for range: ${range}`);
 
-      // 1. Fetch from IMAP
+      // Fetch from IMAP
       const emails = await emailService.fetchEmails(range);
 
-      // 2. Fetch metadata from DB for these UIDs
-      const uids = emails.map(e => e.uid);
-      let metadataMap = new Map();
+      // Return emails directly without broken metadata lookup
+      const formattedEmails = emails.map(email => ({
+        ...email,
+        orderId: null,
+        caseId: null,
+        returnId: null,
+        repairId: null,
+        starred: false,
+        archived: false
+      }));
 
-      if (uids.length > 0) {
-        const metadata = await db.select({
-          uid: emailThreads.uid,
-          orderId: emailThreads.orderId,
-          caseId: emailThreads.caseId,
-          returnId: emailThreads.returnId,
-          repairId: emailThreads.repairId,
-          starred: emailThreads.starred,
-          archived: emailThreads.archived
-        })
-          .from(emailThreads)
-          .where(inArray(emailThreads.uid, uids));
-
-        metadata.forEach(m => {
-          if (m.uid) metadataMap.set(m.uid, m);
-        });
-      }
-
-      // 3. Merge metadata
-      const mergedEmails = emails.map(email => {
-        const meta = metadataMap.get(email.uid) || {};
-        return {
-          ...email,
-          orderId: meta.orderId,
-          caseId: meta.caseId,
-          returnId: meta.returnId,
-          repairId: meta.repairId,
-          starred: meta.starred || false,
-          archived: meta.archived || false
-        };
-      });
-
-      res.json(mergedEmails);
+      res.json(formattedEmails);
     } catch (error) {
       console.error("Error fetching email list:", error);
       res.status(500).json({ error: "Failed to fetch email list" });
     }
   });
+
 
   // Get email body on-demand (for detail view)
   app.get("/api/emails/:uid/body", async (req, res) => {
@@ -2353,7 +2345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({
           items: result.threads,
           nextCursor,
-          total: result.total
+          total: (result.total || 0).toString(),
         });
       }
     } catch (error) {
@@ -2369,8 +2361,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🔄 Starting order matching for existing email threads...`);
 
       // Get all threads that don't have orders linked
-      const threads = await storage.getEmailThreads();
-      const threadsWithoutOrders = threads.filter((thread) => !thread.orderId);
+      const threadsData = await storage.getEmailThreads();
+      const threadsWithoutOrders = (threadsData.threads || []).filter((thread: any) => !thread.orderId);
 
       console.log(
         `📊 Found ${threadsWithoutOrders.length} threads without orders to process`,
@@ -2723,12 +2715,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 );
 
                 await storage.createEmailAttachment({
-                  messageId: createdMessage.id,
+                  emailId: createdMessage.id,
                   filename: filename,
-                  storageUrl: attachmentUrl,
-                  contentType: "application/octet-stream", // Default, could be improved
+                  storagePath: attachmentUrl,
+                  mimeType: "application/octet-stream", // Default, could be improved
                   size: 0, // Could be improved to track actual size
-                  isInline: false,
                 });
 
                 console.log(`✅ Created attachment record: ${filename}`);
@@ -2769,8 +2760,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Auto-match orders for newly imported emails
         console.log(`🔄 Auto-matching orders for imported emails...`);
         try {
-          const threads = await storage.getEmailThreads({});
-          const threadsWithoutOrders = threads.filter((thread) => !thread.orderId);
+          const threadsData = await storage.getEmailThreads({});
+          const threadsWithoutOrders = threadsData.threads.filter((thread: any) => !thread.orderId);
 
           let matchedCount = 0;
           for (const thread of threadsWithoutOrders) {
@@ -3115,7 +3106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const returnCase = await storage.createCase({
         title: `Return: ${order.orderNumber}`,
         description: `Return request from email`,
-        customerEmail: order.customerEmail || "",
+        customerEmail: req.body.customerEmail || undefined,
         orderId: orderId,
         status: "new",
         priority: "medium",
@@ -3251,20 +3242,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(
           "Found email attachment:",
           emailAttachment.filename,
-          "contentType:",
-          emailAttachment.contentType,
+          "mimeType:",
+          emailAttachment.mimeType,
         );
-        await storage.downloadAttachment(attachmentPath, res, forceDownload);
+        await objectStorage.downloadAttachmentByPath(attachmentPath, res, forceDownload);
         return;
       }
 
       // If not found as email attachment, serve directly from object storage
       // This handles repair attachments and other files
       console.log("Attempting to serve file directly from object storage");
-      const objectStorageService = new ObjectStorageService();
       try {
-        const file = await objectStorageService.getAttachmentFile(attachmentPath);
-        await objectStorageService.downloadObject(file, res, 3600, forceDownload);
+        const file = await objectStorage.getAttachmentFile(attachmentPath);
+        await objectStorage.downloadObject(file, res, 3600, forceDownload);
       } catch (storageError) {
         console.log("File not found in object storage:", attachmentPath);
         return res.status(404).json({ error: "Attachment not found" });
@@ -4846,7 +4836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (entityType === 'order') {
         const currentCase = await storage.getCase(id);
         if (currentCase && !currentCase.orderId) {
-          await storage.updateCase(id, { orderId: Number(entityId) });
+          await storage.updateCase(id, { orderId: entityId });
         }
       }
 
@@ -5955,7 +5945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Attachment not found" });
       }
 
-      await objectStorage.deleteFile(attachment.storageUrl);
+      await objectStorage.deleteAttachment(attachment.storageUrl);
       await db.delete(todoAttachments).where(eq(todoAttachments.id, attachmentId));
 
       res.json({ message: "Attachment deleted successfully" });
@@ -5968,8 +5958,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
   // MAIL SYSTEM ROUTES (NEW)
   // ============================================
-
-
 
   // POST /api/mail/refresh-inbox-only - OLD Refresh mails from INBOX only
   // NOTE: Use /api/mail/refresh for multi-folder sync (Inbox + Sent)
@@ -6065,8 +6053,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get UIDs to fetch
       let uidsToFetch: number[];
       if (syncMode === 'date-based') {
-        uidsToFetch = await client.search(searchCriteria);
+        const searchResult = await client.search(searchCriteria);
+        uidsToFetch = Array.isArray(searchResult) ? searchResult : [];
         console.log(`📧 [MAIL SYNC] Search found ${uidsToFetch.length} UIDs`);
+
       } else {
         uidsToFetch = [];
       }
@@ -6084,11 +6074,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Parse email
-          const parsed = await simpleParser(msg.source);
+          // Parse email - check source exists and cast to proper type
+          if (!msg.source) {
+            console.warn(`Skipping email UID ${msg.uid}: no source data`);
+            continue;
+          }
+          const parsed = await simpleParser(msg.source as any);
 
-          // Sanitize HTML (server-side for security)
-          const cleanHtml = DOMPurify.sanitize(parsed.html || '', {
+          // Handle mailparser's strict types (html can be string | false)
+          const htmlContent = typeof parsed.html === 'string' ? parsed.html : '';
+          const cleanHtml = DOMPurify.sanitize(htmlContent, {
             ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'img', 'div', 'span', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th'],
             ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'style']
           });
@@ -6104,18 +6099,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             imapUid: msg.uid
           });
 
+
           // Save attachments if any
           if (parsed.attachments?.length) {
             const attachmentData = [];
 
             for (const att of parsed.attachments) {
+
               // TODO: Save attachment to storage (Supabase or local)
               // For now, just create metadata
               const storagePath = `attachments/${email.id}/${att.filename}`;
 
               attachmentData.push({
                 emailId: email.id,
-                filename: att.filename,
+                filename: att.filename || 'unnamed',
                 mimeType: att.contentType,
                 size: att.size,
                 storagePath: storagePath
@@ -6219,7 +6216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lastEmail = emails[emails.length - 1];
         const checkMore = await storage.getEmails({
           limit: 1,
-          beforeDate: lastEmail.date,
+          beforeDate: lastEmail.date ? lastEmail.date.toISOString() : undefined,
           beforeId: lastEmail.id,
           orderBy: 'date DESC'
         });
@@ -6363,7 +6360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subject: email!.subject || '(No subject)',
           customerEmail: email!.fromEmail || 'Unknown',
           isUnread: false,
-          createdAt: email!.createdAt
+          createdAt: email!.createdAt,
         }));
 
       console.log('[EMAIL-THREADS] Returning', emails.length, 'emails');
@@ -6551,7 +6548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, fullSync);
 
       if (isInternalCall || req.user) {
-        await auditLog(req, "SYNC", "shopify_returns", null, {
+        await auditLog(req, "SYNC", "shopify_returns", undefined, {
           ...result,
           source: isInternalCall ? 'scheduled' : 'manual'
         });
