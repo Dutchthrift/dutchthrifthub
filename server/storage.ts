@@ -600,13 +600,13 @@ export class DatabaseStorage implements IStorage {
 
   // Email Messages
   async getEmailMessages(threadId: string): Promise<EmailMessage[]> {
-    return await db.select().from(emailMessages).where(eq(emailMessages.threadId, threadId)).orderBy(desc(emailMessages.sentAt));
+    return await db.select().from(emailMessages).where(eq(emailMessages.threadId, threadId)).orderBy(emailMessages.sentAt);
   }
 
   // OPTIMIZED: Get messages for multiple threads in one query
   async getEmailMessagesForThreads(threadIds: string[]): Promise<EmailMessage[]> {
     if (threadIds.length === 0) return [];
-    return await db.select().from(emailMessages).where(inArray(emailMessages.threadId, threadIds)).orderBy(desc(emailMessages.sentAt));
+    return await db.select().from(emailMessages).where(inArray(emailMessages.threadId, threadIds)).orderBy(emailMessages.sentAt);
   }
 
   async getEmailMessage(messageId: string): Promise<EmailMessage | undefined> {
