@@ -168,6 +168,7 @@ export function CreateCaseModal({ open, onOpenChange, emailThread }: CreateCaseM
 
       queryClient.invalidateQueries({ queryKey: ["/api/cases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/email-threads"] });
+      queryClient.invalidateQueries({ queryKey: ["mailContext"] });
 
       toast({
         title: "✅ Case aangemaakt",

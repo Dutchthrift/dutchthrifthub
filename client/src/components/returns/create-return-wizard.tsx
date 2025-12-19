@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -106,6 +106,8 @@ interface CreateReturnWizardProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onReturnCreated?: (returnId: string) => void;
+    emailThreadId?: string;
+    customerEmail?: string;
 }
 
 interface SelectedItem {
@@ -122,13 +124,20 @@ interface SelectedItem {
 const STEP_ICONS = [ShoppingBag, Package, AlertCircle, CheckCircle];
 const STEP_LABELS = ["Order", "Artikelen", "Details", "Bevestig"];
 
-export function CreateReturnWizard({ open, onOpenChange, onReturnCreated }: CreateReturnWizardProps) {
+export function CreateReturnWizard({ open, onOpenChange, onReturnCreated, emailThreadId, customerEmail }: CreateReturnWizardProps) {
     const [step, setStep] = useState(1);
-    const [orderSearch, setOrderSearch] = useState("");
+    const [orderSearch, setOrderSearch] = useState(customerEmail || "");
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [selectedItems, setSelectedItems] = useState<Map<string, SelectedItem>>(new Map());
     const [selectedReason, setSelectedReason] = useState("wrong_item");
     const { toast } = useToast();
+
+    // specific useEffect to update search when email prop changes
+    useEffect(() => {
+        if (open && customerEmail) {
+            setOrderSearch(customerEmail);
+        }
+    }, [open, customerEmail]);
 
     const form = useForm<WizardFormValues>({
         resolver: zodResolver(wizardSchema),
@@ -158,7 +167,7 @@ export function CreateReturnWizard({ open, onOpenChange, onReturnCreated }: Crea
     ).slice(0, 20); // Limit to 20 results
 
     const createReturnMutation = useMutation({
-        mutationFn: async (data: WizardFormValues & { items: any[] }) => {
+        mutationFn: async (data: WizardFormValues & { items: any[], emailThreadId?: string }) => {
             const response = await fetch("/api/returns", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -173,6 +182,7 @@ export function CreateReturnWizard({ open, onOpenChange, onReturnCreated }: Crea
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+            queryClient.invalidateQueries({ queryKey: ["mailContext"] }); // Update sidebar
             toast({ title: "✅ Retour succesvol aangemaakt" });
             onReturnCreated?.(data.id);
             handleClose();
@@ -232,6 +242,7 @@ export function CreateReturnWizard({ open, onOpenChange, onReturnCreated }: Crea
                 customerId: selectedOrder.customerId || undefined,
                 orderId: selectedOrder.id,
                 items,
+                emailThreadId // Pass thread ID for linking
             };
 
             createReturnMutation.mutate(submitData);

@@ -29,9 +29,9 @@ import { useAuth } from "@/lib/auth";
 const navigationItems = [
   { href: "/", label: "Home", icon: Home, roles: ["ADMIN", "SUPPORT"] },
   { href: "/inbox", label: "Inbox", icon: Inbox, badge: 3, roles: ["ADMIN", "SUPPORT"] },
+  { href: "/orders", label: "Orders", icon: ShoppingCart, roles: ["ADMIN", "SUPPORT"] },
   { href: "/cases", label: "Cases", icon: Briefcase, roles: ["ADMIN", "SUPPORT"] },
   { href: "/returns", label: "Retouren", icon: Package, roles: ["ADMIN", "SUPPORT"] },
-  { href: "/orders", label: "Orders", icon: ShoppingCart, roles: ["ADMIN", "SUPPORT"] },
   { href: "/purchase-orders", label: "Inkoop Orders", icon: Package2, roles: ["ADMIN", "SUPPORT"] },
   { href: "/repairs", label: "Reparaties", icon: Wrench, roles: ["ADMIN", "SUPPORT", "TECHNICUS"] },
   { href: "/todos", label: "To-do's", icon: CheckSquare, roles: ["ADMIN", "SUPPORT"] },

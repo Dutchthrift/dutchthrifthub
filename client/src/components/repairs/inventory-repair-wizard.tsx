@@ -549,6 +549,6 @@ export function InventoryRepairWizard({ open, onOpenChange, users }: InventoryRe
                     )}
                 </div>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

@@ -1,0 +1,46 @@
+[
+  {
+    "id": "admin-001",
+    "username": "admin",
+    "email": "admin@dutchthrift.com",
+    "password": "$2b$10$.v88i3mJ/249w/F7338tT.X7MJEWu.zx5eS00I119H/hhMySUcJzG",
+    "role": "ADMIN",
+    "firstName": "Admin",
+    "lastName": "User",
+    "createdAt": "2025-09-15T20:28:55.370Z",
+    "updatedAt": "2025-09-15T20:28:55.370Z"
+  },
+  {
+    "id": "b9027b1f-ef2c-4213-99a1-533b45ce3ed2",
+    "username": "theo",
+    "email": "theo@dutchthrift.com",
+    "password": "$2b$10$sA.oHn3WggHuZ9qwFhJNteHwYdHeomQ9gpVlV/QXXgYsmxyjwQm0W",
+    "role": "ADMIN",
+    "firstName": "Theo",
+    "lastName": "Oenema",
+    "createdAt": "2025-11-05T20:46:26.961Z",
+    "updatedAt": "2025-11-05T20:46:26.961Z"
+  },
+  {
+    "id": "25bc2f41-9668-4641-9e85-eefedb3b4ed9",
+    "username": "niek",
+    "email": "niek@dutchthrift.com",
+    "password": "$2b$10$L8pmqDtmzxIAtDw7RY.g4OuMECDhJ0Y74KxoectQmEZA3IMhbKDN2",
+    "role": "ADMIN",
+    "firstName": "Niek",
+    "lastName": "Oenema",
+    "createdAt": "2025-11-05T20:51:32.459Z",
+    "updatedAt": "2025-11-05T20:51:32.459Z"
+  },
+  {
+    "id": "cb43b13f-e5a5-413d-aa23-3aa78db9b3b1",
+    "username": "aram",
+    "email": "aram@dutchthrift.com",
+    "password": "$2b$10$MdR09GGtMDpDtIeY1NXpgOmwGGUSK8z3Y0WFqY450Q8yjqVKsmssu",
+    "role": "TECHNICUS",
+    "firstName": "Aram",
+    "lastName": "Reparatie",
+    "createdAt": "2025-11-06T15:52:41.215Z",
+    "updatedAt": "2025-11-06T15:52:41.215Z"
+  }
+]

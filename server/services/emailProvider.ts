@@ -25,7 +25,8 @@ export interface RawEmail {
 }
 
 export interface EmailProvider {
-  syncEmails(): Promise<RawEmail[]>;
+  getMailboxes(): Promise<{ path: string; name: string; specialUse?: string }[]>;
+  syncEmails(mailbox?: string): Promise<RawEmail[]>;
   sendEmail(to: string, subject: string, body: string, replyToMessageId?: string): Promise<{ success: boolean }>;
   fetchEmailBody(uid: number): Promise<{ body: string; isHtml: boolean }>;
   downloadAttachment(uid: number, partId: string): Promise<{ buffer: Buffer; contentType: string }>;

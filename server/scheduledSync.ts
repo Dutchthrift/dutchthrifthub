@@ -1,13 +1,14 @@
 import cron from 'node-cron';
 import { log } from './vite';
+import { incrementalEmailSync } from './services/incrementalEmailSync';
 
 export function startScheduledSync() {
   // Run every 5 minutes
   cron.schedule('*/5 * * * *', async () => {
     try {
-      log('🔄 [Auto-Sync] Starting scheduled Shopify sync (orders + returns)...');
+      log('🔄 [Auto-Sync] Starting scheduled sync (Shopify + Emails)...');
 
-      // Sync orders first
+      // Sync Shopify orders first
       const ordersResponse = await fetch('http://localhost:5000/api/shopify/sync-incremental', {
         method: 'POST',
         headers: {
@@ -22,13 +23,11 @@ export function startScheduledSync() {
       const ordersResult = await ordersResponse.json();
       log(`✅ [Auto-Sync] Orders: ${ordersResult.stats?.created || 0} created, ${ordersResult.stats?.updated || 0} updated`);
 
-      // Then sync returns
+      // Then sync Shopify returns
       const returnsResponse = await fetch('http://localhost:5000/api/shopify/sync-returns', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // Note: This endpoint requires auth, but we're calling it internally
-          // You might need to add an internal auth token or bypass auth for localhost
         },
       });
 
@@ -39,6 +38,31 @@ export function startScheduledSync() {
         log(`⚠️ [Auto-Sync] Returns sync failed with status: ${returnsResponse.status}`);
       }
 
+      // Finally sync emails (Gmail API or IMAP fallback)
+      try {
+        const hasGmailCreds = process.env.GMAIL_CLIENT_ID &&
+          process.env.GMAIL_CLIENT_SECRET &&
+          process.env.GMAIL_REFRESH_TOKEN;
+
+        if (hasGmailCreds) {
+          const { gmailService } = await import('./services/gmailService');
+          log('🔄 [Auto-Sync] Starting Gmail incremental sync...');
+          await gmailService.incrementalSync();
+          log('✅ [Auto-Sync] Gmail sync completed');
+        } else {
+          // Fallback to IMAP sync (already exists)
+          const emailResult = await incrementalEmailSync();
+          if (emailResult.synced > 0) {
+            log(`✅ [Auto-Sync] IMAP Emails: ${emailResult.synced} new emails synced`);
+          }
+          if (emailResult.errors.length > 0) {
+            log(`⚠️ [Auto-Sync] IMAP Email sync had ${emailResult.errors.length} errors`);
+          }
+        }
+      } catch (emailError) {
+        log(`⚠️ [Auto-Sync] Email sync failed: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`);
+      }
+
       if (ordersResult.errors && ordersResult.errors.length > 0) {
         log(`⚠️ [Auto-Sync] Encountered ${ordersResult.errors.length} errors during sync`);
       }
@@ -47,5 +71,5 @@ export function startScheduledSync() {
     }
   });
 
-  log('⏰ Scheduled Shopify sync enabled - will run every 5 minutes');
+  log('⏰ Scheduled sync enabled - Shopify + Emails every 5 minutes');
 }

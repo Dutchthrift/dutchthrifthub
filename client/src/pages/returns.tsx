@@ -33,8 +33,8 @@ import { ReturnsKanban } from "@/components/returns/returns-kanban";
 import { EditReturnDialog } from "@/components/returns/edit-return-dialog";
 import { ReturnDetailModalContent } from "@/components/returns/return-detail-modal-content";
 
-// Extend Return type to include orderNumber which is sent by the backend
-type ReturnWithOrder = Return & { orderNumber?: string };
+// Extend Return type to include orderNumber and customerName which are sent by the backend
+type ReturnWithOrder = Return & { orderNumber?: string; customerName?: string };
 
 type EnrichedReturnData = {
   return: Return;
@@ -183,7 +183,11 @@ export default function Returns() {
       ret.returnNumber.toLowerCase().includes(query) ||
       ret.trackingNumber?.toLowerCase().includes(query) ||
       ret.shopifyReturnName?.toLowerCase().includes(query) ||
-      (ret as ReturnWithOrder).orderNumber?.toLowerCase().includes(query);
+      (ret as ReturnWithOrder).orderNumber?.toLowerCase().includes(query) ||
+      (ret as ReturnWithOrder).customerName?.toLowerCase().includes(query) ||
+      ret.status.toLowerCase().includes(query) ||
+      ret.returnReason?.toLowerCase().includes(query) ||
+      ret.otherReason?.toLowerCase().includes(query);
 
     const matchesPriority = priorityFilter === "all" || ret.priority === priorityFilter;
 
@@ -351,7 +355,7 @@ export default function Returns() {
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Zoek op retournummer of tracking..."
+                  placeholder="Zoek op klantnaam, ordernummer, status..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
