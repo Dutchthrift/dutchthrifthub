@@ -19,50 +19,50 @@ export const printRepairLabel = (repair: any) => {
         <title>DYMO Label - ${repairId}</title>
         <style>
           @page {
-            size: 101mm 54mm;
+            size: 32mm 57mm;
             margin: 0;
           }
           body {
-            width: 101mm;
-            height: 54mm;
+            width: 32mm;
+            height: 57mm;
             margin: 0;
-            padding: 2mm 4mm;
+            padding: 2mm;
             box-sizing: border-box;
             font-family: sans-serif;
             display: flex;
             flex-direction: column;
-            gap: 2mm;
+            gap: 1mm;
             overflow: hidden;
           }
           .header {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #000;
-            padding-bottom: 2px;
-            margin-bottom: 2px;
+            flex-direction: column;
+            align-items: flex-start;
+            border-bottom: 1px solid #000;
+            padding-bottom: 1mm;
+            margin-bottom: 1mm;
           }
           .repair-id {
-            font-size: 18pt;
+            font-size: 12pt;
             font-weight: 800;
             font-family: monospace;
           }
           .date {
-            font-size: 10pt;
+            font-size: 7pt;
             font-weight: 600;
           }
           .content {
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 1mm;
           }
           .row {
-            font-size: 9pt;
-            line-height: 1.2;
+            font-size: 6pt;
+            line-height: 1.1;
           }
           .label {
             font-weight: bold;
-            margin-right: 4px;
+            display: block;
           }
           .value {
             word-break: break-word;
