@@ -8,3 +8,7 @@ vite.config.ts.timestamp*
 uploads/
 server/uploads/
 data/
+backups/
+*.sql
+*.sql.gz
+*.dump
