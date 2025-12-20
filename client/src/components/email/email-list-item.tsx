@@ -44,23 +44,32 @@ export function EmailListItem({
     const activityDate = typeof date === 'string' ? new Date(date) : date;
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
     if (activityDate >= today) {
+      // Today: show time only
       return activityDate.toLocaleTimeString('nl-NL', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false
       });
-    } else if (activityDate >= yesterday) {
-      return 'Yesterday';
+    } else if (activityDate >= sevenDaysAgo) {
+      // Last 7 days: show weekday + time
+      return activityDate.toLocaleDateString('nl-NL', { weekday: 'long' }) + ' ' +
+        activityDate.toLocaleTimeString('nl-NL', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
     } else if (activityDate.getFullYear() === now.getFullYear()) {
+      // This year: show day + month
       return activityDate.toLocaleDateString('nl-NL', {
         day: 'numeric',
         month: 'short'
       });
     } else {
+      // Older: show day + month + year
       return activityDate.toLocaleDateString('nl-NL', {
         day: 'numeric',
         month: 'short',
@@ -138,8 +147,8 @@ export function EmailListItem({
                 <Paperclip className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
               )}
               {thread.orderId && (
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className="text-xs px-1 py-0 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
                   data-testid={`order-badge-${thread.id}`}
                 >

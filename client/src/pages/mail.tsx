@@ -37,7 +37,11 @@ import {
     Clock,
     ExternalLink,
     Plus,
-    X
+    X,
+    Download,
+    Trash2,
+    Link2,
+    Link2Off
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +52,7 @@ import { useLocation } from 'wouter';
 import { Textarea } from '@/components/ui/textarea';
 import { CaseDetailModal } from '@/components/cases/case-detail-modal';
 import { ReturnDetailModalContent } from '@/components/returns/return-detail-modal-content';
+import { RepairDetailModal } from '@/components/repairs/repair-detail-modal';
 import {
     Dialog,
     DialogContent,
@@ -55,6 +60,16 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // --- Types ---
 
@@ -111,10 +126,20 @@ export default function MailPage() {
     const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
+    const [selectedRepairId, setSelectedRepairId] = useState<string | null>(null);
     const [isReplying, setIsReplying] = useState(false);
     const [replyText, setReplyText] = useState('');
     const [isComposing, setIsComposing] = useState(false);
     const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
+    const [previewAttachment, setPreviewAttachment] = useState<{
+        filename: string;
+        mimeType: string;
+        size: number;
+        gmailAttachmentId: string;
+        messageId: string;
+    } | null>(null);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [threadToDeleteId, setThreadToDeleteId] = useState<string | null>(null);
     const queryClient = useQueryClient();
     const { toast } = useToast();
     const [location, navigate] = useLocation();
@@ -175,6 +200,8 @@ export default function MailPage() {
         orders: any[];
         cases: any[];
         returns: any[];
+        repairs: any[];
+        currentLinks: any[];
     }>({
         queryKey: ['mailContext', selectedThreadId],
         queryFn: async () => {
@@ -243,6 +270,128 @@ export default function MailPage() {
             toast({ title: "Fout", description: err.message, variant: "destructive" });
         }
     });
+
+    // Delete thread mutation
+    const deleteThreadMutation = useMutation({
+        mutationFn: async (threadId: string) => {
+            const res = await fetch(`/api/mail/${threadId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Kon bericht niet verwijderen');
+            return res.json();
+        },
+        onMutate: async (threadId) => {
+            await queryClient.cancelQueries({ queryKey: ['mailThreads'] });
+            const previousThreads = queryClient.getQueryData(['mailThreads', activeTab, searchQuery]);
+
+            queryClient.setQueryData(['mailThreads', activeTab, searchQuery], (oldResource: any) => {
+                if (!oldResource) return oldResource;
+                return {
+                    ...oldResource,
+                    threads: oldResource.threads.filter((t: any) => t.id !== threadId)
+                };
+            });
+
+            if (selectedThreadId === threadId) {
+                setSelectedThreadId(null);
+            }
+
+            return { previousThreads };
+        },
+        onSuccess: () => {
+            toast({ title: "Verwijderd", description: "Bericht verplaatst naar prullenbak in Gmail" });
+        },
+        onError: (err, threadId, context: any) => {
+            if (context?.previousThreads) {
+                queryClient.setQueryData(['mailThreads', activeTab, searchQuery], context.previousThreads);
+            }
+            toast({ title: "Fout", description: "Kon bericht niet verwijderen", variant: "destructive" });
+        }
+    });
+
+    // Mark as read mutation
+    const markAsReadMutation = useMutation({
+        mutationFn: async (threadId: string) => {
+            const res = await fetch(`/api/mail/${threadId}/flags`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isUnread: false })
+            });
+            if (!res.ok) throw new Error('Kon status niet bijwerken');
+            return res.json();
+        },
+        onMutate: async (threadId) => {
+            await queryClient.cancelQueries({ queryKey: ['mailThreads'] });
+            const previousThreads = queryClient.getQueryData(['mailThreads', activeTab, searchQuery]);
+
+            queryClient.setQueryData(['mailThreads', activeTab, searchQuery], (oldResource: any) => {
+                if (!oldResource) return oldResource;
+                return {
+                    ...oldResource,
+                    threads: oldResource.threads.map((t: any) =>
+                        t.id === threadId ? { ...t, isUnread: false } : t
+                    )
+                };
+            });
+
+            return { previousThreads };
+        },
+        onError: (err, threadId, context: any) => {
+            if (context?.previousThreads) {
+                queryClient.setQueryData(['mailThreads', activeTab, searchQuery], context.previousThreads);
+            }
+        }
+    });
+
+    const linkThreadMutation = useMutation({
+        mutationFn: async ({ threadId, type, entityId }: { threadId: string, type: string, entityId: string }) => {
+            const res = await fetch(`/api/mail/threads/${threadId}/link`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, entityId })
+            });
+            if (!res.ok) throw new Error('Kon bericht niet koppelen');
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mailThreads'] });
+            queryClient.invalidateQueries({ queryKey: ['mailContext', selectedThreadId] });
+            queryClient.invalidateQueries({ queryKey: ['mailThread', selectedThreadId] });
+            toast({ title: 'Gekoppeld', description: 'Het bericht is succesvol gekoppeld.' });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Fout', description: err.message, variant: 'destructive' });
+        }
+    });
+
+    const unlinkThreadMutation = useMutation({
+        mutationFn: async ({ threadId, type, entityId }: { threadId: string, type: string, entityId: string }) => {
+            const res = await fetch(`/api/mail/threads/${threadId}/link`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, entityId })
+            });
+            if (!res.ok) throw new Error('Kon bericht niet ontkoppelen');
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mailThreads'] });
+            queryClient.invalidateQueries({ queryKey: ['mailContext', selectedThreadId] });
+            queryClient.invalidateQueries({ queryKey: ['mailThread', selectedThreadId] });
+            toast({ title: 'Ontkoppeld', description: 'De koppeling is verwijderd.' });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Fout', description: err.message, variant: 'destructive' });
+        }
+    });
+
+    // Mark as read when selected
+    useEffect(() => {
+        if (selectedThreadId && threadsData) {
+            const currentThread = threadsData.threads.find(t => t.id === selectedThreadId);
+            if (currentThread?.isUnread) {
+                markAsReadMutation.mutate(selectedThreadId);
+            }
+        }
+    }, [selectedThreadId, threadsData]);
 
     // Compose mutation
     const composeMutation = useMutation({
@@ -366,6 +515,17 @@ export default function MailPage() {
                                                 <Wrench className="mr-2 h-4 w-4 text-amber-500" />
                                                 Reparatie Inplannen
                                             </ContextMenuItem>
+                                            <ContextMenuSeparator />
+                                            <ContextMenuItem
+                                                className="text-destructive focus:text-destructive"
+                                                onClick={() => {
+                                                    setThreadToDeleteId(thread.id);
+                                                    setDeleteConfirmOpen(true);
+                                                }}
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Verwijderen
+                                            </ContextMenuItem>
                                         </ContextMenuContent>
                                     </ContextMenu>
                                 ))
@@ -395,7 +555,7 @@ export default function MailPage() {
                                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                             <span className="flex items-center gap-1">
                                                 <User className="h-3 w-3" />
-                                                {(threadDetails.participants || []).map(p => p.name || p.email).join(', ') || 'Unknown'}
+                                                {(threadDetails.participants || []).map(p => formatParticipantName(p)).join(', ') || 'Unknown'}
                                             </span>
                                             <span className="flex items-center gap-1">
                                                 <Clock className="h-3 w-3" />
@@ -411,6 +571,19 @@ export default function MailPage() {
                                         <Button variant="outline" size="sm" className="gap-2">
                                             <Archive className="h-4 w-4" />
                                             Archiveer
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            onClick={() => {
+                                                setThreadToDeleteId(threadDetails.id);
+                                                setDeleteConfirmOpen(true);
+                                            }}
+                                            disabled={deleteThreadMutation.isPending}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            Verwijderen
                                         </Button>
                                         <Button
                                             size="sm"
@@ -429,6 +602,12 @@ export default function MailPage() {
                                     </div>
                                 </div>
 
+                                {/* Thread Attachments Summary */}
+                                <ThreadAttachmentsSummary
+                                    messages={threadDetails.messages}
+                                    onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
+                                />
+
                                 {/* Messages List - Newest first */}
                                 <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
                                     {[...threadDetails.messages].reverse().map((msg, idx, arr) => (
@@ -437,6 +616,7 @@ export default function MailPage() {
                                             message={msg}
                                             isFirst={idx === arr.length - 1}
                                             isLatest={idx === 0}
+                                            onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
                                         />
                                     ))}
 
@@ -523,14 +703,14 @@ export default function MailPage() {
                                 <ContextSection
                                     title={`📦 Orders (${contextData?.orders?.length || 0})`}
                                     isLinked={!!threadDetails.orderId}
-                                    onLink={() => toast({ title: "Koppelen", description: "Order koppelings-venster..." })}
+                                    onLink={() => { }} // Legacy
                                 >
                                     {contextData?.orders && contextData.orders.length > 0 ? (
                                         <div className="space-y-3">
                                             {contextData.orders.slice(0, 5).map((order: any) => (
                                                 <div
                                                     key={order.id}
-                                                    className="group relative p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-sm"
+                                                    className="group relative p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-md"
                                                     onClick={() => setSelectedOrderId(order.id)}
                                                 >
                                                     <div className="flex justify-between items-start mb-1">
@@ -547,6 +727,39 @@ export default function MailPage() {
                                                     <div className="flex justify-between items-center text-xs text-muted-foreground">
                                                         <span>{order.orderDate ? format(new Date(order.orderDate), 'd MMM', { locale: nl }) : '-'}</span>
                                                         <span className="font-medium text-foreground">€{((order.totalAmount || 0) / 100).toFixed(2)}</span>
+                                                    </div>
+
+                                                    {/* Manual Link Action */}
+                                                    <div className="mt-3 pt-2 border-t flex justify-end opacity-0 group-hover:opacity-100 transition-opacity gap-2">
+                                                        {threadDetails.orderId === order.id ? (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 px-2 text-[10px] gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    unlinkThreadMutation.mutate({ threadId: threadDetails.id, type: 'order', entityId: order.id });
+                                                                }}
+                                                                disabled={unlinkThreadMutation.isPending}
+                                                            >
+                                                                <Link2Off className="h-3 w-3" />
+                                                                Ontkoppelen
+                                                            </Button>
+                                                        ) : !threadDetails.orderId && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-7 px-2 text-[10px] gap-1 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    linkThreadMutation.mutate({ threadId: threadDetails.id, type: 'order', entityId: order.id });
+                                                                }}
+                                                                disabled={linkThreadMutation.isPending}
+                                                            >
+                                                                <Package className="h-3 w-3" />
+                                                                Koppel aan bericht
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
@@ -578,7 +791,7 @@ export default function MailPage() {
                                                 return (
                                                     <div
                                                         key={c.id}
-                                                        className="p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-sm"
+                                                        className="group relative p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-md"
                                                         onClick={() => setSelectedCaseId(c.id)}
                                                     >
                                                         <div className="flex justify-between items-start mb-1">
@@ -587,7 +800,40 @@ export default function MailPage() {
                                                                 {c.status}
                                                             </Badge>
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{c.title}</p>
+                                                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-2">{c.title}</p>
+
+                                                        {/* Manual Link Action */}
+                                                        <div className="mt-1 pt-2 border-t flex justify-end opacity-0 group-hover:opacity-100 transition-opacity gap-2">
+                                                            {threadDetails.caseId === c.id ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-7 px-2 text-[10px] gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        unlinkThreadMutation.mutate({ threadId: threadDetails.id, type: 'case', entityId: c.id });
+                                                                    }}
+                                                                    disabled={unlinkThreadMutation.isPending}
+                                                                >
+                                                                    <Link2Off className="h-3 w-3" />
+                                                                    Ontkoppelen
+                                                                </Button>
+                                                            ) : !threadDetails.caseId && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-7 px-2 text-[10px] gap-1 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        linkThreadMutation.mutate({ threadId: threadDetails.id, type: 'case', entityId: c.id });
+                                                                    }}
+                                                                    disabled={linkThreadMutation.isPending}
+                                                                >
+                                                                    <Briefcase className="h-3 w-3" />
+                                                                    Koppel aan bericht
+                                                                </Button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 );
                                             })}
@@ -607,31 +853,134 @@ export default function MailPage() {
                                 >
                                     {contextData?.returns && contextData.returns.length > 0 ? (
                                         <div className="space-y-3">
-                                            {contextData.returns.slice(0, 5).map((ret: any) => (
-                                                <div
-                                                    key={ret.id}
-                                                    className="p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-sm"
-                                                    onClick={() => setSelectedReturnId(ret.id)}
-                                                >
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <span className="font-bold text-sm">{ret.returnNumber}</span>
-                                                        <Badge variant="secondary" className="text-[10px] bg-slate-100 text-slate-700">
-                                                            {ret.status}
-                                                        </Badge>
+                                            {contextData.returns.slice(0, 5).map((ret: any) => {
+                                                const isLinked = contextData.currentLinks?.some((l: any) => l.entityType === 'return' && l.entityId === ret.id);
+                                                return (
+                                                    <div
+                                                        key={ret.id}
+                                                        className="group relative p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-md"
+                                                        onClick={() => setSelectedReturnId(ret.id)}
+                                                    >
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="font-bold text-sm tracking-tight">{ret.returnNumber}</span>
+                                                            <Badge variant="secondary" className="text-[10px] bg-slate-100 text-slate-700 uppercase font-bold px-1.5">
+                                                                {ret.status}
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {ret.items && ret.items.length > 0 ? (
+                                                                <span>{ret.items.length} item{ret.items.length > 1 ? 's' : ''}</span>
+                                                            ) : (
+                                                                <span>Geen items</span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Link/Unlink Action */}
+                                                        <div className="mt-2 pt-2 border-t flex justify-end opacity-0 group-hover:opacity-100 transition-opacity gap-2">
+                                                            {isLinked ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-7 px-2 text-[10px] gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        unlinkThreadMutation.mutate({ threadId: threadDetails.id, type: 'return', entityId: ret.id });
+                                                                    }}
+                                                                    disabled={unlinkThreadMutation.isPending}
+                                                                >
+                                                                    <Link2Off className="h-3 w-3" />
+                                                                    Ontkoppelen
+                                                                </Button>
+                                                            ) : (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-7 px-2 text-[10px] gap-1 hover:bg-slate-50 hover:text-slate-600 hover:border-slate-200"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        linkThreadMutation.mutate({ threadId: threadDetails.id, type: 'return', entityId: ret.id });
+                                                                    }}
+                                                                    disabled={linkThreadMutation.isPending}
+                                                                >
+                                                                    <RotateCcw className="h-3 w-3" />
+                                                                    Koppelen
+                                                                </Button>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {ret.items && ret.items.length > 0 ? (
-                                                            <span>{ret.items.length} item{ret.items.length > 1 ? 's' : ''}</span>
-                                                        ) : (
-                                                            <span>Geen items</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     ) : (
                                         <div className="text-center p-4 border border-dashed rounded-lg bg-muted/20">
                                             <p className="text-xs text-muted-foreground">Geen retouren gevonden</p>
+                                        </div>
+                                    )}
+                                </ContextSection>
+
+                                {/* Related Repairs */}
+                                <ContextSection
+                                    title={`🛠️ Reparaties (${contextData?.repairs?.length || 0})`}
+                                    isLinked={false}
+                                    onLink={() => { }}
+                                >
+                                    {contextData?.repairs && contextData.repairs.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {contextData.repairs.slice(0, 5).map((rep: any) => {
+                                                const isLinked = contextData.currentLinks?.some((l: any) => l.entityType === 'repair' && l.entityId === rep.id);
+                                                return (
+                                                    <div
+                                                        key={rep.id}
+                                                        className="group relative p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-md"
+                                                        onClick={() => setSelectedRepairId(rep.id)}
+                                                    >
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="font-bold text-sm tracking-tight">{rep.repairNumber}</span>
+                                                            <Badge variant="secondary" className="text-[10px] bg-slate-100 text-slate-700 uppercase font-bold px-1.5">
+                                                                {rep.status}
+                                                            </Badge>
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{rep.title}</p>
+
+                                                        {/* Link/Unlink Action */}
+                                                        <div className="mt-1 pt-2 border-t flex justify-end opacity-0 group-hover:opacity-100 transition-opacity gap-2">
+                                                            {isLinked ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-7 px-2 text-[10px] gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        unlinkThreadMutation.mutate({ threadId: threadDetails.id, type: 'repair', entityId: rep.id });
+                                                                    }}
+                                                                    disabled={unlinkThreadMutation.isPending}
+                                                                >
+                                                                    <Link2Off className="h-3 w-3" />
+                                                                    Ontkoppelen
+                                                                </Button>
+                                                            ) : (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-7 px-2 text-[10px] gap-1 hover:bg-slate-50 hover:text-slate-600 hover:border-slate-200"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        linkThreadMutation.mutate({ threadId: threadDetails.id, type: 'repair', entityId: rep.id });
+                                                                    }}
+                                                                    disabled={linkThreadMutation.isPending}
+                                                                >
+                                                                    <Wrench className="h-3 w-3" />
+                                                                    Koppelen
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center p-4 border border-dashed rounded-lg bg-muted/20">
+                                            <p className="text-xs text-muted-foreground">Geen reparaties gevonden</p>
                                         </div>
                                     )}
                                 </ContextSection>
@@ -650,6 +999,14 @@ export default function MailPage() {
                     onClose={() => setSelectedCaseId(null)}
                 />
             )}
+
+            {/* Repair Detail Modal */}
+            <RepairDetailModal
+                repair={contextData?.repairs?.find(r => r.id === selectedRepairId) || null}
+                open={!!selectedRepairId}
+                onOpenChange={(open) => !open && setSelectedRepairId(null)}
+                users={[]}
+            />
 
             {/* Creation Modals from Context Menu */}
             <CreateCaseModal
@@ -670,6 +1027,39 @@ export default function MailPage() {
                 onOpenChange={setCreateRepairOpen}
                 emailThreadId={contextThread?.id}
             />
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Bericht verwijderen?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Weet je zeker dat je dit bericht wilt verwijderen?
+                            Het bericht zal worden verplaatst naar de prullenbak in Gmail.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => {
+                            setDeleteConfirmOpen(false);
+                            setThreadToDeleteId(null);
+                        }}>
+                            Annuleren
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                                if (threadToDeleteId) {
+                                    deleteThreadMutation.mutate(threadToDeleteId);
+                                }
+                                setDeleteConfirmOpen(false);
+                                setThreadToDeleteId(null);
+                            }}
+                        >
+                            Verwijderen
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* Order Detail Modal */}
             <Dialog open={!!selectedOrderId} onOpenChange={(open) => !open && setSelectedOrderId(null)}>
@@ -819,11 +1209,211 @@ export default function MailPage() {
                     </div>
                 </DialogContent>
             </Dialog >
+
+            <AttachmentPreviewModal
+                attachment={previewAttachment}
+                messageId={previewAttachment?.messageId}
+                onClose={() => setPreviewAttachment(null)}
+            />
         </>
     );
 }
 
+// --- Helpers ---
+
+// Check if an email or name is related to DutchThrift
+const isDutchThrift = (email?: string, name?: string) => {
+    const e = email?.toLowerCase() || '';
+    const n = name?.toLowerCase() || '';
+    return e.includes('@dutchthrift.com') || e.includes('dutchthrift') || n.includes('contact dutchthrift') || n.includes('dutchthrift');
+};
+
+// Format participant names - replace "Contact DutchThrift" with "DutchThrift"
+const formatParticipantName = (p: Participant) => {
+    const name = p.name || p.email.split('@')[0];
+    if (isDutchThrift(p.email, p.name)) {
+        return 'DutchThrift';
+    }
+    return name;
+};
+
+// Get initials from email or name
+const getInitials = (email: string, name?: string) => {
+    if (isDutchThrift(email, name)) return "DT";
+    const base = name || email.split("@")[0];
+    return base.substring(0, 2).toUpperCase();
+};
+
+// Whitelist for safe in-browser previews - must match server-side ALLOWED_PREVIEW_MIMES
+const ALLOWED_PREVIEW_MIMES = [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+    'text/plain',
+    'text/csv'
+];
+
+const IS_PREVIEWABLE = (mimeType?: string) => {
+    return ALLOWED_PREVIEW_MIMES.includes(mimeType?.toLowerCase() || '');
+};
+
 // --- Sub-components ---
+
+function AttachmentPreviewModal({
+    attachment,
+    messageId,
+    onClose
+}: {
+    attachment: { filename: string; mimeType: string; gmailAttachmentId: string } | null,
+    messageId?: string,
+    onClose: () => void
+}) {
+    if (!attachment || !messageId) return null;
+
+    const url = `/api/mail/attachment/${messageId}/${attachment.gmailAttachmentId}`;
+    const isImage = attachment.mimeType.startsWith('image/');
+    const isPDF = attachment.mimeType === 'application/pdf';
+
+    return (
+        <Dialog open={!!attachment} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-4xl w-[90vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-zinc-950 border-zinc-800">
+                <DialogHeader className="p-4 border-b border-zinc-800 flex flex-row items-center justify-between space-y-0 bg-zinc-900">
+                    <div className="flex items-center gap-3">
+                        <DialogTitle className="text-sm font-medium text-zinc-100 truncate max-w-md">
+                            {attachment.filename}
+                        </DialogTitle>
+                        <Badge variant="outline" className="text-[10px] border-zinc-700 text-zinc-400">
+                            {attachment.mimeType}
+                        </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-zinc-400 hover:text-orange-500 hover:bg-zinc-800 gap-2"
+                            onClick={() => window.open(url, '_blank')}
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                            Nieuw tabblad
+                        </Button>
+                        <a href={url} download={attachment.filename}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 border-zinc-700 bg-zinc-800 text-zinc-100 hover:bg-zinc-700 gap-2"
+                            >
+                                <Download className="h-4 w-4" />
+                                Download
+                            </Button>
+                        </a>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-zinc-400 hover:text-white"
+                            onClick={onClose}
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-zinc-950">
+                    {isImage ? (
+                        <img
+                            src={url}
+                            alt={attachment.filename}
+                            className="max-w-full max-h-full object-contain shadow-2xl"
+                        />
+                    ) : isPDF ? (
+                        <iframe
+                            src={url}
+                            className="w-full h-full rounded-sm bg-white"
+                            title={attachment.filename}
+                        />
+                    ) : (
+                        <div className="text-center p-12">
+                            <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800">
+                                <Paperclip className="h-8 w-8 text-zinc-500" />
+                            </div>
+                            <h3 className="text-zinc-200 font-medium mb-2">Preview niet beschikbaar</h3>
+                            <p className="text-zinc-500 text-sm mb-6 max-w-xs mx-auto">
+                                Dit bestandstype kan niet veilig direct in de browser worden weergegeven.
+                            </p>
+                            <a href={url} download={attachment.filename}>
+                                <Button className="bg-orange-600 hover:bg-orange-700">
+                                    Download om te bekijken
+                                </Button>
+                            </a>
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function ThreadAttachmentsSummary({ messages, onPreview }: { messages: ThreadMessage[], onPreview: (att: any, msgId: string) => void }) {
+    // Extract everything that has attachments
+    const allAttachments = messages.flatMap(msg =>
+        (msg.attachments || []).map(att => ({ ...att, messageId: msg.messageId }))
+    );
+
+    if (allAttachments.length === 0) return null;
+
+    return (
+        <div className="px-6 py-3 bg-muted/20 border-b overflow-hidden">
+            <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-background border px-2 py-1 rounded-sm shadow-sm whitespace-nowrap">
+                    <Paperclip className="h-3 w-3 text-orange-500" />
+                    Bijlagen ({allAttachments.length})
+                </div>
+                <div className="flex gap-2 pb-1 overflow-x-auto no-scrollbar">
+                    {allAttachments.map((att, i) => {
+                        const isImage = att.mimeType?.startsWith('image/');
+                        const canPreview = IS_PREVIEWABLE(att.mimeType);
+                        return (
+                            <div
+                                key={i}
+                                className="flex-shrink-0 flex items-center bg-background border rounded-full pl-1.5 pr-2 py-1 text-xs font-medium transition-colors shadow-sm group hover:border-orange-200"
+                            >
+                                <button
+                                    onClick={() => canPreview && onPreview(att, att.messageId)}
+                                    className={cn(
+                                        "flex items-center gap-2 pr-2 border-r border-border/50 mr-1",
+                                        canPreview ? "cursor-pointer hover:text-orange-500" : "cursor-default"
+                                    )}
+                                    title={canPreview ? "Bekijk preview" : "Preview niet beschikbaar"}
+                                >
+                                    <div className="w-5 h-5 rounded-full overflow-hidden bg-muted flex items-center justify-center flex-shrink-0 border border-border/50 group-hover:border-orange-200">
+                                        {isImage ? (
+                                            <img
+                                                src={`/api/mail/attachment/${att.messageId}/${att.gmailAttachmentId}`}
+                                                className="w-full h-full object-cover"
+                                                alt=""
+                                            />
+                                        ) : (
+                                            <Paperclip className="h-2.5 w-2.5 text-muted-foreground group-hover:text-orange-500" />
+                                        )}
+                                    </div>
+                                    <span className="truncate max-w-[120px] text-muted-foreground group-hover:text-foreground">{att.filename}</span>
+                                </button>
+                                <a
+                                    href={`/api/mail/attachment/${att.messageId}/${att.gmailAttachmentId}`}
+                                    download={att.filename}
+                                    className="p-1 text-muted-foreground hover:text-orange-500 transition-colors"
+                                    title="Downloaden"
+                                >
+                                    <Download className="h-3 w-3" />
+                                </a>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}
 
 
 function FilterChip({ active, label, icon, onClick }: { active: boolean, label: string, icon: any, onClick: () => void }) {
@@ -842,11 +1432,30 @@ function FilterChip({ active, label, icon, onClick }: { active: boolean, label: 
 
 function ThreadCard({ thread, isSelected, onClick }: { thread: EmailThread, isSelected: boolean, onClick: () => void }) {
     const lastDate = new Date(thread.lastActivity);
-    const isToday = lastDate.toDateString() === new Date().toDateString();
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const displayDate = isToday
-        ? lastDate.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-        : lastDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+    let displayDate: string;
+    if (lastDate >= today) {
+        // Today: show time only
+        displayDate = lastDate.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    } else if (lastDate >= sevenDaysAgo) {
+        // Last 7 days: show weekday + time
+        displayDate = lastDate.toLocaleDateString('nl-NL', { weekday: 'long' }) + ' ' +
+            lastDate.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    } else if (lastDate.getFullYear() === now.getFullYear()) {
+        // This year: show day + month
+        displayDate = lastDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+    } else {
+        // Previous years: show full date
+        displayDate = lastDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    // Determine if this is an outbound thread (sent folder or first participant is DutchThrift)
+    const firstParticipant = thread.participants?.[0];
+    const isOutbound = thread.folder === 'sent' || (firstParticipant && isDutchThrift(firstParticipant.email, firstParticipant.name));
 
     return (
         <div
@@ -859,36 +1468,55 @@ function ThreadCard({ thread, isSelected, onClick }: { thread: EmailThread, isSe
         >
             {thread.isUnread && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500" />}
 
-            <div className="flex justify-between items-start mb-1 gap-2">
-                <span className={cn("text-xs font-bold truncate", thread.isUnread ? "text-foreground" : "text-muted-foreground")}>
-                    {(thread.participants || []).map(p => p.name || p.email.split('@')[0]).join(', ') || 'Unknown'}
-                </span>
-                <span className="text-[10px] text-muted-foreground font-medium uppercase">{displayDate}</span>
-            </div>
+            <div className="flex gap-3">
+                {/* Avatar */}
+                <div className={cn(
+                    "flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs",
+                    isOutbound ? "bg-orange-500" : "bg-blue-600"
+                )}>
+                    {getInitials(firstParticipant?.email || '', firstParticipant?.name)}
+                </div>
 
-            <h3 className={cn("text-sm truncate mb-1", thread.isUnread ? "font-bold" : "font-medium")}>
-                {thread.subject}
-            </h3>
+                <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start mb-1 gap-2">
+                        <div className="flex flex-col min-w-0">
+                            <span className={cn("text-xs font-bold truncate", thread.isUnread ? "text-foreground" : "text-muted-foreground")}>
+                                {(thread.participants || []).map(p => formatParticipantName(p)).join(', ') || 'Unknown'}
+                            </span>
+                            {!isOutbound && firstParticipant?.email && (
+                                <span className="text-[10px] text-muted-foreground truncate font-medium">
+                                    {firstParticipant.email}
+                                </span>
+                            )}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase whitespace-nowrap">{displayDate}</span>
+                    </div>
 
-            <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
-                {thread.snippet}
-            </p>
+                    <h3 className={cn("text-sm truncate mb-1", thread.isUnread ? "font-bold" : "font-medium")}>
+                        {thread.subject}
+                    </h3>
 
-            <div className="flex items-center gap-2">
-                {thread.messageCount > 1 && (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 h-4">
-                        {thread.messageCount} ber.
-                    </Badge>
-                )}
-                {thread.orderId && <Package className="h-3 w-3 text-orange-500" />}
-                {thread.caseId && <Briefcase className="h-3 w-3 text-blue-500" />}
-                {thread.starred && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 ml-auto" />}
+                    <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
+                        {thread.snippet}
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                        {thread.messageCount > 1 && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 h-4">
+                                {thread.messageCount} ber.
+                            </Badge>
+                        )}
+                        {thread.orderId && <Package className="h-3 w-3 text-orange-500" />}
+                        {thread.caseId && <Briefcase className="h-3 w-3 text-blue-500" />}
+                        {thread.starred && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 ml-auto" />}
+                    </div>
+                </div>
             </div>
         </div>
     );
 }
 
-function MessageItem({ message, isFirst, isLatest }: { message: ThreadMessage, isFirst: boolean, isLatest: boolean }) {
+function MessageItem({ message, isFirst, isLatest, onPreview }: { message: ThreadMessage, isFirst: boolean, isLatest: boolean, onPreview: (att: any, msgId: string) => void }) {
     const [expanded, setExpanded] = useState(isLatest);
     const sentDate = new Date(message.sentAt);
 
@@ -908,16 +1536,23 @@ function MessageItem({ message, isFirst, isLatest }: { message: ThreadMessage, i
             >
                 <div className={cn(
                     "w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0",
-                    message.isOutbound ? "bg-orange-500" : "bg-blue-600 font-serif"
+                    isDutchThrift(message.fromEmail, message.fromName) ? "bg-orange-500" : "bg-blue-600 font-serif"
                 )}>
-                    {message.isOutbound ? 'J' : (message.fromName?.charAt(0) || message.fromEmail.charAt(0)).toUpperCase()}
+                    {getInitials(message.fromEmail, message.fromName)}
                 </div>
 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold truncate">
-                            {message.isOutbound ? 'Jijzelf' : (message.fromName || message.fromEmail)}
-                        </span>
+                        <div className="flex items-baseline gap-2 min-w-0">
+                            <span className="text-sm font-bold truncate">
+                                {isDutchThrift(message.fromEmail, message.fromName) ? 'DutchThrift' : (message.fromName || message.fromEmail)}
+                            </span>
+                            {!isDutchThrift(message.fromEmail, message.fromName) && message.fromName && (
+                                <span className="text-xs text-muted-foreground font-medium truncate">
+                                    &lt;{message.fromEmail}&gt;
+                                </span>
+                            )}
+                        </div>
                         <span className="text-[10px] text-muted-foreground">
                             {sentDate.toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </span>
@@ -959,20 +1594,31 @@ function MessageItem({ message, isFirst, isLatest }: { message: ThreadMessage, i
                                     {message.attachments
                                         .filter(att => att.mimeType?.startsWith('image/'))
                                         .map((att, i) => (
-                                            <a
-                                                key={i}
-                                                href={`/api/mail/attachment/${message.messageId}/${att.gmailAttachmentId}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="block rounded-lg overflow-hidden border hover:border-primary transition-colors"
-                                            >
+                                            <div key={i} className="group relative rounded-lg overflow-hidden border bg-muted">
                                                 <img
                                                     src={`/api/mail/attachment/${message.messageId}/${att.gmailAttachmentId}`}
                                                     alt={att.filename}
-                                                    className="w-32 h-32 object-cover bg-muted"
+                                                    className="w-32 h-32 object-cover transition-transform group-hover:scale-105"
                                                     loading="lazy"
                                                 />
-                                            </a>
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                    {IS_PREVIEWABLE(att.mimeType) && (
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="icon"
+                                                            className="h-8 w-8 rounded-full"
+                                                            onClick={() => onPreview(att, message.messageId)}
+                                                        >
+                                                            <Search className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    <a href={`/api/mail/attachment/${message.messageId}/${att.gmailAttachmentId}`} download={att.filename}>
+                                                        <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full">
+                                                            <Download className="h-4 w-4" />
+                                                        </Button>
+                                                    </a>
+                                                </div>
+                                            </div>
                                         ))}
                                 </div>
                             )}
@@ -982,17 +1628,28 @@ function MessageItem({ message, isFirst, isLatest }: { message: ThreadMessage, i
                                 {message.attachments
                                     .filter(att => !att.mimeType?.startsWith('image/'))
                                     .map((att, i) => (
-                                        <a
-                                            key={i}
-                                            href={`/api/mail/attachment/${message.messageId}/${att.gmailAttachmentId}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                        >
-                                            <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
-                                                <Paperclip className="h-3 w-3" />
-                                                {att.filename}
-                                            </Button>
-                                        </a>
+                                        <div key={i} className="flex items-center gap-1">
+                                            {IS_PREVIEWABLE(att.mimeType) && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 text-xs gap-2"
+                                                    onClick={() => onPreview(att, message.messageId)}
+                                                >
+                                                    <Search className="h-3 w-3" />
+                                                    Preview
+                                                </Button>
+                                            )}
+                                            <a
+                                                href={`/api/mail/attachment/${message.messageId}/${att.gmailAttachmentId}`}
+                                                download={att.filename}
+                                            >
+                                                <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
+                                                    <Paperclip className="h-3 w-3" />
+                                                    {att.filename}
+                                                </Button>
+                                            </a>
+                                        </div>
                                     ))}
                             </div>
                         </div>

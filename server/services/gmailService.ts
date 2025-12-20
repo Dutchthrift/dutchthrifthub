@@ -95,6 +95,19 @@ class GmailService {
             const gmailUser = process.env.GMAIL_USER || '';
             const isLastMessageOutbound = gmailUser && lastMessageFrom.toLowerCase().includes(gmailUser.toLowerCase());
 
+            const isTrash = allLabels.includes('TRASH');
+            const isSpam = allLabels.includes('SPAM');
+
+            if (isTrash || isSpam) {
+                console.log(`[Gmail] Skipping thread ${threadId} as it is marked as Trash/Spam (Labels: ${uniqueLabels.join(',')})`);
+                // If it exists locally but is now trashed in Gmail, we should remove it locally too
+                const existing = await storage.getEmailThreadByThreadId(threadId);
+                if (existing) {
+                    await storage.deleteEmailThread(existing.id);
+                }
+                return;
+            }
+
             let folder: 'inbox' | 'sent' = hasInbox ? 'inbox' : (hasSent ? 'sent' : 'inbox');
 
             if (!isLastMessageOutbound && folder === 'sent' && !hasInbox) {
@@ -141,11 +154,62 @@ class GmailService {
                 await this.upsertMessage(dbThreadId, msg);
             }
 
-            // Auto-linking to orders
-            await this.autoLinkThread(dbThreadId, subject, threadData.messages);
+            // Auto-linking to orders (Disabled as per user request to avoid incorrect associations)
+            // await this.autoLinkThread(dbThreadId, subject, threadData.messages);
 
         } catch (error) {
             console.error(`[Gmail] Error syncing thread ${threadId}:`, error);
+        }
+    }
+
+    async markThreadAsRead(threadId: string) {
+        try {
+            // Find Gmail thread ID
+            const thread = await storage.getEmailThread(threadId) || await storage.getEmailThreadByThreadId(threadId);
+            if (!thread) {
+                console.error(`[Gmail] Thread ${threadId} not found in DB`);
+                return;
+            }
+
+            console.log(`[Gmail] Marking thread ${thread.threadId} as read...`);
+
+            await this.gmail.users.threads.modify({
+                userId: 'me',
+                id: thread.threadId,
+                requestBody: {
+                    removeLabelIds: ['UNREAD']
+                }
+            });
+
+            // Update local DB
+            await storage.updateEmailThread(thread.id, { isUnread: false });
+            console.log(`[Gmail] Thread ${thread.threadId} marked as read successfully.`);
+        } catch (error) {
+            console.error(`[Gmail] Error marking thread ${threadId} as read:`, error);
+        }
+    }
+
+    async trashThread(threadId: string) {
+        try {
+            // Find Gmail thread ID
+            const thread = await storage.getEmailThread(threadId) || await storage.getEmailThreadByThreadId(threadId);
+            if (!thread) {
+                console.error(`[Gmail] Thread ${threadId} not found in DB`);
+                return;
+            }
+
+            console.log(`[Gmail] Trashing thread ${thread.threadId}...`);
+
+            await this.gmail.users.threads.trash({
+                userId: 'me',
+                id: thread.threadId
+            });
+
+            // Update local DB
+            await storage.deleteEmailThread(thread.id);
+            console.log(`[Gmail] Thread ${thread.threadId} trashed successfully.`);
+        } catch (error) {
+            console.error(`[Gmail] Error trashing thread ${threadId}:`, error);
         }
     }
 
@@ -380,39 +444,10 @@ class GmailService {
 
             if (!res.data.data) return null;
 
-            // Get message to find attachment metadata
-            const msgRes = await this.gmail.users.messages.get({
-                userId: 'me',
-                id: messageId,
-                format: 'metadata',
-                metadataHeaders: []
-            });
-
-            // Find the attachment metadata
-            let mimeType = 'application/octet-stream';
-            let filename = 'attachment';
-
-            const findAttachment = (parts: any[]): void => {
-                for (const part of parts) {
-                    if (part.body?.attachmentId === attachmentId) {
-                        mimeType = part.mimeType || mimeType;
-                        filename = part.filename || filename;
-                        return;
-                    }
-                    if (part.parts) {
-                        findAttachment(part.parts);
-                    }
-                }
-            };
-
-            if (msgRes.data.payload?.parts) {
-                findAttachment(msgRes.data.payload.parts);
-            }
-
             return {
                 data: res.data.data,
-                mimeType,
-                filename
+                mimeType: 'application/octet-stream', // Default, route will overwrite from DB
+                filename: 'attachment' // Default, route will overwrite from DB
             };
         } catch (error) {
             console.error('[Gmail] Error fetching attachment:', error);

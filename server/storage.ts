@@ -207,6 +207,9 @@ export interface IStorage {
   // Email context lookups
   getCasesByCustomerEmail(email: string): Promise<Case[]>;
   getReturnsByCustomerEmail(email: string): Promise<Return[]>;
+  getRepairsByCustomerEmail(email: string): Promise<Repair[]>;
+  getMailThreadLinks(threadId: string): Promise<MailThreadLink[]>;
+  deleteMailThreadLink(threadId: string, type: string, entityId: string): Promise<void>;
 
 
   // Case Events
@@ -587,6 +590,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEmailThread(id: string): Promise<void> {
+    // Delete messages first to avoid foreign key constraints
+    await db.delete(emailMessages).where(eq(emailMessages.threadId, id));
     await db.delete(emailThreads).where(eq(emailThreads.id, id));
   }
 
@@ -961,6 +966,10 @@ export class DatabaseStorage implements IStorage {
 
   async getCasesByCustomerEmail(email: string): Promise<Case[]> {
     return await db.select().from(cases).where(eq(cases.customerEmail, email)).orderBy(desc(cases.createdAt));
+  }
+
+  async getRepairsByCustomerEmail(email: string): Promise<Repair[]> {
+    return await db.select().from(repairs).where(eq(repairs.customerEmail, email)).orderBy(desc(repairs.createdAt));
   }
 
   async createCase(caseData: InsertCase): Promise<Case> {
@@ -2216,6 +2225,16 @@ export class DatabaseStorage implements IStorage {
 
   async getMailThreadLinks(threadId: string): Promise<MailThreadLink[]> {
     return await db.select().from(mailThreadLinks).where(eq(mailThreadLinks.threadId, threadId));
+  }
+
+  async deleteMailThreadLink(threadId: string, type: string, entityId: string): Promise<void> {
+    await db.delete(mailThreadLinks).where(
+      and(
+        eq(mailThreadLinks.threadId, threadId),
+        eq(mailThreadLinks.entityType, type),
+        eq(mailThreadLinks.entityId, entityId)
+      )
+    );
   }
 
   // Link email thread to entity
