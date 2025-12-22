@@ -3,6 +3,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { storage } from '../storage';
 import { emailThreads, emailMessages, mailThreadLinks } from '../../shared/schema';
 import { OrderMatchingService, orderMatchingService } from './orderMatchingService';
+import { aiService } from './aiService';
 import DOMPurify from 'isomorphic-dompurify';
 
 class GmailService {
@@ -154,8 +155,10 @@ class GmailService {
                 await this.upsertMessage(dbThreadId, msg);
             }
 
-            // Auto-linking to orders (Disabled as per user request to avoid incorrect associations)
-            // await this.autoLinkThread(dbThreadId, subject, threadData.messages);
+            // Trigger AI analysis on the background
+            aiService.analyzeThread(threadId).catch(err => {
+                console.error(`[Gmail] AI Analysis failed for thread ${threadId}:`, err);
+            });
 
         } catch (error) {
             console.error(`[Gmail] Error syncing thread ${threadId}:`, error);

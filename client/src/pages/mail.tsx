@@ -41,7 +41,13 @@ import {
     Download,
     Trash2,
     Link2,
-    Link2Off
+    Link2Off,
+    Sparkles,
+    Wand2,
+    Angry,
+    Smile,
+    Meh,
+    Brain
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -92,6 +98,18 @@ interface EmailThread {
     folder: string;
     orderId?: string;
     caseId?: string;
+
+    // AI Fields
+    aiSummary?: string;
+    sentiment?: 'positive' | 'negative' | 'neutral' | string;
+    detectedIntent?: string;
+    suggestedReply?: string;
+    aiInsights?: {
+        reasoning?: string;
+        actionPlan?: string;
+        systemStatus?: string;
+    };
+    lastAiSync?: string;
 }
 
 interface ThreadMessage {
@@ -154,6 +172,12 @@ export default function MailPage() {
             // navigate('/mail', { replace: true }); 
         }
     }, []);
+
+    // Reset reply state when switching threads
+    useEffect(() => {
+        setIsReplying(false);
+        setReplyText('');
+    }, [selectedThreadId]);
 
     // Fetch Threads
     const { data: threadsData, isLoading: isLoadingThreads } = useQuery<{ threads: EmailThread[], total: number }>({
@@ -602,6 +626,9 @@ export default function MailPage() {
                                     </div>
                                 </div>
 
+                                {/* AI Summary Card */}
+                                <AISummaryCard key={selectedThreadId} thread={threadDetails} />
+
                                 {/* Thread Attachments Summary */}
                                 <ThreadAttachmentsSummary
                                     messages={threadDetails.messages}
@@ -650,7 +677,23 @@ export default function MailPage() {
 
                                             <div className="flex items-center justify-between pt-2 border-t">
                                                 <div className="flex items-center gap-2">
-                                                    {/* Future: Attachments, Bold, Italic buttons */}
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 gap-1.5 text-xs border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 hover:text-orange-800 transition-all font-semibold"
+                                                        onClick={() => {
+                                                            if (threadDetails.suggestedReply) {
+                                                                setReplyText(threadDetails.suggestedReply);
+                                                                toast({ title: "Magic Reply toegepast", description: "Het concept-antwoord van de AI is ingevoegd." });
+                                                            } else {
+                                                                toast({ title: "Geen suggestie", description: "De AI heeft nog geen antwoord voorbereid voor dit bericht.", variant: "destructive" });
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Wand2 className="h-3.5 w-3.5" />
+                                                        Magic Reply
+                                                    </Button>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Button variant="ghost" onClick={() => setIsReplying(false)}>
@@ -699,6 +742,44 @@ export default function MailPage() {
                             )}
 
                             <div className="space-y-6">
+                                {/* AI Deep Context Section */}
+                                {threadDetails.aiInsights && (
+                                    <div key={selectedThreadId} className="p-4 bg-orange-50/50 border border-orange-100 rounded-xl space-y-4 mb-4">
+                                        <div className="flex items-center gap-2 text-sm font-bold text-orange-900 tracking-tight uppercase">
+                                            <Sparkles className="h-4 w-4" />
+                                            AI Diepe Context
+                                        </div>
+
+                                        {threadDetails.aiInsights.systemStatus && (
+                                            <div className="space-y-1">
+                                                <div className="text-[10px] font-bold text-orange-800/60 uppercase">Systeem Status</div>
+                                                <p className="text-xs text-orange-900 leading-normal">{threadDetails.aiInsights.systemStatus}</p>
+                                            </div>
+                                        )}
+
+                                        {threadDetails.aiInsights.reasoning && (
+                                            <div className="space-y-1">
+                                                <div className="text-[10px] font-bold text-orange-800/60 uppercase">Analyse</div>
+                                                <p className="text-xs text-orange-900/80 leading-normal italic">{threadDetails.aiInsights.reasoning}</p>
+                                            </div>
+                                        )}
+
+                                        {threadDetails.aiInsights.actionPlan && (
+                                            <div className="space-y-1 pt-2 border-t border-orange-200/50">
+                                                <div className="text-[10px] font-bold text-orange-800/60 uppercase">Actie Plan</div>
+                                                <div className="text-xs text-orange-900 space-y-1.5 pt-1">
+                                                    {(threadDetails.aiInsights.actionPlan || '').split('\n').map((step, idx) => (
+                                                        <div key={idx} className="flex gap-2">
+                                                            <span className="text-orange-500 font-bold shrink-0">•</span>
+                                                            <span className="leading-normal">{step.replace(/^[•\-\d.\s]*/, '')}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Related Orders */}
                                 <ContextSection
                                     title={`📦 Orders (${contextData?.orders?.length || 0})`}
@@ -1508,6 +1589,23 @@ function ThreadCard({ thread, isSelected, onClick }: { thread: EmailThread, isSe
                         )}
                         {thread.orderId && <Package className="h-3 w-3 text-orange-500" />}
                         {thread.caseId && <Briefcase className="h-3 w-3 text-blue-500" />}
+
+                        {/* AI Sentiment indicator */}
+                        {thread.sentiment && (
+                            <div className={cn(
+                                "h-2 w-2 rounded-full",
+                                thread.sentiment === 'positive' ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" :
+                                    thread.sentiment === 'negative' ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" :
+                                        "bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"
+                            )} title={`Sentiment: ${thread.sentiment}`} />
+                        )}
+
+                        {thread.detectedIntent && (
+                            <Badge variant="outline" className="text-[9px] px-1 h-4 uppercase border-orange-200 text-orange-700 bg-orange-50 font-bold tracking-tighter">
+                                {thread.detectedIntent}
+                            </Badge>
+                        )}
+
                         {thread.starred && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 ml-auto" />}
                     </div>
                 </div>
@@ -1675,6 +1773,105 @@ function ContextSection({ title, isLinked, onLink, children }: { title: string, 
                 )}
             </div>
             {children}
+        </div>
+    );
+}
+
+function AISummaryCard({ thread }: { thread: ThreadDetails }) {
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
+
+    const manualAnalyzeMutation = useMutation({
+        mutationFn: async () => {
+            const res = await fetch(`/api/mail/${thread.id}/ai-analyze`, { method: 'POST' });
+            if (!res.ok) throw new Error('AI Analyse mislukt');
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mailThread', thread.id] });
+            queryClient.invalidateQueries({ queryKey: ['mailThreads'] });
+            toast({ title: "AI Analyse voltooid", description: "De inzichten zijn bijgewerkt." });
+        },
+        onError: (err: any) => {
+            toast({ title: "Fout", description: err.message, variant: "destructive" });
+        }
+    });
+
+    if (!thread.aiSummary && !manualAnalyzeMutation.isPending) {
+        return (
+            <div className="px-6 py-4 mx-6 mt-4 rounded-xl border border-dashed border-orange-200 bg-orange-50/30 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                        <Brain className="h-4 w-4 text-orange-500" />
+                    </div>
+                    <div className="text-sm">
+                        <p className="font-semibold text-orange-900">Geen AI Analyse beschikbaar</p>
+                        <p className="text-orange-700/70 text-xs">Klik op de knop om deze conversatie te laten samenvatten.</p>
+                    </div>
+                </div>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-orange-200 hover:bg-orange-100 text-orange-700"
+                    onClick={() => manualAnalyzeMutation.mutate()}
+                >
+                    <Sparkles className="h-3 w-3 mr-2" />
+                    Analyseer nu
+                </Button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="px-6 py-5 mx-6 mt-4 rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50/50 to-white shadow-sm relative overflow-hidden group">
+            {/* Background sparkle effect */}
+            <div className="absolute top-[-10%] right-[-10%] w-32 h-32 bg-orange-200/20 blur-3xl rounded-full" />
+
+            <div className="flex items-start gap-4 relative z-10">
+                <div className="flex-shrink-0 mt-1">
+                    <div className="w-10 h-10 rounded-xl bg-orange-500 shadow-lg shadow-orange-200 flex items-center justify-center text-white">
+                        <Sparkles className="h-5 w-5" />
+                    </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                            <h4 className="text-sm font-bold text-orange-900 flex items-center gap-2">
+                                AI INZICHTEN
+                                {thread.sentiment === 'positive' ? <Smile className="h-4 w-4 text-emerald-500" /> :
+                                    thread.sentiment === 'negative' ? <Angry className="h-4 w-4 text-rose-500" /> :
+                                        <Meh className="h-4 w-4 text-amber-500" />}
+                            </h4>
+                            {thread.detectedIntent && (
+                                <Badge className="bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200 text-[10px] h-5 uppercase">
+                                    {thread.detectedIntent}
+                                </Badge>
+                            )}
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-orange-300 hover:text-orange-600 hover:bg-orange-100 transition-colors"
+                            onClick={() => manualAnalyzeMutation.mutate()}
+                            disabled={manualAnalyzeMutation.isPending}
+                        >
+                            <RefreshCw className={cn("h-3 w-3", manualAnalyzeMutation.isPending && "animate-spin")} />
+                        </Button>
+                    </div>
+
+                    {manualAnalyzeMutation.isPending ? (
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-full bg-orange-100/50" />
+                            <Skeleton className="h-4 w-2/3 bg-orange-100/50" />
+                        </div>
+                    ) : (
+                        <p className="text-sm text-orange-900/80 leading-relaxed font-medium italic">
+                            "{thread.aiSummary}"
+                        </p>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

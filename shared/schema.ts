@@ -110,8 +110,47 @@ export const emailThreads = pgTable("email_threads", {
   labels: jsonb("labels"), // Gmail labelIds
   messageCount: integer("message_count").default(1),
   lastHistoryId: text("last_history_id"), // For incremental sync
+
+  // AI related fields
+  aiSummary: text("ai_summary"),
+  sentiment: varchar("sentiment", { length: 50 }), // positive, negative, neutral
+  detectedIntent: varchar("detected_intent", { length: 100 }), // e.g., 'return_request', 'shipping_issue'
+  suggestedReply: text("suggested_reply"),
+  aiInsights: jsonb("ai_insights"), // Structured reasoning, action plan, and system status
+  lastAiSync: timestamp("last_ai_sync"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// AI Settings table (Global personality and tone)
+export const aiSettings = pgTable("ai_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  styleGuide: text("style_guide").notNull(), // Detailed description of the tone and rules
+  useHonorifics: boolean("use_honorifics").default(false), // Je vs U
+  allowEmojis: boolean("allow_emojis").default(true),
+  brevityLevel: integer("brevity_level").default(5), // 1-10 (short to long)
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// AI Style Examples (Few-shot learning)
+export const aiExamples = pgTable("ai_examples", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  incomingMail: text("incoming_mail").notNull(),
+  perfectResponse: text("perfect_response").notNull(),
+  scenarioLabel: text("scenario_label"), // e.g., 'Camera defect'
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// AI Scenarios (SOP instructions)
+export const aiScenarios = pgTable("ai_scenarios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // e.g., 'Camera Defect Video Request'
+  triggerKeywords: text("trigger_keywords").array().notNull(), // e.g., ['camera', 'defect', 'sd kaart']
+  instruction: text("instruction").notNull(), // e.g., 'Ask for a 10s video demonstration'
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Email messages table
@@ -387,6 +426,7 @@ export const returns = pgTable("returns", {
   orderId: varchar("order_id").references(() => orders.id),
   caseId: varchar("case_id").references(() => cases.id),
   assignedUserId: varchar("assigned_user_id").references(() => users.id),
+  customerEmail: text("customer_email"), // Direct customer email for display & filtering
 
   // Return details
   status: returnStatusEnum("status").notNull().default("nieuw"),
@@ -1097,3 +1137,30 @@ export const insertMailThreadLinkSchema = createInsertSchema(mailThreadLinks);
 // TypeScript types
 export type MailThreadLink = typeof mailThreadLinks.$inferSelect;
 export type InsertMailThreadLink = z.infer<typeof insertMailThreadLinkSchema>;
+// AI Settings Insert Schema
+export const insertAiSettingsSchema = createInsertSchema(aiSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+// AI Examples Insert Schema
+export const insertAiExampleSchema = createInsertSchema(aiExamples).omit({
+  id: true,
+  createdAt: true,
+});
+
+// AI Scenarios Insert Schema
+export const insertAiScenarioSchema = createInsertSchema(aiScenarios).omit({
+  id: true,
+  createdAt: true,
+});
+
+// AI TypeScript types
+export type AiSettings = typeof aiSettings.$inferSelect;
+export type InsertAiSettings = z.infer<typeof insertAiSettingsSchema>;
+
+export type AiExample = typeof aiExamples.$inferSelect;
+export type InsertAiExample = z.infer<typeof insertAiExampleSchema>;
+
+export type AiScenario = typeof aiScenarios.$inferSelect;
+export type InsertAiScenario = z.infer<typeof insertAiScenarioSchema>;

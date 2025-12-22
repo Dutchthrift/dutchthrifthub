@@ -445,5 +445,57 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// AI Analysis manual trigger
+router.post('/:id/ai-analyze', async (req, res) => {
+    try {
+        const thread = await storage.getEmailThread(req.params.id);
+        if (!thread) return res.status(404).json({ message: 'Thread not found' });
+
+        const { aiService } = await import('./services/aiService');
+        const result = await aiService.analyzeThread(thread.threadId);
+
+        res.json({ success: true, result });
+    } catch (error: any) {
+        console.error('Error in manual AI analysis:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Get AI Settings
+router.get('/settings/ai', async (req, res) => {
+    try {
+        const { db } = await import('./db');
+        const { aiSettings } = await import('@shared/schema');
+        const settings = await db.query.aiSettings.findFirst();
+        res.json(settings || {});
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Update AI Settings
+router.patch('/settings/ai', async (req, res) => {
+    try {
+        const { db } = await import('./db');
+        const { aiSettings } = await import('@shared/schema');
+        const existing = await db.query.aiSettings.findFirst();
+
+        if (existing) {
+            await db.update(aiSettings).set({
+                ...req.body,
+                updatedAt: new Date()
+            }).where(eq(aiSettings.id, existing.id));
+        } else {
+            await db.insert(aiSettings).values({
+                ...req.body,
+                id: undefined // handled by default uuid
+            });
+        }
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 export default router;
 
