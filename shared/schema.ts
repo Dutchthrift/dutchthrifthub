@@ -106,16 +106,19 @@ export const emailThreads = pgTable("email_threads", {
   slaDeadline: timestamp("sla_deadline"),
   orderId: varchar("order_id").references(() => orders.id),
   caseId: varchar("case_id").references(() => cases.id),
+  returnId: varchar("return_id").references(() => returns.id),
+  repairId: varchar("repair_id").references(() => repairs.id),
   participants: jsonb("participants"), // Array of {name, email}
   labels: jsonb("labels"), // Gmail labelIds
   messageCount: integer("message_count").default(1),
   lastHistoryId: text("last_history_id"), // For incremental sync
+  lastMessageIsOutbound: boolean("last_message_is_outbound").default(false), // To support Action Needed vs Waiting logic
 
   // AI related fields
   aiSummary: text("ai_summary"),
   sentiment: varchar("sentiment", { length: 50 }), // positive, negative, neutral
   detectedIntent: varchar("detected_intent", { length: 100 }), // e.g., 'return_request', 'shipping_issue'
-  suggestedReply: text("suggested_reply"),
+  suggestedReply: jsonb("suggested_reply"), // { customer: string, english: string }
   aiInsights: jsonb("ai_insights"), // Structured reasoning, action plan, and system status
   lastAiSync: timestamp("last_ai_sync"),
 

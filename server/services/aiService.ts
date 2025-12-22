@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { db } from './supabaseClient';
+import { db } from './database';
 import {
     emailThreads,
     emailMessages,
@@ -10,13 +10,12 @@ import {
     repairs,
     returns,
     cases,
-    ilike,
     type EmailMessage,
-    type AISettings,
-    type AIExample,
-    type AIScenario
+    type AiSettings,
+    type AiExample,
+    type AiScenario
 } from '../../shared/schema';
-import { eq, desc, asc, and } from 'drizzle-orm';
+import { eq, desc, asc, and, ilike } from 'drizzle-orm';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -55,13 +54,18 @@ export class AIService {
                 where: eq(emailThreads.threadId, threadId),
             });
 
+            if (!thread) {
+                console.log(`[AI] Thread not found: ${threadId}`);
+                return null;
+            }
+
             const threadMessages = await db.query.emailMessages.findMany({
                 where: eq(emailMessages.threadId, thread.id),
                 orderBy: (messages, { asc }) => [asc(messages.sentAt)],
             });
 
-            if (!thread || threadMessages.length === 0) {
-                console.log(`[AI] No messages found for thread ${threadId} (DB ID: ${thread?.id})`);
+            if (threadMessages.length === 0) {
+                console.log(`[AI] No messages found for thread ${threadId} (DB ID: ${thread.id})`);
                 return null;
             }
 
@@ -83,7 +87,9 @@ export class AIService {
                 response_format: { type: "json_object" }
             });
 
-            const aiResult = JSON.parse(response.choices[0].message.content || "{}");
+            const aiReply = response.choices[0].message.content || "{}";
+            const aiResult = JSON.parse(aiReply);
+            console.log(`[AI] Result for thread ${threadId}:`, JSON.stringify(aiResult, null, 2));
 
             // 6. Save to Database
             await db.update(emailThreads)
@@ -101,6 +107,11 @@ export class AIService {
                     updatedAt: new Date()
                 })
                 .where(eq(emailThreads.threadId, threadId));
+
+            const updatedThread = await db.query.emailThreads.findFirst({
+                where: eq(emailThreads.threadId, threadId),
+            });
+            console.log(`[AI] Saved suggestedReply for thread ${threadId}:`, JSON.stringify(updatedThread?.suggestedReply, null, 2));
 
             return aiResult;
         } catch (error) {
@@ -130,26 +141,28 @@ export class AIService {
         return { history, currentOrderId: thread.orderId, currentCaseId: thread.caseId };
     }
 
-    private async getAIRules(): Promise<{ settings: AISettings | undefined; examples: AIExample[]; scenarios: AIScenario[] }> {
+    private async getAIRules(): Promise<{ settings: AiSettings | undefined; examples: AiExample[]; scenarios: AiScenario[] }> {
         await this.ensureSettings(); // Ensure settings exist before fetching
-        const settings: AISettings | undefined = await db.query.aiSettings.findFirst();
-        const examples: AIExample[] = await db.query.aiExamples.findMany({
+        const settings: AiSettings | undefined = await db.query.aiSettings.findFirst();
+        const examples: AiExample[] = await db.query.aiExamples.findMany({
             where: (r: any) => eq(r.isActive, true),
             limit: 3
-        }) as AIExample[];
-        const scenarios: AIScenario[] = await db.query.aiScenarios.findMany({
+        }) as AiExample[];
+        const scenarios: AiScenario[] = await db.query.aiScenarios.findMany({
             where: (r: any) => eq(r.isActive, true)
-        }) as AIScenario[];
+        }) as AiScenario[];
 
         return { settings, examples, scenarios };
     }
 
-    private async buildPrompt(threadMessages: EmailMessage[], context: any, rules: { settings: AISettings | undefined; examples: AIExample[]; scenarios: AIScenario[] }): Promise<string> {
+    private async buildPrompt(threadMessages: EmailMessage[], context: any, rules: { settings: AiSettings | undefined; examples: AiExample[]; scenarios: AiScenario[] }): Promise<string> {
         const { settings, examples, scenarios } = rules;
 
         const prompt = `
 Je bent een senior AI email-assistent voor DutchThrift. 
 VAT DE VOLGENDE CONVERSATIE SAMEN EN GEEF DIEPE CONSTRUCTIEVE INZICHTEN.
+VERBETER HET ANTWOORD EN MAAK HET KLANTVRIENDELIJKER.
+GIVE THE SUGGESTED REPLY IN BOTH THE CUSTOMER'S LANGUAGE AND ENGLISH.
 
 BELANGRIJK: 
 1. Gebruik de "HUB CONTEXT" hieronder om te zien of een klant al een bestelling, retour of reparatie heeft. 
@@ -178,7 +191,10 @@ OUTPUT FORMAT (JSON):
   "reasoning": "Diepere analyse van het probleem van de klant (bijv. compatibiliteit, eerdere klachten). Gebruik info uit de HUB CONTEXT.",
   "systemStatus": "Status-update EXCLUSIEF gebaseerd op de HUB CONTEXT (bijv. 'Klant heeft 1 open retour RET-2025-XXX op status onderweg').",
   "actionPlan": "Stapsgewijs plan voor Niek (bijv. 1. Check Shopify docs, 2. Mail klant terug).",
-  "suggestedReply": "Een perfect, kant-en-klaar antwoord in de DutchThrift stijl."
+  "suggestedReply": {
+    "customer": "Een perfect, kant-en-klaar antwoord in de DutchThrift stijl, in de taal die de klant gebruikt. Verbeter het bericht en maak het uiterst klantvriendelijk en professioneel.",
+    "english": "The same perfect, customer-friendly reply translated into professional English."
+  }
 }
 `;
 

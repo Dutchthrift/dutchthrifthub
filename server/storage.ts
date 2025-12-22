@@ -38,7 +38,7 @@ import {
   type CaseNote, type InsertCaseNote,
   users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, mailThreadLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks, repairCounters, emailMetadata, insertEmailMetadataSchema, caseNotes, insertCaseNoteSchema
 } from "@shared/schema";
-import { db } from "./services/supabaseClient";
+import { db } from "./services/database";
 import { eq, desc, asc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns, lt } from "drizzle-orm";
 import { ObjectStorageService } from "./objectStorage";
 import type { Response } from "express";
@@ -502,8 +502,11 @@ export class DatabaseStorage implements IStorage {
     archived?: boolean;
     isUnread?: boolean;
     hasOrder?: boolean;
+    hasCase?: boolean;
+    hasReturn?: boolean;
+    hasRepair?: boolean;
   }): Promise<{ threads: EmailThread[], total: number }> {
-    const { limit = 50, offset = 0, folder, starred, archived, isUnread, hasOrder } = filters || {};
+    const { limit = 50, offset = 0, folder, starred, archived, isUnread, hasOrder, hasCase, hasReturn, hasRepair } = filters || {};
 
     let query = db.select().from(emailThreads);
     const conditions = [];
@@ -539,6 +542,24 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${emailThreads.orderId} IS NOT NULL`);
       } else {
         conditions.push(sql`${emailThreads.orderId} IS NULL`);
+      }
+    }
+    if (hasCase !== undefined) {
+      if (hasCase) {
+        // Strict filter: Only explicitly linked emails
+        conditions.push(isNotNull(emailThreads.caseId));
+      }
+    }
+    if (hasReturn !== undefined) {
+      if (hasReturn) {
+        // Strict filter: Only explicitly linked emails
+        conditions.push(isNotNull(emailThreads.returnId));
+      }
+    }
+    if (hasRepair !== undefined) {
+      if (hasRepair) {
+        // Strict filter: Only explicitly linked emails
+        conditions.push(isNotNull(emailThreads.repairId));
       }
     }
 
@@ -583,6 +604,12 @@ export class DatabaseStorage implements IStorage {
     }
     if (updateData.caseId === '') {
       updateData.caseId = null;
+    }
+    if (updateData.returnId === '') {
+      updateData.returnId = null;
+    }
+    if (updateData.repairId === '') {
+      updateData.repairId = null;
     }
 
     const result = await db.update(emailThreads).set(updateData).where(eq(emailThreads.id, id)).returning();
@@ -830,6 +857,8 @@ export class DatabaseStorage implements IStorage {
         // Joined customer fields (firstName, lastName)
         ilike(customers.firstName, searchTerm),
         ilike(customers.lastName, searchTerm),
+        // Combined name search for "First Last" - robust against nulls
+        sql`(COALESCE(${customers.firstName}, '') || ' ' || COALESCE(${customers.lastName}, '')) ILIKE ${searchTerm}`,
         // Joined order fields (orderNumber)
         ilike(orders.orderNumber, searchTerm),
         // Case items: SKU or productName match (subquery)
@@ -896,7 +925,13 @@ export class DatabaseStorage implements IStorage {
       })
       .from(cases)
       .leftJoin(orders, eq(cases.orderId, orders.id))
-      .leftJoin(customers, eq(cases.customerId, customers.id))
+      // Robust customer join: Check Case ID/Email OR Order ID/Email (Case-Insensitive)
+      .leftJoin(customers, sql`
+        ${customers.id} = ${cases.customerId} OR 
+        lower(${customers.email}) = lower(${cases.customerEmail}) OR 
+        ${customers.id} = ${orders.customerId} OR 
+        lower(${customers.email}) = lower(${orders.customerEmail})
+      `)
       .leftJoin(users, eq(cases.assignedUserId, users.id))
       .where(whereClause)
       .orderBy(desc(cases.createdAt));

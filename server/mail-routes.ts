@@ -131,7 +131,7 @@ router.post('/compose', async (req, res) => {
 // List Email Threads
 
 router.get('/list', async (req, res) => {
-    const { folder, starred, archived, isUnread, hasOrder, page = 1, limit = 50 } = req.query;
+    const { folder, starred, archived, isUnread, hasOrder, hasCase, hasReturn, hasRepair, page = 1, limit = 50 } = req.query;
 
     try {
         const offset = (Number(page) - 1) * Number(limit);
@@ -142,7 +142,10 @@ router.get('/list', async (req, res) => {
             starred: starred === 'true' ? true : starred === 'false' ? false : undefined,
             archived: archived === 'true' ? true : archived === 'false' ? false : undefined,
             isUnread: isUnread === 'true' ? true : isUnread === 'false' ? false : undefined,
-            hasOrder: hasOrder === 'true' ? true : hasOrder === 'false' ? false : undefined
+            hasOrder: hasOrder === 'true' ? true : hasOrder === 'false' ? false : undefined,
+            hasCase: hasCase === 'true' ? true : hasCase === 'false' ? false : undefined,
+            hasReturn: hasReturn === 'true' ? true : hasReturn === 'false' ? false : undefined,
+            hasRepair: hasRepair === 'true' ? true : hasRepair === 'false' ? false : undefined
         });
 
         res.json(result);
@@ -372,6 +375,8 @@ router.post('/threads/:id/link', async (req, res) => {
         const updates: any = {};
         if (type === 'case') updates.caseId = entityId;
         if (type === 'order') updates.orderId = entityId;
+        if (type === 'return') updates.returnId = entityId;
+        if (type === 'repair') updates.repairId = entityId;
 
         await storage.updateEmailThread(thread.id, updates);
 
@@ -464,7 +469,7 @@ router.post('/:id/ai-analyze', async (req, res) => {
 // Get AI Settings
 router.get('/settings/ai', async (req, res) => {
     try {
-        const { db } = await import('./db');
+        const { db } = await import('./services/database');
         const { aiSettings } = await import('@shared/schema');
         const settings = await db.query.aiSettings.findFirst();
         res.json(settings || {});
@@ -476,8 +481,9 @@ router.get('/settings/ai', async (req, res) => {
 // Update AI Settings
 router.patch('/settings/ai', async (req, res) => {
     try {
-        const { db } = await import('./db');
+        const { db } = await import('./services/database');
         const { aiSettings } = await import('@shared/schema');
+        const { eq } = await import('drizzle-orm');
         const existing = await db.query.aiSettings.findFirst();
 
         if (existing) {

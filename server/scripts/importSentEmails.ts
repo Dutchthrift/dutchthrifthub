@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { simpleParser } from 'mailparser';
 import DOMPurify from 'isomorphic-dompurify';
-import { db } from '../services/supabaseClient';
+import { db } from '../services/database.js';
 import { emailThreads, emailMessages } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 

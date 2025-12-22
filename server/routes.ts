@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { storage } from "./storage";
-import { db } from "./services/supabaseClient";
+import { db } from "./services/database";
 import { count } from "drizzle-orm";
 import { log } from "./vite";
 import {

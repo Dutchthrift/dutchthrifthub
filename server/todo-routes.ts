@@ -1,4 +1,4 @@
-import { db } from "./services/supabaseClient";
+import { db } from "./services/database";
 import { eq, desc, sql } from "drizzle-orm";
 import { subtasks, todoAttachments } from "@shared/schema";
 import { requireAuth } from "./routes";

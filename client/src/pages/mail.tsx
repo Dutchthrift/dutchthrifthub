@@ -11,6 +11,18 @@ import {
 import { CreateCaseModal } from '@/components/forms/create-case-modal';
 import { CreateReturnWizard } from '@/components/returns/create-return-wizard';
 import { CreateRepairWizard } from '@/components/repairs/create-repair-wizard';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { EmailThreadMessage } from '@/components/email/email-thread-message';
 import { Button } from '@/components/ui/button';
@@ -47,7 +59,9 @@ import {
     Angry,
     Smile,
     Meh,
-    Brain
+    Brain,
+    Loader2,
+    MoreHorizontal
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -98,12 +112,18 @@ interface EmailThread {
     folder: string;
     orderId?: string;
     caseId?: string;
+    returnId?: string;
+    repairId?: string;
+    lastMessageIsOutbound?: boolean;
 
     // AI Fields
     aiSummary?: string;
     sentiment?: 'positive' | 'negative' | 'neutral' | string;
     detectedIntent?: string;
-    suggestedReply?: string;
+    suggestedReply?: {
+        customer?: string;
+        english?: string;
+    } | string;
     aiInsights?: {
         reasoning?: string;
         actionPlan?: string;
@@ -140,7 +160,7 @@ interface ThreadDetails extends EmailThread {
 export default function MailPage() {
     const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'archived' | 'starred' | 'linked' | 'unlinked'>('inbox');
+    const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'archived' | 'starred' | 'linked' | 'unlinked' | 'cases' | 'returns' | 'repairs'>('inbox');
     const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
@@ -186,6 +206,9 @@ export default function MailPage() {
             let url = `/api/mail/list?limit=50&folder=${activeTab === 'inbox' ? 'inbox' : activeTab === 'sent' ? 'sent' : ''}&archived=${activeTab === 'archived'}&starred=${activeTab === 'starred'}`;
             if (activeTab === 'linked') url += '&hasOrder=true';
             if (activeTab === 'unlinked') url += '&hasOrder=false';
+            if (activeTab === 'cases') url += '&hasCase=true';
+            if (activeTab === 'returns') url += '&hasReturn=true';
+            if (activeTab === 'repairs') url += '&hasRepair=true';
 
             const res = await fetch(url);
             if (!res.ok) throw new Error('Kon threads niet laden');
@@ -245,6 +268,62 @@ export default function MailPage() {
             return res.json();
         },
         enabled: !!selectedOrderId
+    });
+
+    // Toggle star status
+    const toggleStarMutation = useMutation({
+        mutationFn: async ({ threadId, starred }: { threadId: string, starred: boolean }) => {
+            const res = await fetch(`/api/mail/${threadId}/flags`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ starred })
+            });
+            if (!res.ok) throw new Error('Kon ster niet aanpassen');
+            return res.json();
+        },
+        onMutate: async ({ threadId, starred }) => {
+            await queryClient.cancelQueries({ queryKey: ['mailThreads'] });
+            const previousThreads = queryClient.getQueryData(['mailThreads', activeTab, searchQuery]);
+
+            queryClient.setQueryData(['mailThreads', activeTab, searchQuery], (old: any) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    threads: old.threads.map((t: any) =>
+                        t.id === threadId ? { ...t, starred } : t
+                    )
+                };
+            });
+
+            return { previousThreads };
+        },
+        onError: (err, newTodo, context: any) => {
+            if (context?.previousThreads) {
+                queryClient.setQueryData(['mailThreads', activeTab, searchQuery], context.previousThreads);
+            }
+            toast({ title: 'Fout', description: 'Kon ster niet aanpassen', variant: 'destructive' });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mailThreads'] });
+        }
+    });
+
+    // Mutation to generate magic reply
+    const generateMagicReplyMutation = useMutation({
+        mutationFn: async (threadId: string) => {
+            const res = await fetch(`/api/mail/${threadId}/ai-analyze`, {
+                method: 'POST'
+            });
+            if (!res.ok) throw new Error("Failed to generate Magic Reply");
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mailThread', selectedThreadId] });
+            toast({ title: "Magic Reply gegenereerd", description: "De AI heeft een antwoord voorbereid." });
+        },
+        onError: () => {
+            toast({ title: "Fout", description: "Kon geen Magic Reply genereren.", variant: "destructive" });
+        }
     });
 
     // Fetch return details for modal
@@ -488,14 +567,57 @@ export default function MailPage() {
                                 />
                             </div>
 
-                            <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar">
-                                <FilterChip active={activeTab === 'inbox'} label="Inbox" icon={<Inbox className="h-3 w-3" />} onClick={() => setActiveTab('inbox')} />
-                                <FilterChip active={activeTab === 'sent'} label="Verzonden" icon={<Send className="h-3 w-3" />} onClick={() => setActiveTab('sent')} />
-                                <FilterChip active={activeTab === 'starred'} label="Ster" icon={<Star className="h-3 w-3" />} onClick={() => setActiveTab('starred')} />
-                                <FilterChip active={activeTab === 'linked'} label="Gekoppeld" icon={<Package className="h-3 w-3" />} onClick={() => setActiveTab('linked')} />
-                                <FilterChip active={activeTab === 'unlinked'} label="Niet gekoppeld" icon={<Mail className="h-3 w-3" />} onClick={() => setActiveTab('unlinked')} />
-                                <FilterChip active={activeTab === 'archived'} label="Archief" icon={<Archive className="h-3 w-3" />} onClick={() => setActiveTab('archived')} />
-                            </div>
+                            <TooltipProvider delayDuration={0}>
+                                <div className="grid grid-cols-6 gap-2 pb-1">
+                                    <FilterChip active={activeTab === 'inbox'} label="Inbox" icon={<Inbox className="h-4 w-4" />} onClick={() => setActiveTab('inbox')} />
+                                    <FilterChip active={activeTab === 'cases'} label="Cases" icon={<Briefcase className="h-4 w-4" />} onClick={() => setActiveTab('cases')} />
+                                    <FilterChip active={activeTab === 'returns'} label="Retouren" icon={<RotateCcw className="h-4 w-4" />} onClick={() => setActiveTab('returns')} />
+                                    <FilterChip active={activeTab === 'repairs'} label="Reparaties" icon={<Wrench className="h-4 w-4" />} onClick={() => setActiveTab('repairs')} />
+                                    <FilterChip active={activeTab === 'starred'} label="Ster" icon={<Star className="h-4 w-4" />} onClick={() => setActiveTab('starred')} />
+
+                                    <DropdownMenu>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant={['sent', 'linked', 'unlinked', 'archived'].includes(activeTab) ? "default" : "ghost"}
+                                                        size="icon"
+                                                        className={cn(
+                                                            "h-10 w-10 text-xs rounded-lg transition-all",
+                                                            ['sent', 'linked', 'unlinked', 'archived'].includes(activeTab) ? "bg-orange-500 hover:bg-orange-600 text-white shadow-sm" : "bg-transparent hover:bg-muted text-muted-foreground hover:text-foreground",
+                                                            !['sent', 'linked', 'unlinked', 'archived'].includes(activeTab) && "border border-transparent hover:border-border"
+                                                        )}
+                                                    >
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom">
+                                                <p>Overig</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => setActiveTab('sent')}>
+                                                <Send className="mr-2 h-4 w-4" />
+                                                Verzonden
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setActiveTab('linked')}>
+                                                <Package className="mr-2 h-4 w-4" />
+                                                Gekoppeld
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setActiveTab('unlinked')}>
+                                                <Mail className="mr-2 h-4 w-4" />
+                                                Niet gekoppeld
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setActiveTab('archived')}>
+                                                <Archive className="mr-2 h-4 w-4" />
+                                                Archief
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </TooltipProvider>
                         </div>
 
                         <div className="flex-1 overflow-y-auto">
@@ -513,6 +635,10 @@ export default function MailPage() {
                                                 thread={thread}
                                                 isSelected={selectedThreadId === thread.id}
                                                 onClick={() => setSelectedThreadId(thread.id)}
+                                                onToggleStar={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleStarMutation.mutate({ threadId: thread.id, starred: !thread.starred });
+                                                }}
                                             />
                                         </ContextMenuTrigger>
                                         <ContextMenuContent>
@@ -682,18 +808,61 @@ export default function MailPage() {
                                                         variant="outline"
                                                         size="sm"
                                                         className="h-8 gap-1.5 text-xs border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 hover:text-orange-800 transition-all font-semibold"
+                                                        disabled={generateMagicReplyMutation.isPending}
                                                         onClick={() => {
                                                             if (threadDetails.suggestedReply) {
-                                                                setReplyText(threadDetails.suggestedReply);
+                                                                if (typeof threadDetails.suggestedReply === 'string') {
+                                                                    setReplyText(threadDetails.suggestedReply);
+                                                                } else {
+                                                                    // Default to customer language if available, else english
+                                                                    setReplyText(threadDetails.suggestedReply.customer || threadDetails.suggestedReply.english || '');
+                                                                }
                                                                 toast({ title: "Magic Reply toegepast", description: "Het concept-antwoord van de AI is ingevoegd." });
                                                             } else {
-                                                                toast({ title: "Geen suggestie", description: "De AI heeft nog geen antwoord voorbereid voor dit bericht.", variant: "destructive" });
+                                                                generateMagicReplyMutation.mutate(threadDetails.id);
                                                             }
                                                         }}
                                                     >
-                                                        <Wand2 className="h-3.5 w-3.5" />
+                                                        {generateMagicReplyMutation.isPending ? (
+                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        ) : (
+                                                            <Wand2 className="h-3.5 w-3.5" />
+                                                        )}
                                                         Magic Reply
                                                     </Button>
+
+                                                    {(() => {
+                                                        const suggestion = threadDetails.suggestedReply;
+                                                        if (suggestion && typeof suggestion === 'object') {
+                                                            return (
+                                                                <div className="flex gap-1 ml-1 scale-90 origin-left">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className={cn(
+                                                                            "h-7 px-2 text-[10px] font-bold uppercase tracking-wider transition-all",
+                                                                            replyText === suggestion.customer ? "bg-orange-100 text-orange-700" : "text-muted-foreground hover:bg-muted"
+                                                                        )}
+                                                                        onClick={() => setReplyText(suggestion.customer || '')}
+                                                                    >
+                                                                        Klanttaal
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className={cn(
+                                                                            "h-7 px-2 text-[10px] font-bold uppercase tracking-wider transition-all",
+                                                                            replyText === suggestion.english ? "bg-orange-100 text-orange-700" : "text-muted-foreground hover:bg-muted"
+                                                                        )}
+                                                                        onClick={() => setReplyText(suggestion.english || '')}
+                                                                    >
+                                                                        English
+                                                                    </Button>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Button variant="ghost" onClick={() => setIsReplying(false)}>
@@ -1184,7 +1353,7 @@ export default function MailPage() {
                                     </div>
                                 </div>
                             )}
-                            <Button variant="outline" className="w-full" onClick={() => navigate(`/orders`)}>
+                            <Button variant="outline" className="w-full" onClick={() => navigate(`/orders?orderId=${selectedOrder.id}`)}>
                                 <ExternalLink className="h-4 w-4 mr-2" />
                                 Bekijk op Orders pagina
                             </Button>
@@ -1499,19 +1668,29 @@ function ThreadAttachmentsSummary({ messages, onPreview }: { messages: ThreadMes
 
 function FilterChip({ active, label, icon, onClick }: { active: boolean, label: string, icon: any, onClick: () => void }) {
     return (
-        <Button
-            variant={active ? "default" : "outline"}
-            size="sm"
-            onClick={onClick}
-            className={cn("rounded-full h-8 text-xs gap-1.5 whitespace-nowrap px-3", !active && "bg-background")}
-        >
-            {icon}
-            {label}
-        </Button>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button
+                    variant={active ? "default" : "ghost"}
+                    size="icon"
+                    onClick={onClick}
+                    className={cn(
+                        "h-10 w-10 text-xs rounded-lg transition-all",
+                        active ? "bg-orange-500 hover:bg-orange-600 text-white shadow-sm" : "bg-transparent hover:bg-muted text-muted-foreground hover:text-foreground",
+                        !active && "border border-transparent hover:border-border"
+                    )}
+                >
+                    {icon}
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+                <p>{label}</p>
+            </TooltipContent>
+        </Tooltip>
     );
 }
 
-function ThreadCard({ thread, isSelected, onClick }: { thread: EmailThread, isSelected: boolean, onClick: () => void }) {
+function ThreadCard({ thread, isSelected, onClick, onToggleStar }: { thread: EmailThread, isSelected: boolean, onClick: () => void, onToggleStar: (e: React.MouseEvent) => void }) {
     const lastDate = new Date(thread.lastActivity);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1570,6 +1749,14 @@ function ThreadCard({ thread, isSelected, onClick }: { thread: EmailThread, isSe
                                 </span>
                             )}
                         </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0 hover:bg-muted text-muted-foreground"
+                            onClick={onToggleStar}
+                        >
+                            <Star className={cn("h-4 w-4", thread.starred && "fill-yellow-400 text-yellow-400")} />
+                        </Button>
                         <span className="text-[10px] text-muted-foreground font-medium uppercase whitespace-nowrap">{displayDate}</span>
                     </div>
 
@@ -1581,12 +1768,28 @@ function ThreadCard({ thread, isSelected, onClick }: { thread: EmailThread, isSe
                         {thread.snippet}
                     </p>
 
-                    <div className="flex items-center gap-2">
-                        {thread.messageCount > 1 && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 h-4">
-                                {thread.messageCount} ber.
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Status Badges - Mailbox 2.0 */}
+                        {!thread.isUnread && thread.lastMessageIsOutbound && (
+                            <Badge variant="outline" className="h-5 px-1.5 text-[10px] gap-1 bg-muted/50 text-muted-foreground border-transparent font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500/50" />
+                                Afwachten
                             </Badge>
                         )}
+                        {!thread.isUnread && !thread.lastMessageIsOutbound && (
+                            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] gap-1 bg-orange-100/80 text-orange-700 hover:bg-orange-100 border-orange-200 font-bold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                                Actie vereist
+                            </Badge>
+                        )}
+
+                        {thread.messageCount > 1 && (
+                            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] gap-1 bg-muted text-muted-foreground font-medium">
+                                <Mail className="h-2.5 w-2.5" />
+                                {thread.messageCount}
+                            </Badge>
+                        )}
+                        {/* Labels */}
                         {thread.orderId && <Package className="h-3 w-3 text-orange-500" />}
                         {thread.caseId && <Briefcase className="h-3 w-3 text-blue-500" />}
 

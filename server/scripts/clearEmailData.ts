@@ -7,7 +7,7 @@
  */
 
 import 'dotenv/config';
-import { db } from '../services/supabaseClient';
+import { db } from '../services/database';
 import { emailMessages, emailThreads, emailAttachments, emails, emailLinks } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 

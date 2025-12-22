@@ -32,7 +32,7 @@ class GmailService {
         try {
             const res = await this.gmail.users.threads.list({
                 userId: 'me',
-                maxResults: 50,
+                maxResults: 200,
                 q: 'in:inbox OR in:sent'  // Sync both inbox and sent
             });
 
@@ -94,7 +94,26 @@ class GmailService {
             // 3. Fallback: if the last message is inbound, it's inbox
             const lastMessageFrom = lastMessage.payload?.headers?.find((h: any) => h.name?.toLowerCase() === 'from')?.value || '';
             const gmailUser = process.env.GMAIL_USER || '';
-            const isLastMessageOutbound = gmailUser && lastMessageFrom.toLowerCase().includes(gmailUser.toLowerCase());
+
+            // Comprehensive list of company emails
+            const COMPANY_EMAILS = [
+                'contact@dutchthrift.com',
+                'info@dutchthrift.com',
+                'noreply@dutchthrift.com',
+                'support@dutchthrift.com',
+                'me'
+            ];
+
+            // Check if last message is outbound
+            // 1. Is it labelled SENT?
+            const lastMessageLabels = lastMessage.labelIds || [];
+            const isLabelledSent = lastMessageLabels.includes('SENT');
+
+            // 2. Is the sender one of our emails?
+            const isFromCompany = [...COMPANY_EMAILS, gmailUser].filter(Boolean)
+                .some(e => lastMessageFrom.toLowerCase().includes(e.toLowerCase()));
+
+            const isLastMessageOutbound = isLabelledSent || isFromCompany;
 
             const isTrash = allLabels.includes('TRASH');
             const isSpam = allLabels.includes('SPAM');
@@ -130,7 +149,9 @@ class GmailService {
                     messageCount: threadData.messages.length,
                     lastHistoryId: threadData.historyId || existingThread.lastHistoryId,
                     isUnread: threadData.messages.some(m => m.labelIds?.includes('UNREAD')),
-                    folder // Ensure thread moves to correct folder if it changed (e.g. from sent to inbox)
+                    folder, // Ensure thread moves to correct folder if it changed (e.g. from sent to inbox)
+                    archived: hasInbox ? false : existingThread.archived, // Unarchive if it moves back to INBOX
+                    lastMessageIsOutbound: !!isLastMessageOutbound
                 });
                 dbThreadId = existingThread.id;
             } else {
@@ -144,7 +165,8 @@ class GmailService {
                     lastHistoryId: threadData.historyId,
                     isUnread: threadData.messages.some(m => m.labelIds?.includes('UNREAD')),
                     status: 'open',
-                    folder
+                    folder,
+                    lastMessageIsOutbound: !!isLastMessageOutbound
                 });
                 dbThreadId = newThread.id;
             }
@@ -155,10 +177,8 @@ class GmailService {
                 await this.upsertMessage(dbThreadId, msg);
             }
 
-            // Trigger AI analysis on the background
-            aiService.analyzeThread(threadId).catch(err => {
-                console.error(`[Gmail] AI Analysis failed for thread ${threadId}:`, err);
-            });
+            // AI Analysis is now triggered manually via the frontend
+            // aiService.analyzeThread(threadId)...
 
         } catch (error) {
             console.error(`[Gmail] Error syncing thread ${threadId}:`, error);
@@ -213,6 +233,7 @@ class GmailService {
             console.log(`[Gmail] Thread ${thread.threadId} trashed successfully.`);
         } catch (error) {
             console.error(`[Gmail] Error trashing thread ${threadId}:`, error);
+            throw error;
         }
     }
 
@@ -220,19 +241,27 @@ class GmailService {
      * Uses history API to sync only what has changed since lastHistoryId.
      */
     async incrementalSync() {
-        const lastThread = await storage.getLatestEmailThreadWithHistoryId();
-        if (!lastThread || !lastThread.lastHistoryId) {
+        // Use system settings for stable sync state, so deleting a thread doesn't roll back the sync point
+        const lastHistoryId = await storage.getSystemSetting('gmail_last_history_id');
+
+        if (!lastHistoryId) {
+            console.log('[Gmail] No lastHistoryId found in settings, performing initial sync...');
             return this.initialSync();
         }
 
         try {
+            console.log(`[Gmail] Starting incremental sync from historyId: ${lastHistoryId}...`);
             const res = await this.gmail.users.history.list({
                 userId: 'me',
-                startHistoryId: lastThread.lastHistoryId
+                startHistoryId: lastHistoryId
             });
 
             if (!res.data.history) {
                 console.log('[Gmail] No new history events.');
+                // Update historyId anyway if provided
+                if (res.data.historyId) {
+                    await storage.setSystemSetting('gmail_last_history_id', res.data.historyId);
+                }
                 return;
             }
 
@@ -252,7 +281,12 @@ class GmailService {
                 await this.syncThread(tId);
             }
 
-            console.log(`[Gmail] Incremental sync completed: ${changedThreadIds.size} threads updated.`);
+            // Successfully processed, update the historyId
+            if (res.data.historyId) {
+                await storage.setSystemSetting('gmail_last_history_id', res.data.historyId);
+            }
+
+            console.log(`[Gmail] Incremental sync completed: ${changedThreadIds.size} threads updated. New historyId: ${res.data.historyId}`);
         } catch (error) {
             console.error('[Gmail] Incremental sync failed:', error);
             // Fallback to initial sync if history is expired
