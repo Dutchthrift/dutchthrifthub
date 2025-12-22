@@ -20,6 +20,7 @@ import CustomerDetail from "@/pages/customer-detail";
 import CaseDetail from "@/pages/case-detail";
 import UserManagement from "@/pages/user-management";
 import Settings from "@/pages/settings";
+import AiHub from "@/pages/ai-hub";
 
 function Router() {
   return (
@@ -180,6 +181,17 @@ function Router() {
         component={(props: any) => (
           <ProtectedRoute
             component={CustomerDetail}
+            roles={["ADMIN", "SUPPORT"]}
+            {...props}
+          />
+        )}
+      />
+
+      <Route
+        path="/ai-hub"
+        component={(props: any) => (
+          <ProtectedRoute
+            component={AiHub}
             roles={["ADMIN", "SUPPORT"]}
             {...props}
           />

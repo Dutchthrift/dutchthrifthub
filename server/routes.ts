@@ -7,6 +7,8 @@ import { storage } from "./storage";
 import { db } from "./services/database";
 import { count } from "drizzle-orm";
 import { log } from "./vite";
+import mailRoutes from "./mail-routes";
+import aiRoutes from "./ai-routes";
 import {
   insertUserSchema,
   insertCustomerSchema,
@@ -66,7 +68,6 @@ import DOMPurify from 'isomorphic-dompurify';
 import * as emailService from "./services/emailService";
 const { sendEmail, fetchEmailBody, downloadAttachment, syncEmails } = emailService;
 import { importAllEmails } from "./scripts/importAllEmails";
-import mailRoutes from "./mail-routes";
 
 // Extend Request type to include session
 interface AuthenticatedRequest extends Request {
@@ -174,6 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Gmail API mail routes
   app.use("/api/mail", mailRoutes);
+  app.use("/api/ai", aiRoutes);
 
   // Authentication routes
   app.post("/api/auth/signin", async (req, res) => {

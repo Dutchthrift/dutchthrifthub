@@ -10,12 +10,14 @@ import {
     repairs,
     returns,
     cases,
+    aiKnowledge,
     type EmailMessage,
     type AiSettings,
     type AiExample,
-    type AiScenario
+    type AiScenario,
+    type AiKnowledge
 } from '../../shared/schema';
-import { eq, desc, asc, and, ilike } from 'drizzle-orm';
+import { eq, desc, asc, and, ilike, or } from 'drizzle-orm';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -72,8 +74,8 @@ export class AIService {
             // 2. Get Hub Context (Order, Repair, Customer)
             const context = await this.getHubContext(thread);
 
-            // 3. Get AI Rules (Style, SOPs)
-            const rules = await this.getAIRules();
+            // 3. Get AI Rules (Style, SOPs, Knowledge)
+            const rules = await this.getAIRules(threadMessages);
 
             // 4. Prepare Prompt
             const prompt = await this.buildPrompt(threadMessages, context, rules);
@@ -122,27 +124,113 @@ export class AIService {
 
     private async getHubContext(thread: any) {
         const customerEmail = thread.customerEmail;
-        if (!customerEmail) return { history: "Geen klant email gevonden." };
+        const customerId = thread.customerId;
+
+        if (!customerEmail && !customerId) {
+            return { history: "Geen klantgegevens gevonden in dit maildraadje." };
+        }
+
+        const conditions = [];
+        if (customerEmail) conditions.push(ilike(orders.customerEmail, customerEmail));
+        if (customerId) conditions.push(eq(orders.customerId, customerId));
+
+        const getWhere = (table: any) => {
+            const conds = [];
+            if (customerEmail) conds.push(ilike(table.customerEmail, customerEmail));
+            if (customerId) conds.push(eq(table.customerId, customerId));
+            return conds.length > 1 ? or(...conds) : conds[0];
+        };
 
         const [customerOrders, customerReturns, customerRepairs, customerCases] = await Promise.all([
-            db.query.orders.findMany({ where: ilike(orders.customerEmail, customerEmail), limit: 5, orderBy: [desc(orders.createdAt)] }),
-            db.query.returns.findMany({ where: ilike(returns.customerEmail, customerEmail), limit: 5, orderBy: [desc(returns.createdAt)] }),
-            db.query.repairs.findMany({ where: ilike(repairs.customerEmail, customerEmail), limit: 5, orderBy: [desc(repairs.createdAt)] }),
-            db.query.cases.findMany({ where: ilike(cases.customerEmail, customerEmail), limit: 5, orderBy: [desc(cases.createdAt)] }),
+            db.query.orders.findMany({
+                where: getWhere(orders),
+                limit: 10,
+                orderBy: [desc(orders.createdAt)]
+            }),
+            db.query.returns.findMany({
+                where: getWhere(returns),
+                limit: 10,
+                orderBy: [desc(returns.createdAt)]
+            }),
+            db.query.repairs.findMany({
+                where: getWhere(repairs),
+                limit: 10,
+                orderBy: [desc(repairs.createdAt)]
+            }),
+            db.query.cases.findMany({
+                where: getWhere(cases),
+                limit: 10,
+                orderBy: [desc(cases.createdAt)]
+            }),
         ]);
 
         const history = {
-            orders: customerOrders.map(o => ({ id: o.orderNumber, status: o.status, date: o.createdAt })),
-            returns: customerReturns.map(r => ({ id: r.returnNumber, status: r.status, reason: r.returnReason })),
-            repairs: customerRepairs.map(r => ({ id: r.repairNumber, status: r.status, title: r.title })),
-            cases: customerCases.map(c => ({ id: c.caseNumber, status: c.status, title: c.title }))
+            orders: customerOrders.map(o => ({ id: o.orderNumber, status: o.status, date: o.createdAt, total: o.totalAmount })),
+            returns: customerReturns.map(r => ({ id: r.returnNumber, status: r.status, reason: r.returnReason, date: r.createdAt })),
+            repairs: customerRepairs.map(r => ({ id: r.repairNumber, status: r.status, title: r.title, date: r.createdAt })),
+            cases: customerCases.map(c => ({ id: c.caseNumber, status: c.status, title: c.title, date: c.createdAt }))
         };
 
-        return { history, currentOrderId: thread.orderId, currentCaseId: thread.caseId };
+        return {
+            history,
+            currentOrderId: thread.orderId,
+            currentCaseId: thread.caseId,
+            customerEmail,
+            customerId
+        };
     }
 
-    private async getAIRules(): Promise<{ settings: AiSettings | undefined; examples: AiExample[]; scenarios: AiScenario[] }> {
-        await this.ensureSettings(); // Ensure settings exist before fetching
+    /**
+     * Search the knowledge base via AI.
+     */
+    async searchKnowledge(query: string) {
+        try {
+            const knowledgeBase = await db.query.aiKnowledge.findMany({
+                where: eq(aiKnowledge.isActive, true)
+            });
+
+            const systemPrompt = `
+Je bent een expert in de databank van DutchThrift. 
+BEANTWOORD DE VRAAG GEBASEERD OP DE ONDERSTAANDE KENNISBANK.
+Als het antwoord niet in de kennisbank staat, zeg dat dan eerlijk.
+
+KENNISBANK:
+${knowledgeBase.map(k => `[${k.category}] ${k.title}\n${k.content}`).join('\n\n')}
+`;
+
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: query }
+                ]
+            });
+
+            return response.choices[0].message.content;
+        } catch (e) {
+            console.error("[AI] Knowledge search failed:", e);
+            return "Er is een fout opgetreden bij het doorzoeken van de kennisbank.";
+        }
+    }
+
+    private async getRelevantKnowledge(messages: EmailMessage[]): Promise<AiKnowledge[]> {
+        const lastMessage = messages[messages.length - 1]?.bodyText || "";
+        const allKnowledge = await db.query.aiKnowledge.findMany({
+            where: eq(aiKnowledge.isActive, true)
+        });
+
+        // Simple keyword-based filtering for now. Could be upgraded to vector search.
+        const relevant = allKnowledge.filter(k => {
+            const words = k.title.toLowerCase().split(' ');
+            return words.some(word => word.length > 3 && lastMessage.toLowerCase().includes(word));
+        });
+
+        // If no specific match, return general documents if any
+        return relevant.length > 0 ? relevant : allKnowledge.filter(k => k.category === "Algemeen");
+    }
+
+    private async getAIRules(messages: EmailMessage[]): Promise<{ settings: AiSettings | undefined; examples: AiExample[]; scenarios: AiScenario[]; knowledge: AiKnowledge[] }> {
+        await this.ensureSettings();
         const settings: AiSettings | undefined = await db.query.aiSettings.findFirst();
         const examples: AiExample[] = await db.query.aiExamples.findMany({
             where: (r: any) => eq(r.isActive, true),
@@ -152,11 +240,13 @@ export class AIService {
             where: (r: any) => eq(r.isActive, true)
         }) as AiScenario[];
 
-        return { settings, examples, scenarios };
+        const knowledge = await this.getRelevantKnowledge(messages);
+
+        return { settings, examples, scenarios, knowledge };
     }
 
-    private async buildPrompt(threadMessages: EmailMessage[], context: any, rules: { settings: AiSettings | undefined; examples: AiExample[]; scenarios: AiScenario[] }): Promise<string> {
-        const { settings, examples, scenarios } = rules;
+    private async buildPrompt(threadMessages: EmailMessage[], context: any, rules: { settings: AiSettings | undefined; examples: AiExample[]; scenarios: AiScenario[]; knowledge: AiKnowledge[] }): Promise<string> {
+        const { settings, examples, scenarios, knowledge } = rules;
 
         const prompt = `
 Je bent een senior AI email-assistent voor DutchThrift. 
@@ -164,10 +254,14 @@ VAT DE VOLGENDE CONVERSATIE SAMEN EN GEEF DIEPE CONSTRUCTIEVE INZICHTEN.
 VERBETER HET ANTWOORD EN MAAK HET KLANTVRIENDELIJKER.
 GIVE THE SUGGESTED REPLY IN BOTH THE CUSTOMER'S LANGUAGE AND ENGLISH.
 
-BELANGRIJK: 
-1. Gebruik de "HUB CONTEXT" hieronder om te zien of een klant al een bestelling, retour of reparatie heeft. 
-2. Als er in de HUB CONTEXT een retour, case of order staat, zeg dan NOOIT dat er "geen records zijn". 
-3. De "systemStatus" moet specifiek vermelden wat er in de Hub staat (bijv: "Er is een actieve retour RET-2025-030 onderweg").
+BELANGRIJK VOOR DE "suggestedReply": 
+1. Gebruik ALTIJD de "Vaste Aanhef/Header" als de eerste zin van het bericht.
+2. Gebruik ALTIJD de "Vaste Afsluiting/Footer" als de laatste zin van het bericht.
+3. Houd je STRIKT aan de "Structurele Regels" en de "STIJLGIDS".
+4. Gebruik NOOIT de "VERBODEN WOORDEN/ZINNEN".
+5. Gebruik de "HUB CONTEXT" hieronder om te zien of een klant al een bestelling, retour of reparatie heeft. 
+6. Als er in de HUB CONTEXT een retour, case of order staat, zeg dan NOOIT dat er "geen records zijn". 
+7. De "systemStatus" moet specifiek vermelden wat er in de Hub staat.
 
 CONVERSATIE:
 ${threadMessages.map((m: EmailMessage) => `VAN: ${m.fromName} (${m.fromEmail})\nDATUM: ${m.sentAt}\nINHOUD: ${m.bodyText || m.snippet}`).join('\n---\n')}
@@ -177,22 +271,30 @@ ${JSON.stringify(context.history, null, 2)}
 Huidige gekoppelde Order: ${context.currentOrderId || 'Geen'}
 Huidige gekoppelde Case: ${context.currentCaseId || 'Geen'}
 
-STIJLGIDS:
+KENNISBANK (DOCUMENTATIE & VOORWAARDEN):
+${knowledge.length > 0 ? knowledge.map(k => `[${k.category}] ${k.title}:\n${k.content}`).join('\n\n') : "Geen specifieke documentatie gevonden voor deze context."}
+
+STIJLGIDS & STRUCTUUR:
 ${settings?.styleGuide || "Wees vriendelijk, nuchter en professioneel in het Nederlands. Gebruik 'je' tenzij anders aangegeven."}
 - Gebruik ${settings?.useHonorifics ? "u" : "je/jij"}
 - Emojis: ${settings?.allowEmojis ? "Toegestaan (beperkt)" : "Niet toegestaan"}
 - Beknoptheid: ${settings?.brevityLevel || 5}/10 (1=kort, 10=uitgebreid)
+
+${settings?.emailHeader ? `Vaste Aanhef/Header:\n${settings.emailHeader}` : ""}
+${settings?.emailFooter ? `Vaste Afsluiting/Footer:\n${settings.emailFooter}` : ""}
+${settings?.structureRules ? `Structurele Regels:\n${settings.structureRules}` : ""}
+${settings?.prohibitedPhrases?.length ? `VERBODEN WOORDEN/ZINNEN (NIET GEBRUIKEN):\n${settings.prohibitedPhrases.join(', ')}` : ""}
 
 OUTPUT FORMAT (JSON):
 {
   "summary": "Korte samenvatting (1-2 zinnen)",
   "sentiment": "positive" | "negative" | "neutral",
   "intent": "REPAIR" | "ORDER_STATUS" | "RETURN" | "QUESTION" | "OTHER",
-  "reasoning": "Diepere analyse van het probleem van de klant (bijv. compatibiliteit, eerdere klachten). Gebruik info uit de HUB CONTEXT.",
+  "reasoning": "Diepere analyse van het probleem van de klant (bijv. compatibiliteit, eerdere klachten). Gebruik info uit de HUB CONTEXT en KENNISBANK.",
   "systemStatus": "Status-update EXCLUSIEF gebaseerd op de HUB CONTEXT (bijv. 'Klant heeft 1 open retour RET-2025-XXX op status onderweg').",
   "actionPlan": "Stapsgewijs plan voor Niek (bijv. 1. Check Shopify docs, 2. Mail klant terug).",
   "suggestedReply": {
-    "customer": "Een perfect, kant-en-klaar antwoord in de DutchThrift stijl, in de taal die de klant gebruikt. Verbeter het bericht en maak het uiterst klantvriendelijk en professioneel.",
+    "customer": "Een perfect, kant-en-klaar antwoord in de DutchThrift stijl, in de taal die de klant gebruikt. Verbeter het bericht en maak het uiterst klantvriendelijk en professioneel. Gebruik de KENNISBANK info indien relevant.",
     "english": "The same perfect, customer-friendly reply translated into professional English."
   }
 }

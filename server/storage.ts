@@ -36,7 +36,8 @@ import {
   type MailThreadLink, type InsertMailThreadLink,
   type EmailMetadata, type InsertEmailMetadata,
   type CaseNote, type InsertCaseNote,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, mailThreadLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks, repairCounters, emailMetadata, insertEmailMetadataSchema, caseNotes, insertCaseNoteSchema
+  type AiKnowledge, type InsertAiKnowledge,
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, mailThreadLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks, repairCounters, emailMetadata, insertEmailMetadataSchema, caseNotes, insertCaseNoteSchema, aiKnowledge
 } from "@shared/schema";
 import { db } from "./services/database";
 import { eq, desc, asc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns, lt } from "drizzle-orm";
@@ -333,6 +334,13 @@ export interface IStorage {
 
   getSetting(key: string): Promise<string | undefined>;
   setSetting(key: string, value: string): Promise<void>;
+
+  // AI Knowledge
+  getAiKnowledge(filters?: { category?: string; isActive?: boolean }): Promise<AiKnowledge[]>;
+  getAiKnowledgeItem(id: string): Promise<AiKnowledge | undefined>;
+  createAiKnowledge(item: InsertAiKnowledge): Promise<AiKnowledge>;
+  updateAiKnowledge(id: string, updates: Partial<InsertAiKnowledge>): Promise<AiKnowledge>;
+  deleteAiKnowledge(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1328,12 +1336,52 @@ export class DatabaseStorage implements IStorage {
   }
 
   async setSystemSetting(key: string, value: string): Promise<void> {
-    const existing = await this.getSystemSetting(key);
-    if (existing) {
-      await db.update(systemSettings).set({ value, updatedAt: new Date() }).where(eq(systemSettings.key, key));
-    } else {
-      await db.insert(systemSettings).values({ key, value });
+    await db.insert(systemSettings).values({ key, value, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: systemSettings.key,
+        set: { value, updatedAt: new Date() }
+      });
+  }
+
+  // AI Knowledge
+  async getAiKnowledge(filters?: { category?: string; isActive?: boolean }): Promise<AiKnowledge[]> {
+    let query = db.select().from(aiKnowledge);
+    const conditions = [];
+
+    if (filters?.category) {
+      conditions.push(eq(aiKnowledge.category, filters.category));
     }
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(aiKnowledge.isActive, filters.isActive));
+    }
+
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions)).orderBy(desc(aiKnowledge.createdAt));
+    }
+    return await query.orderBy(desc(aiKnowledge.createdAt));
+  }
+
+  async getAiKnowledgeItem(id: string): Promise<AiKnowledge | undefined> {
+    const result = await db.select().from(aiKnowledge).where(eq(aiKnowledge.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createAiKnowledge(item: InsertAiKnowledge): Promise<AiKnowledge> {
+    const result = await db.insert(aiKnowledge).values(item).returning();
+    return result[0];
+  }
+
+  async updateAiKnowledge(id: string, updates: Partial<InsertAiKnowledge>): Promise<AiKnowledge> {
+    const result = await db.update(aiKnowledge).set({
+      ...updates,
+      updatedAt: new Date()
+    }).where(eq(aiKnowledge.id, id)).returning();
+    if (result.length === 0) throw new Error("Knowledge item not found");
+    return result[0];
+  }
+
+  async deleteAiKnowledge(id: string): Promise<void> {
+    await db.delete(aiKnowledge).where(eq(aiKnowledge.id, id));
   }
 
   // Dashboard stats

@@ -133,6 +133,25 @@ export const aiSettings = pgTable("ai_settings", {
   useHonorifics: boolean("use_honorifics").default(false), // Je vs U
   allowEmojis: boolean("allow_emojis").default(true),
   brevityLevel: integer("brevity_level").default(5), // 1-10 (short to long)
+
+  // Advanced mailing style
+  emailHeader: text("email_header"),
+  emailFooter: text("email_footer"),
+  structureRules: text("structure_rules"), // Custom rules like "always end with a question"
+  prohibitedPhrases: text("prohibited_phrases").array(),
+
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// AI Knowledge base for large documents
+export const aiKnowledge = pgTable("ai_knowledge", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(), // Large chunks of text/markdown
+  category: text("category").notNull().default("Algemeen"),
+  isActive: boolean("is_active").default(true),
+  metadata: jsonb("metadata"), // For priority, tags, etc.
+  createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -1158,6 +1177,13 @@ export const insertAiScenarioSchema = createInsertSchema(aiScenarios).omit({
   createdAt: true,
 });
 
+// AI Knowledge Insert Schema
+export const insertAiKnowledgeSchema = createInsertSchema(aiKnowledge).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // AI TypeScript types
 export type AiSettings = typeof aiSettings.$inferSelect;
 export type InsertAiSettings = z.infer<typeof insertAiSettingsSchema>;
@@ -1167,3 +1193,6 @@ export type InsertAiExample = z.infer<typeof insertAiExampleSchema>;
 
 export type AiScenario = typeof aiScenarios.$inferSelect;
 export type InsertAiScenario = z.infer<typeof insertAiScenarioSchema>;
+
+export type AiKnowledge = typeof aiKnowledge.$inferSelect;
+export type InsertAiKnowledge = z.infer<typeof insertAiKnowledgeSchema>;
