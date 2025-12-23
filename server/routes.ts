@@ -9,6 +9,7 @@ import { count } from "drizzle-orm";
 import { log } from "./vite";
 import mailRoutes from "./mail-routes";
 import aiRoutes from "./ai-routes";
+import pickingRoutes from "./picking-routes";
 import {
   insertUserSchema,
   insertCustomerSchema,
@@ -176,6 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register Gmail API mail routes
   app.use("/api/mail", mailRoutes);
   app.use("/api/ai", aiRoutes);
+  app.use("/api/picking", pickingRoutes);
 
   // Authentication routes
   app.post("/api/auth/signin", async (req, res) => {

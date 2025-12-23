@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/dialog";
 import { NotesPanel } from "@/components/notes/NotesPanel";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { PickingListModal } from '@/components/picking/picking-list-modal';
 
 type SortField = 'orderNumber' | 'customer' | 'totalAmount' | 'status' | 'paymentStatus' | 'createdAt' | 'orderDate';
 type SortDirection = 'asc' | 'desc';
@@ -77,6 +78,7 @@ export default function Orders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showPickingList, setShowPickingList] = useState(false); // New State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
@@ -429,9 +431,15 @@ export default function Orders() {
                 <span className="hidden sm:inline">{syncAllMutation.isPending ? "Synchroniseren..." : "Synchroniseer Shopify"}</span>
                 <span className="sm:hidden">{syncAllMutation.isPending ? "Sync..." : "Sync"}</span>
               </Button>
+              <Button onClick={() => setShowPickingList(true)} variant="outline">
+                <FileText className="h-4 w-4 mr-2" />
+                Order Picken
+              </Button>
             </div>
           </div>
         </div>
+
+        <PickingListModal open={showPickingList} onOpenChange={setShowPickingList} />
 
         {/* Stats Cards - Repairs page gradient style */}
         <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5 mb-6 sm:mb-8">

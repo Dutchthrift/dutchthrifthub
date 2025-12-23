@@ -302,6 +302,112 @@ OUTPUT FORMAT (JSON):
 
         return prompt;
     }
+
+    /**
+     * Rewrite text based on the selected mode.
+     */
+    async rewriteText(text: string, mode: 'rewrite' | 'english' | 'customer_english', threadId?: string) {
+        try {
+            let systemPrompt = `Je bent een professionele business communication expert voor DutchThrift.
+            Je doel is om concept-teksten te verbeteren naar professionele, klantvriendelijke e-mails.
+            Gebruik de 'je'-vorm, wees nuchter, vriendelijk en helpend.`;
+
+            let userContent = text;
+
+            // FETCH CONTEXT (Always try to get context if threadId is present)
+            let lastCustomerMessage = "";
+            let contextData = null;
+
+            if (threadId) {
+                try {
+                    const thread = await db.query.emailThreads.findFirst({ where: eq(emailThreads.threadId, threadId) });
+                    if (thread) {
+                        const threadMessages = await db.query.emailMessages.findMany({
+                            where: eq(emailMessages.threadId, thread.id),
+                            orderBy: (messages, { asc }) => [asc(messages.sentAt)],
+                        });
+
+                        // Find last message that is NOT from us (inbound)
+                        // This ensures we detect the language of the CUSTOMER, not our own previous reply.
+                        const inboundMessages = threadMessages.filter(m => !m.isOutbound);
+                        const lastMsg = inboundMessages.length > 0 ? inboundMessages[inboundMessages.length - 1] : threadMessages[threadMessages.length - 1];
+                        lastCustomerMessage = lastMsg?.bodyText || lastMsg?.snippet || "";
+
+                        // Only fetch full hub context if generating draft to save tokens/time on simple rewrites? 
+                        // Actually, hub context is good for rewrites too (order details etc).
+                        contextData = await this.getHubContext(thread);
+                    }
+                } catch (e) {
+                    console.warn("[AI] Failed to fetch context for rewrite:", e);
+                }
+            }
+
+            // HANDLE DRAFT GENERATION (Empty Text) vs REWRITE
+            if (!text || text.trim() === "") {
+                if (!threadId) throw new Error("Thread ID vereist voor concept generatie");
+                // ...(Use contextData we just fetched)...
+
+                systemPrompt += `
+                
+                SITUATIE: Je schrijft een NIEUW ANTWOORD op een lopende conversatie.
+                Gebruik de onderstaande informatie/context slim.
+                
+                LAATSTE BERICHT VAN KLANT (Gebruik dit om de TAAL van de klant te bepalen):
+                "${lastCustomerMessage}"
+                
+                HUB CONTEXT:
+                ${contextData ? JSON.stringify(contextData.history, null, 2) : 'Geen'}
+                `;
+
+                userContent = "Genereer een passend antwoord.";
+            } else {
+                // NORMAL REWRITE (Text Provided)
+                systemPrompt += `
+                SITUATIE: Je herschrijft een concept tekst.
+                
+                CONTEXT (Gebruik dit voor feiten en TAAL detectie):
+                Laatste bericht van klant: "${lastCustomerMessage}"
+                `;
+            }
+
+            // ADD OUTPUT MODE INSTRUCTIONS
+            if (mode === 'rewrite') {
+                systemPrompt += `
+                TAAK: Herschrijf de tekst.
+                BELANGRIJK: 
+                1. BEHOUD DE TAAL VAN DE INVOER. Als de invoer Engels is, MOET het antwoord Engels zijn. Als het Nederlands is, Nederlands. Vertaal NIET (tenzij expliciet gevraagd in de tekst).
+                2. MAAK HET EXTRA KLANTVRIENDELIJK. Gebruik een warme, behulpzame toon. Niet te formeel, maar wel professioneel.
+                3. Verbeter grammatica en zinsbouw.`;
+            } else if (mode === 'customer_english') {
+                systemPrompt += `
+                TAAK: Genereer TWEE versies.
+                1. [Klanttaal]: Detecteer de taal uit het "Laatste bericht van klant". Is dat Spaans? Duits? Frans? Schrijf dan in die taal. Als niet te bepalen, gebruik Nederlands.
+                2. [English]: Professioneel Engels.
+                
+                OUTPUT FORMAAT VERPLICHT:
+                [Versie in Klanttaal]
+                
+                ---
+                
+                [English Version]
+                `;
+            }
+
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userContent }
+                ],
+                temperature: 0.7
+            });
+
+            return response.choices[0].message.content;
+        } catch (error) {
+            console.error("[AI] Rewrite/Generate failed:", error);
+            throw new Error("Kon tekst niet genereren/herschrijven");
+        }
+    }
 }
 
 export const aiService = new AIService();

@@ -61,7 +61,9 @@ import {
     Meh,
     Brain,
     Loader2,
-    MoreHorizontal
+    MoreHorizontal,
+    Languages,
+    ChevronDown
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -323,6 +325,28 @@ export default function MailPage() {
         },
         onError: () => {
             toast({ title: "Fout", description: "Kon geen Magic Reply genereren.", variant: "destructive" });
+        }
+    });
+
+    // Mutation to rewrite reply
+    const rewriteReplyMutation = useMutation({
+        mutationFn: async (data: { text: string; mode: 'rewrite' | 'english' | 'customer_english' }) => {
+            const res = await fetch(`/api/mail/rewrite`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...data, threadId: selectedThreadId })
+            });
+            if (!res.ok) throw new Error("Kon tekst niet herschrijven");
+            return res.json();
+        },
+        onSuccess: (data) => {
+            if (data.rewritten) {
+                setReplyText(data.rewritten);
+                toast({ title: "Tekst herschreven", description: "De AI heeft je tekst verbeterd." });
+            }
+        },
+        onError: () => {
+            toast({ title: "Fout", description: "Kon tekst niet herschrijven.", variant: "destructive" });
         }
     });
 
@@ -808,22 +832,10 @@ export default function MailPage() {
                                                         variant="outline"
                                                         size="sm"
                                                         className="h-8 gap-1.5 text-xs border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 hover:text-orange-800 transition-all font-semibold"
-                                                        disabled={generateMagicReplyMutation.isPending}
-                                                        onClick={() => {
-                                                            if (threadDetails.suggestedReply) {
-                                                                if (typeof threadDetails.suggestedReply === 'string') {
-                                                                    setReplyText(threadDetails.suggestedReply);
-                                                                } else {
-                                                                    // Default to customer language if available, else english
-                                                                    setReplyText(threadDetails.suggestedReply.customer || threadDetails.suggestedReply.english || '');
-                                                                }
-                                                                toast({ title: "Magic Reply toegepast", description: "Het concept-antwoord van de AI is ingevoegd." });
-                                                            } else {
-                                                                generateMagicReplyMutation.mutate(threadDetails.id);
-                                                            }
-                                                        }}
+                                                        disabled={rewriteReplyMutation.isPending}
+                                                        onClick={() => rewriteReplyMutation.mutate({ text: replyText, mode: 'rewrite' })}
                                                     >
-                                                        {generateMagicReplyMutation.isPending ? (
+                                                        {rewriteReplyMutation.isPending ? (
                                                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                         ) : (
                                                             <Wand2 className="h-3.5 w-3.5" />
@@ -831,38 +843,7 @@ export default function MailPage() {
                                                         Magic Reply
                                                     </Button>
 
-                                                    {(() => {
-                                                        const suggestion = threadDetails.suggestedReply;
-                                                        if (suggestion && typeof suggestion === 'object') {
-                                                            return (
-                                                                <div className="flex gap-1 ml-1 scale-90 origin-left">
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className={cn(
-                                                                            "h-7 px-2 text-[10px] font-bold uppercase tracking-wider transition-all",
-                                                                            replyText === suggestion.customer ? "bg-orange-100 text-orange-700" : "text-muted-foreground hover:bg-muted"
-                                                                        )}
-                                                                        onClick={() => setReplyText(suggestion.customer || '')}
-                                                                    >
-                                                                        Klanttaal
-                                                                    </Button>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className={cn(
-                                                                            "h-7 px-2 text-[10px] font-bold uppercase tracking-wider transition-all",
-                                                                            replyText === suggestion.english ? "bg-orange-100 text-orange-700" : "text-muted-foreground hover:bg-muted"
-                                                                        )}
-                                                                        onClick={() => setReplyText(suggestion.english || '')}
-                                                                    >
-                                                                        English
-                                                                    </Button>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    })()}
+
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Button variant="ghost" onClick={() => setIsReplying(false)}>

@@ -450,6 +450,29 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// Rewrite Text
+router.post('/rewrite', async (req, res) => {
+    try {
+        const { text, mode, threadId } = req.body;
+        const { aiService } = await import('./services/aiService');
+
+        // Optionally get context from thread if threadId provided
+        let context = undefined;
+        if (threadId) {
+            const thread = await storage.getEmailThread(threadId);
+            if (thread) {
+                // We might need deep context later, but for now just pass threadId
+            }
+        }
+
+        const rewritten = await aiService.rewriteText(text, mode, threadId);
+        res.json({ success: true, rewritten });
+    } catch (error: any) {
+        console.error('Error rewriting text:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // AI Analysis manual trigger
 router.post('/:id/ai-analyze', async (req, res) => {
     try {
