@@ -21,6 +21,7 @@ import CaseDetail from "@/pages/case-detail";
 import UserManagement from "@/pages/user-management";
 import Settings from "@/pages/settings";
 import AiHub from "@/pages/ai-hub";
+import Agenda from "@/pages/agenda";
 
 function Router() {
   return (
@@ -193,6 +194,18 @@ function Router() {
           <ProtectedRoute
             component={AiHub}
             roles={["ADMIN", "SUPPORT"]}
+            {...props}
+          />
+        )}
+      />
+
+      {/* Agenda - all roles */}
+      <Route
+        path="/agenda"
+        component={(props: any) => (
+          <ProtectedRoute
+            component={Agenda}
+            roles={["ADMIN", "SUPPORT", "TECHNICUS"]}
             {...props}
           />
         )}

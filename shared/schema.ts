@@ -257,7 +257,110 @@ export const todos = pgTable("todos", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Internal notes table
+// ============ AGENDA / APPOINTMENTS ============
+
+// Appointment types - 4 generic types
+export const appointmentTypeEnum = pgEnum("appointment_type", [
+  "afspraak",  // Hard appointments (klant, reparatie, leverancier)
+  "intern",    // Internal meetings
+  "taak",      // Flexible tasks
+  "blok"       // Unavailable blocks (lunch, privé, focus)
+]);
+
+// Visibility levels
+export const appointmentVisibilityEnum = pgEnum("appointment_visibility", [
+  "public",    // Visible to all
+  "internal",  // Visible to team
+  "private"    // Only owner
+]);
+
+// Attendee role
+export const attendeeRoleEnum = pgEnum("attendee_role", ["owner", "attendee"]);
+
+// Attendee status
+export const attendeeStatusEnum = pgEnum("attendee_status", ["invited", "accepted", "declined"]);
+
+// Appointment series - master record for single and recurring events
+export const appointmentSeries = pgTable("appointment_series", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: appointmentTypeEnum("type").notNull().default("afspraak"),
+  color: text("color"), // Optional hex override
+
+  // Timing
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  allDay: boolean("all_day").default(false),
+  timezone: text("timezone").default("Europe/Amsterdam"),
+
+  // Location
+  location: text("location"),
+  isRemote: boolean("is_remote").default(false),
+  meetingLink: text("meeting_link"),
+
+  // Visibility
+  visibility: appointmentVisibilityEnum("visibility").default("internal"),
+
+  // Recurrence (iCal RRULE compatible)
+  recurrenceRule: text("recurrence_rule"), // e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"
+  recurrenceEndDate: timestamp("recurrence_end_date"),
+  recurrenceCount: integer("recurrence_count"),
+
+  // Reminders (minutes before: [1440, 30] = 1 day + 30 min)
+  reminders: integer("reminders").array(),
+
+  // Assignment
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  createdBy: varchar("created_by").references(() => users.id),
+
+  // Entity links
+  orderId: varchar("order_id").references(() => orders.id),
+  customerId: varchar("customer_id").references(() => customers.id),
+  caseId: varchar("case_id").references(() => cases.id),
+  repairId: varchar("repair_id").references(() => repairs.id),
+
+  // Status
+  status: text("status").default("scheduled"), // scheduled, completed, cancelled
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Appointment exceptions - overrides for single occurrences in a series
+export const appointmentExceptions = pgTable("appointment_exceptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  seriesId: varchar("series_id").references(() => appointmentSeries.id).notNull(),
+
+  // The instance being overridden (identified by original start time)
+  originalStartTime: timestamp("original_start_time").notNull(),
+
+  // Override values (null = use series value)
+  overrideStartTime: timestamp("override_start_time"),
+  overrideEndTime: timestamp("override_end_time"),
+  overrideTitle: text("override_title"),
+  overrideType: appointmentTypeEnum("override_type"),
+  overrideLocation: text("override_location"),
+
+  // Cancel this single occurrence
+  isCancelled: boolean("is_cancelled").default(false),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Appointment attendees
+export const appointmentAttendees = pgTable("appointment_attendees", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  seriesId: varchar("series_id").references(() => appointmentSeries.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  role: attendeeRoleEnum("role").default("attendee"),
+  status: attendeeStatusEnum("status").default("invited"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ============ END AGENDA ============
 export const internalNotes = pgTable("internal_notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   content: text("content").notNull(),
@@ -732,6 +835,33 @@ export const insertTodoSchema = createInsertSchema(todos).omit({
   dueDate: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
 });
 
+// Appointment insert schemas
+export const insertAppointmentSeriesSchema = createInsertSchema(appointmentSeries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  startTime: z.string().datetime().or(z.date()),
+  endTime: z.string().datetime().or(z.date()),
+  recurrenceEndDate: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
+  reminders: z.array(z.number()).optional(),
+});
+
+export const insertAppointmentExceptionSchema = createInsertSchema(appointmentExceptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  originalStartTime: z.string().datetime().or(z.date()),
+  overrideStartTime: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
+  overrideEndTime: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
+});
+
+export const insertAppointmentAttendeeSchema = createInsertSchema(appointmentAttendees).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertInternalNoteSchema = createInsertSchema(internalNotes).omit({
   id: true,
   createdAt: true,
@@ -931,6 +1061,15 @@ export type InsertRepair = z.infer<typeof insertRepairSchema>;
 
 export type Todo = typeof todos.$inferSelect;
 export type InsertTodo = z.infer<typeof insertTodoSchema>;
+
+export type AppointmentSeries = typeof appointmentSeries.$inferSelect;
+export type InsertAppointmentSeries = z.infer<typeof insertAppointmentSeriesSchema>;
+
+export type AppointmentException = typeof appointmentExceptions.$inferSelect;
+export type InsertAppointmentException = z.infer<typeof insertAppointmentExceptionSchema>;
+
+export type AppointmentAttendee = typeof appointmentAttendees.$inferSelect;
+export type InsertAppointmentAttendee = z.infer<typeof insertAppointmentAttendeeSchema>;
 
 export type InternalNote = typeof internalNotes.$inferSelect;
 export type InsertInternalNote = z.infer<typeof insertInternalNoteSchema>;

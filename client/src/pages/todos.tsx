@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Search,
@@ -47,7 +46,7 @@ export default function Todos() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
-  const [taskScope, setTaskScope] = useState<"all" | "my">("all");
+  const [userFilter, setUserFilter] = useState<string>("all"); // "all", "my", or a userId
   const [showNewTodo, setShowNewTodo] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [selectedTask, setSelectedTask] = useState<Todo | null>(null);
@@ -60,18 +59,33 @@ export default function Todos() {
   const canSeeAllTasks = user?.role === "ADMIN" || user?.role === "SUPPORT";
   const isTechnicus = user?.role === "TECHNICUS";
 
+  // Helper function to get the userId for filtering
+  function getFilterUserId(): string | undefined {
+    if (isTechnicus && user?.id) return user.id; // Technicians always see only their tasks
+    if (userFilter === "all") return undefined; // Show all tasks
+    if (userFilter === "my" && user?.id) return user.id; // Show my tasks
+    return userFilter; // Show specific user's tasks
+  }
+
   const { data: todos, isLoading } = useQuery<Todo[]>({
-    queryKey: ["/api/todos", { userId: (isTechnicus || (canSeeAllTasks && taskScope === "my")) && user?.id ? user.id : undefined }],
+    queryKey: ["/api/todos", { userId: getFilterUserId() }],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if ((isTechnicus || (canSeeAllTasks && taskScope === "my")) && user?.id) {
-        params.append("userId", user.id);
+      const filterUserId = getFilterUserId();
+      if (filterUserId) {
+        params.append("userId", filterUserId);
       }
       const url = `/api/todos${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await fetch(url, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch todos");
       return response.json();
     },
+  });
+
+  // Fetch users list for the user filter dropdown
+  const { data: users } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
+    queryKey: ["/api/users/list"],
+    enabled: canSeeAllTasks,
   });
 
   // Check for todoId in URL and open detail modal
@@ -101,9 +115,9 @@ export default function Todos() {
     },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: ["/api/todos"] });
-      const previousTodos = queryClient.getQueryData<Todo[]>(["/api/todos", { userId: (isTechnicus || (canSeeAllTasks && taskScope === "my")) && user?.id ? user.id : undefined }]);
+      const previousTodos = queryClient.getQueryData<Todo[]>(["/api/todos", { userId: getFilterUserId() }]);
       queryClient.setQueryData<Todo[]>(
-        ["/api/todos", { userId: (isTechnicus || (canSeeAllTasks && taskScope === "my")) && user?.id ? user.id : undefined }],
+        ["/api/todos", { userId: getFilterUserId() }],
         (old) => old?.map((todo) => (todo.id === id ? { ...todo, ...data } : todo)) || []
       );
       return { previousTodos };
@@ -111,7 +125,7 @@ export default function Todos() {
     onError: (err, variables, context) => {
       if (context?.previousTodos) {
         queryClient.setQueryData(
-          ["/api/todos", { userId: (isTechnicus || (canSeeAllTasks && taskScope === "my")) && user?.id ? user.id : undefined }],
+          ["/api/todos", { userId: getFilterUserId() }],
           context.previousTodos
         );
       }
@@ -344,14 +358,29 @@ export default function Todos() {
 
           {/* Status & Priority Filters - inline on mobile */}
           <div className="flex flex-wrap gap-2">
-            {/* Task Scope Toggle (for Admin/Support) */}
+            {/* User Filter (for Admin/Support) */}
             {canSeeAllTasks && (
-              <Tabs value={taskScope} onValueChange={(value) => setTaskScope(value as "all" | "my")} className="flex-shrink-0">
-                <TabsList>
-                  <TabsTrigger value="all" data-testid="filter-all-tasks">Alle Taken</TabsTrigger>
-                  <TabsTrigger value="my" data-testid="filter-my-tasks">Mijn Taken</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <Select value={userFilter} onValueChange={setUserFilter}>
+                <SelectTrigger className="w-[160px] sm:w-[180px]">
+                  <SelectValue placeholder="Gebruiker" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle Taken</SelectItem>
+                  <SelectItem value="my">Mijn Taken</SelectItem>
+                  {users && users.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-t mt-1 pt-2">
+                        Gebruikers
+                      </div>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name || u.email}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
             )}
 
             {/* Status Filter */}

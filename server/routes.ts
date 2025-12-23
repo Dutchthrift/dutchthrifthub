@@ -10,6 +10,7 @@ import { log } from "./vite";
 import mailRoutes from "./mail-routes";
 import aiRoutes from "./ai-routes";
 import pickingRoutes from "./picking-routes";
+import { registerAgendaRoutes } from "./agenda-routes";
 import {
   insertUserSchema,
   insertCustomerSchema,
@@ -178,6 +179,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/mail", mailRoutes);
   app.use("/api/ai", aiRoutes);
   app.use("/api/picking", pickingRoutes);
+
+  // Register Agenda routes
+  registerAgendaRoutes(app);
 
   // Authentication routes
   app.post("/api/auth/signin", async (req, res) => {

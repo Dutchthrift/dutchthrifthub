@@ -1,4 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import {
+    Drawer,
+    DrawerContent,
+    DrawerHeader,
+    DrawerTitle,
+    DrawerClose,
+} from '@/components/ui/drawer';
 import { Navigation } from "@/components/layout/navigation";
 import {
     ContextMenu,
@@ -160,6 +168,7 @@ interface ThreadDetails extends EmailThread {
 // --- Main Page ---
 
 export default function MailPage() {
+    const isMobile = useIsMobile();
     const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'archived' | 'starred' | 'linked' | 'unlinked' | 'cases' | 'returns' | 'repairs'>('inbox');
@@ -557,23 +566,27 @@ export default function MailPage() {
 
     return (
         <>
-            <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+            <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden max-w-full">
                 <Navigation />
 
-                <div className="flex-1 flex overflow-hidden">
-                    {/* Column 1: Thread List */}
-                    <div className="w-96 flex-shrink-0 flex flex-col border-r bg-muted/20">
-                        <div className="p-4 space-y-4">
+                <div className="flex-1 flex overflow-hidden max-w-full">
+                    {/* Column 1: Thread List - Full width on mobile */}
+                    <div className={cn(
+                        "flex flex-col border-r bg-muted/20 overflow-hidden",
+                        isMobile ? "w-full max-w-full" : "w-96 flex-shrink-0"
+                    )}>
+                        <div className="p-3 md:p-4 space-y-3 md:space-y-4">
                             <div className="flex items-center justify-between">
-                                <h1 className="text-xl font-bold">Mail</h1>
+                                <h1 className="text-lg md:text-xl font-bold">Mail</h1>
                                 <div className="flex items-center gap-1">
                                     <Button
                                         size="sm"
-                                        className="bg-orange-500 hover:bg-orange-600 gap-2 h-8"
+                                        className="bg-orange-500 hover:bg-orange-600 gap-1 md:gap-2 h-8 text-xs md:text-sm"
                                         onClick={() => setIsComposing(true)}
                                     >
                                         <Plus className="h-4 w-4" />
-                                        Nieuw bericht
+                                        <span className="hidden sm:inline">Nieuw bericht</span>
+                                        <span className="sm:hidden">Nieuw</span>
                                     </Button>
                                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>
                                         <RefreshCw className={cn("h-4 w-4", refreshMutation.isPending && "animate-spin")} />
@@ -592,7 +605,7 @@ export default function MailPage() {
                             </div>
 
                             <TooltipProvider delayDuration={0}>
-                                <div className="grid grid-cols-6 gap-2 pb-1">
+                                <div className="grid grid-cols-6 gap-2 pb-1 overflow-hidden">
                                     <FilterChip active={activeTab === 'inbox'} label="Inbox" icon={<Inbox className="h-4 w-4" />} onClick={() => setActiveTab('inbox')} />
                                     <FilterChip active={activeTab === 'cases'} label="Cases" icon={<Briefcase className="h-4 w-4" />} onClick={() => setActiveTab('cases')} />
                                     <FilterChip active={activeTab === 'returns'} label="Retouren" icon={<RotateCcw className="h-4 w-4" />} onClick={() => setActiveTab('returns')} />
@@ -644,7 +657,7 @@ export default function MailPage() {
                             </TooltipProvider>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto">
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden">
                             {isLoadingThreads ? (
                                 <div className="p-4 space-y-4">
                                     {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-20 w-full" />)}
@@ -707,182 +720,184 @@ export default function MailPage() {
                         </div>
                     </div>
 
-                    {/* Column 2: Conversation View */}
-                    <div className="flex-1 flex flex-col overflow-hidden bg-background">
-                        {!selectedThreadId ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
-                                <Mail className="h-12 w-12 mb-4 opacity-10" />
-                                <p>Selecteer een bericht om te lezen</p>
-                            </div>
-                        ) : isLoadingDetails ? (
-                            <div className="flex-1 p-8 space-y-8">
-                                <Skeleton className="h-10 w-2/3" />
-                                <Skeleton className="h-40 w-full" />
-                                <Skeleton className="h-40 w-full" />
-                            </div>
-                        ) : threadDetails ? (
-                            <>
-                                {/* Thread Header */}
-                                <div className="p-6 border-b flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-xl font-semibold mb-1">{threadDetails.subject}</h2>
-                                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                            <span className="flex items-center gap-1">
-                                                <User className="h-3 w-3" />
-                                                {(threadDetails.participants || []).map(p => formatParticipantName(p)).join(', ') || 'Unknown'}
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <Clock className="h-3 w-3" />
-                                                Sinds {formatDistanceToNow(new Date(threadDetails.lastActivity), { addSuffix: true, locale: nl })}
-                                            </span>
+                    {/* Column 2: Conversation View - Hidden on mobile (shown in drawer instead) */}
+                    {!isMobile && (
+                        <div className="flex-1 flex flex-col overflow-hidden bg-background">
+                            {!selectedThreadId ? (
+                                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+                                    <Mail className="h-12 w-12 mb-4 opacity-10" />
+                                    <p>Selecteer een bericht om te lezen</p>
+                                </div>
+                            ) : isLoadingDetails ? (
+                                <div className="flex-1 p-8 space-y-8">
+                                    <Skeleton className="h-10 w-2/3" />
+                                    <Skeleton className="h-40 w-full" />
+                                    <Skeleton className="h-40 w-full" />
+                                </div>
+                            ) : threadDetails ? (
+                                <>
+                                    {/* Thread Header */}
+                                    <div className="p-6 border-b flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-xl font-semibold mb-1">{threadDetails.subject}</h2>
+                                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                                <span className="flex items-center gap-1">
+                                                    <User className="h-3 w-3" />
+                                                    {(threadDetails.participants || []).map(p => formatParticipantName(p)).join(', ') || 'Unknown'}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    Sinds {formatDistanceToNow(new Date(threadDetails.lastActivity), { addSuffix: true, locale: nl })}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button variant="outline" size="sm" className="gap-2">
+                                                <Star className={cn("h-4 w-4", threadDetails.starred && "fill-yellow-400 text-yellow-400")} />
+                                                Ster
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="gap-2">
+                                                <Archive className="h-4 w-4" />
+                                                Archiveer
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                onClick={() => {
+                                                    setThreadToDeleteId(threadDetails.id);
+                                                    setDeleteConfirmOpen(true);
+                                                }}
+                                                disabled={deleteThreadMutation.isPending}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                Verwijderen
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                className="gap-2 bg-orange-500 hover:bg-orange-600"
+                                                onClick={() => {
+                                                    setIsReplying(true);
+                                                    // Pre-scroll to composer
+                                                    setTimeout(() => {
+                                                        document.getElementById('reply-composer')?.scrollIntoView({ behavior: 'smooth' });
+                                                    }, 100);
+                                                }}
+                                            >
+                                                <Reply className="h-4 w-4" />
+                                                Beantwoorden
+                                            </Button>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button variant="outline" size="sm" className="gap-2">
-                                            <Star className={cn("h-4 w-4", threadDetails.starred && "fill-yellow-400 text-yellow-400")} />
-                                            Ster
-                                        </Button>
-                                        <Button variant="outline" size="sm" className="gap-2">
-                                            <Archive className="h-4 w-4" />
-                                            Archiveer
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                            onClick={() => {
-                                                setThreadToDeleteId(threadDetails.id);
-                                                setDeleteConfirmOpen(true);
-                                            }}
-                                            disabled={deleteThreadMutation.isPending}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                            Verwijderen
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            className="gap-2 bg-orange-500 hover:bg-orange-600"
-                                            onClick={() => {
-                                                setIsReplying(true);
-                                                // Pre-scroll to composer
-                                                setTimeout(() => {
-                                                    document.getElementById('reply-composer')?.scrollIntoView({ behavior: 'smooth' });
-                                                }, 100);
-                                            }}
-                                        >
-                                            <Reply className="h-4 w-4" />
-                                            Beantwoorden
-                                        </Button>
-                                    </div>
-                                </div>
 
-                                {/* AI Summary Card */}
-                                <AISummaryCard key={selectedThreadId} thread={threadDetails} />
+                                    {/* AI Summary Card */}
+                                    <AISummaryCard key={selectedThreadId} thread={threadDetails} />
 
-                                {/* Thread Attachments Summary */}
-                                <ThreadAttachmentsSummary
-                                    messages={threadDetails.messages}
-                                    onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
-                                />
+                                    {/* Thread Attachments Summary */}
+                                    <ThreadAttachmentsSummary
+                                        messages={threadDetails.messages}
+                                        onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
+                                    />
 
-                                {/* Messages List - Newest first */}
-                                <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
-                                    {[...threadDetails.messages].reverse().map((msg, idx, arr) => (
-                                        <MessageItem
-                                            key={msg.id}
-                                            message={msg}
-                                            isFirst={idx === arr.length - 1}
-                                            isLatest={idx === 0}
-                                            onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
-                                        />
-                                    ))}
-
-                                    {/* Reply Composer */}
-                                    {isReplying && (
-                                        <div id="reply-composer" className="mt-8 p-4 border rounded-lg bg-card shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-300">
-                                            <div className="flex items-center justify-between mb-4 pb-2 border-b">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">
-                                                        J
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-bold">Concept antwoord</p>
-                                                        <p className="text-[11px] text-muted-foreground">
-                                                            Aan: {threadDetails.messages[threadDetails.messages.length - 1].fromEmail}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <Button size="icon" variant="ghost" onClick={() => setIsReplying(false)}>
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-
-                                            <Textarea
-                                                placeholder="Schrijf je antwoord hier..."
-                                                className="min-h-[200px] mb-4 border-none focus-visible:ring-0 resize-none p-0"
-                                                value={replyText}
-                                                onChange={(e) => setReplyText(e.target.value)}
-                                                autoFocus
+                                    {/* Messages List - Newest first */}
+                                    <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
+                                        {[...threadDetails.messages].reverse().map((msg, idx, arr) => (
+                                            <MessageItem
+                                                key={msg.id}
+                                                message={msg}
+                                                isFirst={idx === arr.length - 1}
+                                                isLatest={idx === 0}
+                                                onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
                                             />
+                                        ))}
 
-                                            <div className="flex items-center justify-between pt-2 border-t">
-                                                <div className="flex items-center gap-2">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-8 gap-1.5 text-xs border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 hover:text-orange-800 transition-all font-semibold"
-                                                        disabled={rewriteReplyMutation.isPending}
-                                                        onClick={() => rewriteReplyMutation.mutate({ text: replyText, mode: 'rewrite' })}
-                                                    >
-                                                        {rewriteReplyMutation.isPending ? (
-                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                        ) : (
-                                                            <Wand2 className="h-3.5 w-3.5" />
-                                                        )}
-                                                        Magic Reply
+                                        {/* Reply Composer */}
+                                        {isReplying && (
+                                            <div id="reply-composer" className="mt-8 p-4 border rounded-lg bg-card shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                                <div className="flex items-center justify-between mb-4 pb-2 border-b">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">
+                                                            J
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold">Concept antwoord</p>
+                                                            <p className="text-[11px] text-muted-foreground">
+                                                                Aan: {threadDetails.messages[threadDetails.messages.length - 1].fromEmail}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <Button size="icon" variant="ghost" onClick={() => setIsReplying(false)}>
+                                                        <X className="h-4 w-4" />
                                                     </Button>
-
-
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Button variant="ghost" onClick={() => setIsReplying(false)}>
-                                                        Annuleren
-                                                    </Button>
-                                                    <Button
-                                                        className="bg-orange-600 hover:bg-orange-700 gap-2"
-                                                        disabled={!replyText.trim() || replyMutation.isPending}
-                                                        onClick={() => {
-                                                            const latestMsg = threadDetails.messages[threadDetails.messages.length - 1];
-                                                            replyMutation.mutate({
-                                                                threadId: threadDetails.id,
-                                                                to: latestMsg.fromEmail,
-                                                                subject: threadDetails.subject.startsWith('Re:') ? threadDetails.subject : `Re: ${threadDetails.subject}`,
-                                                                body: replyText.replace(/\n/g, '<br/>'),
-                                                                inReplyTo: latestMsg.messageId
-                                                            });
-                                                        }}
-                                                    >
-                                                        {replyMutation.isPending ? (
-                                                            <RefreshCw className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <Send className="h-4 w-4" />
-                                                        )}
-                                                        Verzenden
-                                                    </Button>
+
+                                                <Textarea
+                                                    placeholder="Schrijf je antwoord hier..."
+                                                    className="min-h-[200px] mb-4 border-none focus-visible:ring-0 resize-none p-0"
+                                                    value={replyText}
+                                                    onChange={(e) => setReplyText(e.target.value)}
+                                                    autoFocus
+                                                />
+
+                                                <div className="flex items-center justify-between pt-2 border-t">
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 gap-1.5 text-xs border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 hover:text-orange-800 transition-all font-semibold"
+                                                            disabled={rewriteReplyMutation.isPending}
+                                                            onClick={() => rewriteReplyMutation.mutate({ text: replyText, mode: 'rewrite' })}
+                                                        >
+                                                            {rewriteReplyMutation.isPending ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <Wand2 className="h-3.5 w-3.5" />
+                                                            )}
+                                                            Magic Reply
+                                                        </Button>
+
+
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button variant="ghost" onClick={() => setIsReplying(false)}>
+                                                            Annuleren
+                                                        </Button>
+                                                        <Button
+                                                            className="bg-orange-600 hover:bg-orange-700 gap-2"
+                                                            disabled={!replyText.trim() || replyMutation.isPending}
+                                                            onClick={() => {
+                                                                const latestMsg = threadDetails.messages[threadDetails.messages.length - 1];
+                                                                replyMutation.mutate({
+                                                                    threadId: threadDetails.id,
+                                                                    to: latestMsg.fromEmail,
+                                                                    subject: threadDetails.subject.startsWith('Re:') ? threadDetails.subject : `Re: ${threadDetails.subject}`,
+                                                                    body: replyText.replace(/\n/g, '<br/>'),
+                                                                    inReplyTo: latestMsg.messageId
+                                                                });
+                                                            }}
+                                                        >
+                                                            {replyMutation.isPending ? (
+                                                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <Send className="h-4 w-4" />
+                                                            )}
+                                                            Verzenden
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
+                                        )}
+                                    </div>
 
 
-                            </>
-                        ) : null}
-                    </div>
+                                </>
+                            ) : null}
+                        </div>
+                    )}
 
-                    {/* Column 3: Context Sidebar */}
-                    {selectedThreadId && threadDetails && (
+                    {/* Column 3: Context Sidebar - Hidden on mobile */}
+                    {!isMobile && selectedThreadId && threadDetails && (
                         <div className="w-80 flex-shrink-0 border-l bg-muted/10 p-4 overflow-y-auto">
                             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Context</h3>
                             {contextData?.customerEmail && (
@@ -1221,6 +1236,156 @@ export default function MailPage() {
 
                 </div>
             </div>
+
+            {/* Mobile Bottom Sheet Drawer for Conversation View */}
+            {isMobile && (
+                <Drawer
+                    open={!!selectedThreadId}
+                    onOpenChange={(open) => !open && setSelectedThreadId(null)}
+                >
+                    <DrawerContent className="h-[92vh] max-h-[92vh] overflow-hidden">
+                        {isLoadingDetails ? (
+                            <div className="p-4 space-y-4">
+                                <Skeleton className="h-8 w-2/3" />
+                                <Skeleton className="h-32 w-full" />
+                                <Skeleton className="h-32 w-full" />
+                            </div>
+                        ) : threadDetails ? (
+                            <div className="flex flex-col h-full overflow-hidden">
+                                {/* Mobile Header */}
+                                <DrawerHeader className="border-b py-3 px-4">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                            <DrawerTitle className="text-base font-semibold line-clamp-2 break-words">
+                                                {threadDetails.subject}
+                                            </DrawerTitle>
+                                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                                {(threadDetails.participants || []).map(p => formatParticipantName(p)).join(', ') || 'Unknown'}
+                                            </p>
+                                        </div>
+                                        <DrawerClose asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </DrawerClose>
+                                    </div>
+
+                                    {/* Quick Actions */}
+                                    <div className="flex items-center gap-2 mt-3">
+                                        <Button
+                                            size="sm"
+                                            className="flex-1 gap-1.5 bg-orange-500 hover:bg-orange-600 h-9"
+                                            onClick={() => setIsReplying(true)}
+                                        >
+                                            <Reply className="h-3.5 w-3.5" />
+                                            Beantwoord
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9"
+                                            onClick={() => toggleStarMutation.mutate({ threadId: threadDetails.id, starred: !threadDetails.starred })}
+                                        >
+                                            <Star className={cn("h-4 w-4", threadDetails.starred && "fill-yellow-400 text-yellow-400")} />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9 text-destructive hover:text-destructive"
+                                            onClick={() => {
+                                                setThreadToDeleteId(threadDetails.id);
+                                                setDeleteConfirmOpen(true);
+                                            }}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </DrawerHeader>
+
+                                {/* Messages List */}
+                                <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-4">
+                                    {/* AI Summary - Compact on mobile */}
+                                    <AISummaryCard key={selectedThreadId} thread={threadDetails} />
+
+                                    {/* Thread Attachments */}
+                                    <ThreadAttachmentsSummary
+                                        messages={threadDetails.messages}
+                                        onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
+                                    />
+
+                                    {/* Messages */}
+                                    {[...threadDetails.messages].reverse().map((msg, idx, arr) => (
+                                        <MessageItem
+                                            key={msg.id}
+                                            message={msg}
+                                            isFirst={idx === arr.length - 1}
+                                            isLatest={idx === 0}
+                                            onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
+                                        />
+                                    ))}
+
+                                    {/* Reply Composer */}
+                                    {isReplying && (
+                                        <div className="p-3 border rounded-lg bg-card shadow-md">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <p className="text-sm font-medium">Antwoord</p>
+                                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setIsReplying(false)}>
+                                                    <X className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                            <Textarea
+                                                placeholder="Schrijf je antwoord..."
+                                                className="min-h-[120px] mb-3 text-sm"
+                                                value={replyText}
+                                                onChange={(e) => setReplyText(e.target.value)}
+                                                autoFocus
+                                            />
+                                            <div className="flex items-center justify-between gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="gap-1.5 text-xs h-8"
+                                                    disabled={rewriteReplyMutation.isPending}
+                                                    onClick={() => rewriteReplyMutation.mutate({ text: replyText, mode: 'rewrite' })}
+                                                >
+                                                    {rewriteReplyMutation.isPending ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                        <Wand2 className="h-3 w-3" />
+                                                    )}
+                                                    Magic
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    className="gap-1.5 bg-orange-500 hover:bg-orange-600 h-8"
+                                                    disabled={!replyText.trim() || replyMutation.isPending}
+                                                    onClick={() => {
+                                                        const latestMsg = threadDetails.messages[threadDetails.messages.length - 1];
+                                                        replyMutation.mutate({
+                                                            threadId: threadDetails.id,
+                                                            to: latestMsg.fromEmail,
+                                                            subject: threadDetails.subject.startsWith('Re:') ? threadDetails.subject : `Re: ${threadDetails.subject}`,
+                                                            body: replyText.replace(/\n/g, '<br/>'),
+                                                            inReplyTo: latestMsg.messageId
+                                                        });
+                                                    }}
+                                                >
+                                                    {replyMutation.isPending ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                        <Send className="h-3 w-3" />
+                                                    )}
+                                                    Verzend
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
+                    </DrawerContent>
+                </Drawer>
+            )}
 
             {/* Case Detail Modal */}
             {selectedCaseId && (
@@ -1702,14 +1867,14 @@ function ThreadCard({ thread, isSelected, onClick, onToggleStar }: { thread: Ema
         <div
             onClick={onClick}
             className={cn(
-                "p-4 border-b cursor-pointer transition-all hover:bg-muted/50 relative overflow-hidden",
+                "p-4 border-b cursor-pointer transition-all hover:bg-muted/50 relative overflow-hidden max-w-full",
                 isSelected ? "bg-orange-50 dark:bg-orange-950/20 border-l-4 border-l-orange-500 shadow-sm z-10" : "bg-transparent border-l-4 border-l-transparent",
                 thread.isUnread && !isSelected && "bg-blue-500/5 group"
             )}
         >
             {thread.isUnread && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500" />}
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 overflow-hidden">
                 {/* Avatar */}
                 <div className={cn(
                     "flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs",
@@ -1741,7 +1906,7 @@ function ThreadCard({ thread, isSelected, onClick, onToggleStar }: { thread: Ema
                         <span className="text-[10px] text-muted-foreground font-medium uppercase whitespace-nowrap">{displayDate}</span>
                     </div>
 
-                    <h3 className={cn("text-sm truncate mb-1", thread.isUnread ? "font-bold" : "font-medium")}>
+                    <h3 className={cn("text-sm truncate mb-1 max-w-full", thread.isUnread ? "font-bold" : "font-medium")}>
                         {thread.subject}
                     </h3>
 
@@ -1749,7 +1914,7 @@ function ThreadCard({ thread, isSelected, onClick, onToggleStar }: { thread: Ema
                         {thread.snippet}
                     </p>
 
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 overflow-x-auto max-w-full scrollbar-hide">
                         {/* Status Badges - Mailbox 2.0 */}
                         {!thread.isUnread && thread.lastMessageIsOutbound && (
                             <Badge variant="outline" className="h-5 px-1.5 text-[10px] gap-1 bg-muted/50 text-muted-foreground border-transparent font-medium">
@@ -1804,7 +1969,7 @@ function MessageItem({ message, isFirst, isLatest, onPreview }: { message: Threa
 
     return (
         <div className={cn(
-            "border rounded-lg transition-all",
+            "border rounded-lg transition-all overflow-hidden max-w-full",
             expanded ? "bg-card border-border shadow-sm" : "bg-muted/30 border-transparent hover:bg-muted/50 cursor-pointer"
         )}>
             <div
@@ -1853,14 +2018,14 @@ function MessageItem({ message, isFirst, isLatest, onPreview }: { message: Threa
 
 
             {expanded && (
-                <div className="px-4 pb-6 pt-0 ml-11">
-                    <div className="text-[11px] text-muted-foreground mb-4">
+                <div className="px-4 pb-6 pt-0 ml-11 overflow-hidden max-w-full">
+                    <div className="text-[11px] text-muted-foreground mb-4 truncate">
                         Aan: {message.to.map(p => p.email).join(', ')}
                         {message.cc.length > 0 && ` | Cc: ${message.cc.map(p => p.email).join(', ')}`}
                     </div>
 
                     <div
-                        className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none prose-p:my-2"
+                        className="email-content text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none prose-p:my-2"
                         dangerouslySetInnerHTML={{ __html: message.body }}
                     />
 
