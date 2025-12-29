@@ -513,11 +513,23 @@ export class DatabaseStorage implements IStorage {
     hasCase?: boolean;
     hasReturn?: boolean;
     hasRepair?: boolean;
+    search?: string;
   }): Promise<{ threads: EmailThread[], total: number }> {
-    const { limit = 50, offset = 0, folder, starred, archived, isUnread, hasOrder, hasCase, hasReturn, hasRepair } = filters || {};
+    const { limit = 50, offset = 0, folder, starred, archived, isUnread, hasOrder, hasCase, hasReturn, hasRepair, search } = filters || {};
 
     let query = db.select().from(emailThreads);
     const conditions = [];
+
+    // Search filter: search in subject, snippet, and participants (JSON array with name/email)
+    if (search && search.trim()) {
+      const searchTerm = `%${search.trim()}%`;
+      conditions.push(or(
+        ilike(emailThreads.subject, searchTerm),
+        ilike(emailThreads.snippet, searchTerm),
+        // Search in participants JSON array (name and email fields)
+        sql`${emailThreads.participants}::text ILIKE ${searchTerm}`
+      ));
+    }
 
     // Handle virtual folders that map to combinations of flags
     if (folder === 'inbox') {

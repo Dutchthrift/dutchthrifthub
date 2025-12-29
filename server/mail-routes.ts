@@ -131,7 +131,9 @@ router.post('/compose', async (req, res) => {
 // List Email Threads
 
 router.get('/list', async (req, res) => {
-    const { folder, starred, archived, isUnread, hasOrder, hasCase, hasReturn, hasRepair, page = 1, limit = 50 } = req.query;
+    const { folder, starred, archived, isUnread, hasOrder, hasCase, hasReturn, hasRepair, search, page = 1, limit = 50 } = req.query;
+
+    console.log('[MAIL /list] Request received:', { folder, search, starred, archived });
 
     try {
         const offset = (Number(page) - 1) * Number(limit);
@@ -145,14 +147,19 @@ router.get('/list', async (req, res) => {
             hasOrder: hasOrder === 'true' ? true : hasOrder === 'false' ? false : undefined,
             hasCase: hasCase === 'true' ? true : hasCase === 'false' ? false : undefined,
             hasReturn: hasReturn === 'true' ? true : hasReturn === 'false' ? false : undefined,
-            hasRepair: hasRepair === 'true' ? true : hasRepair === 'false' ? false : undefined
+            hasRepair: hasRepair === 'true' ? true : hasRepair === 'false' ? false : undefined,
+            search: search as string
         });
 
+        console.log('[MAIL /list] Returning', result.threads.length, 'threads out of', result.total);
         res.json(result);
     } catch (error: any) {
+        console.error('[MAIL /list] Error:', error);
         res.status(500).json({ message: error.message });
     }
 });
+
+
 
 // Get Thread Details
 router.get('/:id', async (req, res) => {

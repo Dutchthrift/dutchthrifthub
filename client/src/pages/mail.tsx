@@ -221,6 +221,11 @@ export default function MailPage() {
             if (activeTab === 'returns') url += '&hasReturn=true';
             if (activeTab === 'repairs') url += '&hasRepair=true';
 
+            // Add search query if provided
+            if (searchQuery.trim()) {
+                url += `&search=${encodeURIComponent(searchQuery.trim())}`;
+            }
+
             const res = await fetch(url);
             if (!res.ok) throw new Error('Kon threads niet laden');
             return res.json();
