@@ -38,6 +38,9 @@ git checkout update/versie0.1
 # Haal laatste wijzigingen op (van GitHub)
 git pull origin update/versie0.1
 
+# ⚠️ NA GROTE UPDATES: Installeer nieuwe/gewijzigde packages
+npm install
+
 # Open in VS Code
 code .
 
@@ -158,7 +161,8 @@ pm2 logs dutchthrift --lines 30
 cd "d:\Niek Oenema\Documents\ai\projecten\dutchthrifthub"
 git checkout update/versie0.1
 git pull origin update/versie0.1
-npm run dev  # Test op localhost:5000
+npm install               # Na grote updates
+npm run dev               # Test op localhost:5000
 ```
 
 ### Push Updates
@@ -224,6 +228,40 @@ npm run db:push
 npm run build
 pm2 restart dutchthrift
 ```
+
+---
+
+## 💾 Database Backup
+
+### Backup Maken (op server via SSH)
+
+```bash
+# Verbind met server
+ssh -i "C:\Users\Niek Oenema\.ssh\strato_vps" root@85.215.181.179
+
+# Maak backup
+cd /var/www/dutchthrifthub
+pg_dump -U dutchthrift_user -d dutchthrift -h localhost > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Of met compressie (kleiner bestand)
+pg_dump -U dutchthrift_user -d dutchthrift -h localhost | gzip > backup_$(date +%Y%m%d).sql.gz
+```
+
+### Backup Downloaden naar PC
+
+```powershell
+# In PowerShell op je PC
+scp -i "C:\Users\Niek Oenema\.ssh\strato_vps" root@85.215.181.179:/var/www/dutchthrifthub/backup_*.sql "C:\Users\Niek Oenema\Documents\backups\"
+```
+
+### Backup Terugzetten
+
+```bash
+# Op server (alleen bij noodgevallen!)
+psql -U dutchthrift_user -d dutchthrift -h localhost < backup_20241218_123456.sql
+```
+
+> ⚠️ **TIP:** Maak ALTIJD een backup voordat je schema wijzigingen doet via `npm run db:push`!
 
 ---
 

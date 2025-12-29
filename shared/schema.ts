@@ -106,12 +106,73 @@ export const emailThreads = pgTable("email_threads", {
   slaDeadline: timestamp("sla_deadline"),
   orderId: varchar("order_id").references(() => orders.id),
   caseId: varchar("case_id").references(() => cases.id),
+  returnId: varchar("return_id").references(() => returns.id),
+  repairId: varchar("repair_id").references(() => repairs.id),
   participants: jsonb("participants"), // Array of {name, email}
   labels: jsonb("labels"), // Gmail labelIds
   messageCount: integer("message_count").default(1),
   lastHistoryId: text("last_history_id"), // For incremental sync
+  lastMessageIsOutbound: boolean("last_message_is_outbound").default(false), // To support Action Needed vs Waiting logic
+
+  // AI related fields
+  aiSummary: text("ai_summary"),
+  sentiment: varchar("sentiment", { length: 50 }), // positive, negative, neutral
+  detectedIntent: varchar("detected_intent", { length: 100 }), // e.g., 'return_request', 'shipping_issue'
+  suggestedReply: jsonb("suggested_reply"), // { customer: string, english: string }
+  aiInsights: jsonb("ai_insights"), // Structured reasoning, action plan, and system status
+  lastAiSync: timestamp("last_ai_sync"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// AI Settings table (Global personality and tone)
+export const aiSettings = pgTable("ai_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  styleGuide: text("style_guide").notNull(), // Detailed description of the tone and rules
+  useHonorifics: boolean("use_honorifics").default(false), // Je vs U
+  allowEmojis: boolean("allow_emojis").default(true),
+  brevityLevel: integer("brevity_level").default(5), // 1-10 (short to long)
+
+  // Advanced mailing style
+  emailHeader: text("email_header"),
+  emailFooter: text("email_footer"),
+  structureRules: text("structure_rules"), // Custom rules like "always end with a question"
+  prohibitedPhrases: text("prohibited_phrases").array(),
+
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// AI Knowledge base for large documents
+export const aiKnowledge = pgTable("ai_knowledge", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(), // Large chunks of text/markdown
+  category: text("category").notNull().default("Algemeen"),
+  isActive: boolean("is_active").default(true),
+  metadata: jsonb("metadata"), // For priority, tags, etc.
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// AI Style Examples (Few-shot learning)
+export const aiExamples = pgTable("ai_examples", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  incomingMail: text("incoming_mail").notNull(),
+  perfectResponse: text("perfect_response").notNull(),
+  scenarioLabel: text("scenario_label"), // e.g., 'Camera defect'
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// AI Scenarios (SOP instructions)
+export const aiScenarios = pgTable("ai_scenarios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // e.g., 'Camera Defect Video Request'
+  triggerKeywords: text("trigger_keywords").array().notNull(), // e.g., ['camera', 'defect', 'sd kaart']
+  instruction: text("instruction").notNull(), // e.g., 'Ask for a 10s video demonstration'
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Email messages table
@@ -196,7 +257,110 @@ export const todos = pgTable("todos", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Internal notes table
+// ============ AGENDA / APPOINTMENTS ============
+
+// Appointment types - 4 generic types
+export const appointmentTypeEnum = pgEnum("appointment_type", [
+  "afspraak",  // Hard appointments (klant, reparatie, leverancier)
+  "intern",    // Internal meetings
+  "taak",      // Flexible tasks
+  "blok"       // Unavailable blocks (lunch, privé, focus)
+]);
+
+// Visibility levels
+export const appointmentVisibilityEnum = pgEnum("appointment_visibility", [
+  "public",    // Visible to all
+  "internal",  // Visible to team
+  "private"    // Only owner
+]);
+
+// Attendee role
+export const attendeeRoleEnum = pgEnum("attendee_role", ["owner", "attendee"]);
+
+// Attendee status
+export const attendeeStatusEnum = pgEnum("attendee_status", ["invited", "accepted", "declined"]);
+
+// Appointment series - master record for single and recurring events
+export const appointmentSeries = pgTable("appointment_series", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: appointmentTypeEnum("type").notNull().default("afspraak"),
+  color: text("color"), // Optional hex override
+
+  // Timing
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  allDay: boolean("all_day").default(false),
+  timezone: text("timezone").default("Europe/Amsterdam"),
+
+  // Location
+  location: text("location"),
+  isRemote: boolean("is_remote").default(false),
+  meetingLink: text("meeting_link"),
+
+  // Visibility
+  visibility: appointmentVisibilityEnum("visibility").default("internal"),
+
+  // Recurrence (iCal RRULE compatible)
+  recurrenceRule: text("recurrence_rule"), // e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"
+  recurrenceEndDate: timestamp("recurrence_end_date"),
+  recurrenceCount: integer("recurrence_count"),
+
+  // Reminders (minutes before: [1440, 30] = 1 day + 30 min)
+  reminders: integer("reminders").array(),
+
+  // Assignment
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  createdBy: varchar("created_by").references(() => users.id),
+
+  // Entity links
+  orderId: varchar("order_id").references(() => orders.id),
+  customerId: varchar("customer_id").references(() => customers.id),
+  caseId: varchar("case_id").references(() => cases.id),
+  repairId: varchar("repair_id").references(() => repairs.id),
+
+  // Status
+  status: text("status").default("scheduled"), // scheduled, completed, cancelled
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Appointment exceptions - overrides for single occurrences in a series
+export const appointmentExceptions = pgTable("appointment_exceptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  seriesId: varchar("series_id").references(() => appointmentSeries.id).notNull(),
+
+  // The instance being overridden (identified by original start time)
+  originalStartTime: timestamp("original_start_time").notNull(),
+
+  // Override values (null = use series value)
+  overrideStartTime: timestamp("override_start_time"),
+  overrideEndTime: timestamp("override_end_time"),
+  overrideTitle: text("override_title"),
+  overrideType: appointmentTypeEnum("override_type"),
+  overrideLocation: text("override_location"),
+
+  // Cancel this single occurrence
+  isCancelled: boolean("is_cancelled").default(false),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Appointment attendees
+export const appointmentAttendees = pgTable("appointment_attendees", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  seriesId: varchar("series_id").references(() => appointmentSeries.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  role: attendeeRoleEnum("role").default("attendee"),
+  status: attendeeStatusEnum("status").default("invited"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ============ END AGENDA ============
 export const internalNotes = pgTable("internal_notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   content: text("content").notNull(),
@@ -387,6 +551,7 @@ export const returns = pgTable("returns", {
   orderId: varchar("order_id").references(() => orders.id),
   caseId: varchar("case_id").references(() => cases.id),
   assignedUserId: varchar("assigned_user_id").references(() => users.id),
+  customerEmail: text("customer_email"), // Direct customer email for display & filtering
 
   // Return details
   status: returnStatusEnum("status").notNull().default("nieuw"),
@@ -670,6 +835,33 @@ export const insertTodoSchema = createInsertSchema(todos).omit({
   dueDate: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
 });
 
+// Appointment insert schemas
+export const insertAppointmentSeriesSchema = createInsertSchema(appointmentSeries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  startTime: z.string().datetime().or(z.date()),
+  endTime: z.string().datetime().or(z.date()),
+  recurrenceEndDate: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
+  reminders: z.array(z.number()).optional(),
+});
+
+export const insertAppointmentExceptionSchema = createInsertSchema(appointmentExceptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  originalStartTime: z.string().datetime().or(z.date()),
+  overrideStartTime: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
+  overrideEndTime: z.string().datetime().optional().or(z.date().optional()).or(z.null()),
+});
+
+export const insertAppointmentAttendeeSchema = createInsertSchema(appointmentAttendees).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertInternalNoteSchema = createInsertSchema(internalNotes).omit({
   id: true,
   createdAt: true,
@@ -869,6 +1061,15 @@ export type InsertRepair = z.infer<typeof insertRepairSchema>;
 
 export type Todo = typeof todos.$inferSelect;
 export type InsertTodo = z.infer<typeof insertTodoSchema>;
+
+export type AppointmentSeries = typeof appointmentSeries.$inferSelect;
+export type InsertAppointmentSeries = z.infer<typeof insertAppointmentSeriesSchema>;
+
+export type AppointmentException = typeof appointmentExceptions.$inferSelect;
+export type InsertAppointmentException = z.infer<typeof insertAppointmentExceptionSchema>;
+
+export type AppointmentAttendee = typeof appointmentAttendees.$inferSelect;
+export type InsertAppointmentAttendee = z.infer<typeof insertAppointmentAttendeeSchema>;
 
 export type InternalNote = typeof internalNotes.$inferSelect;
 export type InsertInternalNote = z.infer<typeof insertInternalNoteSchema>;
@@ -1097,3 +1298,40 @@ export const insertMailThreadLinkSchema = createInsertSchema(mailThreadLinks);
 // TypeScript types
 export type MailThreadLink = typeof mailThreadLinks.$inferSelect;
 export type InsertMailThreadLink = z.infer<typeof insertMailThreadLinkSchema>;
+// AI Settings Insert Schema
+export const insertAiSettingsSchema = createInsertSchema(aiSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+// AI Examples Insert Schema
+export const insertAiExampleSchema = createInsertSchema(aiExamples).omit({
+  id: true,
+  createdAt: true,
+});
+
+// AI Scenarios Insert Schema
+export const insertAiScenarioSchema = createInsertSchema(aiScenarios).omit({
+  id: true,
+  createdAt: true,
+});
+
+// AI Knowledge Insert Schema
+export const insertAiKnowledgeSchema = createInsertSchema(aiKnowledge).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// AI TypeScript types
+export type AiSettings = typeof aiSettings.$inferSelect;
+export type InsertAiSettings = z.infer<typeof insertAiSettingsSchema>;
+
+export type AiExample = typeof aiExamples.$inferSelect;
+export type InsertAiExample = z.infer<typeof insertAiExampleSchema>;
+
+export type AiScenario = typeof aiScenarios.$inferSelect;
+export type InsertAiScenario = z.infer<typeof insertAiScenarioSchema>;
+
+export type AiKnowledge = typeof aiKnowledge.$inferSelect;
+export type InsertAiKnowledge = z.infer<typeof insertAiKnowledgeSchema>;

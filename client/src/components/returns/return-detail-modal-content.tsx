@@ -204,9 +204,27 @@ export function ReturnDetailModalContent({
             {/* HEADER */}
             <div className="flex items-center justify-between pb-2 border-b">
                 <div className="flex items-center gap-3">
-                    <Badge className={`${STATUS_COLORS[ret.status]} text-white border-0`}>
-                        {STATUS_OPTIONS.find(s => s.value === ret.status)?.label || ret.status}
-                    </Badge>
+                    {isEditMode ? (
+                        <Select
+                            value={editedData.status}
+                            onValueChange={(val) => setEditedData({ ...editedData, status: val })}
+                        >
+                            <SelectTrigger className="h-8 w-[200px] text-sm">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {STATUS_OPTIONS.map((status) => (
+                                    <SelectItem key={status.value} value={status.value}>
+                                        {status.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <Badge className={`${STATUS_COLORS[ret.status]} text-white border-0`}>
+                            {STATUS_OPTIONS.find(s => s.value === ret.status)?.label || ret.status}
+                        </Badge>
+                    )}
                     {turnaroundDays !== null && (
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Clock className="h-3 w-3" />{turnaroundDays}d

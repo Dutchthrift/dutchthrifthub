@@ -55,7 +55,8 @@
 5. [Testen op update/versie0.1 Branch](#testen-op-versie01-branch)
 6. [Deployen naar Production (main)](#deployen-naar-production-main)
 7. [Database Migraties](#database-migraties)
-8. [Troubleshooting](#troubleshooting)
+8. [Database Backups](#database-backups)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -1075,6 +1076,85 @@ cat /var/www/dutchthrifthub/.env | grep DATABASE_URL
 5. **Migraties zijn onomkeerbaar in Drizzle ORM**
    - `db:push` past direct aan zonder history
    - Voor productie: overweeg manual SQL migraties met rollback plan
+
+---
+
+## 💾 Database Backups
+
+### Waarom Backups?
+
+- 🛡️ **Veiligheid:** Herstel na data-verlies of fouten
+- 🔄 **Migratie:** Backup maken vóór schema wijzigingen
+- 📦 **Archief:** Periodieke snapshots voor auditing
+
+### Backup Maken
+
+**Verbind met server:**
+```bash
+ssh -i "C:\Users\Niek Oenema\.ssh\strato_vps" root@85.215.181.179
+cd /var/www/dutchthrifthub
+```
+
+**Maak backup (zonder compressie):**
+```bash
+pg_dump -U dutchthrift_user -d dutchthrift -h localhost > backup_$(date +%Y%m%d_%H%M%S).sql
+```
+
+**Maak backup (met compressie - aanbevolen):**
+```bash
+pg_dump -U dutchthrift_user -d dutchthrift -h localhost | gzip > backup_$(date +%Y%m%d).sql.gz
+```
+
+### Backup Downloaden naar PC
+
+```powershell
+# In PowerShell op je PC
+scp -i "C:\Users\Niek Oenema\.ssh\strato_vps" root@85.215.181.179:/var/www/dutchthrifthub/backup_*.sql "C:\Users\Niek Oenema\Documents\backups\"
+
+# Of gecomprimeerde backup
+scp -i "C:\Users\Niek Oenema\.ssh\strato_vps" root@85.215.181.179:/var/www/dutchthrifthub/backup_*.sql.gz "C:\Users\Niek Oenema\Documents\backups\"
+```
+
+### Backup Terugzetten (Restore)
+
+**⚠️ LET OP:** Dit overschrijft de huidige database!
+
+```bash
+# Reguliere backup
+psql -U dutchthrift_user -d dutchthrift -h localhost < backup_20241218_123456.sql
+
+# Gecomprimeerde backup
+gunzip -c backup_20241218.sql.gz | psql -U dutchthrift_user -d dutchthrift -h localhost
+```
+
+### Backup Best Practices ✅
+
+| Wanneer | Actie |
+|---------|-------|
+| **Vóór schema wijziging** | Altijd backup maken voor `npm run db:push` |
+| **Wekelijks** | Periodieke backup voor archief |
+| **Vóór grote updates** | Backup voor nieuwe features deployment |
+| **Na database restore** | Test grondig of alles werkt |
+
+### Automatische Backup (Optioneel)
+
+**Cron job voor dagelijkse backup:**
+```bash
+# Maak backup script
+cat > /root/backup_db.sh << 'EOF'
+#!/bin/bash
+BACKUP_DIR="/var/www/dutchthrifthub/backups"
+mkdir -p $BACKUP_DIR
+pg_dump -U dutchthrift_user -d dutchthrift -h localhost | gzip > $BACKUP_DIR/backup_$(date +%Y%m%d).sql.gz
+# Verwijder backups ouder dan 30 dagen
+find $BACKUP_DIR -name "backup_*.sql.gz" -mtime +30 -delete
+EOF
+
+chmod +x /root/backup_db.sh
+
+# Voeg toe aan crontab (dagelijks om 3:00)
+(crontab -l 2>/dev/null; echo "0 3 * * * /root/backup_db.sh") | crontab -
+```
 
 ---
 

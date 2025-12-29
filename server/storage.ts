@@ -36,9 +36,10 @@ import {
   type MailThreadLink, type InsertMailThreadLink,
   type EmailMetadata, type InsertEmailMetadata,
   type CaseNote, type InsertCaseNote,
-  users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, mailThreadLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks, repairCounters, emailMetadata, insertEmailMetadataSchema, caseNotes, insertCaseNoteSchema
+  type AiKnowledge, type InsertAiKnowledge,
+  users, customers, orders, emailThreads, emailMessages, emailAttachments, emails, emailLinks, mailThreadLinks, repairs, todos, purchaseOrders, suppliers, purchaseOrderItems, purchaseOrderFiles, returns, returnItems, cases, caseItems, caseLinks, caseEvents, activities, auditLogs, systemSettings, notes, noteTags, noteTagAssignments, noteMentions, noteReactions, noteAttachments, noteFollowups, noteRevisions, noteTemplates, noteLinks, repairCounters, emailMetadata, insertEmailMetadataSchema, caseNotes, insertCaseNoteSchema, aiKnowledge
 } from "@shared/schema";
-import { db } from "./services/supabaseClient";
+import { db } from "./services/database";
 import { eq, desc, asc, and, or, ilike, count, inArray, isNotNull, sql, getTableColumns, lt } from "drizzle-orm";
 import { ObjectStorageService } from "./objectStorage";
 import type { Response } from "express";
@@ -207,6 +208,9 @@ export interface IStorage {
   // Email context lookups
   getCasesByCustomerEmail(email: string): Promise<Case[]>;
   getReturnsByCustomerEmail(email: string): Promise<Return[]>;
+  getRepairsByCustomerEmail(email: string): Promise<Repair[]>;
+  getMailThreadLinks(threadId: string): Promise<MailThreadLink[]>;
+  deleteMailThreadLink(threadId: string, type: string, entityId: string): Promise<void>;
 
 
   // Case Events
@@ -330,6 +334,13 @@ export interface IStorage {
 
   getSetting(key: string): Promise<string | undefined>;
   setSetting(key: string, value: string): Promise<void>;
+
+  // AI Knowledge
+  getAiKnowledge(filters?: { category?: string; isActive?: boolean }): Promise<AiKnowledge[]>;
+  getAiKnowledgeItem(id: string): Promise<AiKnowledge | undefined>;
+  createAiKnowledge(item: InsertAiKnowledge): Promise<AiKnowledge>;
+  updateAiKnowledge(id: string, updates: Partial<InsertAiKnowledge>): Promise<AiKnowledge>;
+  deleteAiKnowledge(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -499,11 +510,26 @@ export class DatabaseStorage implements IStorage {
     archived?: boolean;
     isUnread?: boolean;
     hasOrder?: boolean;
+    hasCase?: boolean;
+    hasReturn?: boolean;
+    hasRepair?: boolean;
+    search?: string;
   }): Promise<{ threads: EmailThread[], total: number }> {
-    const { limit = 50, offset = 0, folder, starred, archived, isUnread, hasOrder } = filters || {};
+    const { limit = 50, offset = 0, folder, starred, archived, isUnread, hasOrder, hasCase, hasReturn, hasRepair, search } = filters || {};
 
     let query = db.select().from(emailThreads);
     const conditions = [];
+
+    // Search filter: search in subject, snippet, and participants (JSON array with name/email)
+    if (search && search.trim()) {
+      const searchTerm = `%${search.trim()}%`;
+      conditions.push(or(
+        ilike(emailThreads.subject, searchTerm),
+        ilike(emailThreads.snippet, searchTerm),
+        // Search in participants JSON array (name and email fields)
+        sql`${emailThreads.participants}::text ILIKE ${searchTerm}`
+      ));
+    }
 
     // Handle virtual folders that map to combinations of flags
     if (folder === 'inbox') {
@@ -536,6 +562,24 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${emailThreads.orderId} IS NOT NULL`);
       } else {
         conditions.push(sql`${emailThreads.orderId} IS NULL`);
+      }
+    }
+    if (hasCase !== undefined) {
+      if (hasCase) {
+        // Strict filter: Only explicitly linked emails
+        conditions.push(isNotNull(emailThreads.caseId));
+      }
+    }
+    if (hasReturn !== undefined) {
+      if (hasReturn) {
+        // Strict filter: Only explicitly linked emails
+        conditions.push(isNotNull(emailThreads.returnId));
+      }
+    }
+    if (hasRepair !== undefined) {
+      if (hasRepair) {
+        // Strict filter: Only explicitly linked emails
+        conditions.push(isNotNull(emailThreads.repairId));
       }
     }
 
@@ -581,12 +625,20 @@ export class DatabaseStorage implements IStorage {
     if (updateData.caseId === '') {
       updateData.caseId = null;
     }
+    if (updateData.returnId === '') {
+      updateData.returnId = null;
+    }
+    if (updateData.repairId === '') {
+      updateData.repairId = null;
+    }
 
     const result = await db.update(emailThreads).set(updateData).where(eq(emailThreads.id, id)).returning();
     return result[0];
   }
 
   async deleteEmailThread(id: string): Promise<void> {
+    // Delete messages first to avoid foreign key constraints
+    await db.delete(emailMessages).where(eq(emailMessages.threadId, id));
     await db.delete(emailThreads).where(eq(emailThreads.id, id));
   }
 
@@ -600,13 +652,13 @@ export class DatabaseStorage implements IStorage {
 
   // Email Messages
   async getEmailMessages(threadId: string): Promise<EmailMessage[]> {
-    return await db.select().from(emailMessages).where(eq(emailMessages.threadId, threadId)).orderBy(desc(emailMessages.sentAt));
+    return await db.select().from(emailMessages).where(eq(emailMessages.threadId, threadId)).orderBy(emailMessages.sentAt);
   }
 
   // OPTIMIZED: Get messages for multiple threads in one query
   async getEmailMessagesForThreads(threadIds: string[]): Promise<EmailMessage[]> {
     if (threadIds.length === 0) return [];
-    return await db.select().from(emailMessages).where(inArray(emailMessages.threadId, threadIds)).orderBy(desc(emailMessages.sentAt));
+    return await db.select().from(emailMessages).where(inArray(emailMessages.threadId, threadIds)).orderBy(emailMessages.sentAt);
   }
 
   async getEmailMessage(messageId: string): Promise<EmailMessage | undefined> {
@@ -825,6 +877,8 @@ export class DatabaseStorage implements IStorage {
         // Joined customer fields (firstName, lastName)
         ilike(customers.firstName, searchTerm),
         ilike(customers.lastName, searchTerm),
+        // Combined name search for "First Last" - robust against nulls
+        sql`(COALESCE(${customers.firstName}, '') || ' ' || COALESCE(${customers.lastName}, '')) ILIKE ${searchTerm}`,
         // Joined order fields (orderNumber)
         ilike(orders.orderNumber, searchTerm),
         // Case items: SKU or productName match (subquery)
@@ -891,7 +945,13 @@ export class DatabaseStorage implements IStorage {
       })
       .from(cases)
       .leftJoin(orders, eq(cases.orderId, orders.id))
-      .leftJoin(customers, eq(cases.customerId, customers.id))
+      // Robust customer join: Check Case ID/Email OR Order ID/Email (Case-Insensitive)
+      .leftJoin(customers, sql`
+        ${customers.id} = ${cases.customerId} OR 
+        lower(${customers.email}) = lower(${cases.customerEmail}) OR 
+        ${customers.id} = ${orders.customerId} OR 
+        lower(${customers.email}) = lower(${orders.customerEmail})
+      `)
       .leftJoin(users, eq(cases.assignedUserId, users.id))
       .where(whereClause)
       .orderBy(desc(cases.createdAt));
@@ -961,6 +1021,10 @@ export class DatabaseStorage implements IStorage {
 
   async getCasesByCustomerEmail(email: string): Promise<Case[]> {
     return await db.select().from(cases).where(eq(cases.customerEmail, email)).orderBy(desc(cases.createdAt));
+  }
+
+  async getRepairsByCustomerEmail(email: string): Promise<Repair[]> {
+    return await db.select().from(repairs).where(eq(repairs.customerEmail, email)).orderBy(desc(repairs.createdAt));
   }
 
   async createCase(caseData: InsertCase): Promise<Case> {
@@ -1284,12 +1348,52 @@ export class DatabaseStorage implements IStorage {
   }
 
   async setSystemSetting(key: string, value: string): Promise<void> {
-    const existing = await this.getSystemSetting(key);
-    if (existing) {
-      await db.update(systemSettings).set({ value, updatedAt: new Date() }).where(eq(systemSettings.key, key));
-    } else {
-      await db.insert(systemSettings).values({ key, value });
+    await db.insert(systemSettings).values({ key, value, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: systemSettings.key,
+        set: { value, updatedAt: new Date() }
+      });
+  }
+
+  // AI Knowledge
+  async getAiKnowledge(filters?: { category?: string; isActive?: boolean }): Promise<AiKnowledge[]> {
+    let query = db.select().from(aiKnowledge);
+    const conditions = [];
+
+    if (filters?.category) {
+      conditions.push(eq(aiKnowledge.category, filters.category));
     }
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(aiKnowledge.isActive, filters.isActive));
+    }
+
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions)).orderBy(desc(aiKnowledge.createdAt));
+    }
+    return await query.orderBy(desc(aiKnowledge.createdAt));
+  }
+
+  async getAiKnowledgeItem(id: string): Promise<AiKnowledge | undefined> {
+    const result = await db.select().from(aiKnowledge).where(eq(aiKnowledge.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createAiKnowledge(item: InsertAiKnowledge): Promise<AiKnowledge> {
+    const result = await db.insert(aiKnowledge).values(item).returning();
+    return result[0];
+  }
+
+  async updateAiKnowledge(id: string, updates: Partial<InsertAiKnowledge>): Promise<AiKnowledge> {
+    const result = await db.update(aiKnowledge).set({
+      ...updates,
+      updatedAt: new Date()
+    }).where(eq(aiKnowledge.id, id)).returning();
+    if (result.length === 0) throw new Error("Knowledge item not found");
+    return result[0];
+  }
+
+  async deleteAiKnowledge(id: string): Promise<void> {
+    await db.delete(aiKnowledge).where(eq(aiKnowledge.id, id));
   }
 
   // Dashboard stats
@@ -2216,6 +2320,16 @@ export class DatabaseStorage implements IStorage {
 
   async getMailThreadLinks(threadId: string): Promise<MailThreadLink[]> {
     return await db.select().from(mailThreadLinks).where(eq(mailThreadLinks.threadId, threadId));
+  }
+
+  async deleteMailThreadLink(threadId: string, type: string, entityId: string): Promise<void> {
+    await db.delete(mailThreadLinks).where(
+      and(
+        eq(mailThreadLinks.threadId, threadId),
+        eq(mailThreadLinks.entityType, type),
+        eq(mailThreadLinks.entityId, entityId)
+      )
+    );
   }
 
   // Link email thread to entity

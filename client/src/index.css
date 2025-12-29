@@ -506,3 +506,49 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ========== EMAIL CONTENT CONTAINER ========== */
+/* Force all email content to respect container width - overrides inline styles */
+.email-content {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
+
+.email-content * {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.email-content table {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+.email-content td,
+.email-content th {
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
+
+.email-content img {
+  height: auto !important;
+  max-width: 100% !important;
+}
+
+.email-content pre,
+.email-content code {
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+  overflow-x: auto !important;
+}
+
+/* Remove fixed widths from common email elements */
+.email-content div[style*="width"],
+.email-content table[style*="width"],
+.email-content td[style*="width"],
+.email-content span[style*="width"] {
+  width: auto !important;
+  min-width: 0 !important;
+}

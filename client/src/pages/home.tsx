@@ -31,7 +31,7 @@ export default function Home() {
         {/* Page Header */}
         <div className="flex items-center justify-between" data-testid="page-header">
           <div>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight bg-gradient-primary bg-clip-text text-transparent">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-orange-500">
               Welkom terug, {userName}! 👋
             </h2>
             <p className="text-muted-foreground mt-1 text-sm sm:text-base md:text-lg">

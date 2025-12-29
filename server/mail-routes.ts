@@ -131,7 +131,9 @@ router.post('/compose', async (req, res) => {
 // List Email Threads
 
 router.get('/list', async (req, res) => {
-    const { folder, starred, archived, isUnread, hasOrder, page = 1, limit = 50 } = req.query;
+    const { folder, starred, archived, isUnread, hasOrder, hasCase, hasReturn, hasRepair, search, page = 1, limit = 50 } = req.query;
+
+    console.log('[MAIL /list] Request received:', { folder, search, starred, archived });
 
     try {
         const offset = (Number(page) - 1) * Number(limit);
@@ -142,14 +144,22 @@ router.get('/list', async (req, res) => {
             starred: starred === 'true' ? true : starred === 'false' ? false : undefined,
             archived: archived === 'true' ? true : archived === 'false' ? false : undefined,
             isUnread: isUnread === 'true' ? true : isUnread === 'false' ? false : undefined,
-            hasOrder: hasOrder === 'true' ? true : hasOrder === 'false' ? false : undefined
+            hasOrder: hasOrder === 'true' ? true : hasOrder === 'false' ? false : undefined,
+            hasCase: hasCase === 'true' ? true : hasCase === 'false' ? false : undefined,
+            hasReturn: hasReturn === 'true' ? true : hasReturn === 'false' ? false : undefined,
+            hasRepair: hasRepair === 'true' ? true : hasRepair === 'false' ? false : undefined,
+            search: search as string
         });
 
+        console.log('[MAIL /list] Returning', result.threads.length, 'threads out of', result.total);
         res.json(result);
     } catch (error: any) {
+        console.error('[MAIL /list] Error:', error);
         res.status(500).json({ message: error.message });
     }
 });
+
+
 
 // Get Thread Details
 router.get('/:id', async (req, res) => {
@@ -226,11 +236,19 @@ router.get('/:id/context', async (req, res) => {
         // Find returns by customer email
         const returns = customerEmail ? await storage.getReturnsByCustomerEmail(customerEmail) : [];
 
+        // Find repairs
+        const repairs = customerEmail ? await storage.getRepairsByCustomerEmail(customerEmail) : [];
+
+        // Find existing thread links
+        const currentLinks = await storage.getMailThreadLinks(thread.id);
+
         res.json({
             customerEmail,
             orders: orders.slice(0, 10), // Limit to 10 most recent
             cases: cases.slice(0, 10),
-            returns: returns.slice(0, 10)
+            returns: returns.slice(0, 10),
+            repairs: repairs.slice(0, 10),
+            currentLinks
         });
     } catch (error: any) {
         console.error('Error fetching context:', error);
@@ -242,14 +260,30 @@ router.get('/:id/context', async (req, res) => {
 
 router.patch('/:id/flags', async (req, res) => {
     try {
-        const { starred, archived } = req.body;
+        const { starred, archived, isUnread } = req.body;
         const thread = await storage.getEmailThread(req.params.id);
         if (!thread) return res.status(404).json({ message: 'Thread not found' });
 
-        const updated = await storage.updateEmailThread(thread.id, {
-            starred: starred !== undefined ? starred : thread.starred,
-            archived: archived !== undefined ? archived : thread.archived
-        });
+        const updates: any = {};
+        if (starred !== undefined) updates.starred = starred;
+        if (archived !== undefined) updates.archived = archived;
+        if (isUnread !== undefined) updates.isUnread = isUnread;
+
+        const updated = await storage.updateEmailThread(thread.id, updates);
+
+        // If marked as read, sync with Gmail
+        if (isUnread === false) {
+            const hasGmailCreds = process.env.GMAIL_CLIENT_ID &&
+                process.env.GMAIL_CLIENT_SECRET &&
+                process.env.GMAIL_REFRESH_TOKEN;
+
+            if (hasGmailCreds) {
+                const { gmailService } = await import('./services/gmailService');
+                gmailService.markThreadAsRead(thread.id).catch(err => {
+                    console.error('[API] Error syncing read status to Gmail:', err);
+                });
+            }
+        }
 
         res.json(updated);
     } catch (error: any) {
@@ -257,7 +291,16 @@ router.patch('/:id/flags', async (req, res) => {
     }
 });
 
-// Get attachment data from Gmail
+// Whitelist for safe in-browser previews
+const ALLOWED_PREVIEW_MIMES = [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+    'text/plain',
+    'text/csv'
+];
+
 router.get('/attachment/:messageId/:attachmentId', async (req, res) => {
     try {
         const { messageId, attachmentId } = req.params;
@@ -271,19 +314,54 @@ router.get('/attachment/:messageId/:attachmentId', async (req, res) => {
             return res.status(500).json({ message: 'Gmail credentials not configured' });
         }
 
+        const { storage } = await import('./storage');
         const { gmailService } = await import('./services/gmailService');
+
+        // 1. Try to get metadata from our database first (more reliable)
+        const message = await storage.getEmailMessage(messageId);
+        let filename = 'attachment';
+        let mimeType = 'application/octet-stream';
+
+        if (message && message.attachments) {
+            const att = (message.attachments as any[]).find(a => a.gmailAttachmentId === attachmentId);
+            if (att) {
+                filename = att.filename;
+                mimeType = att.mimeType;
+            }
+        }
+
+        // 2. Fetch the actual content from Gmail
         const attachmentData = await gmailService.getAttachment(messageId, attachmentId);
 
         if (!attachmentData) {
             return res.status(404).json({ message: 'Attachment not found' });
         }
 
+        // Use metadata from attachmentData if it actually found something better than our fallback
+        if (attachmentData.mimeType && attachmentData.mimeType !== 'application/octet-stream') {
+            mimeType = attachmentData.mimeType;
+        }
+        if (attachmentData.filename && attachmentData.filename !== 'attachment') {
+            filename = attachmentData.filename;
+        }
+
+        const detectedMime = mimeType.toLowerCase();
+        const isSafePreview = ALLOWED_PREVIEW_MIMES.includes(detectedMime);
+
+        // Security Headers
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+
         // attachmentData contains base64 encoded data
         const buffer = Buffer.from(attachmentData.data, 'base64');
 
         // Set appropriate content type
-        res.setHeader('Content-Type', attachmentData.mimeType || 'application/octet-stream');
-        res.setHeader('Content-Disposition', `inline; filename="${attachmentData.filename || 'attachment'}"`);
+        res.setHeader('Content-Type', detectedMime);
+
+        // Content-Disposition: inline only for whitelisted safe types, otherwise attachment (forced download)
+        const disposition = isSafePreview ? 'inline' : 'attachment';
+
+        // RFC 5987 / 6266 improved filename handling for special characters
+        res.setHeader('Content-Disposition', `${disposition}; filename="${filename.replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
         res.send(buffer);
     } catch (error: any) {
         console.error('Error fetching attachment:', error);
@@ -304,23 +382,153 @@ router.post('/threads/:id/link', async (req, res) => {
         const updates: any = {};
         if (type === 'case') updates.caseId = entityId;
         if (type === 'order') updates.orderId = entityId;
-        // returns are not directly on email_threads schema in my previous view, 
-        // but let's check if we should add it or if it's there.
-        // The schema viewed earlier showed: orderId, caseId. 
-        // It did NOT show returnId or repairId explicitly in the top level snippet I saw.
-        // Let's check schema again if possible, or just try to update what we know.
-
-        // Actually, looking at the schema view in history:
-        // emailThreads has: customerId, orderId, caseId.
-        // It does NOT have returnId or repairId.
-        // However, CreateCaseModal tries to link 'case'.
+        if (type === 'return') updates.returnId = entityId;
+        if (type === 'repair') updates.repairId = entityId;
 
         await storage.updateEmailThread(thread.id, updates);
+
+        // Also add to flexible mailThreadLinks table
+        await storage.createMailThreadLink({
+            threadId: thread.id,
+            entityType: type,
+            entityId: entityId
+        });
 
         console.log(`[API] Linked thread ${thread.id} to ${type} ${entityId}`);
         res.json({ success: true });
     } catch (error: any) {
         console.error('Error linking thread:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Unlink Email Thread
+router.delete('/threads/:id/link', async (req, res) => {
+    try {
+        const { type, entityId } = req.body;
+        const thread = await storage.getEmailThread(req.params.id);
+
+        if (!thread) {
+            return res.status(404).json({ message: 'Thread not found' });
+        }
+
+        const updates: any = {};
+        if (type === 'case' && thread.caseId === entityId) updates.caseId = null;
+        if (type === 'order' && thread.orderId === entityId) updates.orderId = null;
+
+        if (Object.keys(updates).length > 0) {
+            await storage.updateEmailThread(thread.id, updates);
+        }
+
+        // Also remove from flexible mailThreadLinks table
+        await storage.deleteMailThreadLink(thread.id, type, entityId);
+
+        console.log(`[API] Unlinked thread ${thread.id} from ${type} ${entityId}`);
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('Error unlinking thread:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Delete Email Thread (Trash sync)
+router.delete('/:id', async (req, res) => {
+    try {
+        const thread = await storage.getEmailThread(req.params.id);
+        if (!thread) return res.status(404).json({ message: 'Thread not found' });
+
+        const hasGmailCreds = process.env.GMAIL_CLIENT_ID &&
+            process.env.GMAIL_CLIENT_SECRET &&
+            process.env.GMAIL_REFRESH_TOKEN;
+
+        if (hasGmailCreds) {
+            const { gmailService } = await import('./services/gmailService');
+            // This will also delete from local DB
+            await gmailService.trashThread(req.params.id);
+        } else {
+            // Local delete only if no Gmail sync
+            await storage.deleteEmailThread(req.params.id);
+        }
+
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('Error deleting thread:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Rewrite Text
+router.post('/rewrite', async (req, res) => {
+    try {
+        const { text, mode, threadId } = req.body;
+        const { aiService } = await import('./services/aiService');
+
+        // Optionally get context from thread if threadId provided
+        let context = undefined;
+        if (threadId) {
+            const thread = await storage.getEmailThread(threadId);
+            if (thread) {
+                // We might need deep context later, but for now just pass threadId
+            }
+        }
+
+        const rewritten = await aiService.rewriteText(text, mode, threadId);
+        res.json({ success: true, rewritten });
+    } catch (error: any) {
+        console.error('Error rewriting text:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// AI Analysis manual trigger
+router.post('/:id/ai-analyze', async (req, res) => {
+    try {
+        const thread = await storage.getEmailThread(req.params.id);
+        if (!thread) return res.status(404).json({ message: 'Thread not found' });
+
+        const { aiService } = await import('./services/aiService');
+        const result = await aiService.analyzeThread(thread.threadId);
+
+        res.json({ success: true, result });
+    } catch (error: any) {
+        console.error('Error in manual AI analysis:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Get AI Settings
+router.get('/settings/ai', async (req, res) => {
+    try {
+        const { db } = await import('./services/database');
+        const { aiSettings } = await import('@shared/schema');
+        const settings = await db.query.aiSettings.findFirst();
+        res.json(settings || {});
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Update AI Settings
+router.patch('/settings/ai', async (req, res) => {
+    try {
+        const { db } = await import('./services/database');
+        const { aiSettings } = await import('@shared/schema');
+        const { eq } = await import('drizzle-orm');
+        const existing = await db.query.aiSettings.findFirst();
+
+        if (existing) {
+            await db.update(aiSettings).set({
+                ...req.body,
+                updatedAt: new Date()
+            }).where(eq(aiSettings.id, existing.id));
+        } else {
+            await db.insert(aiSettings).values({
+                ...req.body,
+                id: undefined // handled by default uuid
+            });
+        }
+        res.json({ success: true });
+    } catch (error: any) {
         res.status(500).json({ message: error.message });
     }
 });

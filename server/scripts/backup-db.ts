@@ -1,7 +1,6 @@
-
 import dotenv from 'dotenv';
 dotenv.config();
-import { db } from "../services/supabaseClient";
+import { db } from '../services/database';
 import * as schema from "@shared/schema";
 import fs from "fs";
 import path from "path";

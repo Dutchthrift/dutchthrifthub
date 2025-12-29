@@ -425,10 +425,9 @@ class ShopifyClient {
   async getReturnsSinceDate(sinceDate: Date, onProgress?: (processed: number) => void) {
     const createdAtMin = sinceDate.toISOString();
     // Use updated_at for orders query, as creating/updating a return updates the order
-    // AND filter by return_status to only get active returns (REQUESTED or IN_PROGRESS)
-    // This avoids fetching old completed/cancelled returns
-    // NOTE: We REMOVED updated_at filter to ensure we get ALL active returns regardless of when they were last updated
-    const searchQuery = `return_status:RETURN_REQUESTED OR return_status:IN_PROGRESS`;
+    // AND filter by return_status to get active returns AND recently declined ones
+    // This ensures we can update locally stored "nieuw" returns that were declined in Shopify
+    const searchQuery = `return_status:RETURN_REQUESTED OR return_status:IN_PROGRESS OR return_status:RETURN_DECLINED`;
 
     console.log(`📦 Starting to fetch return IDs via orders updated since: ${createdAtMin}`);
 

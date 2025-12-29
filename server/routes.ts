@@ -4,9 +4,13 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { storage } from "./storage";
-import { db } from "./services/supabaseClient";
+import { db } from "./services/database";
 import { count } from "drizzle-orm";
 import { log } from "./vite";
+import mailRoutes from "./mail-routes";
+import aiRoutes from "./ai-routes";
+import pickingRoutes from "./picking-routes";
+import { registerAgendaRoutes } from "./agenda-routes";
 import {
   insertUserSchema,
   insertCustomerSchema,
@@ -66,7 +70,6 @@ import DOMPurify from 'isomorphic-dompurify';
 import * as emailService from "./services/emailService";
 const { sendEmail, fetchEmailBody, downloadAttachment, syncEmails } = emailService;
 import { importAllEmails } from "./scripts/importAllEmails";
-import mailRoutes from "./mail-routes";
 
 // Extend Request type to include session
 interface AuthenticatedRequest extends Request {
@@ -174,6 +177,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Gmail API mail routes
   app.use("/api/mail", mailRoutes);
+  app.use("/api/ai", aiRoutes);
+  app.use("/api/picking", pickingRoutes);
+
+  // Register Agenda routes
+  registerAgendaRoutes(app);
 
   // Authentication routes
   app.post("/api/auth/signin", async (req, res) => {
@@ -2355,75 +2363,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Match orders for existing email threads that don't have orders linked
+  // DISABLED: Decided against automatic linking to avoid incorrect matches
   app.post("/api/email-threads/match-orders", async (req, res) => {
-    try {
-      console.log(`🔄 POST /api/email-threads/match-orders endpoint called`);
-      console.log(`🔄 Starting order matching for existing email threads...`);
-
-      // Get all threads that don't have orders linked
-      const threadsData = await storage.getEmailThreads();
-      const threadsWithoutOrders = (threadsData.threads || []).filter((thread: any) => !thread.orderId);
-
-      console.log(
-        `📊 Found ${threadsWithoutOrders.length} threads without orders to process`,
-      );
-
-      let matchedCount = 0;
-      let processedCount = 0;
-
-      for (const thread of threadsWithoutOrders) {
-        processedCount++;
-        console.log(
-          `🔍 Processing thread ${processedCount}/${threadsWithoutOrders.length}: "${thread.subject}" from ${thread.customerEmail}`,
-        );
-
-        try {
-          // Try to match order using thread subject and customer email
-          const matchedOrder = await orderMatchingService.getOrderForAutoLink(
-            "", // no body content for existing threads
-            thread.customerEmail || "",
-            thread.subject || "",
-          );
-
-          if (matchedOrder) {
-            console.log(
-              `🎯 MATCHED: Order ${matchedOrder.orderNumber} (ID: ${matchedOrder.id}) for thread "${thread.subject}" from ${thread.customerEmail}`,
-            );
-
-            // Update the thread with the matched order
-            await storage.updateEmailThread(thread.id, {
-              orderId: matchedOrder.id,
-            });
-
-            matchedCount++;
-          } else {
-            console.log(
-              `🔍 NO MATCH: No order found for thread "${thread.subject}" from ${thread.customerEmail}`,
-            );
-          }
-        } catch (matchingError) {
-          console.error(
-            `❌ Error matching order for thread ${thread.id}:`,
-            matchingError,
-          );
-        }
-      }
-
-      console.log(
-        `✅ Order matching completed: ${matchedCount}/${processedCount} threads matched with orders`,
-      );
-
-      res.json({
-        processed: processedCount,
-        matched: matchedCount,
-        message: `Successfully processed ${processedCount} threads, matched ${matchedCount} with orders`,
-      });
-    } catch (error) {
-      console.error("❌ Error in match-orders endpoint:", error);
-      res
-        .status(500)
-        .json({ message: "Failed to match orders for existing threads" });
-    }
+    res.status(403).json({ message: "Automatic matching is currently disabled." });
   });
 
   app.get("/api/email-threads/:id", async (req, res) => {
@@ -2601,21 +2543,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let thread = await storage.getEmailThreadByThreadId(threadId);
 
         if (!thread) {
-          // Create new thread with automatic order matching
+          // Create new thread without automatic order matching
           try {
-            // Try to automatically match orders for this email
-            const matchedOrder = await orderMatchingService.getOrderForAutoLink(
-              email.body || "",
-              email.from || "",
-              email.subject || "",
-            );
-
-            console.log(
-              matchedOrder
-                ? `🎯 NEW THREAD: Automatically matched order ${matchedOrder.orderNumber} (ID: ${matchedOrder.id}) for email from ${email.from}`
-                : `🔍 NEW THREAD: No automatic order match found for email from ${email.from}`,
-            );
-
             thread = await storage.createEmailThread({
               threadId: threadId,
               subject: email.subject,
@@ -2624,7 +2553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               isUnread: !email.isRead,
               lastActivity: new Date(email.receivedDateTime),
               hasAttachment: email.hasAttachment,
-              orderId: matchedOrder?.id || null, // Automatically link order if found
+              orderId: null, // Disabled automatic linking
             });
           } catch (error: any) {
             // If duplicate thread ID, fetch the existing one
@@ -2637,38 +2566,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               throw error;
             }
           }
-        } else if (!thread.orderId) {
-          // Thread exists but doesn't have an order linked - try to match one
-          try {
-            const matchedOrder = await orderMatchingService.getOrderForAutoLink(
-              email.body || "",
-              email.from || "",
-              email.subject || "",
-            );
-
-            if (matchedOrder) {
-              console.log(
-                `🎯 EXISTING THREAD: Matched order ${matchedOrder.orderNumber} (ID: ${matchedOrder.id}) for existing thread from ${email.from}`,
-              );
-
-              // Update the existing thread with the matched order
-              thread = await storage.updateEmailThread(thread.id, {
-                orderId: matchedOrder.id,
-              });
-            } else {
-              console.log(
-                `🔍 EXISTING THREAD: No order match found for existing thread from ${email.from}`,
-              );
-            }
-          } catch (matchingError) {
-            console.error(
-              `❌ Error matching order for existing thread ${thread.id}:`,
-              matchingError,
-            );
-          }
         } else {
           console.log(
-            `✅ EXISTING THREAD: Thread from ${email.from} already has order ${thread.orderId} linked`,
+            `✅ EXISTING THREAD: Thread from ${email.from} already exists (skipping auto-link)`,
           );
         }
 

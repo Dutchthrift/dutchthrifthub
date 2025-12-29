@@ -1,4 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import {
+    Drawer,
+    DrawerContent,
+    DrawerHeader,
+    DrawerTitle,
+    DrawerClose,
+} from '@/components/ui/drawer';
 import { Navigation } from "@/components/layout/navigation";
 import {
     ContextMenu,
@@ -11,6 +19,18 @@ import {
 import { CreateCaseModal } from '@/components/forms/create-case-modal';
 import { CreateReturnWizard } from '@/components/returns/create-return-wizard';
 import { CreateRepairWizard } from '@/components/repairs/create-repair-wizard';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { EmailThreadMessage } from '@/components/email/email-thread-message';
 import { Button } from '@/components/ui/button';
@@ -37,7 +57,21 @@ import {
     Clock,
     ExternalLink,
     Plus,
-    X
+    X,
+    Download,
+    Trash2,
+    Link2,
+    Link2Off,
+    Sparkles,
+    Wand2,
+    Angry,
+    Smile,
+    Meh,
+    Brain,
+    Loader2,
+    MoreHorizontal,
+    Languages,
+    ChevronDown
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +82,7 @@ import { useLocation } from 'wouter';
 import { Textarea } from '@/components/ui/textarea';
 import { CaseDetailModal } from '@/components/cases/case-detail-modal';
 import { ReturnDetailModalContent } from '@/components/returns/return-detail-modal-content';
+import { RepairDetailModal } from '@/components/repairs/repair-detail-modal';
 import {
     Dialog,
     DialogContent,
@@ -55,6 +90,16 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // --- Types ---
 
@@ -77,6 +122,24 @@ interface EmailThread {
     folder: string;
     orderId?: string;
     caseId?: string;
+    returnId?: string;
+    repairId?: string;
+    lastMessageIsOutbound?: boolean;
+
+    // AI Fields
+    aiSummary?: string;
+    sentiment?: 'positive' | 'negative' | 'neutral' | string;
+    detectedIntent?: string;
+    suggestedReply?: {
+        customer?: string;
+        english?: string;
+    } | string;
+    aiInsights?: {
+        reasoning?: string;
+        actionPlan?: string;
+        systemStatus?: string;
+    };
+    lastAiSync?: string;
 }
 
 interface ThreadMessage {
@@ -105,16 +168,27 @@ interface ThreadDetails extends EmailThread {
 // --- Main Page ---
 
 export default function MailPage() {
+    const isMobile = useIsMobile();
     const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'archived' | 'starred' | 'linked' | 'unlinked'>('inbox');
+    const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'archived' | 'starred' | 'linked' | 'unlinked' | 'cases' | 'returns' | 'repairs'>('inbox');
     const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
+    const [selectedRepairId, setSelectedRepairId] = useState<string | null>(null);
     const [isReplying, setIsReplying] = useState(false);
     const [replyText, setReplyText] = useState('');
     const [isComposing, setIsComposing] = useState(false);
     const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
+    const [previewAttachment, setPreviewAttachment] = useState<{
+        filename: string;
+        mimeType: string;
+        size: number;
+        gmailAttachmentId: string;
+        messageId: string;
+    } | null>(null);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [threadToDeleteId, setThreadToDeleteId] = useState<string | null>(null);
     const queryClient = useQueryClient();
     const { toast } = useToast();
     const [location, navigate] = useLocation();
@@ -130,6 +204,12 @@ export default function MailPage() {
         }
     }, []);
 
+    // Reset reply state when switching threads
+    useEffect(() => {
+        setIsReplying(false);
+        setReplyText('');
+    }, [selectedThreadId]);
+
     // Fetch Threads
     const { data: threadsData, isLoading: isLoadingThreads } = useQuery<{ threads: EmailThread[], total: number }>({
         queryKey: ['mailThreads', activeTab, searchQuery],
@@ -137,6 +217,14 @@ export default function MailPage() {
             let url = `/api/mail/list?limit=50&folder=${activeTab === 'inbox' ? 'inbox' : activeTab === 'sent' ? 'sent' : ''}&archived=${activeTab === 'archived'}&starred=${activeTab === 'starred'}`;
             if (activeTab === 'linked') url += '&hasOrder=true';
             if (activeTab === 'unlinked') url += '&hasOrder=false';
+            if (activeTab === 'cases') url += '&hasCase=true';
+            if (activeTab === 'returns') url += '&hasReturn=true';
+            if (activeTab === 'repairs') url += '&hasRepair=true';
+
+            // Add search query if provided
+            if (searchQuery.trim()) {
+                url += `&search=${encodeURIComponent(searchQuery.trim())}`;
+            }
 
             const res = await fetch(url);
             if (!res.ok) throw new Error('Kon threads niet laden');
@@ -175,6 +263,8 @@ export default function MailPage() {
         orders: any[];
         cases: any[];
         returns: any[];
+        repairs: any[];
+        currentLinks: any[];
     }>({
         queryKey: ['mailContext', selectedThreadId],
         queryFn: async () => {
@@ -194,6 +284,84 @@ export default function MailPage() {
             return res.json();
         },
         enabled: !!selectedOrderId
+    });
+
+    // Toggle star status
+    const toggleStarMutation = useMutation({
+        mutationFn: async ({ threadId, starred }: { threadId: string, starred: boolean }) => {
+            const res = await fetch(`/api/mail/${threadId}/flags`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ starred })
+            });
+            if (!res.ok) throw new Error('Kon ster niet aanpassen');
+            return res.json();
+        },
+        onMutate: async ({ threadId, starred }) => {
+            await queryClient.cancelQueries({ queryKey: ['mailThreads'] });
+            const previousThreads = queryClient.getQueryData(['mailThreads', activeTab, searchQuery]);
+
+            queryClient.setQueryData(['mailThreads', activeTab, searchQuery], (old: any) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    threads: old.threads.map((t: any) =>
+                        t.id === threadId ? { ...t, starred } : t
+                    )
+                };
+            });
+
+            return { previousThreads };
+        },
+        onError: (err, newTodo, context: any) => {
+            if (context?.previousThreads) {
+                queryClient.setQueryData(['mailThreads', activeTab, searchQuery], context.previousThreads);
+            }
+            toast({ title: 'Fout', description: 'Kon ster niet aanpassen', variant: 'destructive' });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mailThreads'] });
+        }
+    });
+
+    // Mutation to generate magic reply
+    const generateMagicReplyMutation = useMutation({
+        mutationFn: async (threadId: string) => {
+            const res = await fetch(`/api/mail/${threadId}/ai-analyze`, {
+                method: 'POST'
+            });
+            if (!res.ok) throw new Error("Failed to generate Magic Reply");
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mailThread', selectedThreadId] });
+            toast({ title: "Magic Reply gegenereerd", description: "De AI heeft een antwoord voorbereid." });
+        },
+        onError: () => {
+            toast({ title: "Fout", description: "Kon geen Magic Reply genereren.", variant: "destructive" });
+        }
+    });
+
+    // Mutation to rewrite reply
+    const rewriteReplyMutation = useMutation({
+        mutationFn: async (data: { text: string; mode: 'rewrite' | 'english' | 'customer_english' }) => {
+            const res = await fetch(`/api/mail/rewrite`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...data, threadId: selectedThreadId })
+            });
+            if (!res.ok) throw new Error("Kon tekst niet herschrijven");
+            return res.json();
+        },
+        onSuccess: (data) => {
+            if (data.rewritten) {
+                setReplyText(data.rewritten);
+                toast({ title: "Tekst herschreven", description: "De AI heeft je tekst verbeterd." });
+            }
+        },
+        onError: () => {
+            toast({ title: "Fout", description: "Kon tekst niet herschrijven.", variant: "destructive" });
+        }
     });
 
     // Fetch return details for modal
@@ -244,6 +412,128 @@ export default function MailPage() {
         }
     });
 
+    // Delete thread mutation
+    const deleteThreadMutation = useMutation({
+        mutationFn: async (threadId: string) => {
+            const res = await fetch(`/api/mail/${threadId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Kon bericht niet verwijderen');
+            return res.json();
+        },
+        onMutate: async (threadId) => {
+            await queryClient.cancelQueries({ queryKey: ['mailThreads'] });
+            const previousThreads = queryClient.getQueryData(['mailThreads', activeTab, searchQuery]);
+
+            queryClient.setQueryData(['mailThreads', activeTab, searchQuery], (oldResource: any) => {
+                if (!oldResource) return oldResource;
+                return {
+                    ...oldResource,
+                    threads: oldResource.threads.filter((t: any) => t.id !== threadId)
+                };
+            });
+
+            if (selectedThreadId === threadId) {
+                setSelectedThreadId(null);
+            }
+
+            return { previousThreads };
+        },
+        onSuccess: () => {
+            toast({ title: "Verwijderd", description: "Bericht verplaatst naar prullenbak in Gmail" });
+        },
+        onError: (err, threadId, context: any) => {
+            if (context?.previousThreads) {
+                queryClient.setQueryData(['mailThreads', activeTab, searchQuery], context.previousThreads);
+            }
+            toast({ title: "Fout", description: "Kon bericht niet verwijderen", variant: "destructive" });
+        }
+    });
+
+    // Mark as read mutation
+    const markAsReadMutation = useMutation({
+        mutationFn: async (threadId: string) => {
+            const res = await fetch(`/api/mail/${threadId}/flags`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isUnread: false })
+            });
+            if (!res.ok) throw new Error('Kon status niet bijwerken');
+            return res.json();
+        },
+        onMutate: async (threadId) => {
+            await queryClient.cancelQueries({ queryKey: ['mailThreads'] });
+            const previousThreads = queryClient.getQueryData(['mailThreads', activeTab, searchQuery]);
+
+            queryClient.setQueryData(['mailThreads', activeTab, searchQuery], (oldResource: any) => {
+                if (!oldResource) return oldResource;
+                return {
+                    ...oldResource,
+                    threads: oldResource.threads.map((t: any) =>
+                        t.id === threadId ? { ...t, isUnread: false } : t
+                    )
+                };
+            });
+
+            return { previousThreads };
+        },
+        onError: (err, threadId, context: any) => {
+            if (context?.previousThreads) {
+                queryClient.setQueryData(['mailThreads', activeTab, searchQuery], context.previousThreads);
+            }
+        }
+    });
+
+    const linkThreadMutation = useMutation({
+        mutationFn: async ({ threadId, type, entityId }: { threadId: string, type: string, entityId: string }) => {
+            const res = await fetch(`/api/mail/threads/${threadId}/link`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, entityId })
+            });
+            if (!res.ok) throw new Error('Kon bericht niet koppelen');
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mailThreads'] });
+            queryClient.invalidateQueries({ queryKey: ['mailContext', selectedThreadId] });
+            queryClient.invalidateQueries({ queryKey: ['mailThread', selectedThreadId] });
+            toast({ title: 'Gekoppeld', description: 'Het bericht is succesvol gekoppeld.' });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Fout', description: err.message, variant: 'destructive' });
+        }
+    });
+
+    const unlinkThreadMutation = useMutation({
+        mutationFn: async ({ threadId, type, entityId }: { threadId: string, type: string, entityId: string }) => {
+            const res = await fetch(`/api/mail/threads/${threadId}/link`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, entityId })
+            });
+            if (!res.ok) throw new Error('Kon bericht niet ontkoppelen');
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mailThreads'] });
+            queryClient.invalidateQueries({ queryKey: ['mailContext', selectedThreadId] });
+            queryClient.invalidateQueries({ queryKey: ['mailThread', selectedThreadId] });
+            toast({ title: 'Ontkoppeld', description: 'De koppeling is verwijderd.' });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Fout', description: err.message, variant: 'destructive' });
+        }
+    });
+
+    // Mark as read when selected
+    useEffect(() => {
+        if (selectedThreadId && threadsData) {
+            const currentThread = threadsData.threads.find(t => t.id === selectedThreadId);
+            if (currentThread?.isUnread) {
+                markAsReadMutation.mutate(selectedThreadId);
+            }
+        }
+    }, [selectedThreadId, threadsData]);
+
     // Compose mutation
     const composeMutation = useMutation({
         mutationFn: async (data: { to: string; subject: string; body: string }) => {
@@ -281,23 +571,27 @@ export default function MailPage() {
 
     return (
         <>
-            <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+            <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden max-w-full">
                 <Navigation />
 
-                <div className="flex-1 flex overflow-hidden">
-                    {/* Column 1: Thread List */}
-                    <div className="w-96 flex-shrink-0 flex flex-col border-r bg-muted/20">
-                        <div className="p-4 space-y-4">
+                <div className="flex-1 flex overflow-hidden max-w-full">
+                    {/* Column 1: Thread List - Full width on mobile */}
+                    <div className={cn(
+                        "flex flex-col border-r bg-muted/20 overflow-hidden",
+                        isMobile ? "w-full max-w-full" : "w-96 flex-shrink-0"
+                    )}>
+                        <div className="p-3 md:p-4 space-y-3 md:space-y-4">
                             <div className="flex items-center justify-between">
-                                <h1 className="text-xl font-bold">Mail</h1>
+                                <h1 className="text-lg md:text-xl font-bold">Mail</h1>
                                 <div className="flex items-center gap-1">
                                     <Button
                                         size="sm"
-                                        className="bg-orange-500 hover:bg-orange-600 gap-2 h-8"
+                                        className="bg-orange-500 hover:bg-orange-600 gap-1 md:gap-2 h-8 text-xs md:text-sm"
                                         onClick={() => setIsComposing(true)}
                                     >
                                         <Plus className="h-4 w-4" />
-                                        Nieuw bericht
+                                        <span className="hidden sm:inline">Nieuw bericht</span>
+                                        <span className="sm:hidden">Nieuw</span>
                                     </Button>
                                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>
                                         <RefreshCw className={cn("h-4 w-4", refreshMutation.isPending && "animate-spin")} />
@@ -315,17 +609,60 @@ export default function MailPage() {
                                 />
                             </div>
 
-                            <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar">
-                                <FilterChip active={activeTab === 'inbox'} label="Inbox" icon={<Inbox className="h-3 w-3" />} onClick={() => setActiveTab('inbox')} />
-                                <FilterChip active={activeTab === 'sent'} label="Verzonden" icon={<Send className="h-3 w-3" />} onClick={() => setActiveTab('sent')} />
-                                <FilterChip active={activeTab === 'starred'} label="Ster" icon={<Star className="h-3 w-3" />} onClick={() => setActiveTab('starred')} />
-                                <FilterChip active={activeTab === 'linked'} label="Gekoppeld" icon={<Package className="h-3 w-3" />} onClick={() => setActiveTab('linked')} />
-                                <FilterChip active={activeTab === 'unlinked'} label="Niet gekoppeld" icon={<Mail className="h-3 w-3" />} onClick={() => setActiveTab('unlinked')} />
-                                <FilterChip active={activeTab === 'archived'} label="Archief" icon={<Archive className="h-3 w-3" />} onClick={() => setActiveTab('archived')} />
-                            </div>
+                            <TooltipProvider delayDuration={0}>
+                                <div className="grid grid-cols-6 gap-2 pb-1 overflow-hidden">
+                                    <FilterChip active={activeTab === 'inbox'} label="Inbox" icon={<Inbox className="h-4 w-4" />} onClick={() => setActiveTab('inbox')} />
+                                    <FilterChip active={activeTab === 'cases'} label="Cases" icon={<Briefcase className="h-4 w-4" />} onClick={() => setActiveTab('cases')} />
+                                    <FilterChip active={activeTab === 'returns'} label="Retouren" icon={<RotateCcw className="h-4 w-4" />} onClick={() => setActiveTab('returns')} />
+                                    <FilterChip active={activeTab === 'repairs'} label="Reparaties" icon={<Wrench className="h-4 w-4" />} onClick={() => setActiveTab('repairs')} />
+                                    <FilterChip active={activeTab === 'starred'} label="Ster" icon={<Star className="h-4 w-4" />} onClick={() => setActiveTab('starred')} />
+
+                                    <DropdownMenu>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant={['sent', 'linked', 'unlinked', 'archived'].includes(activeTab) ? "default" : "ghost"}
+                                                        size="icon"
+                                                        className={cn(
+                                                            "h-10 w-10 text-xs rounded-lg transition-all",
+                                                            ['sent', 'linked', 'unlinked', 'archived'].includes(activeTab) ? "bg-orange-500 hover:bg-orange-600 text-white shadow-sm" : "bg-transparent hover:bg-muted text-muted-foreground hover:text-foreground",
+                                                            !['sent', 'linked', 'unlinked', 'archived'].includes(activeTab) && "border border-transparent hover:border-border"
+                                                        )}
+                                                    >
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom">
+                                                <p>Overig</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => setActiveTab('sent')}>
+                                                <Send className="mr-2 h-4 w-4" />
+                                                Verzonden
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setActiveTab('linked')}>
+                                                <Package className="mr-2 h-4 w-4" />
+                                                Gekoppeld
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setActiveTab('unlinked')}>
+                                                <Mail className="mr-2 h-4 w-4" />
+                                                Niet gekoppeld
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setActiveTab('archived')}>
+                                                <Archive className="mr-2 h-4 w-4" />
+                                                Archief
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </TooltipProvider>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto">
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden">
                             {isLoadingThreads ? (
                                 <div className="p-4 space-y-4">
                                     {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-20 w-full" />)}
@@ -340,6 +677,10 @@ export default function MailPage() {
                                                 thread={thread}
                                                 isSelected={selectedThreadId === thread.id}
                                                 onClick={() => setSelectedThreadId(thread.id)}
+                                                onToggleStar={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleStarMutation.mutate({ threadId: thread.id, starred: !thread.starred });
+                                                }}
                                             />
                                         </ContextMenuTrigger>
                                         <ContextMenuContent>
@@ -366,6 +707,17 @@ export default function MailPage() {
                                                 <Wrench className="mr-2 h-4 w-4 text-amber-500" />
                                                 Reparatie Inplannen
                                             </ContextMenuItem>
+                                            <ContextMenuSeparator />
+                                            <ContextMenuItem
+                                                className="text-destructive focus:text-destructive"
+                                                onClick={() => {
+                                                    setThreadToDeleteId(thread.id);
+                                                    setDeleteConfirmOpen(true);
+                                                }}
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Verwijderen
+                                            </ContextMenuItem>
                                         </ContextMenuContent>
                                     </ContextMenu>
                                 ))
@@ -373,143 +725,184 @@ export default function MailPage() {
                         </div>
                     </div>
 
-                    {/* Column 2: Conversation View */}
-                    <div className="flex-1 flex flex-col overflow-hidden bg-background">
-                        {!selectedThreadId ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
-                                <Mail className="h-12 w-12 mb-4 opacity-10" />
-                                <p>Selecteer een bericht om te lezen</p>
-                            </div>
-                        ) : isLoadingDetails ? (
-                            <div className="flex-1 p-8 space-y-8">
-                                <Skeleton className="h-10 w-2/3" />
-                                <Skeleton className="h-40 w-full" />
-                                <Skeleton className="h-40 w-full" />
-                            </div>
-                        ) : threadDetails ? (
-                            <>
-                                {/* Thread Header */}
-                                <div className="p-6 border-b flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-xl font-semibold mb-1">{threadDetails.subject}</h2>
-                                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                            <span className="flex items-center gap-1">
-                                                <User className="h-3 w-3" />
-                                                {(threadDetails.participants || []).map(p => p.name || p.email).join(', ') || 'Unknown'}
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <Clock className="h-3 w-3" />
-                                                Sinds {formatDistanceToNow(new Date(threadDetails.lastActivity), { addSuffix: true, locale: nl })}
-                                            </span>
+                    {/* Column 2: Conversation View - Hidden on mobile (shown in drawer instead) */}
+                    {!isMobile && (
+                        <div className="flex-1 flex flex-col overflow-hidden bg-background">
+                            {!selectedThreadId ? (
+                                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+                                    <Mail className="h-12 w-12 mb-4 opacity-10" />
+                                    <p>Selecteer een bericht om te lezen</p>
+                                </div>
+                            ) : isLoadingDetails ? (
+                                <div className="flex-1 p-8 space-y-8">
+                                    <Skeleton className="h-10 w-2/3" />
+                                    <Skeleton className="h-40 w-full" />
+                                    <Skeleton className="h-40 w-full" />
+                                </div>
+                            ) : threadDetails ? (
+                                <>
+                                    {/* Thread Header */}
+                                    <div className="p-6 border-b flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-xl font-semibold mb-1">{threadDetails.subject}</h2>
+                                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                                <span className="flex items-center gap-1">
+                                                    <User className="h-3 w-3" />
+                                                    {(threadDetails.participants || []).map(p => formatParticipantName(p)).join(', ') || 'Unknown'}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    Sinds {formatDistanceToNow(new Date(threadDetails.lastActivity), { addSuffix: true, locale: nl })}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button variant="outline" size="sm" className="gap-2">
+                                                <Star className={cn("h-4 w-4", threadDetails.starred && "fill-yellow-400 text-yellow-400")} />
+                                                Ster
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="gap-2">
+                                                <Archive className="h-4 w-4" />
+                                                Archiveer
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                onClick={() => {
+                                                    setThreadToDeleteId(threadDetails.id);
+                                                    setDeleteConfirmOpen(true);
+                                                }}
+                                                disabled={deleteThreadMutation.isPending}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                Verwijderen
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                className="gap-2 bg-orange-500 hover:bg-orange-600"
+                                                onClick={() => {
+                                                    setIsReplying(true);
+                                                    // Pre-scroll to composer
+                                                    setTimeout(() => {
+                                                        document.getElementById('reply-composer')?.scrollIntoView({ behavior: 'smooth' });
+                                                    }, 100);
+                                                }}
+                                            >
+                                                <Reply className="h-4 w-4" />
+                                                Beantwoorden
+                                            </Button>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button variant="outline" size="sm" className="gap-2">
-                                            <Star className={cn("h-4 w-4", threadDetails.starred && "fill-yellow-400 text-yellow-400")} />
-                                            Ster
-                                        </Button>
-                                        <Button variant="outline" size="sm" className="gap-2">
-                                            <Archive className="h-4 w-4" />
-                                            Archiveer
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            className="gap-2 bg-orange-500 hover:bg-orange-600"
-                                            onClick={() => {
-                                                setIsReplying(true);
-                                                // Pre-scroll to composer
-                                                setTimeout(() => {
-                                                    document.getElementById('reply-composer')?.scrollIntoView({ behavior: 'smooth' });
-                                                }, 100);
-                                            }}
-                                        >
-                                            <Reply className="h-4 w-4" />
-                                            Beantwoorden
-                                        </Button>
-                                    </div>
-                                </div>
 
-                                {/* Messages List - Newest first */}
-                                <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
-                                    {[...threadDetails.messages].reverse().map((msg, idx, arr) => (
-                                        <MessageItem
-                                            key={msg.id}
-                                            message={msg}
-                                            isFirst={idx === arr.length - 1}
-                                            isLatest={idx === 0}
-                                        />
-                                    ))}
+                                    {/* AI Summary Card */}
+                                    <AISummaryCard key={selectedThreadId} thread={threadDetails} />
 
-                                    {/* Reply Composer */}
-                                    {isReplying && (
-                                        <div id="reply-composer" className="mt-8 p-4 border rounded-lg bg-card shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-300">
-                                            <div className="flex items-center justify-between mb-4 pb-2 border-b">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">
-                                                        J
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-bold">Concept antwoord</p>
-                                                        <p className="text-[11px] text-muted-foreground">
-                                                            Aan: {threadDetails.messages[threadDetails.messages.length - 1].fromEmail}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <Button size="icon" variant="ghost" onClick={() => setIsReplying(false)}>
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                    {/* Thread Attachments Summary */}
+                                    <ThreadAttachmentsSummary
+                                        messages={threadDetails.messages}
+                                        onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
+                                    />
 
-                                            <Textarea
-                                                placeholder="Schrijf je antwoord hier..."
-                                                className="min-h-[200px] mb-4 border-none focus-visible:ring-0 resize-none p-0"
-                                                value={replyText}
-                                                onChange={(e) => setReplyText(e.target.value)}
-                                                autoFocus
+                                    {/* Messages List - Newest first */}
+                                    <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
+                                        {[...threadDetails.messages].reverse().map((msg, idx, arr) => (
+                                            <MessageItem
+                                                key={msg.id}
+                                                message={msg}
+                                                isFirst={idx === arr.length - 1}
+                                                isLatest={idx === 0}
+                                                onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
                                             />
+                                        ))}
 
-                                            <div className="flex items-center justify-between pt-2 border-t">
-                                                <div className="flex items-center gap-2">
-                                                    {/* Future: Attachments, Bold, Italic buttons */}
+                                        {/* Reply Composer */}
+                                        {isReplying && (
+                                            <div id="reply-composer" className="mt-8 p-4 border rounded-lg bg-card shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                                <div className="flex items-center justify-between mb-4 pb-2 border-b">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">
+                                                            J
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold">Concept antwoord</p>
+                                                            <p className="text-[11px] text-muted-foreground">
+                                                                Aan: {threadDetails.messages[threadDetails.messages.length - 1].fromEmail}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <Button size="icon" variant="ghost" onClick={() => setIsReplying(false)}>
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Button variant="ghost" onClick={() => setIsReplying(false)}>
-                                                        Annuleren
-                                                    </Button>
-                                                    <Button
-                                                        className="bg-orange-600 hover:bg-orange-700 gap-2"
-                                                        disabled={!replyText.trim() || replyMutation.isPending}
-                                                        onClick={() => {
-                                                            const latestMsg = threadDetails.messages[threadDetails.messages.length - 1];
-                                                            replyMutation.mutate({
-                                                                threadId: threadDetails.id,
-                                                                to: latestMsg.fromEmail,
-                                                                subject: threadDetails.subject.startsWith('Re:') ? threadDetails.subject : `Re: ${threadDetails.subject}`,
-                                                                body: replyText.replace(/\n/g, '<br/>'),
-                                                                inReplyTo: latestMsg.messageId
-                                                            });
-                                                        }}
-                                                    >
-                                                        {replyMutation.isPending ? (
-                                                            <RefreshCw className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <Send className="h-4 w-4" />
-                                                        )}
-                                                        Verzenden
-                                                    </Button>
+
+                                                <Textarea
+                                                    placeholder="Schrijf je antwoord hier..."
+                                                    className="min-h-[200px] mb-4 border-none focus-visible:ring-0 resize-none p-0"
+                                                    value={replyText}
+                                                    onChange={(e) => setReplyText(e.target.value)}
+                                                    autoFocus
+                                                />
+
+                                                <div className="flex items-center justify-between pt-2 border-t">
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 gap-1.5 text-xs border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 hover:text-orange-800 transition-all font-semibold"
+                                                            disabled={rewriteReplyMutation.isPending}
+                                                            onClick={() => rewriteReplyMutation.mutate({ text: replyText, mode: 'rewrite' })}
+                                                        >
+                                                            {rewriteReplyMutation.isPending ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <Wand2 className="h-3.5 w-3.5" />
+                                                            )}
+                                                            Magic Reply
+                                                        </Button>
+
+
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button variant="ghost" onClick={() => setIsReplying(false)}>
+                                                            Annuleren
+                                                        </Button>
+                                                        <Button
+                                                            className="bg-orange-600 hover:bg-orange-700 gap-2"
+                                                            disabled={!replyText.trim() || replyMutation.isPending}
+                                                            onClick={() => {
+                                                                const latestMsg = threadDetails.messages[threadDetails.messages.length - 1];
+                                                                replyMutation.mutate({
+                                                                    threadId: threadDetails.id,
+                                                                    to: latestMsg.fromEmail,
+                                                                    subject: threadDetails.subject.startsWith('Re:') ? threadDetails.subject : `Re: ${threadDetails.subject}`,
+                                                                    body: replyText.replace(/\n/g, '<br/>'),
+                                                                    inReplyTo: latestMsg.messageId
+                                                                });
+                                                            }}
+                                                        >
+                                                            {replyMutation.isPending ? (
+                                                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <Send className="h-4 w-4" />
+                                                            )}
+                                                            Verzenden
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
+                                        )}
+                                    </div>
 
 
-                            </>
-                        ) : null}
-                    </div>
+                                </>
+                            ) : null}
+                        </div>
+                    )}
 
-                    {/* Column 3: Context Sidebar */}
-                    {selectedThreadId && threadDetails && (
+                    {/* Column 3: Context Sidebar - Hidden on mobile */}
+                    {!isMobile && selectedThreadId && threadDetails && (
                         <div className="w-80 flex-shrink-0 border-l bg-muted/10 p-4 overflow-y-auto">
                             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Context</h3>
                             {contextData?.customerEmail && (
@@ -519,18 +912,56 @@ export default function MailPage() {
                             )}
 
                             <div className="space-y-6">
+                                {/* AI Deep Context Section */}
+                                {threadDetails.aiInsights && (
+                                    <div key={selectedThreadId} className="p-4 bg-orange-50/50 border border-orange-100 rounded-xl space-y-4 mb-4">
+                                        <div className="flex items-center gap-2 text-sm font-bold text-orange-900 tracking-tight uppercase">
+                                            <Sparkles className="h-4 w-4" />
+                                            AI Diepe Context
+                                        </div>
+
+                                        {threadDetails.aiInsights.systemStatus && (
+                                            <div className="space-y-1">
+                                                <div className="text-[10px] font-bold text-orange-800/60 uppercase">Systeem Status</div>
+                                                <p className="text-xs text-orange-900 leading-normal">{threadDetails.aiInsights.systemStatus}</p>
+                                            </div>
+                                        )}
+
+                                        {threadDetails.aiInsights.reasoning && (
+                                            <div className="space-y-1">
+                                                <div className="text-[10px] font-bold text-orange-800/60 uppercase">Analyse</div>
+                                                <p className="text-xs text-orange-900/80 leading-normal italic">{threadDetails.aiInsights.reasoning}</p>
+                                            </div>
+                                        )}
+
+                                        {threadDetails.aiInsights.actionPlan && (
+                                            <div className="space-y-1 pt-2 border-t border-orange-200/50">
+                                                <div className="text-[10px] font-bold text-orange-800/60 uppercase">Actie Plan</div>
+                                                <div className="text-xs text-orange-900 space-y-1.5 pt-1">
+                                                    {(threadDetails.aiInsights.actionPlan || '').split('\n').map((step, idx) => (
+                                                        <div key={idx} className="flex gap-2">
+                                                            <span className="text-orange-500 font-bold shrink-0">•</span>
+                                                            <span className="leading-normal">{step.replace(/^[•\-\d.\s]*/, '')}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Related Orders */}
                                 <ContextSection
                                     title={`📦 Orders (${contextData?.orders?.length || 0})`}
                                     isLinked={!!threadDetails.orderId}
-                                    onLink={() => toast({ title: "Koppelen", description: "Order koppelings-venster..." })}
+                                    onLink={() => { }} // Legacy
                                 >
                                     {contextData?.orders && contextData.orders.length > 0 ? (
                                         <div className="space-y-3">
                                             {contextData.orders.slice(0, 5).map((order: any) => (
                                                 <div
                                                     key={order.id}
-                                                    className="group relative p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-sm"
+                                                    className="group relative p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-md"
                                                     onClick={() => setSelectedOrderId(order.id)}
                                                 >
                                                     <div className="flex justify-between items-start mb-1">
@@ -547,6 +978,39 @@ export default function MailPage() {
                                                     <div className="flex justify-between items-center text-xs text-muted-foreground">
                                                         <span>{order.orderDate ? format(new Date(order.orderDate), 'd MMM', { locale: nl }) : '-'}</span>
                                                         <span className="font-medium text-foreground">€{((order.totalAmount || 0) / 100).toFixed(2)}</span>
+                                                    </div>
+
+                                                    {/* Manual Link Action */}
+                                                    <div className="mt-3 pt-2 border-t flex justify-end opacity-0 group-hover:opacity-100 transition-opacity gap-2">
+                                                        {threadDetails.orderId === order.id ? (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 px-2 text-[10px] gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    unlinkThreadMutation.mutate({ threadId: threadDetails.id, type: 'order', entityId: order.id });
+                                                                }}
+                                                                disabled={unlinkThreadMutation.isPending}
+                                                            >
+                                                                <Link2Off className="h-3 w-3" />
+                                                                Ontkoppelen
+                                                            </Button>
+                                                        ) : !threadDetails.orderId && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-7 px-2 text-[10px] gap-1 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    linkThreadMutation.mutate({ threadId: threadDetails.id, type: 'order', entityId: order.id });
+                                                                }}
+                                                                disabled={linkThreadMutation.isPending}
+                                                            >
+                                                                <Package className="h-3 w-3" />
+                                                                Koppel aan bericht
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
@@ -578,7 +1042,7 @@ export default function MailPage() {
                                                 return (
                                                     <div
                                                         key={c.id}
-                                                        className="p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-sm"
+                                                        className="group relative p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-md"
                                                         onClick={() => setSelectedCaseId(c.id)}
                                                     >
                                                         <div className="flex justify-between items-start mb-1">
@@ -587,7 +1051,40 @@ export default function MailPage() {
                                                                 {c.status}
                                                             </Badge>
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{c.title}</p>
+                                                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-2">{c.title}</p>
+
+                                                        {/* Manual Link Action */}
+                                                        <div className="mt-1 pt-2 border-t flex justify-end opacity-0 group-hover:opacity-100 transition-opacity gap-2">
+                                                            {threadDetails.caseId === c.id ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-7 px-2 text-[10px] gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        unlinkThreadMutation.mutate({ threadId: threadDetails.id, type: 'case', entityId: c.id });
+                                                                    }}
+                                                                    disabled={unlinkThreadMutation.isPending}
+                                                                >
+                                                                    <Link2Off className="h-3 w-3" />
+                                                                    Ontkoppelen
+                                                                </Button>
+                                                            ) : !threadDetails.caseId && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-7 px-2 text-[10px] gap-1 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        linkThreadMutation.mutate({ threadId: threadDetails.id, type: 'case', entityId: c.id });
+                                                                    }}
+                                                                    disabled={linkThreadMutation.isPending}
+                                                                >
+                                                                    <Briefcase className="h-3 w-3" />
+                                                                    Koppel aan bericht
+                                                                </Button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 );
                                             })}
@@ -607,31 +1104,134 @@ export default function MailPage() {
                                 >
                                     {contextData?.returns && contextData.returns.length > 0 ? (
                                         <div className="space-y-3">
-                                            {contextData.returns.slice(0, 5).map((ret: any) => (
-                                                <div
-                                                    key={ret.id}
-                                                    className="p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-sm"
-                                                    onClick={() => setSelectedReturnId(ret.id)}
-                                                >
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <span className="font-bold text-sm">{ret.returnNumber}</span>
-                                                        <Badge variant="secondary" className="text-[10px] bg-slate-100 text-slate-700">
-                                                            {ret.status}
-                                                        </Badge>
+                                            {contextData.returns.slice(0, 5).map((ret: any) => {
+                                                const isLinked = contextData.currentLinks?.some((l: any) => l.entityType === 'return' && l.entityId === ret.id);
+                                                return (
+                                                    <div
+                                                        key={ret.id}
+                                                        className="group relative p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-md"
+                                                        onClick={() => setSelectedReturnId(ret.id)}
+                                                    >
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="font-bold text-sm tracking-tight">{ret.returnNumber}</span>
+                                                            <Badge variant="secondary" className="text-[10px] bg-slate-100 text-slate-700 uppercase font-bold px-1.5">
+                                                                {ret.status}
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {ret.items && ret.items.length > 0 ? (
+                                                                <span>{ret.items.length} item{ret.items.length > 1 ? 's' : ''}</span>
+                                                            ) : (
+                                                                <span>Geen items</span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Link/Unlink Action */}
+                                                        <div className="mt-2 pt-2 border-t flex justify-end opacity-0 group-hover:opacity-100 transition-opacity gap-2">
+                                                            {isLinked ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-7 px-2 text-[10px] gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        unlinkThreadMutation.mutate({ threadId: threadDetails.id, type: 'return', entityId: ret.id });
+                                                                    }}
+                                                                    disabled={unlinkThreadMutation.isPending}
+                                                                >
+                                                                    <Link2Off className="h-3 w-3" />
+                                                                    Ontkoppelen
+                                                                </Button>
+                                                            ) : (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-7 px-2 text-[10px] gap-1 hover:bg-slate-50 hover:text-slate-600 hover:border-slate-200"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        linkThreadMutation.mutate({ threadId: threadDetails.id, type: 'return', entityId: ret.id });
+                                                                    }}
+                                                                    disabled={linkThreadMutation.isPending}
+                                                                >
+                                                                    <RotateCcw className="h-3 w-3" />
+                                                                    Koppelen
+                                                                </Button>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {ret.items && ret.items.length > 0 ? (
-                                                            <span>{ret.items.length} item{ret.items.length > 1 ? 's' : ''}</span>
-                                                        ) : (
-                                                            <span>Geen items</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     ) : (
                                         <div className="text-center p-4 border border-dashed rounded-lg bg-muted/20">
                                             <p className="text-xs text-muted-foreground">Geen retouren gevonden</p>
+                                        </div>
+                                    )}
+                                </ContextSection>
+
+                                {/* Related Repairs */}
+                                <ContextSection
+                                    title={`🛠️ Reparaties (${contextData?.repairs?.length || 0})`}
+                                    isLinked={false}
+                                    onLink={() => { }}
+                                >
+                                    {contextData?.repairs && contextData.repairs.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {contextData.repairs.slice(0, 5).map((rep: any) => {
+                                                const isLinked = contextData.currentLinks?.some((l: any) => l.entityType === 'repair' && l.entityId === rep.id);
+                                                return (
+                                                    <div
+                                                        key={rep.id}
+                                                        className="group relative p-3 bg-white/50 hover:bg-white border rounded-lg cursor-pointer transition-all hover:shadow-md"
+                                                        onClick={() => setSelectedRepairId(rep.id)}
+                                                    >
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="font-bold text-sm tracking-tight">{rep.repairNumber}</span>
+                                                            <Badge variant="secondary" className="text-[10px] bg-slate-100 text-slate-700 uppercase font-bold px-1.5">
+                                                                {rep.status}
+                                                            </Badge>
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{rep.title}</p>
+
+                                                        {/* Link/Unlink Action */}
+                                                        <div className="mt-1 pt-2 border-t flex justify-end opacity-0 group-hover:opacity-100 transition-opacity gap-2">
+                                                            {isLinked ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-7 px-2 text-[10px] gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        unlinkThreadMutation.mutate({ threadId: threadDetails.id, type: 'repair', entityId: rep.id });
+                                                                    }}
+                                                                    disabled={unlinkThreadMutation.isPending}
+                                                                >
+                                                                    <Link2Off className="h-3 w-3" />
+                                                                    Ontkoppelen
+                                                                </Button>
+                                                            ) : (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-7 px-2 text-[10px] gap-1 hover:bg-slate-50 hover:text-slate-600 hover:border-slate-200"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        linkThreadMutation.mutate({ threadId: threadDetails.id, type: 'repair', entityId: rep.id });
+                                                                    }}
+                                                                    disabled={linkThreadMutation.isPending}
+                                                                >
+                                                                    <Wrench className="h-3 w-3" />
+                                                                    Koppelen
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center p-4 border border-dashed rounded-lg bg-muted/20">
+                                            <p className="text-xs text-muted-foreground">Geen reparaties gevonden</p>
                                         </div>
                                     )}
                                 </ContextSection>
@@ -642,6 +1242,156 @@ export default function MailPage() {
                 </div>
             </div>
 
+            {/* Mobile Bottom Sheet Drawer for Conversation View */}
+            {isMobile && (
+                <Drawer
+                    open={!!selectedThreadId}
+                    onOpenChange={(open) => !open && setSelectedThreadId(null)}
+                >
+                    <DrawerContent className="h-[92vh] max-h-[92vh] overflow-hidden">
+                        {isLoadingDetails ? (
+                            <div className="p-4 space-y-4">
+                                <Skeleton className="h-8 w-2/3" />
+                                <Skeleton className="h-32 w-full" />
+                                <Skeleton className="h-32 w-full" />
+                            </div>
+                        ) : threadDetails ? (
+                            <div className="flex flex-col h-full overflow-hidden">
+                                {/* Mobile Header */}
+                                <DrawerHeader className="border-b py-3 px-4">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                            <DrawerTitle className="text-base font-semibold line-clamp-2 break-words">
+                                                {threadDetails.subject}
+                                            </DrawerTitle>
+                                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                                {(threadDetails.participants || []).map(p => formatParticipantName(p)).join(', ') || 'Unknown'}
+                                            </p>
+                                        </div>
+                                        <DrawerClose asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </DrawerClose>
+                                    </div>
+
+                                    {/* Quick Actions */}
+                                    <div className="flex items-center gap-2 mt-3">
+                                        <Button
+                                            size="sm"
+                                            className="flex-1 gap-1.5 bg-orange-500 hover:bg-orange-600 h-9"
+                                            onClick={() => setIsReplying(true)}
+                                        >
+                                            <Reply className="h-3.5 w-3.5" />
+                                            Beantwoord
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9"
+                                            onClick={() => toggleStarMutation.mutate({ threadId: threadDetails.id, starred: !threadDetails.starred })}
+                                        >
+                                            <Star className={cn("h-4 w-4", threadDetails.starred && "fill-yellow-400 text-yellow-400")} />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9 text-destructive hover:text-destructive"
+                                            onClick={() => {
+                                                setThreadToDeleteId(threadDetails.id);
+                                                setDeleteConfirmOpen(true);
+                                            }}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </DrawerHeader>
+
+                                {/* Messages List */}
+                                <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-4">
+                                    {/* AI Summary - Compact on mobile */}
+                                    <AISummaryCard key={selectedThreadId} thread={threadDetails} />
+
+                                    {/* Thread Attachments */}
+                                    <ThreadAttachmentsSummary
+                                        messages={threadDetails.messages}
+                                        onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
+                                    />
+
+                                    {/* Messages */}
+                                    {[...threadDetails.messages].reverse().map((msg, idx, arr) => (
+                                        <MessageItem
+                                            key={msg.id}
+                                            message={msg}
+                                            isFirst={idx === arr.length - 1}
+                                            isLatest={idx === 0}
+                                            onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
+                                        />
+                                    ))}
+
+                                    {/* Reply Composer */}
+                                    {isReplying && (
+                                        <div className="p-3 border rounded-lg bg-card shadow-md">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <p className="text-sm font-medium">Antwoord</p>
+                                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setIsReplying(false)}>
+                                                    <X className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                            <Textarea
+                                                placeholder="Schrijf je antwoord..."
+                                                className="min-h-[120px] mb-3 text-sm"
+                                                value={replyText}
+                                                onChange={(e) => setReplyText(e.target.value)}
+                                                autoFocus
+                                            />
+                                            <div className="flex items-center justify-between gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="gap-1.5 text-xs h-8"
+                                                    disabled={rewriteReplyMutation.isPending}
+                                                    onClick={() => rewriteReplyMutation.mutate({ text: replyText, mode: 'rewrite' })}
+                                                >
+                                                    {rewriteReplyMutation.isPending ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                        <Wand2 className="h-3 w-3" />
+                                                    )}
+                                                    Magic
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    className="gap-1.5 bg-orange-500 hover:bg-orange-600 h-8"
+                                                    disabled={!replyText.trim() || replyMutation.isPending}
+                                                    onClick={() => {
+                                                        const latestMsg = threadDetails.messages[threadDetails.messages.length - 1];
+                                                        replyMutation.mutate({
+                                                            threadId: threadDetails.id,
+                                                            to: latestMsg.fromEmail,
+                                                            subject: threadDetails.subject.startsWith('Re:') ? threadDetails.subject : `Re: ${threadDetails.subject}`,
+                                                            body: replyText.replace(/\n/g, '<br/>'),
+                                                            inReplyTo: latestMsg.messageId
+                                                        });
+                                                    }}
+                                                >
+                                                    {replyMutation.isPending ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                        <Send className="h-3 w-3" />
+                                                    )}
+                                                    Verzend
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
+                    </DrawerContent>
+                </Drawer>
+            )}
+
             {/* Case Detail Modal */}
             {selectedCaseId && (
                 <CaseDetailModal
@@ -650,6 +1400,14 @@ export default function MailPage() {
                     onClose={() => setSelectedCaseId(null)}
                 />
             )}
+
+            {/* Repair Detail Modal */}
+            <RepairDetailModal
+                repair={contextData?.repairs?.find(r => r.id === selectedRepairId) || null}
+                open={!!selectedRepairId}
+                onOpenChange={(open) => !open && setSelectedRepairId(null)}
+                users={[]}
+            />
 
             {/* Creation Modals from Context Menu */}
             <CreateCaseModal
@@ -670,6 +1428,39 @@ export default function MailPage() {
                 onOpenChange={setCreateRepairOpen}
                 emailThreadId={contextThread?.id}
             />
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Bericht verwijderen?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Weet je zeker dat je dit bericht wilt verwijderen?
+                            Het bericht zal worden verplaatst naar de prullenbak in Gmail.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => {
+                            setDeleteConfirmOpen(false);
+                            setThreadToDeleteId(null);
+                        }}>
+                            Annuleren
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                                if (threadToDeleteId) {
+                                    deleteThreadMutation.mutate(threadToDeleteId);
+                                }
+                                setDeleteConfirmOpen(false);
+                                setThreadToDeleteId(null);
+                            }}
+                        >
+                            Verwijderen
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* Order Detail Modal */}
             <Dialog open={!!selectedOrderId} onOpenChange={(open) => !open && setSelectedOrderId(null)}>
@@ -713,7 +1504,7 @@ export default function MailPage() {
                                     </div>
                                 </div>
                             )}
-                            <Button variant="outline" className="w-full" onClick={() => navigate(`/orders`)}>
+                            <Button variant="outline" className="w-full" onClick={() => navigate(`/orders?orderId=${selectedOrder.id}`)}>
                                 <ExternalLink className="h-4 w-4 mr-2" />
                                 Bekijk op Orders pagina
                             </Button>
@@ -819,82 +1610,371 @@ export default function MailPage() {
                     </div>
                 </DialogContent>
             </Dialog >
+
+            <AttachmentPreviewModal
+                attachment={previewAttachment}
+                messageId={previewAttachment?.messageId}
+                onClose={() => setPreviewAttachment(null)}
+            />
         </>
     );
 }
 
+// --- Helpers ---
+
+// Check if an email or name is related to DutchThrift
+const isDutchThrift = (email?: string, name?: string) => {
+    const e = email?.toLowerCase() || '';
+    const n = name?.toLowerCase() || '';
+    return e.includes('@dutchthrift.com') || e.includes('dutchthrift') || n.includes('contact dutchthrift') || n.includes('dutchthrift');
+};
+
+// Format participant names - replace "Contact DutchThrift" with "DutchThrift"
+const formatParticipantName = (p: Participant) => {
+    const name = p.name || p.email.split('@')[0];
+    if (isDutchThrift(p.email, p.name)) {
+        return 'DutchThrift';
+    }
+    return name;
+};
+
+// Get initials from email or name
+const getInitials = (email: string, name?: string) => {
+    if (isDutchThrift(email, name)) return "DT";
+    const base = name || email.split("@")[0];
+    return base.substring(0, 2).toUpperCase();
+};
+
+// Whitelist for safe in-browser previews - must match server-side ALLOWED_PREVIEW_MIMES
+const ALLOWED_PREVIEW_MIMES = [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+    'text/plain',
+    'text/csv'
+];
+
+const IS_PREVIEWABLE = (mimeType?: string) => {
+    return ALLOWED_PREVIEW_MIMES.includes(mimeType?.toLowerCase() || '');
+};
+
 // --- Sub-components ---
+
+function AttachmentPreviewModal({
+    attachment,
+    messageId,
+    onClose
+}: {
+    attachment: { filename: string; mimeType: string; gmailAttachmentId: string } | null,
+    messageId?: string,
+    onClose: () => void
+}) {
+    if (!attachment || !messageId) return null;
+
+    const url = `/api/mail/attachment/${messageId}/${attachment.gmailAttachmentId}`;
+    const isImage = attachment.mimeType.startsWith('image/');
+    const isPDF = attachment.mimeType === 'application/pdf';
+
+    return (
+        <Dialog open={!!attachment} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-4xl w-[90vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-zinc-950 border-zinc-800">
+                <DialogHeader className="p-4 border-b border-zinc-800 flex flex-row items-center justify-between space-y-0 bg-zinc-900">
+                    <div className="flex items-center gap-3">
+                        <DialogTitle className="text-sm font-medium text-zinc-100 truncate max-w-md">
+                            {attachment.filename}
+                        </DialogTitle>
+                        <Badge variant="outline" className="text-[10px] border-zinc-700 text-zinc-400">
+                            {attachment.mimeType}
+                        </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-zinc-400 hover:text-orange-500 hover:bg-zinc-800 gap-2"
+                            onClick={() => window.open(url, '_blank')}
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                            Nieuw tabblad
+                        </Button>
+                        <a href={url} download={attachment.filename}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 border-zinc-700 bg-zinc-800 text-zinc-100 hover:bg-zinc-700 gap-2"
+                            >
+                                <Download className="h-4 w-4" />
+                                Download
+                            </Button>
+                        </a>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-zinc-400 hover:text-white"
+                            onClick={onClose}
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-zinc-950">
+                    {isImage ? (
+                        <img
+                            src={url}
+                            alt={attachment.filename}
+                            className="max-w-full max-h-full object-contain shadow-2xl"
+                        />
+                    ) : isPDF ? (
+                        <iframe
+                            src={url}
+                            className="w-full h-full rounded-sm bg-white"
+                            title={attachment.filename}
+                        />
+                    ) : (
+                        <div className="text-center p-12">
+                            <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800">
+                                <Paperclip className="h-8 w-8 text-zinc-500" />
+                            </div>
+                            <h3 className="text-zinc-200 font-medium mb-2">Preview niet beschikbaar</h3>
+                            <p className="text-zinc-500 text-sm mb-6 max-w-xs mx-auto">
+                                Dit bestandstype kan niet veilig direct in de browser worden weergegeven.
+                            </p>
+                            <a href={url} download={attachment.filename}>
+                                <Button className="bg-orange-600 hover:bg-orange-700">
+                                    Download om te bekijken
+                                </Button>
+                            </a>
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function ThreadAttachmentsSummary({ messages, onPreview }: { messages: ThreadMessage[], onPreview: (att: any, msgId: string) => void }) {
+    // Extract everything that has attachments
+    const allAttachments = messages.flatMap(msg =>
+        (msg.attachments || []).map(att => ({ ...att, messageId: msg.messageId }))
+    );
+
+    if (allAttachments.length === 0) return null;
+
+    return (
+        <div className="px-6 py-3 bg-muted/20 border-b overflow-hidden">
+            <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-background border px-2 py-1 rounded-sm shadow-sm whitespace-nowrap">
+                    <Paperclip className="h-3 w-3 text-orange-500" />
+                    Bijlagen ({allAttachments.length})
+                </div>
+                <div className="flex gap-2 pb-1 overflow-x-auto no-scrollbar">
+                    {allAttachments.map((att, i) => {
+                        const isImage = att.mimeType?.startsWith('image/');
+                        const canPreview = IS_PREVIEWABLE(att.mimeType);
+                        return (
+                            <div
+                                key={i}
+                                className="flex-shrink-0 flex items-center bg-background border rounded-full pl-1.5 pr-2 py-1 text-xs font-medium transition-colors shadow-sm group hover:border-orange-200"
+                            >
+                                <button
+                                    onClick={() => canPreview && onPreview(att, att.messageId)}
+                                    className={cn(
+                                        "flex items-center gap-2 pr-2 border-r border-border/50 mr-1",
+                                        canPreview ? "cursor-pointer hover:text-orange-500" : "cursor-default"
+                                    )}
+                                    title={canPreview ? "Bekijk preview" : "Preview niet beschikbaar"}
+                                >
+                                    <div className="w-5 h-5 rounded-full overflow-hidden bg-muted flex items-center justify-center flex-shrink-0 border border-border/50 group-hover:border-orange-200">
+                                        {isImage ? (
+                                            <img
+                                                src={`/api/mail/attachment/${att.messageId}/${att.gmailAttachmentId}`}
+                                                className="w-full h-full object-cover"
+                                                alt=""
+                                            />
+                                        ) : (
+                                            <Paperclip className="h-2.5 w-2.5 text-muted-foreground group-hover:text-orange-500" />
+                                        )}
+                                    </div>
+                                    <span className="truncate max-w-[120px] text-muted-foreground group-hover:text-foreground">{att.filename}</span>
+                                </button>
+                                <a
+                                    href={`/api/mail/attachment/${att.messageId}/${att.gmailAttachmentId}`}
+                                    download={att.filename}
+                                    className="p-1 text-muted-foreground hover:text-orange-500 transition-colors"
+                                    title="Downloaden"
+                                >
+                                    <Download className="h-3 w-3" />
+                                </a>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}
 
 
 function FilterChip({ active, label, icon, onClick }: { active: boolean, label: string, icon: any, onClick: () => void }) {
     return (
-        <Button
-            variant={active ? "default" : "outline"}
-            size="sm"
-            onClick={onClick}
-            className={cn("rounded-full h-8 text-xs gap-1.5 whitespace-nowrap px-3", !active && "bg-background")}
-        >
-            {icon}
-            {label}
-        </Button>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button
+                    variant={active ? "default" : "ghost"}
+                    size="icon"
+                    onClick={onClick}
+                    className={cn(
+                        "h-10 w-10 text-xs rounded-lg transition-all",
+                        active ? "bg-orange-500 hover:bg-orange-600 text-white shadow-sm" : "bg-transparent hover:bg-muted text-muted-foreground hover:text-foreground",
+                        !active && "border border-transparent hover:border-border"
+                    )}
+                >
+                    {icon}
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+                <p>{label}</p>
+            </TooltipContent>
+        </Tooltip>
     );
 }
 
-function ThreadCard({ thread, isSelected, onClick }: { thread: EmailThread, isSelected: boolean, onClick: () => void }) {
+function ThreadCard({ thread, isSelected, onClick, onToggleStar }: { thread: EmailThread, isSelected: boolean, onClick: () => void, onToggleStar: (e: React.MouseEvent) => void }) {
     const lastDate = new Date(thread.lastActivity);
-    const isToday = lastDate.toDateString() === new Date().toDateString();
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const displayDate = isToday
-        ? lastDate.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-        : lastDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+    let displayDate: string;
+    if (lastDate >= today) {
+        // Today: show time only
+        displayDate = lastDate.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    } else if (lastDate >= sevenDaysAgo) {
+        // Last 7 days: show weekday + time
+        displayDate = lastDate.toLocaleDateString('nl-NL', { weekday: 'long' }) + ' ' +
+            lastDate.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    } else if (lastDate.getFullYear() === now.getFullYear()) {
+        // This year: show day + month
+        displayDate = lastDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+    } else {
+        // Previous years: show full date
+        displayDate = lastDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    // Determine if this is an outbound thread (sent folder or first participant is DutchThrift)
+    const firstParticipant = thread.participants?.[0];
+    const isOutbound = thread.folder === 'sent' || (firstParticipant && isDutchThrift(firstParticipant.email, firstParticipant.name));
 
     return (
         <div
             onClick={onClick}
             className={cn(
-                "p-4 border-b cursor-pointer transition-all hover:bg-muted/50 relative overflow-hidden",
+                "p-4 border-b cursor-pointer transition-all hover:bg-muted/50 relative overflow-hidden max-w-full",
                 isSelected ? "bg-orange-50 dark:bg-orange-950/20 border-l-4 border-l-orange-500 shadow-sm z-10" : "bg-transparent border-l-4 border-l-transparent",
                 thread.isUnread && !isSelected && "bg-blue-500/5 group"
             )}
         >
             {thread.isUnread && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500" />}
 
-            <div className="flex justify-between items-start mb-1 gap-2">
-                <span className={cn("text-xs font-bold truncate", thread.isUnread ? "text-foreground" : "text-muted-foreground")}>
-                    {(thread.participants || []).map(p => p.name || p.email.split('@')[0]).join(', ') || 'Unknown'}
-                </span>
-                <span className="text-[10px] text-muted-foreground font-medium uppercase">{displayDate}</span>
-            </div>
+            <div className="flex gap-3 overflow-hidden">
+                {/* Avatar */}
+                <div className={cn(
+                    "flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs",
+                    isOutbound ? "bg-orange-500" : "bg-blue-600"
+                )}>
+                    {getInitials(firstParticipant?.email || '', firstParticipant?.name)}
+                </div>
 
-            <h3 className={cn("text-sm truncate mb-1", thread.isUnread ? "font-bold" : "font-medium")}>
-                {thread.subject}
-            </h3>
+                <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start mb-1 gap-2">
+                        <div className="flex flex-col min-w-0">
+                            <span className={cn("text-xs font-bold truncate", thread.isUnread ? "text-foreground" : "text-muted-foreground")}>
+                                {(thread.participants || []).map(p => formatParticipantName(p)).join(', ') || 'Unknown'}
+                            </span>
+                            {!isOutbound && firstParticipant?.email && (
+                                <span className="text-[10px] text-muted-foreground truncate font-medium">
+                                    {firstParticipant.email}
+                                </span>
+                            )}
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0 hover:bg-muted text-muted-foreground"
+                            onClick={onToggleStar}
+                        >
+                            <Star className={cn("h-4 w-4", thread.starred && "fill-yellow-400 text-yellow-400")} />
+                        </Button>
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase whitespace-nowrap">{displayDate}</span>
+                    </div>
 
-            <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
-                {thread.snippet}
-            </p>
+                    <h3 className={cn("text-sm truncate mb-1 max-w-full", thread.isUnread ? "font-bold" : "font-medium")}>
+                        {thread.subject}
+                    </h3>
 
-            <div className="flex items-center gap-2">
-                {thread.messageCount > 1 && (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 h-4">
-                        {thread.messageCount} ber.
-                    </Badge>
-                )}
-                {thread.orderId && <Package className="h-3 w-3 text-orange-500" />}
-                {thread.caseId && <Briefcase className="h-3 w-3 text-blue-500" />}
-                {thread.starred && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 ml-auto" />}
+                    <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
+                        {thread.snippet}
+                    </p>
+
+                    <div className="flex items-center gap-2 overflow-x-auto max-w-full scrollbar-hide">
+                        {/* Status Badges - Mailbox 2.0 */}
+                        {!thread.isUnread && thread.lastMessageIsOutbound && (
+                            <Badge variant="outline" className="h-5 px-1.5 text-[10px] gap-1 bg-muted/50 text-muted-foreground border-transparent font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500/50" />
+                                Afwachten
+                            </Badge>
+                        )}
+                        {!thread.isUnread && !thread.lastMessageIsOutbound && (
+                            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] gap-1 bg-orange-100/80 text-orange-700 hover:bg-orange-100 border-orange-200 font-bold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                                Actie vereist
+                            </Badge>
+                        )}
+
+                        {thread.messageCount > 1 && (
+                            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] gap-1 bg-muted text-muted-foreground font-medium">
+                                <Mail className="h-2.5 w-2.5" />
+                                {thread.messageCount}
+                            </Badge>
+                        )}
+                        {/* Labels */}
+                        {thread.orderId && <Package className="h-3 w-3 text-orange-500" />}
+                        {thread.caseId && <Briefcase className="h-3 w-3 text-blue-500" />}
+
+                        {/* AI Sentiment indicator */}
+                        {thread.sentiment && (
+                            <div className={cn(
+                                "h-2 w-2 rounded-full",
+                                thread.sentiment === 'positive' ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" :
+                                    thread.sentiment === 'negative' ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" :
+                                        "bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"
+                            )} title={`Sentiment: ${thread.sentiment}`} />
+                        )}
+
+                        {thread.detectedIntent && (
+                            <Badge variant="outline" className="text-[9px] px-1 h-4 uppercase border-orange-200 text-orange-700 bg-orange-50 font-bold tracking-tighter">
+                                {thread.detectedIntent}
+                            </Badge>
+                        )}
+
+                        {thread.starred && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 ml-auto" />}
+                    </div>
+                </div>
             </div>
         </div>
     );
 }
 
-function MessageItem({ message, isFirst, isLatest }: { message: ThreadMessage, isFirst: boolean, isLatest: boolean }) {
+function MessageItem({ message, isFirst, isLatest, onPreview }: { message: ThreadMessage, isFirst: boolean, isLatest: boolean, onPreview: (att: any, msgId: string) => void }) {
     const [expanded, setExpanded] = useState(isLatest);
     const sentDate = new Date(message.sentAt);
 
     return (
         <div className={cn(
-            "border rounded-lg transition-all",
+            "border rounded-lg transition-all overflow-hidden max-w-full",
             expanded ? "bg-card border-border shadow-sm" : "bg-muted/30 border-transparent hover:bg-muted/50 cursor-pointer"
         )}>
             <div
@@ -908,16 +1988,23 @@ function MessageItem({ message, isFirst, isLatest }: { message: ThreadMessage, i
             >
                 <div className={cn(
                     "w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0",
-                    message.isOutbound ? "bg-orange-500" : "bg-blue-600 font-serif"
+                    isDutchThrift(message.fromEmail, message.fromName) ? "bg-orange-500" : "bg-blue-600 font-serif"
                 )}>
-                    {message.isOutbound ? 'J' : (message.fromName?.charAt(0) || message.fromEmail.charAt(0)).toUpperCase()}
+                    {getInitials(message.fromEmail, message.fromName)}
                 </div>
 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold truncate">
-                            {message.isOutbound ? 'Jijzelf' : (message.fromName || message.fromEmail)}
-                        </span>
+                        <div className="flex items-baseline gap-2 min-w-0">
+                            <span className="text-sm font-bold truncate">
+                                {isDutchThrift(message.fromEmail, message.fromName) ? 'DutchThrift' : (message.fromName || message.fromEmail)}
+                            </span>
+                            {!isDutchThrift(message.fromEmail, message.fromName) && message.fromName && (
+                                <span className="text-xs text-muted-foreground font-medium truncate">
+                                    &lt;{message.fromEmail}&gt;
+                                </span>
+                            )}
+                        </div>
                         <span className="text-[10px] text-muted-foreground">
                             {sentDate.toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </span>
@@ -936,14 +2023,14 @@ function MessageItem({ message, isFirst, isLatest }: { message: ThreadMessage, i
 
 
             {expanded && (
-                <div className="px-4 pb-6 pt-0 ml-11">
-                    <div className="text-[11px] text-muted-foreground mb-4">
+                <div className="px-4 pb-6 pt-0 ml-11 overflow-hidden max-w-full">
+                    <div className="text-[11px] text-muted-foreground mb-4 truncate">
                         Aan: {message.to.map(p => p.email).join(', ')}
                         {message.cc.length > 0 && ` | Cc: ${message.cc.map(p => p.email).join(', ')}`}
                     </div>
 
                     <div
-                        className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none prose-p:my-2"
+                        className="email-content text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none prose-p:my-2"
                         dangerouslySetInnerHTML={{ __html: message.body }}
                     />
 
@@ -959,20 +2046,31 @@ function MessageItem({ message, isFirst, isLatest }: { message: ThreadMessage, i
                                     {message.attachments
                                         .filter(att => att.mimeType?.startsWith('image/'))
                                         .map((att, i) => (
-                                            <a
-                                                key={i}
-                                                href={`/api/mail/attachment/${message.messageId}/${att.gmailAttachmentId}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="block rounded-lg overflow-hidden border hover:border-primary transition-colors"
-                                            >
+                                            <div key={i} className="group relative rounded-lg overflow-hidden border bg-muted">
                                                 <img
                                                     src={`/api/mail/attachment/${message.messageId}/${att.gmailAttachmentId}`}
                                                     alt={att.filename}
-                                                    className="w-32 h-32 object-cover bg-muted"
+                                                    className="w-32 h-32 object-cover transition-transform group-hover:scale-105"
                                                     loading="lazy"
                                                 />
-                                            </a>
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                    {IS_PREVIEWABLE(att.mimeType) && (
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="icon"
+                                                            className="h-8 w-8 rounded-full"
+                                                            onClick={() => onPreview(att, message.messageId)}
+                                                        >
+                                                            <Search className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    <a href={`/api/mail/attachment/${message.messageId}/${att.gmailAttachmentId}`} download={att.filename}>
+                                                        <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full">
+                                                            <Download className="h-4 w-4" />
+                                                        </Button>
+                                                    </a>
+                                                </div>
+                                            </div>
                                         ))}
                                 </div>
                             )}
@@ -982,17 +2080,28 @@ function MessageItem({ message, isFirst, isLatest }: { message: ThreadMessage, i
                                 {message.attachments
                                     .filter(att => !att.mimeType?.startsWith('image/'))
                                     .map((att, i) => (
-                                        <a
-                                            key={i}
-                                            href={`/api/mail/attachment/${message.messageId}/${att.gmailAttachmentId}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                        >
-                                            <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
-                                                <Paperclip className="h-3 w-3" />
-                                                {att.filename}
-                                            </Button>
-                                        </a>
+                                        <div key={i} className="flex items-center gap-1">
+                                            {IS_PREVIEWABLE(att.mimeType) && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 text-xs gap-2"
+                                                    onClick={() => onPreview(att, message.messageId)}
+                                                >
+                                                    <Search className="h-3 w-3" />
+                                                    Preview
+                                                </Button>
+                                            )}
+                                            <a
+                                                href={`/api/mail/attachment/${message.messageId}/${att.gmailAttachmentId}`}
+                                                download={att.filename}
+                                            >
+                                                <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
+                                                    <Paperclip className="h-3 w-3" />
+                                                    {att.filename}
+                                                </Button>
+                                            </a>
+                                        </div>
                                     ))}
                             </div>
                         </div>
@@ -1018,6 +2127,105 @@ function ContextSection({ title, isLinked, onLink, children }: { title: string, 
                 )}
             </div>
             {children}
+        </div>
+    );
+}
+
+function AISummaryCard({ thread }: { thread: ThreadDetails }) {
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
+
+    const manualAnalyzeMutation = useMutation({
+        mutationFn: async () => {
+            const res = await fetch(`/api/mail/${thread.id}/ai-analyze`, { method: 'POST' });
+            if (!res.ok) throw new Error('AI Analyse mislukt');
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mailThread', thread.id] });
+            queryClient.invalidateQueries({ queryKey: ['mailThreads'] });
+            toast({ title: "AI Analyse voltooid", description: "De inzichten zijn bijgewerkt." });
+        },
+        onError: (err: any) => {
+            toast({ title: "Fout", description: err.message, variant: "destructive" });
+        }
+    });
+
+    if (!thread.aiSummary && !manualAnalyzeMutation.isPending) {
+        return (
+            <div className="px-6 py-4 mx-6 mt-4 rounded-xl border border-dashed border-orange-200 bg-orange-50/30 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                        <Brain className="h-4 w-4 text-orange-500" />
+                    </div>
+                    <div className="text-sm">
+                        <p className="font-semibold text-orange-900">Geen AI Analyse beschikbaar</p>
+                        <p className="text-orange-700/70 text-xs">Klik op de knop om deze conversatie te laten samenvatten.</p>
+                    </div>
+                </div>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-orange-200 hover:bg-orange-100 text-orange-700"
+                    onClick={() => manualAnalyzeMutation.mutate()}
+                >
+                    <Sparkles className="h-3 w-3 mr-2" />
+                    Analyseer nu
+                </Button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="px-6 py-5 mx-6 mt-4 rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50/50 to-white shadow-sm relative overflow-hidden group">
+            {/* Background sparkle effect */}
+            <div className="absolute top-[-10%] right-[-10%] w-32 h-32 bg-orange-200/20 blur-3xl rounded-full" />
+
+            <div className="flex items-start gap-4 relative z-10">
+                <div className="flex-shrink-0 mt-1">
+                    <div className="w-10 h-10 rounded-xl bg-orange-500 shadow-lg shadow-orange-200 flex items-center justify-center text-white">
+                        <Sparkles className="h-5 w-5" />
+                    </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                            <h4 className="text-sm font-bold text-orange-900 flex items-center gap-2">
+                                AI INZICHTEN
+                                {thread.sentiment === 'positive' ? <Smile className="h-4 w-4 text-emerald-500" /> :
+                                    thread.sentiment === 'negative' ? <Angry className="h-4 w-4 text-rose-500" /> :
+                                        <Meh className="h-4 w-4 text-amber-500" />}
+                            </h4>
+                            {thread.detectedIntent && (
+                                <Badge className="bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200 text-[10px] h-5 uppercase">
+                                    {thread.detectedIntent}
+                                </Badge>
+                            )}
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-orange-300 hover:text-orange-600 hover:bg-orange-100 transition-colors"
+                            onClick={() => manualAnalyzeMutation.mutate()}
+                            disabled={manualAnalyzeMutation.isPending}
+                        >
+                            <RefreshCw className={cn("h-3 w-3", manualAnalyzeMutation.isPending && "animate-spin")} />
+                        </Button>
+                    </div>
+
+                    {manualAnalyzeMutation.isPending ? (
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-full bg-orange-100/50" />
+                            <Skeleton className="h-4 w-2/3 bg-orange-100/50" />
+                        </div>
+                    ) : (
+                        <p className="text-sm text-orange-900/80 leading-relaxed font-medium italic">
+                            "{thread.aiSummary}"
+                        </p>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

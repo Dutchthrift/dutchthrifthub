@@ -74,16 +74,8 @@ function findTextParts(structure: any, partId = ''): { partId: string; type: str
 }
 
 async function getLastUidForFolder(folderEnum: string): Promise<number> {
-    // Get emails sorted by imapUid descending, take the first one
-    const recentEmails = await storage.getEmails({ folder: folderEnum, limit: 1, orderBy: 'date DESC' });
-    // Find the max UID from recently fetched emails
-    let maxUid = 0;
-    for (const email of recentEmails) {
-        if (email.imapUid && email.imapUid > maxUid) {
-            maxUid = email.imapUid;
-        }
-    }
-    return maxUid;
+    const lastUid = await storage.getSystemSetting(`imap_last_uid_${folderEnum}`);
+    return lastUid ? parseInt(lastUid) : 0;
 }
 
 async function syncFolder(client: ImapFlow, folder: { path: string; folderEnum: 'inbox' | 'sent' }): Promise<number> {
@@ -160,6 +152,9 @@ async function syncFolder(client: ImapFlow, folder: { path: string; folderEnum: 
                     folder: folder.folderEnum,
                     imapUid: uid,
                 });
+
+                // Update last UID in settings immediately to prevent re-sync if process crashes
+                await storage.setSystemSetting(`imap_last_uid_${folder.folderEnum}`, uid.toString());
 
                 synced++;
             } catch (msgError) {

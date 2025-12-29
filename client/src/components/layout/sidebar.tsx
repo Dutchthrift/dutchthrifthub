@@ -11,8 +11,8 @@ import {
   LogOut,
   User,
   Bell,
-  Search,
-  Package
+  Package,
+  Brain
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ const navigationItems = [
   { href: "/repairs", label: "Reparaties", icon: Wrench },
   { href: "/returns", label: "Retouren", icon: Package },
   { href: "/todos", label: "To-do's", icon: CheckSquare },
+  { href: "/ai-hub", label: "AI Hub", icon: Brain },
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
 ];
 

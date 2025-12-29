@@ -3,6 +3,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { storage } from '../storage';
 import { emailThreads, emailMessages, mailThreadLinks } from '../../shared/schema';
 import { OrderMatchingService, orderMatchingService } from './orderMatchingService';
+import { aiService } from './aiService';
 import DOMPurify from 'isomorphic-dompurify';
 
 class GmailService {
@@ -31,7 +32,7 @@ class GmailService {
         try {
             const res = await this.gmail.users.threads.list({
                 userId: 'me',
-                maxResults: 50,
+                maxResults: 200,
                 q: 'in:inbox OR in:sent'  // Sync both inbox and sent
             });
 
@@ -93,7 +94,39 @@ class GmailService {
             // 3. Fallback: if the last message is inbound, it's inbox
             const lastMessageFrom = lastMessage.payload?.headers?.find((h: any) => h.name?.toLowerCase() === 'from')?.value || '';
             const gmailUser = process.env.GMAIL_USER || '';
-            const isLastMessageOutbound = gmailUser && lastMessageFrom.toLowerCase().includes(gmailUser.toLowerCase());
+
+            // Comprehensive list of company emails
+            const COMPANY_EMAILS = [
+                'contact@dutchthrift.com',
+                'info@dutchthrift.com',
+                'noreply@dutchthrift.com',
+                'support@dutchthrift.com',
+                'me'
+            ];
+
+            // Check if last message is outbound
+            // 1. Is it labelled SENT?
+            const lastMessageLabels = lastMessage.labelIds || [];
+            const isLabelledSent = lastMessageLabels.includes('SENT');
+
+            // 2. Is the sender one of our emails?
+            const isFromCompany = [...COMPANY_EMAILS, gmailUser].filter(Boolean)
+                .some(e => lastMessageFrom.toLowerCase().includes(e.toLowerCase()));
+
+            const isLastMessageOutbound = isLabelledSent || isFromCompany;
+
+            const isTrash = allLabels.includes('TRASH');
+            const isSpam = allLabels.includes('SPAM');
+
+            if (isTrash || isSpam) {
+                console.log(`[Gmail] Skipping thread ${threadId} as it is marked as Trash/Spam (Labels: ${uniqueLabels.join(',')})`);
+                // If it exists locally but is now trashed in Gmail, we should remove it locally too
+                const existing = await storage.getEmailThreadByThreadId(threadId);
+                if (existing) {
+                    await storage.deleteEmailThread(existing.id);
+                }
+                return;
+            }
 
             let folder: 'inbox' | 'sent' = hasInbox ? 'inbox' : (hasSent ? 'sent' : 'inbox');
 
@@ -116,7 +149,9 @@ class GmailService {
                     messageCount: threadData.messages.length,
                     lastHistoryId: threadData.historyId || existingThread.lastHistoryId,
                     isUnread: threadData.messages.some(m => m.labelIds?.includes('UNREAD')),
-                    folder // Ensure thread moves to correct folder if it changed (e.g. from sent to inbox)
+                    folder, // Ensure thread moves to correct folder if it changed (e.g. from sent to inbox)
+                    archived: hasInbox ? false : existingThread.archived, // Unarchive if it moves back to INBOX
+                    lastMessageIsOutbound: !!isLastMessageOutbound
                 });
                 dbThreadId = existingThread.id;
             } else {
@@ -130,7 +165,8 @@ class GmailService {
                     lastHistoryId: threadData.historyId,
                     isUnread: threadData.messages.some(m => m.labelIds?.includes('UNREAD')),
                     status: 'open',
-                    folder
+                    folder,
+                    lastMessageIsOutbound: !!isLastMessageOutbound
                 });
                 dbThreadId = newThread.id;
             }
@@ -141,11 +177,63 @@ class GmailService {
                 await this.upsertMessage(dbThreadId, msg);
             }
 
-            // Auto-linking to orders
-            await this.autoLinkThread(dbThreadId, subject, threadData.messages);
+            // AI Analysis is now triggered manually via the frontend
+            // aiService.analyzeThread(threadId)...
 
         } catch (error) {
             console.error(`[Gmail] Error syncing thread ${threadId}:`, error);
+        }
+    }
+
+    async markThreadAsRead(threadId: string) {
+        try {
+            // Find Gmail thread ID
+            const thread = await storage.getEmailThread(threadId) || await storage.getEmailThreadByThreadId(threadId);
+            if (!thread) {
+                console.error(`[Gmail] Thread ${threadId} not found in DB`);
+                return;
+            }
+
+            console.log(`[Gmail] Marking thread ${thread.threadId} as read...`);
+
+            await this.gmail.users.threads.modify({
+                userId: 'me',
+                id: thread.threadId,
+                requestBody: {
+                    removeLabelIds: ['UNREAD']
+                }
+            });
+
+            // Update local DB
+            await storage.updateEmailThread(thread.id, { isUnread: false });
+            console.log(`[Gmail] Thread ${thread.threadId} marked as read successfully.`);
+        } catch (error) {
+            console.error(`[Gmail] Error marking thread ${threadId} as read:`, error);
+        }
+    }
+
+    async trashThread(threadId: string) {
+        try {
+            // Find Gmail thread ID
+            const thread = await storage.getEmailThread(threadId) || await storage.getEmailThreadByThreadId(threadId);
+            if (!thread) {
+                console.error(`[Gmail] Thread ${threadId} not found in DB`);
+                return;
+            }
+
+            console.log(`[Gmail] Trashing thread ${thread.threadId}...`);
+
+            await this.gmail.users.threads.trash({
+                userId: 'me',
+                id: thread.threadId
+            });
+
+            // Update local DB
+            await storage.deleteEmailThread(thread.id);
+            console.log(`[Gmail] Thread ${thread.threadId} trashed successfully.`);
+        } catch (error) {
+            console.error(`[Gmail] Error trashing thread ${threadId}:`, error);
+            throw error;
         }
     }
 
@@ -153,19 +241,27 @@ class GmailService {
      * Uses history API to sync only what has changed since lastHistoryId.
      */
     async incrementalSync() {
-        const lastThread = await storage.getLatestEmailThreadWithHistoryId();
-        if (!lastThread || !lastThread.lastHistoryId) {
+        // Use system settings for stable sync state, so deleting a thread doesn't roll back the sync point
+        const lastHistoryId = await storage.getSystemSetting('gmail_last_history_id');
+
+        if (!lastHistoryId) {
+            console.log('[Gmail] No lastHistoryId found in settings, performing initial sync...');
             return this.initialSync();
         }
 
         try {
+            console.log(`[Gmail] Starting incremental sync from historyId: ${lastHistoryId}...`);
             const res = await this.gmail.users.history.list({
                 userId: 'me',
-                startHistoryId: lastThread.lastHistoryId
+                startHistoryId: lastHistoryId
             });
 
             if (!res.data.history) {
                 console.log('[Gmail] No new history events.');
+                // Update historyId anyway if provided
+                if (res.data.historyId) {
+                    await storage.setSystemSetting('gmail_last_history_id', res.data.historyId);
+                }
                 return;
             }
 
@@ -185,7 +281,12 @@ class GmailService {
                 await this.syncThread(tId);
             }
 
-            console.log(`[Gmail] Incremental sync completed: ${changedThreadIds.size} threads updated.`);
+            // Successfully processed, update the historyId
+            if (res.data.historyId) {
+                await storage.setSystemSetting('gmail_last_history_id', res.data.historyId);
+            }
+
+            console.log(`[Gmail] Incremental sync completed: ${changedThreadIds.size} threads updated. New historyId: ${res.data.historyId}`);
         } catch (error) {
             console.error('[Gmail] Incremental sync failed:', error);
             // Fallback to initial sync if history is expired
@@ -380,39 +481,10 @@ class GmailService {
 
             if (!res.data.data) return null;
 
-            // Get message to find attachment metadata
-            const msgRes = await this.gmail.users.messages.get({
-                userId: 'me',
-                id: messageId,
-                format: 'metadata',
-                metadataHeaders: []
-            });
-
-            // Find the attachment metadata
-            let mimeType = 'application/octet-stream';
-            let filename = 'attachment';
-
-            const findAttachment = (parts: any[]): void => {
-                for (const part of parts) {
-                    if (part.body?.attachmentId === attachmentId) {
-                        mimeType = part.mimeType || mimeType;
-                        filename = part.filename || filename;
-                        return;
-                    }
-                    if (part.parts) {
-                        findAttachment(part.parts);
-                    }
-                }
-            };
-
-            if (msgRes.data.payload?.parts) {
-                findAttachment(msgRes.data.payload.parts);
-            }
-
             return {
                 data: res.data.data,
-                mimeType,
-                filename
+                mimeType: 'application/octet-stream', // Default, route will overwrite from DB
+                filename: 'attachment' // Default, route will overwrite from DB
             };
         } catch (error) {
             console.error('[Gmail] Error fetching attachment:', error);

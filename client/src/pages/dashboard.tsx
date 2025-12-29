@@ -30,7 +30,7 @@ export default function Dashboard() {
         {/* Page Header */}
         <div className="flex items-center justify-between" data-testid="dashboard-header">
           <div>
-            <h2 className="text-4xl font-bold tracking-tight bg-gradient-primary bg-clip-text text-transparent">
+            <h2 className="text-4xl font-bold tracking-tight text-orange-500">
               Welkom terug, {userName}! 👋
             </h2>
             <p className="text-muted-foreground mt-1 text-lg">

@@ -180,6 +180,20 @@ export async function syncShopifyReturns(
                     continue;
                 }
 
+                // Handle DECLINED returns - move from "nieuw" to "klaar" (afgekeurd)
+                if (existing.status === 'nieuw' && shopifyStatus === 'DECLINED') {
+                    const now = new Date();
+                    await storage.updateReturn(existing.id, {
+                        status: 'klaar',
+                        completedAt: now,
+                        shopifyStatus: shopifyStatus,
+                        syncedAt: now,
+                    });
+                    updated++;
+                    console.log(`🔄 Updated ${existing.returnNumber}: nieuw → klaar (Shopify: DECLINED - afgekeurd)`);
+                    continue;
+                }
+
                 // Check for missing tracking number
                 if (!existing.trackingNumber) {
                     let trackingNumber = null;
@@ -214,7 +228,7 @@ export async function syncShopifyReturns(
                 }
 
                 // For all other cases, preserve local changes
-                console.log(`⏭️  Skipping ${existing.returnNumber} - local status "${existing.status}" preserved`);
+                console.log(`⏭️  Skipping ${existing.returnNumber} - local "${existing.status}", Shopify "${shopifyStatus}"`);
                 skipped++;
                 continue;
             }
