@@ -260,7 +260,7 @@ router.get('/:id/context', async (req, res) => {
 
 router.patch('/:id/flags', async (req, res) => {
     try {
-        const { starred, archived, isUnread } = req.body;
+        const { starred, archived, isUnread, actionDismissed } = req.body;
         const thread = await storage.getEmailThread(req.params.id);
         if (!thread) return res.status(404).json({ message: 'Thread not found' });
 
@@ -268,6 +268,7 @@ router.patch('/:id/flags', async (req, res) => {
         if (starred !== undefined) updates.starred = starred;
         if (archived !== undefined) updates.archived = archived;
         if (isUnread !== undefined) updates.isUnread = isUnread;
+        if (actionDismissed !== undefined) updates.actionDismissed = actionDismissed;
 
         const updated = await storage.updateEmailThread(thread.id, updates);
 

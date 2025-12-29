@@ -125,6 +125,7 @@ interface EmailThread {
     returnId?: string;
     repairId?: string;
     lastMessageIsOutbound?: boolean;
+    actionDismissed?: boolean;
 
     // AI Fields
     aiSummary?: string;
@@ -214,7 +215,10 @@ export default function MailPage() {
     const { data: threadsData, isLoading: isLoadingThreads } = useQuery<{ threads: EmailThread[], total: number }>({
         queryKey: ['mailThreads', activeTab, searchQuery],
         queryFn: async () => {
-            let url = `/api/mail/list?limit=50&folder=${activeTab === 'inbox' ? 'inbox' : activeTab === 'sent' ? 'sent' : ''}&archived=${activeTab === 'archived'}&starred=${activeTab === 'starred'}`;
+            let url = `/api/mail/list?limit=50&folder=${activeTab === 'inbox' ? 'inbox' : activeTab === 'sent' ? 'sent' : ''}`;
+            // Only filter for archived/starred when on those specific tabs
+            if (activeTab === 'archived') url += '&archived=true';
+            if (activeTab === 'starred') url += '&starred=true';
             if (activeTab === 'linked') url += '&hasOrder=true';
             if (activeTab === 'unlinked') url += '&hasOrder=false';
             if (activeTab === 'cases') url += '&hasCase=true';
@@ -321,6 +325,48 @@ export default function MailPage() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['mailThreads'] });
+        }
+    });
+
+    // Dismiss action required
+    const dismissActionMutation = useMutation({
+        mutationFn: async ({ threadId, dismissed }: { threadId: string, dismissed: boolean }) => {
+            const res = await fetch(`/api/mail/${threadId}/flags`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actionDismissed: dismissed })
+            });
+            if (!res.ok) throw new Error('Kon actie status niet aanpassen');
+            return res.json();
+        },
+        onMutate: async ({ threadId, dismissed }) => {
+            await queryClient.cancelQueries({ queryKey: ['mailThreads'] });
+            const previousThreads = queryClient.getQueryData(['mailThreads', activeTab, searchQuery]);
+
+            queryClient.setQueryData(['mailThreads', activeTab, searchQuery], (old: any) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    threads: old.threads.map((t: any) =>
+                        t.id === threadId ? { ...t, actionDismissed: dismissed } : t
+                    )
+                };
+            });
+
+            return { previousThreads };
+        },
+        onError: (err, newData, context: any) => {
+            if (context?.previousThreads) {
+                queryClient.setQueryData(['mailThreads', activeTab, searchQuery], context.previousThreads);
+            }
+            toast({ title: 'Fout', description: 'Kon actie status niet aanpassen', variant: 'destructive' });
+        },
+        onSuccess: (data, { dismissed }) => {
+            queryClient.invalidateQueries({ queryKey: ['mailThreads'] });
+            toast({
+                title: dismissed ? 'Actie afgevinkt' : 'Actie gemarkeerd',
+                description: dismissed ? 'Email is als afgehandeld gemarkeerd' : 'Email heeft weer actie nodig'
+            });
         }
     });
 
@@ -681,6 +727,10 @@ export default function MailPage() {
                                                     e.stopPropagation();
                                                     toggleStarMutation.mutate({ threadId: thread.id, starred: !thread.starred });
                                                 }}
+                                                onDismissAction={(e) => {
+                                                    e.stopPropagation();
+                                                    dismissActionMutation.mutate({ threadId: thread.id, dismissed: !thread.actionDismissed });
+                                                }}
                                             />
                                         </ContextMenuTrigger>
                                         <ContextMenuContent>
@@ -806,19 +856,9 @@ export default function MailPage() {
 
                                     {/* Messages List - Newest first */}
                                     <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
-                                        {[...threadDetails.messages].reverse().map((msg, idx, arr) => (
-                                            <MessageItem
-                                                key={msg.id}
-                                                message={msg}
-                                                isFirst={idx === arr.length - 1}
-                                                isLatest={idx === 0}
-                                                onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
-                                            />
-                                        ))}
-
-                                        {/* Reply Composer */}
+                                        {/* Reply Composer - At top so user can see last message */}
                                         {isReplying && (
-                                            <div id="reply-composer" className="mt-8 p-4 border rounded-lg bg-card shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                            <div id="reply-composer" className="mb-6 p-4 border rounded-lg bg-card shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
                                                 <div className="flex items-center justify-between mb-4 pb-2 border-b">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">
@@ -893,6 +933,17 @@ export default function MailPage() {
                                                 </div>
                                             </div>
                                         )}
+
+                                        {/* Messages - Show after composer */}
+                                        {[...threadDetails.messages].reverse().map((msg, idx, arr) => (
+                                            <MessageItem
+                                                key={msg.id}
+                                                message={msg}
+                                                isFirst={idx === arr.length - 1}
+                                                isLatest={idx === 0}
+                                                onPreview={(att, msgId) => setPreviewAttachment({ ...att, messageId: msgId })}
+                                            />
+                                        ))}
                                     </div>
 
 
@@ -1031,7 +1082,7 @@ export default function MailPage() {
                                 <ContextSection
                                     title={`📂 Cases (${contextData?.cases?.length || 0})`}
                                     isLinked={!!threadDetails.caseId}
-                                    onLink={() => toast({ title: "Case maken", description: "Case creatie venster..." })}
+                                    onLink={() => openWizardWithContext(threadDetails as any, 'case')}
                                 >
                                     {contextData?.cases && contextData.cases.length > 0 ? (
                                         <div className="space-y-3">
@@ -1100,7 +1151,7 @@ export default function MailPage() {
                                 <ContextSection
                                     title={`↩️ Retouren (${contextData?.returns?.length || 0})`}
                                     isLinked={false}
-                                    onLink={() => { }}
+                                    onLink={() => openWizardWithContext(threadDetails as any, 'return')}
                                 >
                                     {contextData?.returns && contextData.returns.length > 0 ? (
                                         <div className="space-y-3">
@@ -1173,7 +1224,7 @@ export default function MailPage() {
                                 <ContextSection
                                     title={`🛠️ Reparaties (${contextData?.repairs?.length || 0})`}
                                     isLinked={false}
-                                    onLink={() => { }}
+                                    onLink={() => openWizardWithContext(threadDetails as any, 'repair')}
                                 >
                                     {contextData?.repairs && contextData.repairs.length > 0 ? (
                                         <div className="space-y-3">
@@ -1427,6 +1478,7 @@ export default function MailPage() {
                 open={createRepairOpen}
                 onOpenChange={setCreateRepairOpen}
                 emailThreadId={contextThread?.id}
+                initialSearch={contextThread?.participants?.[0]?.email}
             />
 
             {/* Delete Confirmation Dialog */}
@@ -1841,7 +1893,7 @@ function FilterChip({ active, label, icon, onClick }: { active: boolean, label: 
     );
 }
 
-function ThreadCard({ thread, isSelected, onClick, onToggleStar }: { thread: EmailThread, isSelected: boolean, onClick: () => void, onToggleStar: (e: React.MouseEvent) => void }) {
+function ThreadCard({ thread, isSelected, onClick, onToggleStar, onDismissAction }: { thread: EmailThread, isSelected: boolean, onClick: () => void, onToggleStar: (e: React.MouseEvent) => void, onDismissAction: (e: React.MouseEvent) => void }) {
     const lastDate = new Date(thread.lastActivity);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1927,10 +1979,26 @@ function ThreadCard({ thread, isSelected, onClick, onToggleStar }: { thread: Ema
                                 Afwachten
                             </Badge>
                         )}
-                        {!thread.isUnread && !thread.lastMessageIsOutbound && (
-                            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] gap-1 bg-orange-100/80 text-orange-700 hover:bg-orange-100 border-orange-200 font-bold">
+                        {!thread.isUnread && !thread.lastMessageIsOutbound && !thread.actionDismissed && (
+                            <Badge
+                                variant="secondary"
+                                className="h-5 px-1.5 text-[10px] gap-1 bg-orange-100/80 text-orange-700 hover:bg-orange-200 border-orange-200 font-bold cursor-pointer transition-colors"
+                                onClick={onDismissAction}
+                                title="Klik om af te vinken"
+                            >
                                 <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
                                 Actie vereist
+                            </Badge>
+                        )}
+                        {!thread.isUnread && !thread.lastMessageIsOutbound && thread.actionDismissed && (
+                            <Badge
+                                variant="outline"
+                                className="h-5 px-1.5 text-[10px] gap-1 bg-muted/50 text-muted-foreground border-transparent font-medium cursor-pointer hover:bg-muted transition-colors"
+                                onClick={onDismissAction}
+                                title="Klik om opnieuw te markeren"
+                            >
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                                Afgehandeld
                             </Badge>
                         )}
 
@@ -2250,7 +2318,7 @@ function Reply({ className }: { className?: string }) {
     );
 }
 
-function CreateRepairWizardWrapper({ open, onOpenChange, emailThreadId }: { open: boolean, onOpenChange: (open: boolean) => void, emailThreadId?: string }) {
+function CreateRepairWizardWrapper({ open, onOpenChange, emailThreadId, initialSearch }: { open: boolean, onOpenChange: (open: boolean) => void, emailThreadId?: string, initialSearch?: string }) {
     const { data: users = [] } = useQuery<any[]>({
         queryKey: ['/api/users'],
         enabled: open
@@ -2263,6 +2331,7 @@ function CreateRepairWizardWrapper({ open, onOpenChange, emailThreadId }: { open
             users={users}
             emailThreadId={emailThreadId}
             repairType="customer"
+            initialSearch={initialSearch}
         />
     );
 }

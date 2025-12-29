@@ -113,6 +113,7 @@ export const emailThreads = pgTable("email_threads", {
   messageCount: integer("message_count").default(1),
   lastHistoryId: text("last_history_id"), // For incremental sync
   lastMessageIsOutbound: boolean("last_message_is_outbound").default(false), // To support Action Needed vs Waiting logic
+  actionDismissed: boolean("action_dismissed").default(false), // Allow dismissing "Action required" badge
 
   // AI related fields
   aiSummary: text("ai_summary"),

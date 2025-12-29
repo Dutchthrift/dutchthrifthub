@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -49,6 +49,7 @@ interface CreateRepairWizardProps {
     caseId?: string;
     emailThreadId?: string;
     repairType?: 'customer' | 'inventory';
+    initialSearch?: string;
 }
 
 interface SelectedItem {
@@ -77,7 +78,7 @@ const PRIORITY_OPTIONS = [
 const STEP_ICONS = [ShoppingBag, Package, CheckCircle];
 const STEP_LABELS = ["Order", "Details", "Bevestig"];
 
-export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThreadId, repairType = 'customer' }: CreateRepairWizardProps) {
+export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThreadId, repairType = 'customer', initialSearch }: CreateRepairWizardProps) {
     const [step, setStep] = useState(1);
     const [orderSearch, setOrderSearch] = useState("");
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -85,6 +86,13 @@ export function CreateRepairWizard({ open, onOpenChange, users, caseId, emailThr
     const [slaDeadline, setSlaDeadline] = useState<Date | null>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const { toast } = useToast();
+
+    // Auto-fill search when opened with initialSearch
+    useEffect(() => {
+        if (open && initialSearch) {
+            setOrderSearch(initialSearch);
+        }
+    }, [open, initialSearch]);
 
     const { data: customers = [] } = useQuery<Customer[]>({
         queryKey: ['/api/customers'],
