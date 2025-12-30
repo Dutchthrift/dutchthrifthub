@@ -54,7 +54,7 @@ const EXCLUSION_RULES: Record<string, string[]> = {
 // Keyword mapping for intent detection
 const INTENT_KEYWORDS: Record<string, string[]> = {
     'Technisch': ['defect', 'kapot', 'werkt niet', 'error', 'fout', 'probleem', 'stuk', 'broken', 'not working', 'issue', 'repair', 'reparatie', 'firmware', 'update', 'reset', 'instellingen', 'settings'],
-    'Producten': ['lens', 'body', 'camera', 'objectief', 'compatibel', 'compatible', 'past', 'fits', 'adapter', 'mount', 'sensor', 'megapixel', 'conditie', 'condition', 'staat', 'tweedehands', 'used', 'shutter count', 'clicks', 'voorraad', 'stock', 'prijs', 'price', 'beschikbaar', 'available'],
+    'Producten': ['lens', 'body', 'camera', 'objectief', 'compatibel', 'compatible', 'past', 'fits', 'adapter', 'mount', 'sensor', 'megapixel', 'conditie', 'condition', 'staat', 'tweedehands', 'used', 'shutter count', 'clicks', 'voorraad', 'stock', 'prijs', 'price', 'beschikbaar', 'available', 'batterij', 'battery', 'accu', 'oplader', 'charger', 'riem', 'strap', 'tas', 'bag', 'filter', 'statief', 'tripod', 'flitser', 'flash', 'geheugenkaart', 'memory card', 'sd card', 'accessoire', 'accessory', 'grip', 'hood', 'zonnekap', 'cap', 'dop', 'film', 'filmrol', 'kodak', 'colorplus', 'ultramax', 'fuji', 'ilford', 'extension tube', 'extention tube', 'bellows', 'balg', 'speedlight', 'speedlite', 'metz', 'angle finder', 'hoekzoeker', 'reverser', 'omkeerring', 'motor', 'winder', 'cameratas', '35mm', '120', '135'],
     'Retouren': ['retour', 'return', 'terugsturen', 'send back', 'ruilen', 'exchange', 'niet tevreden', 'unhappy', 'verkeerd', 'wrong', 'omruilen', 'terug'],
     'Garantie': ['garantie', 'warranty', 'defect', 'kapot', 'reparatie', 'repair', 'vervangen', 'replace', 'maanden', 'months', 'jaar', 'year'],
     'Verzending': ['verzending', 'shipping', 'levering', 'delivery', 'track', 'tracking', 'bezorging', 'pakket', 'package', 'onderweg', 'transit', 'postnl', 'dhl', 'ups', 'wanneer', 'when', 'arrive'],
@@ -307,9 +307,10 @@ ${hubContext.products && hubContext.products.length > 0
 4. Gebruik ALLEEN info uit de CONTEXT, HUB DATA en PRODUCTEN - verzin niets.
 5. Als de klant vraagt naar een product dat in de PRODUCTEN lijst staat, gebruik dan de prijs en voorraad info.
 6. Als een product NIET in de lijst staat, zeg dan dat je het op dit moment niet kunt vinden in de actuele voorraad en adviseer om de website in de gaten te houden. Wees voorzichtig met keihard 'nee' zeggen.
-7. Gebruik HTML <a> tags voor productlinks in de tekst (bijv. <a href="URL">Product Naam</a>). Gebruik GEEN markdown link syntax (zoals [text](url)). Vermijd rauwe URLs indien mogelijk, verwerk de link in de tekst (link in tekst).
-8. Als de klant Engels spreekt, antwoord in het Engels. NEVER use English if the customer language is Dutch.
-9. Formateer prijzen netjes met een € teken.
+7. VERPLICHT: Als je een product noemt, voeg ALTIJD een klikbare link toe met HTML <a> tags (bijv. <a href="https://dutchthrift.com/products/product-handle">Product Naam</a>). NOOIT een rauwe URL of markdown gebruiken.
+8. FORMATTING: Gebruik HTML <p> tags of <br><br> voor alinea's. Het antwoord mag NIET één groot blok tekst zijn. Maak het leesbaar met witruimte tussen secties (begroeting, inhoud, afsluiting).
+9. Als de klant Engels spreekt, antwoord in het Engels. NEVER use English if the customer language is Dutch.
+10. Formateer prijzen netjes met een € teken.
 
 === OUTPUT (JSON) ===
 {
@@ -606,8 +607,8 @@ BELANGRIJK: Jij BENT DutchThrift. Als een klant vraagt over garantie, reparatie,
 ${settings?.styleGuide || "Vriendelijk, nuchter, professioneel."}
 - Aanspreking: ${settings?.useHonorifics ? "u" : "je/jij"}
 - Emoji's: ${settings?.allowEmojis ? "Toegestaan" : "Nee"}
-${settings?.emailHeader ? `AANHEF: ${settings.emailHeader}` : ''}
-${settings?.emailFooter ? `AFSLUITING: ${settings.emailFooter}` : ''}
+${settings?.emailHeader ? `AANHEF: Gebruik exact: "${settings.emailHeader}"` : ''}
+${settings?.emailFooter ? `AFSLUITING: Gebruik ALLEEN: "${settings.emailFooter}" - voeg GEEN bedrijfsnaam of extra tekst toe na de groet!` : ''}
 ${settings?.prohibitedPhrases?.length ? `VERBODEN WOORDEN: ${settings.prohibitedPhrases.join(', ')}` : ''}
 
 === GEDETECTEERDE KLANTTAAL ===
@@ -631,7 +632,18 @@ ${(contextData as any)?.products && (contextData as any).products.length > 0
   Voorraad: ${p.variants[0]?.inventoryQuantity || 0} stuks
   Link: https://dutchthrift.com/products/${p.handle}
   ${p.metafields.length > 0 ? `Info: ${p.metafields.map((m: any) => `${m.key}: ${m.value}`).join(', ')}` : ''}`).join('\n')
-                    : 'Geen specifieke producten gevonden in de shop.'}`;
+                    : 'Geen specifieke producten gevonden in de shop.'}
+
+=== VERPLICHTE FORMATTING REGELS ===
+1. ALINEA'S: Gebruik <p> tags of <br><br> voor witruimte tussen alinea's. NOOIT één groot blok tekst!
+2. PRODUCTLINKS: Als je een product noemt, MOET je een klikbare link toevoegen: <a href="https://dutchthrift.com/products/HANDLE">Product Naam</a>
+3. STRUCTUUR: Begroeting → Inhoud → Afsluiting, elk gescheiden door witruimte.
+4. GEEN MARKDOWN: Gebruik alleen HTML formatting (<a>, <p>, <br>, <strong>, <em>).
+
+=== NUTTIGE LINKS ===
+- Accessoires collectie: https://dutchthrift.com/collections/photography-accessories
+- Film: https://dutchthrift.com/collections/film
+Als geen specifiek product gevonden, verwijs naar de relevante collectie met een <a> link.`;
 
             let userContent = text;
 
@@ -719,7 +731,25 @@ FORMAT:
 
             console.log(`[AI] Rewrite | Mode: ${mode} | Lang: ${customerLanguage} | Tokens: ${response.usage?.prompt_tokens}/${response.usage?.completion_tokens}`);
 
-            return response.choices[0].message.content;
+            let result = response.choices[0].message.content || "";
+
+            // Post-process: If AI didn't use HTML formatting, add paragraph breaks
+            if (!result.includes('<p>') && !result.includes('<br>')) {
+                // Split by double newlines first (paragraph breaks)
+                const paragraphs = result.split(/\n\n+/);
+                if (paragraphs.length > 1) {
+                    result = paragraphs.map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('\n');
+                } else {
+                    // Try splitting by single newlines if no double newlines
+                    const lines = result.split(/\n/);
+                    if (lines.length > 2) {
+                        // Likely greeting, content, closing - add breaks
+                        result = lines.join('<br><br>');
+                    }
+                }
+            }
+
+            return result;
         } catch (error) {
             console.error("[AI] Rewrite/Generate failed:", error);
             throw new Error("Kon tekst niet genereren/herschrijven");
