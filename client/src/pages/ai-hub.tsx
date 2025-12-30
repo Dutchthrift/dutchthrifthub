@@ -97,6 +97,9 @@ export default function AiHub() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/ai/knowledge"] });
             toast({ title: "Bijgewerkt", description: "Document bijgewerkt." });
+        },
+        onError: (error: any) => {
+            toast({ title: "Fout", description: "Kon wijzigingen niet opslaan: " + error.message, variant: "destructive" });
         }
     });
 
@@ -339,9 +342,10 @@ export default function AiHub() {
                                                     size="sm"
                                                     className="gap-2 bg-[#FF6600] hover:bg-[#E65C00]"
                                                     onClick={() => updateMutation.mutate({ id: selectedItem.id, updates: selectedItem })}
+                                                    disabled={updateMutation.isPending}
                                                 >
                                                     <Save className="h-4 w-4" />
-                                                    Opslaan
+                                                    {updateMutation.isPending ? "Opslaan..." : "Opslaan"}
                                                 </Button>
                                             </div>
                                         </div>
@@ -359,11 +363,16 @@ export default function AiHub() {
                                                                 <SelectValue placeholder="Kies categorie" />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="Voorwaarden">Voorwaarden</SelectItem>
-                                                                <SelectItem value="Logistiek">Logistiek</SelectItem>
-                                                                <SelectItem value="Reparaties">Reparaties</SelectItem>
-                                                                <SelectItem value="Garantie">Garantie</SelectItem>
-                                                                <SelectItem value="Algemeen">Algemeen</SelectItem>
+                                                                <SelectItem value="Producten">Producten & Compatibiliteit</SelectItem>
+                                                                <SelectItem value="Verzending">Verzending & Levering</SelectItem>
+                                                                <SelectItem value="Retourneren">Retouren & Terugsturen</SelectItem>
+                                                                <SelectItem value="Garantie">Garantie & Reparaties</SelectItem>
+                                                                <SelectItem value="Betalingen">Betaling & Facturatie</SelectItem>
+                                                                <SelectItem value="Technisch">Technische Support</SelectItem>
+                                                                <SelectItem value="Algemeen">Algemeen / Voorwaarden</SelectItem>
+                                                                <SelectItem value="Stijl">Stijl & Toon</SelectItem>
+                                                                <SelectItem value="FAQ">FAQ & Veelgestelde Vragen</SelectItem>
+                                                                <SelectItem value="Intern">Interne Kennis</SelectItem>
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
@@ -573,11 +582,16 @@ export default function AiHub() {
                                         <SelectValue placeholder="Kies categorie" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Voorwaarden">Voorwaarden</SelectItem>
-                                        <SelectItem value="Logistiek">Logistiek</SelectItem>
-                                        <SelectItem value="Reparaties">Reparaties</SelectItem>
-                                        <SelectItem value="Garantie">Garantie</SelectItem>
-                                        <SelectItem value="Algemeen">Algemeen</SelectItem>
+                                        <SelectItem value="Producten">Producten & Compatibiliteit</SelectItem>
+                                        <SelectItem value="Verzending">Verzending & Levering</SelectItem>
+                                        <SelectItem value="Retourneren">Retouren & Terugsturen</SelectItem>
+                                        <SelectItem value="Garantie">Garantie & Reparaties</SelectItem>
+                                        <SelectItem value="Betalingen">Betaling & Facturatie</SelectItem>
+                                        <SelectItem value="Technisch">Technische Support</SelectItem>
+                                        <SelectItem value="Algemeen">Algemeen / Voorwaarden</SelectItem>
+                                        <SelectItem value="Stijl">Stijl & Toon</SelectItem>
+                                        <SelectItem value="FAQ">FAQ & Veelgestelde Vragen</SelectItem>
+                                        <SelectItem value="Intern">Interne Kennis</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

@@ -51,9 +51,16 @@ router.post('/knowledge', async (req, res) => {
 // Update knowledge item
 router.patch('/knowledge/:id', async (req, res) => {
     try {
-        const item = await storage.updateAiKnowledge(req.params.id, req.body);
+        // Use partial schema to validate updates and strip out non-updatable fields (id, etc)
+        const parsed = insertAiKnowledgeSchema.partial().safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({ message: 'Ongeldige gegevens', errors: parsed.error.errors });
+        }
+
+        const item = await storage.updateAiKnowledge(req.params.id, parsed.data);
         res.json(item);
     } catch (error: any) {
+        console.error('[AI Knowledge] Update error:', error);
         res.status(500).json({ message: error.message });
     }
 });
