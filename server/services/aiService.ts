@@ -54,13 +54,15 @@ const EXCLUSION_RULES: Record<string, string[]> = {
 // Keyword mapping for intent detection
 const INTENT_KEYWORDS: Record<string, string[]> = {
     'Technisch': ['defect', 'kapot', 'werkt niet', 'error', 'fout', 'probleem', 'stuk', 'broken', 'not working', 'issue', 'repair', 'reparatie', 'firmware', 'update', 'reset', 'instellingen', 'settings'],
-    'Producten': ['lens', 'body', 'camera', 'objectief', 'compatibel', 'compatible', 'past', 'fits', 'adapter', 'mount', 'sensor', 'megapixel', 'conditie', 'condition', 'staat', 'tweedehands', 'used'],
+    'Producten': ['lens', 'body', 'camera', 'objectief', 'compatibel', 'compatible', 'past', 'fits', 'adapter', 'mount', 'sensor', 'megapixel', 'conditie', 'condition', 'staat', 'tweedehands', 'used', 'shutter count', 'clicks', 'voorraad', 'stock', 'prijs', 'price', 'beschikbaar', 'available'],
     'Retouren': ['retour', 'return', 'terugsturen', 'send back', 'ruilen', 'exchange', 'niet tevreden', 'unhappy', 'verkeerd', 'wrong', 'omruilen', 'terug'],
     'Garantie': ['garantie', 'warranty', 'defect', 'kapot', 'reparatie', 'repair', 'vervangen', 'replace', 'maanden', 'months', 'jaar', 'year'],
     'Verzending': ['verzending', 'shipping', 'levering', 'delivery', 'track', 'tracking', 'bezorging', 'pakket', 'package', 'onderweg', 'transit', 'postnl', 'dhl', 'ups', 'wanneer', 'when', 'arrive'],
     'Betaling': ['betaling', 'payment', 'factuur', 'invoice', 'terugbetaling', 'refund', 'geld', 'money', 'euro', 'prijs', 'price', 'korting', 'discount', 'btw', 'vat'],
     'FAQ': ['vraag', 'question', 'hoe', 'how', 'wat', 'what', 'waarom', 'why', 'wanneer', 'when', 'info', 'informatie'],
 };
+
+import { shopifyClient, type ShopifyProduct } from './shopifyClient';
 
 interface AILogEntry {
     threadId: string;
@@ -197,7 +199,7 @@ ${settings?.prohibitedPhrases?.length ? `VERBODEN: ${settings.prohibitedPhrases.
             contextParts.push(`[${doc.category}] ${doc.title}:\n${truncated}`);
         }
 
-        const categoriesUsed = [...new Set([...ALWAYS_ON_CATEGORIES, ...selectedCategories])];
+        const categoriesUsed = Array.from(new Set([...ALWAYS_ON_CATEGORIES, ...selectedCategories]));
 
         return {
             layer: contextParts.length > 0
@@ -268,8 +270,8 @@ ${summaryNote}${formattedMessages}
             await this.ensureSettings();
             const settings = await db.query.aiSettings.findFirst();
 
-            // 3. Get Hub Context (Order, Repair, Customer)
-            const hubContext = await this.getHubContext(thread);
+            // 3. Get Hub Context (Order, Repair, Customer, Products)
+            const hubContext = await this.getHubContext(thread, threadMessages);
 
             // 4. Build 3-Layer Prompt
             const layer1 = await this.buildLayer1Global(settings);
@@ -289,12 +291,25 @@ ${JSON.stringify(hubContext.history, null, 2)}
 Gekoppelde Order: ${hubContext.currentOrderId || 'Geen'}
 Gekoppelde Case: ${hubContext.currentCaseId || 'Geen'}
 
+=== PRODUCTEN UIT SHOP (GEZOCHT OP BASIS VAN VRAAG) ===
+${hubContext.products && hubContext.products.length > 0
+                    ? hubContext.products.map((p: any) => `- ${p.title} (${p.productType}):
+  Prijs: €${p.variants[0]?.price || 'N/A'}
+  Voorraad: ${p.variants[0]?.inventoryQuantity || 0} stuks
+  Link: https://dutchthrift.com/products/${p.handle}
+  ${p.metafields.length > 0 ? `Info: ${p.metafields.map((m: any) => `${m.key}: ${m.value}`).join(', ')}` : ''}`).join('\n')
+                    : 'Geen specifieke producten gevonden in de shop.'}
+
 === INSTRUCTIES ===
 1. Analyseer de conversatie en geef een samenvatting.
 2. Detecteer het sentiment en de intent van de klant.
 3. Genereer een perfect antwoord in de STIJL van Laag 1.
-4. Gebruik ALLEEN info uit de CONTEXT en HUB DATA - verzin niets.
-5. Als de klant Engels spreekt, antwoord in het Engels.
+4. Gebruik ALLEEN info uit de CONTEXT, HUB DATA en PRODUCTEN - verzin niets.
+5. Als de klant vraagt naar een product dat in de PRODUCTEN lijst staat, gebruik dan de prijs en voorraad info.
+6. Als een product NIET in de lijst staat, zeg dan dat je het op dit moment niet kunt vinden in de actuele voorraad en adviseer om de website in de gaten te houden. Wees voorzichtig met keihard 'nee' zeggen.
+7. Gebruik HTML <a> tags voor productlinks in de tekst (bijv. <a href="URL">Product Naam</a>). Gebruik GEEN markdown link syntax (zoals [text](url)). Vermijd rauwe URLs indien mogelijk, verwerk de link in de tekst (link in tekst).
+8. Als de klant Engels spreekt, antwoord in het Engels. NEVER use English if the customer language is Dutch.
+9. Formateer prijzen netjes met een € teken.
 
 === OUTPUT (JSON) ===
 {
@@ -357,12 +372,35 @@ Gekoppelde Case: ${hubContext.currentCaseId || 'Geen'}
         }
     }
 
-    private async getHubContext(thread: any) {
+    private async getHubContext(thread: any, messages: EmailMessage[] = []) {
         const customerEmail = thread.customerEmail;
         const customerId = thread.customerId;
 
+        // Intent detection for dynamic context gathering
+        const lastInbound = messages.filter(m => !m.isOutbound).pop();
+        const messageText = lastInbound?.bodyText || lastInbound?.snippet || "";
+        const intents = this.detectIntent(messageText);
+
+        let foundProducts: ShopifyProduct[] = [];
+        if (intents.includes('Producten')) {
+            // Extract a clean search term using AI to avoid noise (greetings, questions)
+            const searchContext = messageText.length < 500 ? messageText : messageText.substring(0, 500);
+            const extractedTerm = await this.extractProductSearchTerm(searchContext);
+
+            if (extractedTerm && extractedTerm.trim().length > 2) {
+                console.log(`[AI] Checking Shopify for: "${extractedTerm}"`);
+                foundProducts = await shopifyClient.searchProducts(extractedTerm);
+                console.log(`[AI] Shopify Search for "${extractedTerm}" returned ${foundProducts.length} items`);
+            } else {
+                console.log(`[AI] Skipping Shopify search, extracted term empty or too short: "${extractedTerm}"`);
+            }
+        }
+
         if (!customerEmail && !customerId) {
-            return { history: "Geen klantgegevens gevonden." };
+            return {
+                history: "Geen klantgegevens gevonden.",
+                products: foundProducts
+            };
         }
 
         const getWhere = (table: any) => {
@@ -389,7 +427,8 @@ Gekoppelde Case: ${hubContext.currentCaseId || 'Geen'}
             currentOrderId: thread.orderId,
             currentCaseId: thread.caseId,
             customerEmail,
-            customerId
+            customerId,
+            products: foundProducts
         };
     }
 
@@ -424,6 +463,35 @@ ${knowledgeBase.map(k => `[${k.category}] ${k.title}\n${k.content}`).join('\n\n'
         } catch (e) {
             console.error("[AI] Knowledge search failed:", e);
             return "Er is een fout opgetreden bij het doorzoeken van de kennisbank.";
+        }
+    }
+
+    /**
+     * Extracts a clean product search term from a message using AI.
+     */
+    private async extractProductSearchTerm(text: string): Promise<string> {
+        try {
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    {
+                        role: "system",
+                        content: "Extract ONLY the specific brand and model number (e.g. 'Sony W30', 'Canon 5D', 'Nikon D850'). Keep it extremely concise. Remove common words like 'camera', 'lens', 'the', 'is', 'a'. Return ONLY the core search term as a single string. If nothing found, return empty."
+                    },
+                    { role: "user", content: text }
+                ],
+                max_tokens: 30,
+                temperature: 0
+            });
+
+            let term = response.choices[0].message.content?.trim() || "";
+            // Sanitize: remove punctuation and quotes
+            term = term.replace(/['"]+/g, '').replace(/[.!?]/g, "");
+            console.log(`[AI] Core product term extracted: "${term}" from text context.`);
+            return term;
+        } catch (e) {
+            console.error("[AI] Term extraction failed:", e);
+            return "";
         }
     }
 
@@ -497,13 +565,13 @@ ${knowledgeBase.map(k => `[${k.category}] ${k.title}\n${k.content}`).join('\n\n'
                         const isEnglish = englishWords.some(w => msgLower.includes(w));
 
                         // Check for Dutch (to avoid false English detection)
-                        const dutchWords = ['hallo', 'bedankt', 'dank je', 'graag', 'kunt u', 'zou ik', 'mijn camera', 'mijn lens', 'kapot', 'werkt niet', 'verzending', 'bestelling', 'retour', 'garantie', 'groeten', 'mvg'];
+                        const dutchWords = ['hallo', 'hoi', 'bedankt', 'dank je', 'graag', 'kunt u', 'zou ik', 'mijn camera', 'mijn lens', 'kapot', 'werkt niet', 'verzending', 'bestelling', 'retour', 'garantie', 'groeten', 'mvg', 'vraag', 'hebben', 'jullie', 'de', 'het', 'een', 'is', 'wat', 'kan', 'zijn', 'voor'];
                         const isDutch = dutchWords.some(w => msgLower.includes(w));
 
                         // Priority: Spanish > French > German > English > Dutch (default)
                         if (isSpanish && !isDutch) {
                             customerLanguage = "Spaans";
-                        } else if (isFrench) {
+                        } else if (isFrench && !isDutch) {
                             customerLanguage = "Frans";
                         } else if (isGerman && !isDutch) {
                             customerLanguage = "Duits";
@@ -512,7 +580,7 @@ ${knowledgeBase.map(k => `[${k.category}] ${k.title}\n${k.content}`).join('\n\n'
                         }
                         // Default remains "Nederlands"
 
-                        contextData = await this.getHubContext(thread);
+                        contextData = await this.getHubContext(thread, threadMessages);
 
                         // Fetch relevant knowledge base documents
                         const { layer: knowledgeLayer, categoriesUsed } = await this.buildLayer2Context(threadMessages);
@@ -545,6 +613,7 @@ ${settings?.prohibitedPhrases?.length ? `VERBODEN WOORDEN: ${settings.prohibited
 === GEDETECTEERDE KLANTTAAL ===
 De klant schrijft in: **${customerLanguage}**
 BELANGRIJK: Antwoord ALTIJD in ${customerLanguage}! Dit is de taal die de klant gebruikt.
+${customerLanguage === 'Nederlands' ? 'GEBRUIK NOOIT ENGELS ALS DE KLANTTAAL NEDERLANDS IS.' : ''}
 
 === CONVERSATIE CONTEXT ===
 ${allRecentMessages.length > 0 ? allRecentMessages.join('\n\n') : 'Geen eerdere berichten.'}
@@ -553,7 +622,16 @@ ${allRecentMessages.length > 0 ? allRecentMessages.join('\n\n') : 'Geen eerdere 
 ${contextData?.history ? JSON.stringify(contextData.history, null, 2) : 'Geen klantdata gevonden.'}
 
 === KENNISBANK (DUTCHTHRIFT BELEID & PROCEDURES) ===
-${(contextData as any)?.knowledgeLayer || 'Geen specifieke documentatie gevonden. Antwoord op basis van algemene DutchThrift kennis.'}`;
+${(contextData as any)?.knowledgeLayer || 'Geen specifieke documentatie gevonden. Antwoord op basis van algemene DutchThrift kennis.'}
+
+=== PRODUCTEN UIT SHOP (GEZOCHT OP BASIS VAN VRAAG) ===
+${(contextData as any)?.products && (contextData as any).products.length > 0
+                    ? (contextData as any).products.map((p: any) => `- ${p.title} (${p.productType}):
+  Prijs: €${p.variants[0]?.price || 'N/A'}
+  Voorraad: ${p.variants[0]?.inventoryQuantity || 0} stuks
+  Link: https://dutchthrift.com/products/${p.handle}
+  ${p.metafields.length > 0 ? `Info: ${p.metafields.map((m: any) => `${m.key}: ${m.value}`).join(', ')}` : ''}`).join('\n')
+                    : 'Geen specifieke producten gevonden in de shop.'}`;
 
             let userContent = text;
 

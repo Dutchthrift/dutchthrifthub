@@ -23,6 +23,26 @@ export interface ShopifyOrder {
   }>;
 }
 
+export interface ShopifyProduct {
+  id: string;
+  title: string;
+  handle: string;
+  description?: string;
+  productType: string;
+  status: string;
+  variants: Array<{
+    id: string;
+    title: string;
+    sku: string;
+    price: string;
+    inventoryQuantity: number;
+  }>;
+  metafields: Array<{
+    key: string;
+    value: string;
+  }>;
+}
+
 class ShopifyClient {
   private accessToken: string;
   private shopDomain: string;
@@ -420,6 +440,95 @@ class ShopifyClient {
       returns,
       pageInfo: data.orders.pageInfo
     };
+  }
+
+  async searchProducts(query: string, first: number = 5) {
+    console.log(`🔍 Searching Shopify products with query: "${query}"`);
+
+    const gqlQuery = `
+      query searchProducts($first: Int!, $query: String) {
+        products(first: $first, query: $query) {
+          edges {
+            node {
+              id
+              title
+              handle
+              productType
+              status
+              variants(first: 3) {
+                edges {
+                  node {
+                    id
+                    title
+                    sku
+                    price
+                    inventoryQuantity
+                  }
+                }
+              }
+              metafields(first: 10) {
+                edges {
+                  node {
+                    key
+                    value
+                    namespace
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const cleanQuery = query.replace(/[|&;$%@"<>()+,]/g, "").trim();
+    const words = cleanQuery.split(/\s+/).filter(w => w.length > 1);
+
+    // Build a more flexible query: search for each word with a trailing wildcard
+    // This handles cases like "W30" matching "W30-1"
+    let gqlSearchQuery = "";
+    if (words.length > 0) {
+      gqlSearchQuery = words.map(w => `title:${w}*`).join(' AND ');
+    } else {
+      gqlSearchQuery = `${cleanQuery}*`;
+    }
+
+    const variables = {
+      first,
+      query: gqlSearchQuery
+    };
+
+    try {
+      const data = await this.makeGraphQLRequest(gqlQuery, variables);
+
+      const products: ShopifyProduct[] = data.products.edges.map((edge: any) => {
+        const node = edge.node;
+        return {
+          id: node.id,
+          title: node.title,
+          handle: node.handle,
+          productType: node.productType,
+          status: node.status,
+          variants: node.variants.edges.map((vEdge: any) => ({
+            id: vEdge.node.id,
+            title: vEdge.node.title,
+            sku: vEdge.node.sku,
+            price: vEdge.node.price,
+            inventoryQuantity: vEdge.node.inventoryQuantity
+          })),
+          metafields: node.metafields?.edges.map((mEdge: any) => ({
+            key: mEdge.node.key,
+            value: mEdge.node.value
+          })) || []
+        };
+      });
+
+      console.log(`✅ Found ${products.length} products for query "${query}"`);
+      return products;
+    } catch (error) {
+      console.error(`❌ Error searching products:`, error);
+      return [];
+    }
   }
 
   async getReturnsSinceDate(sinceDate: Date, onProgress?: (processed: number) => void) {

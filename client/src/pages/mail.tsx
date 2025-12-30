@@ -83,6 +83,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { CaseDetailModal } from '@/components/cases/case-detail-modal';
 import { ReturnDetailModalContent } from '@/components/returns/return-detail-modal-content';
 import { RepairDetailModal } from '@/components/repairs/repair-detail-modal';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import {
     Dialog,
     DialogContent,
@@ -258,7 +259,7 @@ export default function MailPage() {
             if (!res.ok) throw new Error('Kon thread niet laden');
             return res.json();
         },
-        enabled: !!selectedThreadId
+        enabled: !!selectedThreadId && selectedThreadId !== 'new'
     });
 
     // Fetch related context (orders, cases, returns) based on sender email
@@ -276,7 +277,7 @@ export default function MailPage() {
             if (!res.ok) throw new Error('Kon context niet laden');
             return res.json();
         },
-        enabled: !!selectedThreadId
+        enabled: !!selectedThreadId && selectedThreadId !== 'new'
     });
 
     // Fetch order details for modal
@@ -633,7 +634,7 @@ export default function MailPage() {
                                     <Button
                                         size="sm"
                                         className="bg-orange-500 hover:bg-orange-600 gap-1 md:gap-2 h-8 text-xs md:text-sm"
-                                        onClick={() => setIsComposing(true)}
+                                        onClick={() => setSelectedThreadId('new')}
                                     >
                                         <Plus className="h-4 w-4" />
                                         <span className="hidden sm:inline">Nieuw bericht</span>
@@ -783,6 +784,62 @@ export default function MailPage() {
                                     <Mail className="h-12 w-12 mb-4 opacity-10" />
                                     <p>Selecteer een bericht om te lezen</p>
                                 </div>
+                            ) : selectedThreadId === 'new' ? (
+                                <div className="flex-1 flex flex-col bg-background">
+                                    <div className="p-6 border-b flex items-center justify-between">
+                                        <h2 className="text-xl font-semibold">Nieuw bericht</h2>
+                                        <Button variant="ghost" size="icon" onClick={() => setSelectedThreadId(null)}>
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                                        <div className="flex items-center gap-4 border-b pb-2">
+                                            <span className="text-sm font-medium text-muted-foreground w-20">Aan:</span>
+                                            <Input
+                                                className="border-none shadow-none focus-visible:ring-0 text-sm p-0 h-auto"
+                                                placeholder="ontvanger@example.com"
+                                                value={composeData.to}
+                                                onChange={(e) => setComposeData(prev => ({ ...prev, to: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-4 border-b pb-2">
+                                            <span className="text-sm font-medium text-muted-foreground w-20">Onderwerp:</span>
+                                            <Input
+                                                className="border-none shadow-none focus-visible:ring-0 text-sm p-0 h-auto"
+                                                placeholder="Onderwerp van je bericht"
+                                                value={composeData.subject}
+                                                onChange={(e) => setComposeData(prev => ({ ...prev, subject: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="pt-4 min-h-[400px]">
+                                            <RichTextEditor
+                                                content={composeData.body}
+                                                onChange={(html) => setComposeData(prev => ({ ...prev, body: html }))}
+                                                placeholder="Typ hier je bericht..."
+                                                className="border-none focus:ring-0 px-0"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="p-4 border-t flex justify-end gap-3 bg-muted/5">
+                                        <Button variant="ghost" onClick={() => setSelectedThreadId(null)}>
+                                            Annuleren
+                                        </Button>
+                                        <Button
+                                            className="bg-orange-600 hover:bg-orange-700 gap-2 px-6"
+                                            disabled={!composeData.to || !composeData.subject || !composeData.body || composeMutation.isPending}
+                                            onClick={() => {
+                                                composeMutation.mutate(composeData);
+                                            }}
+                                        >
+                                            {composeMutation.isPending ? (
+                                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Send className="h-4 w-4" />
+                                            )}
+                                            Verzenden
+                                        </Button>
+                                    </div>
+                                </div>
                             ) : isLoadingDetails ? (
                                 <div className="flex-1 p-8 space-y-8">
                                     <Skeleton className="h-10 w-2/3" />
@@ -876,13 +933,14 @@ export default function MailPage() {
                                                     </Button>
                                                 </div>
 
-                                                <Textarea
-                                                    placeholder="Schrijf je antwoord hier..."
-                                                    className="min-h-[200px] mb-4 border-none focus-visible:ring-0 resize-none p-0"
-                                                    value={replyText}
-                                                    onChange={(e) => setReplyText(e.target.value)}
-                                                    autoFocus
-                                                />
+                                                <div className="mb-4 border-none min-h-[250px]">
+                                                    <RichTextEditor
+                                                        content={replyText}
+                                                        onChange={setReplyText}
+                                                        placeholder="Schrijf je antwoord hier..."
+                                                        className="border-none focus:ring-0 px-0"
+                                                    />
+                                                </div>
 
                                                 <div className="flex items-center justify-between pt-2 border-t">
                                                     <div className="flex items-center gap-2">
@@ -917,7 +975,7 @@ export default function MailPage() {
                                                                     threadId: threadDetails.id,
                                                                     to: latestMsg.fromEmail,
                                                                     subject: threadDetails.subject.startsWith('Re:') ? threadDetails.subject : `Re: ${threadDetails.subject}`,
-                                                                    body: replyText.replace(/\n/g, '<br/>'),
+                                                                    body: replyText, // RichText already handles HTML
                                                                     inReplyTo: latestMsg.messageId
                                                                 });
                                                             }}
@@ -1306,6 +1364,63 @@ export default function MailPage() {
                                 <Skeleton className="h-32 w-full" />
                                 <Skeleton className="h-32 w-full" />
                             </div>
+                        ) : selectedThreadId === 'new' ? (
+                            <div className="flex flex-col h-full bg-background overflow-hidden">
+                                <DrawerHeader className="border-b py-3 px-4">
+                                    <div className="flex items-center justify-between">
+                                        <DrawerTitle className="text-base font-semibold">Nieuw bericht</DrawerTitle>
+                                        <DrawerClose asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </DrawerClose>
+                                    </div>
+                                </DrawerHeader>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Aan</label>
+                                        <Input
+                                            className="text-sm h-9"
+                                            placeholder="ontvanger@example.com"
+                                            value={composeData.to}
+                                            onChange={(e) => setComposeData(prev => ({ ...prev, to: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Onderwerp</label>
+                                        <Input
+                                            className="text-sm h-9"
+                                            placeholder="Onderwerp van je bericht"
+                                            value={composeData.subject}
+                                            onChange={(e) => setComposeData(prev => ({ ...prev, subject: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="pt-2 min-h-[300px]">
+                                        <RichTextEditor
+                                            content={composeData.body}
+                                            onChange={(html) => setComposeData(prev => ({ ...prev, body: html }))}
+                                            placeholder="Typ hier je bericht..."
+                                            className="border rounded-md px-3 py-2 min-h-[250px]"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="p-4 border-t flex flex-col gap-2">
+                                    <Button
+                                        className="w-full bg-orange-600 hover:bg-orange-700 gap-2 h-11"
+                                        disabled={!composeData.to || !composeData.subject || !composeData.body || composeMutation.isPending}
+                                        onClick={() => {
+                                            composeMutation.mutate(composeData);
+                                        }}
+                                    >
+                                        {composeMutation.isPending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Send className="h-4 w-4" />
+                                        )}
+                                        Verzenden
+                                    </Button>
+                                </div>
+                            </div>
                         ) : threadDetails ? (
                             <div className="flex flex-col h-full overflow-hidden">
                                 {/* Mobile Header */}
@@ -1389,13 +1504,14 @@ export default function MailPage() {
                                                     <X className="h-3.5 w-3.5" />
                                                 </Button>
                                             </div>
-                                            <Textarea
-                                                placeholder="Schrijf je antwoord..."
-                                                className="min-h-[120px] mb-3 text-sm"
-                                                value={replyText}
-                                                onChange={(e) => setReplyText(e.target.value)}
-                                                autoFocus
-                                            />
+                                            <div className="min-h-[150px] mb-3">
+                                                <RichTextEditor
+                                                    content={replyText}
+                                                    onChange={setReplyText}
+                                                    placeholder="Schrijf je antwoord..."
+                                                    className="border rounded-md p-2 text-sm min-h-[120px]"
+                                                />
+                                            </div>
                                             <div className="flex items-center justify-between gap-2">
                                                 <Button
                                                     size="sm"
@@ -1421,7 +1537,7 @@ export default function MailPage() {
                                                             threadId: threadDetails.id,
                                                             to: latestMsg.fromEmail,
                                                             subject: threadDetails.subject.startsWith('Re:') ? threadDetails.subject : `Re: ${threadDetails.subject}`,
-                                                            body: replyText.replace(/\n/g, '<br/>'),
+                                                            body: replyText,
                                                             inReplyTo: latestMsg.messageId
                                                         });
                                                     }}
@@ -1602,66 +1718,6 @@ export default function MailPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Compose Email Modal */}
-            <Dialog open={isComposing} onOpenChange={setIsComposing}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Nieuw bericht opstellen</DialogTitle>
-                    </DialogHeader>
-
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Aan</label>
-                            <Input
-                                placeholder="ontvanger@example.com"
-                                value={composeData.to}
-                                onChange={(e) => setComposeData(prev => ({ ...prev, to: e.target.value }))}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Onderwerp</label>
-                            <Input
-                                placeholder="Onderwerp van je bericht"
-                                value={composeData.subject}
-                                onChange={(e) => setComposeData(prev => ({ ...prev, subject: e.target.value }))}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Bericht</label>
-                            <Textarea
-                                placeholder="Typ hier je bericht..."
-                                className="min-h-[300px]"
-                                value={composeData.body}
-                                onChange={(e) => setComposeData(prev => ({ ...prev, body: e.target.value }))}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3">
-                        <Button variant="ghost" onClick={() => setIsComposing(false)}>
-                            Annuleren
-                        </Button>
-                        <Button
-                            className="bg-orange-600 hover:bg-orange-700 gap-2"
-                            disabled={!composeData.to || !composeData.subject || !composeData.body || composeMutation.isPending}
-                            onClick={() => {
-                                composeMutation.mutate({
-                                    to: composeData.to,
-                                    subject: composeData.subject,
-                                    body: composeData.body.replace(/\n/g, '<br/>')
-                                });
-                            }}
-                        >
-                            {composeMutation.isPending ? (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Send className="h-4 w-4" />
-                            )}
-                            Verzenden
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog >
 
             <AttachmentPreviewModal
                 attachment={previewAttachment}
